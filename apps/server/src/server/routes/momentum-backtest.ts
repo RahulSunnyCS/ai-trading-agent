@@ -590,6 +590,10 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   fastify.post('/api/momentum/holdings/sync', async (_request, reply) => {
     await forward(reply, '/api/holdings/sync', { method: 'POST' });
   });
+  // BL-142 Phase 4: This week's Lots panel — the lot ledger, read-only (no Kite read, no booking).
+  fastify.get('/api/momentum/lots', async (_request, reply) => {
+    await forward(reply, '/api/lots');
+  });
 
   // BL-142: the Kite connection (read-only). Login returns Kite's login URL as JSON; the login
   // itself comes back to the Momentum API on the laptop, never through this proxy.

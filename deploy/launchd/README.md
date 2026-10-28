@@ -24,6 +24,7 @@ not in plists. See [`apps/scheduler/CLAUDE.md`](../../apps/scheduler/CLAUDE.md).
 | `momentum-stock-ingest` | Fri 19:30 | `mbt stocks sync`, then the stock/Custom Index/Broad final (needs the GUI session) |
 | `momentum-journal-check` | Fri 21:00 | `mbt journal check --send` |
 | `momentum-live-rules` | Fri 21:30 | `mbt live-rules check --send` |
+| `momentum-history` | Fri 22:00 | `mbt verify history --send` (BL-001 Phase 4): names any stored history up to the anchor Friday that changed; a change is its own Telegram and exits 0 once delivered |
 
 Failures and missed runs reach Telegram immediately; successes only appear in the morning
 summary.

@@ -86,8 +86,8 @@ a Fyers access token (see the precedence order in root `technical.md`'s Environm
 Variables table) — that connection is unrelated and still live.
 
 The weekly job (`mbt weekly`) itself runs from the repo's scheduler (`apps/scheduler`,
-BL-012 — Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 20:30 forward-journal
-score, 21:00 forward-journal check IST), replacing first the retired `.github/workflows/momentum-weekly.yml`
+BL-012 — Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 20:30
+forward-journal score, 21:00 forward-journal check, 21:30 live rules and 22:00 restated-history check IST, among others), replacing first the retired `.github/workflows/momentum-weekly.yml`
 and then the per-job launchd plists. The scheduler passes the repo root `.env` to each run
 and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status` reads. The CLI's `weekly()` command is a thin wrapper around
 `api._execute_weekly_run` (the same function the API route calls) — there is exactly one
@@ -567,8 +567,15 @@ contract, not a shared service).
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
   group path of `_compute_orders` (the group's per-sleeve signals ride in `signal["_sleeves"]`,
-  never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. Tests:
-  `tests/test_lots.py`, `tests/test_lot_orders.py`.
+  never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. `api.lots_view`
+  (`GET /api/lots`, Phase 4) is This week's Lots panel: `lots_status`'s answer (both go through
+  `_lots_status_from`; the view reads everything once) plus each lot's value at the last stored
+  close (`db_read.latest_symbol_closes_from_db_or_none`, never a quote), its calendar
+  (`_rebalance_info`, `_last_rebalance` from the paper start), the last orders made on their own
+  Friday per lot (`holdings_store.latest_orders(on_friday=True)`: a midweek run by hand never moves
+  the pending lot, so it is not shown) and the pending plan beside Kite minus the lots, a planned
+  name with no difference included at 0; read-only, and unavailable until a lot is recorded.
+  Tests: `tests/test_lots.py`, `tests/test_lot_orders.py`.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
   `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the
@@ -609,7 +616,7 @@ contract, not a shared service).
   detector freeze from the owner's gallery labels) is committed. `quality.py` grades each base
   0-1 from its own geometry (addendum 1); the blend shapes use state score x quality. `tests/test_patterns.py` pins the
   no-look-ahead property (detections up to a cut are identical with and without later bars).
-- `audit/` — `mbt audit bundle|replay|study|outside|lookahead|lookahead-requests` (BL-010 Phase 2). `request_lookahead.py` is the whole-request cut-off test (saved favourites through the real API; uses `truncate.py`; compares kpis, series, trades, rotations, yearly, open positions and the companion at 1e-9, ignoring price levels). `verify.py` (`mbt verify history`, BL-001 Phase 4) is the restated-history detector: per-instrument-per-year row counts and hashes up to an anchor Friday, baseline in the state dir, nothing accepted without `--accept --reason`. `bundle.py` writes a
+- `audit/` — `mbt audit bundle|replay|study|outside|lookahead|lookahead-requests` (BL-010 Phase 2). `request_lookahead.py` is the whole-request cut-off test (saved favourites through the real API; uses `truncate.py`; compares kpis, series, trades, rotations, yearly, open positions and the companion at 1e-9, ignoring price levels). `verify.py` (`mbt verify history`, BL-001 Phase 4) is the restated-history detector: per-instrument-per-year row counts and hashes up to an anchor Friday, baseline in the state dir (`data/history_baseline.json`, log `history_baseline_log.jsonl`), nothing accepted without `--accept --reason`; a change exits 0 once its Telegram is delivered (`notify.deliver`: the message is the alert), 1 when it reached nobody or the check cannot run; a lost baseline file is refused while the log shows one existed; scheduler job `momentum-history`, Fri 22:00 IST. `bundle.py` writes a
   run's orders and the backtest's claims; `replay.py` rebuilds the result from the orders and
   the lake's raw bars and compares. `replay.py`, `studies.py` and `outside.py` must never import
   from the rest of the package (a test enforces it): shared code would hide a shared mistake.

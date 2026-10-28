@@ -190,6 +190,11 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/kite/:path*`,
             },
             {
+              // BL-142 Phase 4: the Lots panel (read-only)
+              source: '/api/momentum/lots',
+              destination: `${momentumDirectOrigin}/api/lots`,
+            },
+            {
               // sync, paste, rules
               source: '/api/momentum/holdings/:path*',
               destination: `${momentumDirectOrigin}/api/holdings/:path*`,

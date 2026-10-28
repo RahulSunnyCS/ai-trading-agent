@@ -2388,7 +2388,14 @@ def verify_history(
     """Did old history change? Fingerprints every price series, stock bar and corporate action up
     to a fixed anchor Friday and names each instrument whose history differs from the stored
     baseline (the first run just records one). New weeks never trip it. Read-only on the shared
-    database; exits 1 on a change or when it cannot run. Nothing is ever accepted unasked."""
+    database (it writes only its baseline file in the state folder). Nothing is ever accepted
+    unasked.
+
+    Exit codes (the Friday scheduler job `momentum-history` runs it with --send and lets the
+    command alert): 0 = no change, or a change whose Telegram was delivered (the message is the
+    alert, as with a live-rules breach, so the scheduler does not alert twice); 1 = a change that
+    reached nobody (no --send, Telegram off or unreachable), or the check could not run (also
+    sent). A baseline recorded under --send is reported too: it means none was found."""
     from datetime import datetime
 
     from . import notify, verify
@@ -2404,6 +2411,7 @@ def verify_history(
             reason=reason,
             bars=not no_bars,
         )
+        title, body = verify.summary(outcome)
     except Exception as error:
         message = notify.redact(f"{type(error).__name__}: {error}")
         typer.echo(f"history check FAILED: {message}")
@@ -2418,16 +2426,22 @@ def verify_history(
                 )
             )
         raise typer.Exit(1) from error
-    title, body = verify.summary(outcome)
     typer.echo(f"{title}\n{body}")
+    if outcome.status == "new_baseline" and send:
+        # A scheduled run normally finds a baseline: a new one means the file was missing.
+        notify.send(
+            notify.Notification("momentum-history", "warn", title, body, type="momentum.problem")
+        )
     if outcome.status == "changed":
-        if send:
-            notify.send(
-                notify.Notification(
-                    "momentum-history", "warn", title, body, type="momentum.problem"
-                )
-            )
-        raise typer.Exit(1)
+        # The message is the alert (BL-001 Phase 4): delivered = exit 0. A change that reached
+        # nobody fails the run, so the scheduler retries it and the Jobs page shows it. The change
+        # stays unaccepted, so every later check repeats it until `--accept --reason`.
+        delivered = send and notify.deliver(
+            notify.Notification("momentum-history", "warn", title, body, type="momentum.problem")
+        )
+        if not delivered:
+            typer.echo("history changed and no Telegram message was delivered: exit 1")
+            raise typer.Exit(1)
 
 
 @audit_app.command("bundle")

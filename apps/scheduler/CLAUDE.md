@@ -174,6 +174,13 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
   scored favourite on today's code (one engine pass each, cached rankings), writes only
   `forward_scores.json` in the momentum state dir and sends nothing: the headline's score line is
   added to its 19:30 message, so the scheduler's own failure alert is the only Telegram it causes.
+- `momentum-history` (BL-001 Phase 4, Fri 22:00) runs `mbt verify history --send`: read-only on the catalog,
+  but in the `catalog` group because DuckDB will not open a read-only connection while another process
+  writes. It `alertsItself`: a restated history is its own Telegram and exits 0 once Telegram took it (like
+  `momentum-live-rules` on a breach), so the scheduler does not alert twice; an undelivered one exits 1 (the
+  retry sends it again, the Jobs page shows it red), as does a check that cannot run (also sent by the command).
+  Like every `alertsItself` job, an exit the command never reached (a `uv` environment that will not build)
+  is silent apart from the Jobs page, unless it is 124 or 127.
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).

@@ -427,6 +427,30 @@ def latest_company_closes_from_db_or_none(
     }
 
 
+def latest_symbol_closes_from_db_or_none(
+    symbols: list[str], as_of: date, root: Path | None = None
+) -> dict[str, tuple[float, date]] | None:
+    """Latest stored daily share close on or before ``as_of`` for each exchange symbol
+    (``CUPID``, as a broker's holdings name it): ``symbol -> (close, trading day)``. A symbol
+    with no bars is absent. ``None`` when there is no catalog (the BL-142 Lots panel, which
+    values the lots at the last close and never asks a broker for a quote)."""
+    if catalog_mtime(root) is None:
+        return None
+    if not symbols:
+        return {}
+    with stock_bars(root) as con:
+        rows = con.execute(
+            "SELECT symbol, close, date FROM ("
+            "SELECT i.symbol, b.close, b.date, "
+            "row_number() OVER (PARTITION BY i.symbol ORDER BY b.date DESC) AS position "
+            "FROM bars_1d_stock b JOIN instruments i USING (instrument_id) "
+            "WHERE i.symbol IN (SELECT unnest(?)) AND b.date <= ? AND b.close IS NOT NULL"
+            ") WHERE position = 1",
+            [symbols, as_of],
+        ).fetchall()
+    return {str(symbol): (float(close), trading_day) for symbol, close, trading_day in rows}
+
+
 def latest_momentum_closes_from_db_or_none(
     instruments: list[str], kind: str, as_of: date, root: Path | None = None
 ) -> dict[str, tuple[float, date]] | None:

@@ -476,6 +476,7 @@ describe('momentum backtest proxy routes', () => {
       ['POST', '/api/momentum/holdings/sync', 'http://127.0.0.1:8765/api/holdings/sync'],
       ['POST', '/api/momentum/holdings/paste', 'http://127.0.0.1:8765/api/holdings/paste'],
       ['PUT', '/api/momentum/holdings/rules', 'http://127.0.0.1:8765/api/holdings/rules'],
+      ['GET', '/api/momentum/lots', 'http://127.0.0.1:8765/api/lots'],
     ];
     for (const [method, url, upstream] of calls) {
       const response = await server.inject(
