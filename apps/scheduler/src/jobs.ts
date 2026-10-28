@@ -292,6 +292,25 @@ const BASE_JOBS: Job[] = [
     fixHint: 'cd packages/momentum-backtesting && uv run mbt live-rules check --send',
   },
   {
+    id: 'momentum-history',
+    description:
+      "Check that the stored market history up to a fixed anchor Friday has not changed (BL-001 Phase 4): names each price series, stock's bars or corporate action restated since the baseline",
+    // After the 19:30 stock sync and the evening's other catalog jobs. Read-only on the
+    // catalog (it writes only its baseline file in the Momentum state folder).
+    schedule: { at: '22:00', on: FRIDAY, label: 'Fri 22:00' },
+    steps: [['uv', 'run', 'mbt', 'verify', 'history', '--send']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 10,
+    catchUpHours: 48,
+    group: 'catalog',
+    // A restated history is its own Telegram and exits 0; a check that cannot run sends its
+    // own message and exits 1.
+    alertsItself: true,
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt verify history --send',
+  },
+  {
     id: 'options-evening',
     description:
       "The evening run: collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (`obt rotation update`, BL-058), rebuild missing derived tables, store the T1 track's results, then (only from 16:00, so normally a no-op) send the result. The 16:00 Telegram result is the next job's (`options-rotation-result`)",

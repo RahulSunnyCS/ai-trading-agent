@@ -248,3 +248,58 @@ def test_the_log_line_is_written_before_the_baseline_moves(root, tmp_path, monke
     with pytest.raises(OSError):
         verify.run(state, TODAY, root=root, accept=True, reason="x", bars=False)
     assert verify.baseline_path(state).read_text() == before
+
+
+# --- the command (the Friday `momentum-history` scheduler job runs it with --send) -------------
+
+
+@pytest.fixture
+def command(monkeypatch):
+    """Runs `mbt verify history` with `verify.run` faked; returns (result, Telegram messages)."""
+    from typer.testing import CliRunner
+
+    from momentum_backtesting import cli, notify
+
+    sent: list[notify.Notification] = []
+    monkeypatch.setattr(notify, "send", lambda n: sent.append(n) or "")
+
+    def invoke(outcome, *args, error=None):
+        def fake_run(*_a, **_k):
+            if error is not None:
+                raise error
+            return outcome
+
+        monkeypatch.setattr(verify, "run", fake_run)
+        return CliRunner().invoke(cli.app, ["verify", "history", *args]), sent
+
+    return invoke
+
+
+def _changed():
+    moved = verify.Change("price:NIFTY|weekly", 2025, 1, 1)
+    return verify.Outcome("changed", date(2026, 10, 9), verify.Diff(changed=[moved]))
+
+
+def test_a_change_with_send_exits_0_because_the_message_is_the_alert(command):
+    result, sent = command(_changed(), "--send")
+    assert result.exit_code == 0, result.output
+    assert len(sent) == 1 and sent[0].severity == "warn" and sent[0].type == "momentum.problem"
+    assert "price:NIFTY|weekly" in sent[0].body
+
+
+def test_a_change_without_send_is_printed_and_exits_0(command):
+    result, sent = command(_changed())
+    assert result.exit_code == 0 and sent == []
+    assert "Restated history" in result.output and "price:NIFTY|weekly" in result.output
+
+
+def test_a_clean_check_sends_nothing(command):
+    result, sent = command(verify.Outcome("ok", date(2026, 10, 9)), "--send")
+    assert result.exit_code == 0 and sent == []
+
+
+def test_a_check_that_cannot_run_exits_1_and_says_so(command):
+    result, sent = command(None, "--send", error=ValueError("catalog locked"))
+    assert result.exit_code == 1
+    assert len(sent) == 1 and sent[0].severity == "error" and "could not run" in sent[0].title
+    assert "catalog locked" in sent[0].body

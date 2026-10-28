@@ -168,6 +168,10 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
   `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
   scheduler or laptop restart (reaped as interrupted, exit -2, by `startLoop` before its first tick) is
   started again while the session lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
+- `momentum-history` (BL-001 Phase 4, Fri 22:00) runs `mbt verify history --send`: read-only on the catalog,
+  but in the `catalog` group because DuckDB will not open a read-only connection while another process
+  writes. It `alertsItself`: a restated history is its own Telegram and exits 0 (like `momentum-live-rules` on
+  a breach), so the scheduler does not alert twice; exit 1 means it could not run (also sent by the command).
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).

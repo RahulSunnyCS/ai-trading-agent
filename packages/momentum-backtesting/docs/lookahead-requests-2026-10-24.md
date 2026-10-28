@@ -89,7 +89,9 @@ holdings) have more near-ties.
 
 ## Fixed 2026-10-25 (owner: "fix F6")
 
-Branch `fix/momentum-f6-point-in-time-ranking`, stacked on the PR that added the check.
+Branch `fix/momentum-f6-point-in-time-ranking`, stacked on the PR that added the check. **Merged
+2026-10-28** (PRs #318, #319, #322, merge commit `778ba02e`): the fixed ranking is what every run
+and the Friday signal use from then on.
 
 What changed (Broad only; ETF, Stock and Custom Index results are byte-identical, all ten golden
 controls and every live control run):
@@ -140,13 +142,13 @@ the momentum index by a wide margin on this headline, but BL-010's figures and t
 picked these strategies both used the old ranking, so the selection itself carries some of the
 hindsight. Nothing here re-ran the search.
 
-### What the merge changes in live use
+### What the merge changed in live use (written before it, 2026-10-25)
 
-- **This Friday's orders for lot 1 of the followed strategy change.** With the old ranking the model
+- **That Friday's orders for lot 1 of the followed strategy changed.** With the old ranking the model
   buys NAZARA, GRWRHITECH, THELEELA and sells ATHERENERG, AZAD, KPIL; with the fix it buys NAZARA and
   SYRMA, adds ATHERENERG, trims CUPID and sells ACMESOLAR, KIRLOSENG, NAVINFLUOR#2. (Lots 2 to 4 have
-  no trades that week either way.) Do not merge on a Friday before the orders run without choosing
-  which ranking the money follows.
+  no trades that week either way.) It was merged on 2026-10-28, a Wednesday, so the
+  first Friday to trade on the fixed ranking is 2026-10-30.
 - Rank numbers in "why this pick" texts and the Momentum Scores page are unchanged in meaning; the
   Scores page already ranked within the members.
 
@@ -155,6 +157,6 @@ hindsight. Nothing here re-ran the search.
 - `score="residual"` (killed in BL-085, off by default) does not take the cross-section.
 - Custom Index keeps whole-column gap filling and its own cross-section.
 - Search results already on disk (`data/search/*`) and the BL-010 write-ups were produced with the
-  old ranking and are not re-run. Re-running the search on the fixed ranking is a separate decision.
+  old ranking and are not re-run. Re-running the search on the fixed ranking is BL-176.
 - `live_rules.toml`'s drawdown rules were set against the old backtest; the followed strategy's
   backtest drawdown is now about 6 points deeper.

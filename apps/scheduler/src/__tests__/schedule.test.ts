@@ -174,10 +174,35 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 44 jobs', () => {
+  it('has 45 jobs', () => {
     // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
     // BL-012: + check-expiry-calendar (Y4), check-blocked-dates (Y3), universe-refresh-reminder (S3)
-    expect(JOBS).toHaveLength(44);
+    // BL-001 Phase 4: + momentum-history
+    expect(JOBS).toHaveLength(45);
+  });
+});
+
+describe('momentum history check (BL-001 Phase 4)', () => {
+  const job = JOBS.find((j) => j.id === 'momentum-history');
+  const minutes = (at = '') => {
+    const [h = 0, m = 0] = at.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  it('runs mbt verify history --send on Fridays, after the 19:30 stock sync has had its time', () => {
+    const ingest = JOBS.find((j) => j.id === 'momentum-stock-ingest');
+    expect(job?.steps).toEqual([['uv', 'run', 'mbt', 'verify', 'history', '--send']]);
+    expect(job?.cwd).toBe('packages/momentum-backtesting');
+    expect(job?.schedule.on('2026-10-30')).toBe(true); // Friday
+    expect(job?.schedule.on('2026-10-29')).toBe(false); // Thursday
+    expect(minutes(job?.schedule.at)).toBeGreaterThanOrEqual(
+      minutes(ingest?.schedule.at) + (ingest?.timeoutMinutes ?? 0),
+    );
+  });
+
+  it('is in the catalog group and sends its own alerts, so the scheduler never repeats one', () => {
+    expect(job?.group).toBe('catalog');
+    expect(job?.alertsItself).toBe(true);
   });
 });
 

@@ -2313,7 +2313,10 @@ def verify_history(
     """Did old history change? Fingerprints every price series, stock bar and corporate action up
     to a fixed anchor Friday and names each instrument whose history differs from the stored
     baseline (the first run just records one). New weeks never trip it. Read-only on the shared
-    database; exits 1 on a change or when it cannot run. Nothing is ever accepted unasked."""
+    database (it writes only its baseline file in the state folder). A change exits 0, like a
+    live-rules breach: the message is the alert, so the Friday scheduler job (`momentum-history`)
+    does not alert twice. Exit 1 means it could not run, which is also sent. Nothing is ever
+    accepted unasked."""
     from datetime import datetime
 
     from . import notify, verify
@@ -2345,14 +2348,12 @@ def verify_history(
         raise typer.Exit(1) from error
     title, body = verify.summary(outcome)
     typer.echo(f"{title}\n{body}")
-    if outcome.status == "changed":
-        if send:
-            notify.send(
-                notify.Notification(
-                    "momentum-history", "warn", title, body, type="momentum.problem"
-                )
-            )
-        raise typer.Exit(1)
+    if outcome.status == "changed" and send:
+        # Exit 0 on purpose: this message is the alert (BL-001 Phase 4). The change stays
+        # unaccepted, so every later check repeats it until `--accept --reason`.
+        notify.send(
+            notify.Notification("momentum-history", "warn", title, body, type="momentum.problem")
+        )
 
 
 @audit_app.command("bundle")
