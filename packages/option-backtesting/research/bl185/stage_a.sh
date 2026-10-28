@@ -4,7 +4,7 @@
 #   research/bl185/stage_a.sh [workers=6] [not_after=07:00]
 set -u
 cd "$(dirname "$0")/../.."
-W=${1:-6}; NA=${2:-07:00}
+W=${1:-5}; NA=${2:-07:00}
 mkdir -p research/bl185/logs
 for i in $(seq 1 "$W"); do
   nohup caffeinate -i nice -n 10 uv run python research/common/two_session/run_grid.py --not-after "$NA" \
