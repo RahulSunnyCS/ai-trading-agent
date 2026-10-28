@@ -36,8 +36,11 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
   split (−₹115 a day), its morning half earning only +53.
 - The gain is concentrated: for the live NIFTY file the split wins 2025 H1 and 2026 H1 and loses the other
   three half-years; the study's own quarters showed the same.
-- Not adopted; a cheaper broker or an owner who values the halved drawdown could still prefer it (an
-  `override:` in BL-182 would open Phase 2).
+- Brokerage does not decide it: re-read at Shoonya's ₹5 an order the live files read +77 (NIFTY) and +126
+  (SENSEX) a day, at Angel One's ₹20 an order over two lots +53 and +103, and the 90 % interval stays
+  about ±150 wide, so no live file clears zero at any rate (BL-182 Log, post-hoc, descriptive).
+- Not adopted; an owner who values the halved drawdown could still prefer it (an `override:` in BL-182
+  would open Phase 2).
 
 ## Not yet tested
 

@@ -189,3 +189,18 @@ an `override:` here if Phase 2 is to run anyway.
   before-cost figure is (222,681 + 510 × 80) / 510 = ₹517 a day, not the ₹477 registered (one set's costs
   added back). Ours is 502, 3 % off, still within the 15 % rule; the verdict is unchanged. The Phase 0 text
   keeps the registered number with this note.
+- 2026-10-28 — post-hoc brokerage sensitivity (owner's question: Shoonya is ₹5 an order, Angel One ₹20 an
+  order which is ₹10 a lot at two lots), the same stored results re-read with the brokerage swapped and
+  the statutory charges unchanged; descriptive, the rule was registered at ₹13. Split − whole day, net
+  per lot-day [90 %]:
+
+  | Brokerage an order | Live NIFTY | Live SENSEX | `N_wide-t1s4` | `N_wide-t1s8` |
+  |---|---|---|---|---|
+  | ₹13 (registered) | +39 [−107, +187] | +89 [−63, +241] | +77 [−82, +237] | +84 [−36, +207] |
+  | ₹5 (Shoonya) | +77 [−69, +225] | +126 [−25, +279] | +116 [−43, +275] | +122 [+1, +245] |
+  | ₹10 (Angel One, 2 lots) | +53 [−92, +201] | +103 [−49, +255] | +92 [−67, +252] | +98 [−22, +221] |
+  | ₹20 (Angel One, 1 lot) | +6 [−139, +154] | +56 [−96, +208] | +44 [−115, +204] | +51 [−69, +174] |
+
+  Cheaper brokerage adds ₹14–38 a day to the split's edge; the interval is about ±150 wide at every rate,
+  so neither live file clears zero even at ₹5, and only the T1 SL 60 % setting does, by ₹1. The verdict
+  does not turn on the broker; it turns on the day-to-day noise of the difference.
