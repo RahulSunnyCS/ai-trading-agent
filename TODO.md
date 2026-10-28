@@ -454,6 +454,7 @@ collector is forward-only".
 | 3.10.43 | NIFTY gap-and-go band → Williams back-up chain, 150-point ITM buys (POC) — [BL-164](backlog/BL-164-gap-and-go-williams-chain.md) | claude | **Done 2026-10-25: killed.** No candidate: H1 +₹111 a trade (t 0.33), H2 −₹119, chain −₹10; confirmation never opened. Adds `prev_at` / `prev_agg` / `ever`, `trail_peak`, `stop_on: close`. Findings in `research/options/strategies/gap-and-go/`. |
 | 3.10.44 | BL-164's leads on 2022–24: gap-and-go on gap-down days, on expiry days — [BL-165](backlog/BL-165-gap-and-go-leads-gap-down-and-expiry.md) | claude | **Done 2026-10-25: killed.** Gap-down +₹485 a trade (t 1.01), expiry days +₹746 (t 1.21), bar 2.24; each rests on three trades. Adds `expiry_day` to the rule grammar. |
 | 3.10.45 | Higher-high / higher-low structure, 5-minute NIFTY swings, ATM buys — [BL-166](backlog/BL-166-higher-high-higher-low-structure.md) | claude | **Done 2026-10-25: killed.** +₹27 a trade (t 0.20, 399 trades); the break beats later minutes but does not pay. Adds `swing` to the rule grammar. |
+| 3.10.46 | Dir ×2 on non-expiry days, live — [BL-183](backlog/BL-183-dir-double-non-expiry-live.md) | claude | **In progress.** Owner (2026-10-28): from BL-133, the picked Dir at 2 lots on non-expiry days for Core and T1 (no Dir → 3 lots; expiry days 3 lots); Quantiply book stop raised by the Dir's MTM SL; a per-row Settings › Automation toggle, off by default. |
 
 ### 3.11 Local research database (`packages/trading-data`)
 

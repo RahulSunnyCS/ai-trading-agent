@@ -25,6 +25,8 @@ export interface Row {
   multiplier: number;
   /** include the Buy add-on picks (default yes) */
   addon: boolean;
+  /** BL-183: the picked Dir at 2 lots (its MTM SL doubled) on a non-expiry day (default no) */
+  dirBoost: boolean;
   /** Quantiply only (BL-172): the clientwise MTM SL in rupees the 08:00 job keeps; null = leave it */
   mtmSl: number | null;
 }
@@ -59,6 +61,7 @@ export const DEFAULT_AUTOMATION: Automation = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'algotest.angelone': {
@@ -67,6 +70,7 @@ export const DEFAULT_AUTOMATION: Automation = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'quantiply.angelone': {
@@ -75,6 +79,7 @@ export const DEFAULT_AUTOMATION: Automation = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     },
     'quantiply.finvasia': {
@@ -83,6 +88,7 @@ export const DEFAULT_AUTOMATION: Automation = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
   },
@@ -127,6 +133,10 @@ export function readAutomation(path: string = settingsPath()): Automation {
       if (typeof addon !== 'boolean') {
         throw new Error(`${path}: row ${p}.${b} has addon ${JSON.stringify(row.addon)}`);
       }
+      const dirBoost = row.dirBoost ?? false; // a snapshot before BL-183: off
+      if (typeof dirBoost !== 'boolean') {
+        throw new Error(`${path}: row ${p}.${b} has dirBoost ${JSON.stringify(row.dirBoost)}`);
+      }
       // BL-172: missing = the list's stop; anything else must be null or whole rupees 500-100,000.
       const mtmSl = row.mtmSl === undefined ? defaultMtmSl(p, row.list as Row['list']) : row.mtmSl;
       if (
@@ -135,7 +145,7 @@ export function readAutomation(path: string = settingsPath()): Automation {
       ) {
         throw new Error(`${path}: row ${p}.${b} has mtmSl ${JSON.stringify(row.mtmSl)}`);
       }
-      rows[`${p}.${b}`] = { ...(row as Row), multiplier, addon, mtmSl };
+      rows[`${p}.${b}`] = { ...(row as Row), multiplier, addon, dirBoost, mtmSl };
     }
   }
   const until = (raw.pause as { until?: unknown } | undefined)?.until ?? null;
@@ -166,6 +176,7 @@ export function effectiveRow(a: Automation, platform: Platform, broker: Broker):
     upload: a.masters.uploads && row.upload && row.list !== 'none',
     multiplier: row.multiplier,
     addon: row.addon,
+    dirBoost: row.dirBoost,
     mtmSl: row.mtmSl,
   };
 }

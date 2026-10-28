@@ -21,7 +21,7 @@ from pathlib import Path
 
 from ..legwise.quantiply import WEEKDAYS, Export, to_quantiply
 from ..legwise.schema import load_legwise
-from .algtst_export import DayPicks, strategy_name
+from .algtst_export import DayPicks, _lots_block, _lots_field, strategy_name
 from .variants import strategy_path
 
 #: the lists Quantiply can take (BL-140: the dashboard settings choose; core was the first)
@@ -46,8 +46,12 @@ def build(picks: DayPicks) -> list[Built]:
         raise ValueError(f"Quantiply takes {' or '.join(BOOKS)}, not {picks.book!r}")
     day = weekday(picks)
     out = []
+    from .live_lots import scaled
+
     for variant, addon in [(v, False) for v in picks.core] + [(v, True) for v in picks.buy]:
         spec = load_legwise(strategy_path(variant))
+        if not addon:
+            spec = scaled(spec, picks.lots_of(variant))
         name = strategy_name(picks.book, variant, addon)
         out.append(Built(variant, addon, to_quantiply(spec, name, [day])))
     return out
@@ -80,9 +84,11 @@ def write(picks: DayPicks, built: list[Built], out: Path, extra: dict | None = N
                 "addon": b.addon,
                 "file": f"{b.variant}.json",
                 "unconfirmed": b.export.unconfirmed,
+                **_lots_field(picks, b.variant, b.addon),
             }
             for b in built
         ],
+        **_lots_block(picks),
         **(extra or {}),
     }
     old.write_text(json.dumps(manifest, indent=2) + "\n")

@@ -38,6 +38,14 @@ class DayPicks:
     source: str  # "recorded" | "preview" | "given"
     core: list[str]
     buy: list[str]
+    #: BL-183: {'NIFTY': .., 'SENSEX': ..} days to expiry on the weekday basis, when known
+    dte: dict[str, str] | None = None
+    #: BL-183: lots per core pick (`live_lots.lots_for_day`) when the Dir ×2 rule was asked for;
+    #: None = every pick 1 lot and the manifest as before
+    lots: dict[str, int] | None = None
+
+    def lots_of(self, variant: str) -> int:
+        return (self.lots or {}).get(variant, 1)
 
 
 def strategy_name(book: str, variant: str, addon: bool = False) -> str:
@@ -61,8 +69,17 @@ def recorded_picks(day: date, book: str, root: Path | None = None) -> DayPicks |
     entry = next((e for e in entries if e.get("day") == day.isoformat()), None)
     if entry is None:
         return None
+    from .dte import entry_labels
+
     block = entry["lists"][LIST_KEY]
-    return DayPicks(day, book, "recorded", list(block["core"]), list(block.get("buy") or []))
+    return DayPicks(
+        day,
+        book,
+        "recorded",
+        list(block["core"]),
+        list(block.get("buy") or []),
+        dte=entry_labels(entry),
+    )
 
 
 def preview_picks(day: date, book: str, root: Path | None = None) -> DayPicks | None:
@@ -71,15 +88,19 @@ def preview_picks(day: date, book: str, root: Path | None = None) -> DayPicks | 
     picks = next_session_picks(_previous_session(day), root, track=BOOKS[book][0])
     if picks is None or picks.day != day:
         return None
-    return DayPicks(day, book, "preview", list(picks.core), list(picks.buy))
+    return DayPicks(day, book, "preview", list(picks.core), list(picks.buy), dte=picks.dte)
 
 
 def build(picks: DayPicks) -> list[tuple[str, Export]]:
     """(variant, export) for every pick, core first; raises `Unmappable` on a setting with no
     known form."""
+    from .live_lots import scaled
+
     out = []
     for variant, addon in [(v, False) for v in picks.core] + [(v, True) for v in picks.buy]:
         spec = load_legwise(strategy_path(variant))
+        if not addon:
+            spec = scaled(spec, picks.lots_of(variant))
         out.append((variant, to_algtst(spec, strategy_name(picks.book, variant, addon))))
     return out
 
@@ -115,9 +136,11 @@ def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path
                 "name": export.name,
                 "addon": variant in picks.buy,
                 "file": f"{variant}.algtst",
+                **_lots_field(picks, variant, variant in picks.buy),
             }
             for variant, export in exports
         ],
+        **_lots_block(picks),
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     zip_path = out / f"{picks.day.isoformat()}-{picks.book}.zip"
@@ -125,6 +148,19 @@ def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path
         for path in files:
             zf.write(path, path.name)
     return zip_path
+
+
+def _lots_block(picks: DayPicks) -> dict:
+    """BL-183: the manifest's record of the day's lots, only when the Dir ×2 rule was asked for
+    (`picks.lots` set): the days to expiry it read and whether a pick is doubled. Without it the
+    manifest is exactly what it was."""
+    if picks.lots is None:
+        return {}
+    return {"dte": picks.dte, "dir_boost": any(v > 1 for v in picks.lots.values())}
+
+
+def _lots_field(picks: DayPicks, variant: str, addon: bool) -> dict:
+    return {} if picks.lots is None else {"lots": 1 if addon else picks.lots_of(variant)}
 
 
 def write_latest(base: Path, picks: DayPicks, folder: Path) -> Path:

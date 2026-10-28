@@ -43,6 +43,7 @@ describe('automation settings for the jobs (BL-140)', () => {
           upload: true,
           multiplier: 1,
           addon: true,
+          dirBoost: false,
           mtmSl: null,
         };
       }),
@@ -126,6 +127,29 @@ describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
       write(saved(change));
       assert.throws(() => readAutomation(file));
     }
+  });
+});
+
+describe('Dir ×2 on non-expiry days (BL-183)', () => {
+  it('a snapshot before BL-183 reads as off; a saved value reaches the row', () => {
+    const a = readAutomation(join(import.meta.dirname, 'fixtures', 'automation-settings-v2.json'));
+    assert.ok(Object.values(a.rows).every((r) => r.dirBoost === false));
+    write(
+      saved((s) => {
+        s.rows['quantiply.angelone'].dirBoost = true;
+      }),
+    );
+    assert.equal(effectiveRow(readAutomation(file), 'quantiply', 'angelone').dirBoost, true);
+    assert.equal(effectiveRow(readAutomation(file), 'algotest', 'finvasia').dirBoost, false);
+  });
+
+  it('refuses a value that is not true or false', () => {
+    write(
+      saved((s) => {
+        (s.rows['quantiply.angelone'] as unknown as { dirBoost: unknown }).dirBoost = 'yes';
+      }),
+    );
+    assert.throws(() => readAutomation(file), /dirBoost "yes"/);
   });
 });
 
