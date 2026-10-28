@@ -289,6 +289,8 @@ def render_result(
         lines.append("")
         if tomorrow_adaptive is not None:
             lines += _next_lines(_with_dte("🎯 Adaptive", tomorrow_adaptive.dte), tomorrow_adaptive)
+            if tomorrow_t1 is not None:
+                lines += ["", SEPARATOR]  # the two lists apart, as in the morning message
         if isinstance(tomorrow_t1, str):
             lines.append(tomorrow_t1)
         elif tomorrow_t1 is not None:

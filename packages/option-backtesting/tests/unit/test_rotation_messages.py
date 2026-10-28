@@ -191,6 +191,8 @@ def test_the_evening_message_for_a_normal_day():
    {WIDE}
 3️⃣ 12:02  N_widesl_p100
    {WIDE}
+
+━━━━━━━━━━━━━━━
 🧪 Tuned Adaptive (In Testing phase)
 1️⃣ 09:17  N_widesl_p150
    SL60% · TSL15%/10% · REnone · MTMSL4000
@@ -238,7 +240,9 @@ def test_t1_that_is_not_ready_is_one_line_and_its_tomorrow_follows_suit():
         "🧪 Tuned Adaptive (In Testing phase) · not ready",
     )
     assert "\n\n🧪 Tuned Adaptive (In Testing phase) · result not ready\n\n➡️ Wed 21 Oct" in text
-    assert text.endswith("   " + WIDE + "\n🧪 Tuned Adaptive (In Testing phase) · not ready")
+    assert text.endswith(
+        "   " + WIDE + "\n\n━━━━━━━━━━━━━━━\n🧪 Tuned Adaptive (In Testing phase) · not ready"
+    )
 
 
 def test_no_tomorrow_means_no_section():
