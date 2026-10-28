@@ -13,6 +13,7 @@ a ranking or a backtest.
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from typing import Any
 
@@ -46,7 +47,9 @@ def compute_score(*, only: set[str] | None = None, rerun: bool = True) -> dict:
         groups = runs_store.list_groups(con)
     names = _names(rows)
     first_week = pd.Timestamp(min((r["week"] for r in rows), default="2026-01-01"))
-    tables: dict[int, fs.PriceTables] = {}
+    # Keyed by id(ranking) and holding the ranking itself, so an evicted ranking's id is never
+    # reused for another (DATA keeps only a few rankings).
+    tables: dict[int, tuple[Any, fs.PriceTables]] = {}
     results: dict[str, Any] = {}
 
     def request(settings: dict):
@@ -57,7 +60,7 @@ def compute_score(*, only: set[str] | None = None, rerun: bool = True) -> dict:
             return None  # only Broad favourites are journalled today; others say so
         ranking = api._broad_ranking(request(settings))
         key = id(ranking)
-        if key not in tables:
+        if key not in tables or tables[key][0] is not ranking:
             close = ranking.prices
             outer = api.DATA.get()
             extra = [c for c in outer.columns if c not in close.columns and c in names]
@@ -73,8 +76,8 @@ def compute_score(*, only: set[str] | None = None, rerun: bool = True) -> dict:
                 monday = monday_fills.build(close, stock_cols).prices
             except Exception:  # Monday opens are the second figure; never lose the first
                 monday = None
-            tables[key] = fs.PriceTables(close=close, monday=monday)
-        return tables[key]
+            tables[key] = (ranking, fs.PriceTables(close=close, monday=monday))
+        return tables[key][1]
 
     def backtest_now(settings: dict, week: str, next_week: str) -> float | None:
         if not rerun or settings.get("dataset") != "broad":
@@ -111,7 +114,9 @@ def headline_line() -> str | None:
         return None
     members = next((g for g in groups if g["id"] == headline["id"]), None)
     only = {m["id"] for m in members["members"]} if members else {headline["id"]}
-    return fs.headline_line(compute_score(only=only), headline)
+    # No re-run here: the 19:30 run has just computed these backtests, and the message should
+    # not wait for them again. The 20:30 job adds the today's-code figure for the page.
+    return fs.headline_line(compute_score(only=only, rerun=False), headline)
 
 
 def compute_fills() -> dict:
@@ -223,12 +228,39 @@ def _raw_prices(
     return prices, sorted({d for d, *_ in rows})
 
 
+_FILLS_CACHE: dict[str, Any] = {}
+
+
+def _fills_stamp() -> tuple:
+    """What the fills are computed from: the contract-notes day files (names, sizes, times), the
+    catalog's modification time (the ledger, orders and bars live there) and the paper start. A
+    page load with none of them changed reuses the last answer."""
+    from trading_data.db import data_root
+
+    from .db_read import catalog_mtime
+
+    root = data_root()
+    folder = root / "contract-notes" / "days"
+    notes = (
+        tuple(sorted((e.name, e.stat().st_size, e.stat().st_mtime_ns) for e in os.scandir(folder)))
+        if folder.is_dir()
+        else ()
+    )
+    return (str(root), notes, catalog_mtime(root), this_week.paper_start())
+
+
 def view() -> dict:
     """GET /api/journal/forward: the stored score (the Friday job's) and the fills, live."""
     score = fs.load(this_week.state_dir())
     stored_fills = score.pop("fills", None) if score else None
     try:
-        fills = compute_fills()
+        stamp = _fills_stamp()
+        cached = _FILLS_CACHE.get("value")
+        if cached is not None and _FILLS_CACHE.get("stamp") == stamp:
+            fills = cached
+        else:
+            fills = compute_fills()
+            _FILLS_CACHE.update(stamp=stamp, value=fills)
         fills_error = None
     except Exception as error:  # the score must still show; the job's copy is the fallback
         fills, fills_error = stored_fills, f"{type(error).__name__}: {error}"

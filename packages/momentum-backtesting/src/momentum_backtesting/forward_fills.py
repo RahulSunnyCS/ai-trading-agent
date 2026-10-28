@@ -435,8 +435,14 @@ def _one_rebalance(
                 "status": _status(action, weight, plan_qty, abs(shares) if r else None),
             }
         )
-    plan_names = set(plan)
+    # What the 14:15 orders meant the lot to hold: the names they target (a sold name has no
+    # target, so a sale never reads as a disagreement).
+    plan_names = {name for name, row in plan.items() if (row.get("target") or 0) > 0}
+    settings = found["row"].get("settings") or "{}"
+    settings = json.loads(settings) if isinstance(settings, str) else settings
+    slippage = settings.get("slippage_bps")
     return {
+        "slippage_bps": float(slippage) if slippage is not None else None,
         "lot": label,
         "sleeve_id": sleeve_id,
         "week": week,

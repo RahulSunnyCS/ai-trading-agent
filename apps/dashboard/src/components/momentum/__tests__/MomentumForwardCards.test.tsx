@@ -101,6 +101,7 @@ const view: ForwardView = {
             orders_at: null,
             plan_differs: [],
             booked_pending: false,
+            slippage_bps: 15,
             totals: {
               bought: 46650.9,
               sold: 0,

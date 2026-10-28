@@ -116,6 +116,7 @@ export interface FillRebalance {
     slippage_plan_rs: number | null;
   };
   booked_pending: boolean;
+  slippage_bps: number | null;
 }
 
 export interface FillGroup {

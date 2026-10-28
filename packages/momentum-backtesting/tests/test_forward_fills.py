@@ -114,7 +114,13 @@ def test_fills_are_booked_first_in_first_out_and_the_rest_are_outside_the_lots(t
                     "id": "s2",
                     "label": "Lot 2",
                     "budget": 500.0,
-                    "plan": {"rows": [{"symbol": "A", "quantity": 6, "price": 79.0}]},
+                    "plan": {
+                        "rows": [
+                            {"symbol": "A", "quantity": 6, "price": 79.0, "target": 1.0},
+                            # a sale has no target: never a disagreement with the signal
+                            {"symbol": "OLD", "quantity": -3, "price": 5.0, "target": 0.0},
+                        ]
+                    },
                 }
             ],
         }
@@ -149,6 +155,7 @@ def test_fills_are_booked_first_in_first_out_and_the_rest_are_outside_the_lots(t
     assert second["booked_pending"] and lot2["booked"] == [forward_fills.NOT_BOOKED]
     assert (lot2["shares"], lot2["plan_shares"], lot2["status"]) == (6.0, 6.0, "done")
     assert lot2["vs_plan_bps"] == pytest.approx((80 - 79) / 79 * 10000)
+    assert second["plan_differs"] == []
     outside = {(o["symbol"], o["qty"]) for o in out["outside_lots"]}
     assert outside == {("Z", 5.0), ("A", 1.0)}
 

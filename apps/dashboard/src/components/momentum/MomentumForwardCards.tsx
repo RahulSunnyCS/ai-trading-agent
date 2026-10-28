@@ -115,58 +115,82 @@ function ForwardScoreCard({ view }: { view: ForwardView }) {
 }
 
 function GroupTable({ groups }: { groups: ForwardGroup[] }) {
-  if (groups.length === 0) {
-    return <p className="text-sm text-muted">No followed group has a scored week yet.</p>;
+  // A week none of whose sleeves is scored yet (next week's entries not in) is one line, not a
+  // row of dashes per group.
+  const shown = groups.filter((group) => group.scored > 0);
+  const waitingWeeks = [
+    ...new Set(groups.filter((group) => group.scored === 0).map((group) => group.week)),
+  ].sort();
+  const waiting =
+    waitingWeeks.length > 0 ? (
+      <p className="text-xs text-muted">
+        Waiting for the week after:{' '}
+        {waitingWeeks.map((week) => `week of ${formatDay(week)}`).join(', ')} (
+        {formatInt(groups.filter((group) => group.scored === 0).length)} group-weeks).
+      </p>
+    ) : null;
+  if (shown.length === 0) {
+    return (
+      <>
+        <p className="text-sm text-muted">No followed group has a scored week yet.</p>
+        {waiting}
+      </>
+    );
   }
   return (
-    <Table>
-      <THead>
-        <Th>Week of</Th>
-        <Th>Strategy</Th>
-        <Th align="right">Live, Fri close</Th>
-        <Th align="right">Live, Mon open</Th>
-        <Th align="right">Backtest as recorded</Th>
-        <Th align="right">Backtest, today's code</Th>
-        <Th align="right">Gap</Th>
-        <Th align="right">Mom30 TRI</Th>
-        <Th>Status</Th>
-      </THead>
-      <tbody>
-        {groups.map((group) => (
-          <TRow key={`${group.group_id}-${group.week}`}>
-            <Td className="whitespace-nowrap">{formatDay(group.week)}</Td>
-            <Td className="font-medium text-foreground">{group.name}</Td>
-            <Td align="right" numeric className={returnTone(group.live.ideal)}>
-              {signed(group.live.ideal)}
-            </Td>
-            <Td align="right" numeric className={returnTone(group.live.achievable)}>
-              {signed(group.live.achievable)}
-            </Td>
-            <Td align="right" numeric>
-              {signed(group.backtest.recorded)}
-            </Td>
-            <Td align="right" numeric>
-              {signed(group.backtest.now)}
-            </Td>
-            <Td align="right" numeric title="Live at Friday close minus the backtest as recorded">
-              {formatPp(group.gap.recorded.ideal, 2)}
-            </Td>
-            <Td align="right" numeric>
-              {signed(group.benchmark)}
-            </Td>
-            <Td>
-              {group.status === 'scored' ? (
-                <Badge tone="positive">Scored</Badge>
-              ) : (
-                <Badge tone="neutral">
-                  {formatInt(group.scored)} / {formatInt(group.members)} sleeves
-                </Badge>
-              )}
-            </Td>
-          </TRow>
-        ))}
-      </tbody>
-    </Table>
+    <>
+      <Table>
+        <THead>
+          <Th>Week of</Th>
+          <Th>Strategy</Th>
+          <Th align="right">Live, Fri close</Th>
+          <Th align="right">Live, Mon open</Th>
+          <Th align="right">Backtest as recorded</Th>
+          <Th align="right">Backtest, today's code</Th>
+          <Th align="right">Gap</Th>
+          <Th align="right">Mom30 TRI</Th>
+          <Th>Status</Th>
+        </THead>
+        <tbody>
+          {shown.map((group) => (
+            <TRow key={`${group.group_id}-${group.week}`}>
+              <Td className="whitespace-nowrap">{formatDay(group.week)}</Td>
+              <Td className="max-w-[18rem] truncate font-medium text-foreground" title={group.name}>
+                {group.name}
+              </Td>
+              <Td align="right" numeric className={returnTone(group.live.ideal)}>
+                {signed(group.live.ideal)}
+              </Td>
+              <Td align="right" numeric className={returnTone(group.live.achievable)}>
+                {signed(group.live.achievable)}
+              </Td>
+              <Td align="right" numeric>
+                {signed(group.backtest.recorded)}
+              </Td>
+              <Td align="right" numeric>
+                {signed(group.backtest.now)}
+              </Td>
+              <Td align="right" numeric title="Live at Friday close minus the backtest as recorded">
+                {formatPp(group.gap.recorded.ideal, 2)}
+              </Td>
+              <Td align="right" numeric>
+                {signed(group.benchmark)}
+              </Td>
+              <Td>
+                {group.status === 'scored' ? (
+                  <Badge tone="positive">Scored</Badge>
+                ) : (
+                  <Badge tone="neutral">
+                    {formatInt(group.scored)} / {formatInt(group.members)} sleeves
+                  </Badge>
+                )}
+              </Td>
+            </TRow>
+          ))}
+        </tbody>
+      </Table>
+      {waiting}
+    </>
   );
 }
 
@@ -324,7 +348,7 @@ function RebalanceBlock({ group, rebalance }: { group: string; rebalance: FillRe
           <Th align="right">Orders</Th>
           <Th align="right">Done</Th>
           <Th align="right">Diff</Th>
-          <Th align="right">Avg price</Th>
+          <Th align="right">First-day price</Th>
           <Th align="right">vs Fri close</Th>
           <Th align="right">vs Mon open</Th>
           <Th align="right">vs orders</Th>
@@ -343,8 +367,10 @@ function RebalanceBlock({ group, rebalance }: { group: string; rebalance: FillRe
         {formatInr(totals.real_charges, { dp: 2 })} on the notes against{' '}
         {formatInr(totals.model_charges, { dp: 2 })} at the model's rates · first-day fills against
         Friday's close {formatInr(totals.slippage_close_rs, { sign: true })}, against Monday's open{' '}
-        {formatInr(totals.slippage_open_rs, { sign: true })} (+ paid more). The model assumes 15 bps
-        a side.
+        {formatInr(totals.slippage_open_rs, { sign: true })} (+ paid more).
+        {rebalance.slippage_bps != null
+          ? ` The model assumes ${formatNumber(rebalance.slippage_bps, 0)} bps a side.`
+          : ''}
       </p>
     </section>
   );

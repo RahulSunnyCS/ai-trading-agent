@@ -118,12 +118,20 @@ def mismatches(signal: dict, next_holdings: dict[str, float]) -> list[str]:
     return problems
 
 
+#: `api.BacktestRequest`'s own defaults, for settings stored without a field.
+REQUEST_DEFAULTS = {"cost_model": "flat", "cost_pct": 0.10, "slippage_bps": 5.0, "capital": 1e6}
+
+
 def _rates(config: dict) -> engine.Config:
+    def get(key: str):
+        value = config.get(key)
+        return REQUEST_DEFAULTS[key] if value is None else value
+
     return engine.Config(
-        cost_model=config.get("cost_model", "flat"),
-        cost_pct=float(config.get("cost_pct", 0.10)),
-        slippage_bps=float(config.get("slippage_bps", 0.0) or 0.0),
-        capital=float(config.get("capital", 100000.0) or 100000.0),
+        cost_model=get("cost_model"),
+        cost_pct=float(get("cost_pct")),
+        slippage_bps=float(get("slippage_bps")),
+        capital=float(get("capital")),
     )
 
 
@@ -132,11 +140,18 @@ def trade_cost(config: dict, before: dict[str, float], after: dict[str, float]) 
     rates (`engine._Sim.buy_cost` / `sell_cost`, called on a stand-in carrying only the config)."""
     cfg = _rates(config)
     sim = _CostSim(cfg)
+
+    def named(weights: dict[str, float]) -> dict[str, float]:
+        return {k: v for k, v in weights.items() if k not in _IDLE}
+
+    a, b = named(before), named(after)
+    # Money the move parks in, or takes out of, the liquid fund: the engine's PARK / UNPARK legs
+    # (sell proceeds go straight into the buys; only the change in idle money passes the fund).
+    a[CASH] = max(0.0, 1.0 - sum(a.values()))
+    b[CASH] = max(0.0, 1.0 - sum(b.values()))
     total = 0.0
-    for name in set(before) | set(after):
-        if name in _IDLE:
-            continue
-        delta = after.get(name, 0.0) - before.get(name, 0.0)
+    for name in set(a) | set(b):
+        delta = b.get(name, 0.0) - a.get(name, 0.0)
         if delta > 1e-9:
             total += delta * engine._Sim.buy_cost(sim, delta, name)
         elif delta < -1e-9:
@@ -187,20 +202,6 @@ def portfolio_return(
     if missing:
         return None, missing
     return (1.0 - cost) * value - 1.0, []
-
-
-def _drift(
-    weights: dict[str, float], prices: pd.DataFrame | None, start: str | None, end: str
-) -> dict[str, float]:
-    """`weights` (after `start`'s trades) as they stand at `end`'s close, before its trades."""
-    if start is None or prices is None:
-        return weights
-    grown = {}
-    for name, weight in weights.items():
-        growth = _growth(prices, start, end, name)
-        grown[name] = weight * (growth if growth is not None else 1.0)
-    total = sum(grown.values())
-    return {k: v / total for k, v in grown.items()} if total > 0 else weights
 
 
 def _same_reset_year(week: str, next_week: str) -> bool:
@@ -259,7 +260,8 @@ BacktestNow = Callable[[dict, str, str], float | None]
 def backtest_week(result: engine.Result, week: str, next_week: str) -> float | None:
     """The backtest's own return over the week: its value just before `week`'s trades to its
     value just before `next_week`'s, so it pays `week`'s costs as the live figure does. (The
-    engine's equity is after each week's trades; their cost is in the trade log.)"""
+    engine's equity is after each week's trades; their cost, PARK / UNPARK legs included, is in
+    the trade log.)"""
     equity = result.equity
     start, end = pd.Timestamp(week), pd.Timestamp(next_week)
     if start not in equity.index or end not in equity.index:
@@ -281,10 +283,6 @@ def backtest_week(result: engine.Result, week: str, next_week: str) -> float | N
 
 def _next_week(week: str) -> str:
     return (pd.Timestamp(week) + pd.Timedelta(days=7)).strftime("%Y-%m-%d")
-
-
-def _prev_week(week: str) -> str:
-    return (pd.Timestamp(week) - pd.Timedelta(days=7)).strftime("%Y-%m-%d")
 
 
 def _benchmark_levels(selected: dict) -> dict[str, float]:
@@ -356,8 +354,9 @@ def score_item(
         return item
     target = {k: float(v) for k, v in target.items() if v}
     config = json.loads(row["settings"]) if isinstance(row["settings"], str) else row["settings"]
-    before = _drift(_holdings(row), prices.close, _prev_week(week), week)
-    cost = trade_cost(config, before, target)
+    # `holdings_before` is the model portfolio at W's close before W's own trades (prices moved
+    # it since W-1's trades already), so the trades are exactly the move to `target`.
+    cost = trade_cost(config, _holdings(row), target)
     ideal, missing = portfolio_return(target, prices.close, week, next_week, cost)
     if ideal is None:
         item.update(status="not_scored", reason="no price for " + ", ".join(sorted(missing)))
@@ -374,6 +373,10 @@ def score_item(
     )
     if not isinstance(a, int | float) or not isinstance(b, int | float) or a <= 0:
         item["backtest"]["recorded_note"] = "the rows carry no backtest value"
+    elif "unknown" in (next_version, item["ranking"]):
+        item["backtest"]["recorded_note"] = (
+            "which ranking produced a row cannot be told from this clone's git history"
+        )
     elif next_version != item["ranking"]:
         item["backtest"]["recorded_note"] = (
             f"the two rows come from different rankings ({item['ranking']} / {next_version})"

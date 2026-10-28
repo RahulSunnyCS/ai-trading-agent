@@ -28,7 +28,7 @@ it. The Friday 20:30 job (`mbt journal score`) scores the week that has just fin
 
 | Column | What it shows |
 |---|---|
-| Live, Fri close | The signal's portfolio (the model's holdings after that week's trades) bought at that Friday's close and valued at the next Friday's close, after the backtest's own costs (its itemised charges and 15 bps slippage a side). The *ideal* fill: the final signal is recorded after the close. |
+| Live, Fri close | The signal's portfolio (the model's holdings after that week's trades) bought at that Friday's close and valued at the next Friday's close, after the backtest's own costs (its charges and the slippage the strategy is set to). The *ideal* fill: the final signal is recorded after the close. |
 | Live, Mon open | The same at the Monday opens after each Friday: the price you can actually get. It lands a week later than the Friday figure, once that Monday has happened. |
 | Backtest as recorded | How much the backtest that produced the two entries moved over the same week. Shown only when both entries come from the same ranking. |
 | Backtest, today's code | The same settings re-run now. Entries recorded before 28 Oct 2026 come from the ranking before the 28 Oct fix (Broad now ranks only the stocks that were in the universe that week), so this can differ from "as recorded". |
@@ -36,7 +36,8 @@ it. The Friday 20:30 job (`mbt journal score`) scores the week that has just fin
 | Mom30 TRI | The Nifty200 Momentum 30 TRI over the same week, from the journal's benchmark level. |
 
 The top table shows each followed group, its sleeves weighted by their value since the April reset,
-as the group itself is. **Every favourite** lists each sleeve and week: *Waiting* (next week's
+as the group itself is; a week with no sleeve scored yet is one "Waiting for the week after" line
+under it. **Every favourite** lists each sleeve and week: *Waiting* (next week's
 entry not in yet), *Mismatch* (a recorded buy is not in next week's portfolio, or a sell is still
 there: shown, never scored), *Recorded late* (every entry came after the fill). A rerun recorded
 after the fill is a correction and is never scored in place of the entry that could have been
@@ -54,7 +55,7 @@ share belongs to comes from the lot ledger, or, until the next Friday run books 
 | Signal | The journal's action and target weight. A new lot is bought from cash, so every name it holds is a Buy. |
 | Model shares, Orders | Whole shares at the target weight of the lot's budget at Friday's close; what the 14:15 orders said. |
 | Done, Diff | Shares bought (or sold) for the lot, and the difference from the orders (or from the model when there were none). Shares added later in the week are counted here and shown in the tooltip. |
-| vs Fri close, vs Mon open, vs orders | The first day's average fill against the model's fill prices and the orders' price, in basis points; positive means you paid more on a buy, or got less on a sell. |
+| First-day price, vs Fri close, vs Mon open, vs orders | The average price of the first day's fills, and that price against the model's fill prices and the orders' price in basis points; positive means you paid more on a buy, or got less on a sell. Shares added later in the week are not measured. |
 | Charges | Your note's charges, shared by trade value; the tooltip has the model's charges on the same trades. |
 | Status | *done*, *shares differ*, *missed* (asked for, nothing done), *extra* (done, not asked for: a name bought in place of a skipped one, with the ledger's note). |
 

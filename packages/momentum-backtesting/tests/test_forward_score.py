@@ -121,8 +121,23 @@ def test_trade_cost_matches_the_engines_own_buy_and_sell_rates():
         tax_classes={},
     )
     expected = 0.3 * sim.buy_cost(0.3, "A") + 0.2 * sim.sell_cost(0.2, "B")
+    # 30% idle before, 20% after: 10% comes out of the liquid fund (the engine's UNPARK leg).
+    expected += 0.1 * sim.sell_cost(0.1, CASH)
     got = forward_score.trade_cost(CONFIG, {"B": 0.5, "A": 0.2}, {"B": 0.3, "A": 0.5})
     assert got == pytest.approx(expected)
+
+
+def test_parking_money_costs_the_flat_rate_and_a_hold_week_costs_nothing():
+    flat = {"cost_model": "flat", "cost_pct": 0.1}
+    # Selling half of A into the liquid fund: one sale and one PARK leg, 0.1% each.
+    assert forward_score.trade_cost(flat, {"A": 1.0}, {"A": 0.5}) == pytest.approx(0.001)
+    # `holdings_before` is already the portfolio at the signal's close: no trade, no cost.
+    assert forward_score.trade_cost(CONFIG, {"A": 0.6, "B": 0.4}, {"A": 0.6, "B": 0.4}) == 0.0
+
+
+def test_settings_without_a_field_take_the_requests_defaults():
+    rates = forward_score._rates({})
+    assert (rates.cost_model, rates.capital, rates.slippage_bps) == ("flat", 1e6, 5.0)
 
 
 def test_a_recorded_buy_missing_next_week_is_flagged_not_scored():
@@ -228,6 +243,27 @@ def test_rows_from_different_rankings_give_no_recorded_backtest():
     assert "different rankings" in item["backtest"]["recorded_note"]
     assert item["backtest"]["now"] == 0.05
     assert item["gap"]["now"]["ideal"] == pytest.approx(item["live"]["ideal"] - 0.05)
+
+
+def test_two_rows_of_unknown_ranking_are_never_taken_as_the_same():
+    def versions(commit: str) -> str:
+        return "unknown"
+
+    with connect() as con:
+        for week, before, at in (
+            (W1, {}, "2026-10-16T20:00:00+05:30"),
+            (W2, {"A": 1.0}, "2026-10-23T20:00:00+05:30"),
+        ):
+            _record(con, week, target={"A": 1.0}, before=before, rows=[], sleeve_value=1.0, at=at)
+        result = forward_score.score(
+            forward_journal.entries(con),
+            prices_for=lambda settings: _prices(),
+            backtest_now=None,
+            versions=versions,
+        )
+    item = next(i for i in result["items"] if i["week"] == W1)
+    assert item["backtest"]["recorded"] is None
+    assert "git history" in item["backtest"]["recorded_note"]
 
 
 def test_a_group_is_its_sleeves_weighted_by_value():
