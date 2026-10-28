@@ -597,6 +597,15 @@ def test_a_group_t1_followup_that_fails_is_retried_alone(evening):
     assert _send(evening, sent) == 0 and len(sent.messages) == 5
 
 
+def test_a_group_owed_t1_is_settled_without_a_message_when_t1_has_no_entry(evening):
+    done = rotation_result.calculate(DAY, evening)  # no T1 journal: kind "none"
+    for kind in ("", "group", "t1", "group-t1-owed"):
+        rotation_result.mark_sent(done, evening, kind)
+    sent = Sent()
+    assert _send(evening, sent) == 0 and sent.messages == []
+    assert rotation_result.was_sent(done, evening, "group-t1")
+
+
 def test_a_group_copy_sent_before_it_carried_t1_is_owed_no_followup(evening):
     """Before 2026-10-28 the group's evening copy had no T1 part: such a day owes the group nothing."""
     _journal(evening, T1_CORE, "t1")

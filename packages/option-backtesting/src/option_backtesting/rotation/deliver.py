@@ -484,7 +484,7 @@ def _send_result_locked(
     owed = []
     if owner_out and not t1_settled:
         owed.append((None, "t1"))
-    if group_t1_owed and telegram:
+    if group_t1_owed:
         owed.append((group_id, "group-t1"))
     if owed and kind == "none":
         for _, marker in owed:
