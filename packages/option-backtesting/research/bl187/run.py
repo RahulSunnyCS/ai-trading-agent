@@ -70,9 +70,7 @@ def underlying_of(name: str) -> str:
 
 def rank_book(pool, attrs, days_all):
     """Same replay as BL-185's A0 (list C's composite on gross, select), keeping the composite."""
-    days = sorted(
-        set.intersection(*(set(s.rows) for s in pool)) & set(attrs) & set(days_all)
-    )
+    days = sorted(set.intersection(*(set(s.rows) for s in pool)) & set(attrs) & set(days_all))
     days = [d for d in days if d.weekday() < 5]
     names = [s.name for s in pool]
     G = np.array([[s.rows[d][0] for s in pool] for d in days])
@@ -366,7 +364,9 @@ def report_book(label: str, res: dict, attrs: dict) -> tuple[list[str], dict]:
         "Net after ₹13 an order; ₹5 and ₹20 beside. Swap days = days the arm changed the book."
     )
     L.append("")
-    L.append("| Arm | Net / margin lot-day | Gross | Net at ₹5 | Net at ₹20 | Swap days | Max DD (net) | Total net |")
+    L.append(
+        "| Arm | Net / margin lot-day | Gross | Net at ₹5 | Net at ₹20 | Swap days | Max DD (net) | Total net |"
+    )
     L.append("|---|---|---|---|---|---|---|---|")
     for k, d in D.items():
         L.append(
@@ -375,9 +375,13 @@ def report_book(label: str, res: dict, attrs: dict) -> tuple[list[str], dict]:
             f"{fmt(d['net'].sum())} |"
         )
     L.append("")
-    L.append("Difference to B per margin lot-day, 90 % block bootstrap (all days; first period; second period):")
+    L.append(
+        "Difference to B per margin lot-day, 90 % block bootstrap (all days; first period; second period):"
+    )
     L.append("")
-    L.append("| Arm − B | All days: net | gross | ₹5 | ₹20 | First period net | Second period net |")
+    L.append(
+        "| Arm − B | All days: net | gross | ₹5 | ₹20 | First period net | Second period net |"
+    )
     L.append("|---|---|---|---|---|---|---|")
     for k in D:
         if k == "B":
@@ -424,7 +428,9 @@ def report_book(label: str, res: dict, attrs: dict) -> tuple[list[str], dict]:
             bool(x) and attrs[d]["dte_n" if underlying_of(x) == "NIFTY" else "dte_s"] == "0"
             for x, d in zip(arms["R14"]["dir"], days, strict=True)
         ])  # fmt: skip
-        L.append("R14 − B by the Dir's own index and whether it expires that day (per margin lot-day over the subset's swap days):")
+        L.append(
+            "R14 − B by the Dir's own index and whether it expires that day (per margin lot-day over the subset's swap days):"
+        )
         L.append("")
         L.append("| Subset | Swap days | R14 − B net | X14 − B net |")
         L.append("|---|---|---|---|")
@@ -481,7 +487,7 @@ def main() -> None:
         ref = rp.replay(pool, attrs, days_all)  # BL-185's own replay: the picks must be identical
         assert ref["picks"] == books[k]["picks"], f"{k}: picks differ from BL-185's replay"
     print({k: (len(p), len(books[k]["picks"])) for k, p in pools.items()}, flush=True)
-    simulate_cuts(needed_jobs(books) | gate_jobs(books))
+    simulate_cuts(needed_jobs(books))
     if "--jobs-only" in args:
         return
     cuts = read_cuts()
@@ -505,18 +511,6 @@ def main() -> None:
                 w.writerow([d, *(round(float(a["v"][i, 1]), 2) for a in res["arms"].values())])
     (OUT / "summary.md").write_text("\n".join(L) + "\n")
     print("\n".join(L))
-
-
-def gate_jobs(books: dict) -> set:
-    """Original-exit runs for the gate-1 sample (cut None)."""
-    t1 = books["t1"]
-    sample = [
-        (t1["names"][v], d)
-        for d, p in sorted(t1["picks"].items())
-        for v in p
-        if is_dir(t1["names"][v])
-    ]
-    return set()  # the gates simulate their own samples; nothing to cache
 
 
 if __name__ == "__main__":

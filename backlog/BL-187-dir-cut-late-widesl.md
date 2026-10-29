@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades Core and T1 with real money, picks a Dir on most days, and asked this directly |
-| **Status** | Phase 0 registered 2026-10-29, before any run |
+| **Status** | Done 2026-10-29: the registered verdict is **FAIL** for both books. R14 (the Dir cut two minutes before the strongest Widesl that starts after 14:00, that Widesl run in its place) reads +₹32 [−11, +74] net per margin lot-day on T1's 434 pick days with a deeper drawdown, and the gain is gone at ₹115 of late-fill cost per swapped-in Widesl. The Widesl added is worth having (+₹75 [+44, +106]) and the Dir's last hour is worth keeping (−₹43 [−68, −20] when cut); the ranking beats a random late Widesl by +₹44 [+8, +79]. Lead: a fixed 14:00 cut with the 14:02 Widesl, +₹40 [−2, +82], +₹50 [+7, +92] at ₹5 an order. Stage 2 not run. |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -65,11 +65,46 @@ Margin: the Dir's lot is the Widesl's lot, so the book is still three lots and *
 
 **Stage 2 (gated off).** Runs only if Stage 1 passes, or after the owner writes `override: <reason>`. NIFTY 2022-01 → 2024-10 (the lake), a NIFTY-only book (its own Adaptive over NIFTY's variants, same rule, nothing re-tuned). Needs 298 NIFTY variants simulated over about 700 days first.
 
-### Phase 1 — Build and parity gates
+### Phase 1 — Build and parity gates (done 2026-10-29)
 `research/bl187/`: picks and rankings from the A0 CSVs; Dir files derived with `exit_time` changed; the engine runs on the picked Dir days only; the arms; the gates above.
 
-### Phase 2 — Run, read, record
+### Phase 2 — Run, read, record (done 2026-10-29)
 All arms, both books, the sensitivities; findings page `research/options/strategies/directional/exit-time.md` and `widesl/entry-time.md` rows; item closed.
+
+## Result (2026-10-29)
+
+Gates 1 to 3 passed before any arm was read (Log). 3,613 Dir cut runs; the picks equal BL-185's A0 replay exactly. Everything below is per margin lot-day (book ÷ 3), net after ₹13 an order, 434 pick days 2025-01-10 → 2026-10-27, 90 % 5-day block bootstrap.
+
+**T1 book (primary)**
+
+| Arm | Net | Gross | Net at ₹5 | Net at ₹20 | Swap days | Max drawdown |
+|---|---|---|---|---|---|---|
+| B (as picked) | +505 | +617 | +553 | +464 | 0 | −8,536 |
+| **R14** (strongest Widesl from 14:02) | +538 | +672 | +595 | +487 | 362 | −9,642 |
+| F1400 (cut 14:00, Widesl 14:02) | +545 | +679 | +603 | +495 | 358 | −9,758 |
+| X14 (cut, nothing added) | +462 | +572 | +509 | +422 | 362 | −9,523 |
+| P14 (cut + a random eligible Widesl) | +493 | +627 | +551 | +443 | 366 | −9,400 |
+
+| Difference to B | Net | Gross | ₹5 | First period (184 days) | Second period (250) |
+|---|---|---|---|---|---|
+| R14 | +32 [−11, +74] | +55 [+12, +97] | +42 [−1, +84] | +60 [+6, +116] | +12 [−45, +73] |
+| R1430 | +13 [−18, +47] | +37 [+6, +70] | +24 [−7, +57] | +35 [+1, +69] | −2 [−50, +48] |
+| R1500 | +2 [−18, +22] | +26 [+6, +46] | +12 [−8, +32] | 0 [−16, +17] | +3 [−28, +36] |
+| F1400 | +40 [−2, +82] | +62 [+20, +104] | +50 [+7, +92] | +56 [+1, +113] | +28 [−33, +87] |
+| F1430 | +18 [−12, +48] | +41 [+12, +72] | +28 [−1, +58] | +32 [−3, +68] | +8 [−32, +52] |
+| F1500 | −13 [−33, +7] | +11 [−9, +31] | −2 [−22, +18] | −11 [−32, +9] | −14 [−45, +18] |
+| X14 | −43 [−68, −20] | −45 [−70, −22] | −44 [−69, −21] | −18 [−50, +17] | −62 [−95, −28] |
+| P14 | −12 [−29, +4] | +10 [−7, +26] | −2 [−19, +14] | −3 [−26, +20] | −18 [−42, +4] |
+
+- **Pass rule (R14, T1):** (a) lower bound above zero: no (−11); (b) positive in both periods: yes (+60, +12); (c) drawdown no deeper than B's: no (−9,642 against −8,536); (d) still above zero with ₹300 added per swapped-in Widesl: no (−51 [−95, −9]). **FAIL.** Core book: R14 − B +23 [−16, +62], drawdown −14,302 against −13,788, the same three failures. **FAIL.**
+- **Decomposition (T1):** ending the Dir early costs −43 [−68, −20] (its last hour earns, as BL-147 found at 14:55); the strongest Widesl added gives +75 [+44, +106]; the strongest beats a random eligible Widesl by +44 [+8, +79] (Core +27 [+1, +54]). The ranking carries information; the net gain is the Widesl's earnings minus the Dir's tail.
+- **Late-fill allowance:** with ₹100 added per swapped-in Widesl R14 − B is +4 [−39, +47]; with ₹300, −51 [−95, −9]. The break-even is about ₹115 a swapped-in lot (32 × 3 × 434 ÷ 362). The 14:47 slot is not the driver: leaving it out reads +27 [−18, +71].
+- **Where the gain is (descriptive, 362 swap days):** the strongest Widesl entered at 14:02 on 179 days, 14:17 on 82, 14:47 on 51, 14:32 on 31, 15:17 on 13, 15:02 on 6. By the Dir's index: SENSEX Dir +104 a day (177 days), NIFTY Dir −23 (185); expiry days +60 (116), other days +29 (246). Half-years: +7,451, −1,995, +9,671, −1,111 (sum of daily differences per margin lot-day); two of four are negative.
+- **Core book:** same shape, smaller: F1400 +34 [−5, +74], R14 +23, the ranking over random +27, SENSEX/NIFTY reversed (NIFTY Dir +36, SENSEX +20).
+
+**Reading.** The idea is not worthless: the added late Widesl earns, the ranking picks better than chance, and at ₹5 an order the fixed 14:00 / 14:02 version has a 90 % interval above zero (+₹50 [+7, +92]). But the registered primary arm does not clear zero, deepens the drawdown, and its gain is smaller than ₹115 of late-fill cost per Widesl lot, which 1-minute bars with no spread cannot rule out. Seen data, nine arms read besides B.
+
+**Not adopted. Stage 2 (NIFTY 2022-24) was not run:** its gate is a Stage 1 pass or the owner's `override: <reason>`. Leads for a later registration: the fixed 14:00 cut with the 14:02 Widesl; the SENSEX-Dir-only version; measuring the real late-entry slippage from the live capture (`obt rotation live-compare`) first, since the answer turns on a cost of about ₹100 a lot.
 
 ## Risks
 
@@ -85,3 +120,5 @@ None blocking. Defaults taken and stated above: T1 as the primary book, R14 as t
 
 - 2026-10-29 Registered (Phase 0) before any run.
 - 2026-10-29 Phase 1 built; gate (2) sharpened before any arm was read: instead of a Rs 1 match to one bar of the original curve, the cut run's MTM curve must equal the original's at every bar before the cut (the engine is deterministic), and the cut run's gross is reported against the original curve's last bar before the cut. Gates 1-3 pass: 40 of 40 original-exit runs equal A0 (largest gross difference Rs 0.00); 10 of 10 cut curves identical (largest difference Rs 0.0000), the cut gross equals the last bar's MTM exactly. 3,613 Dir cut runs (every picked Dir at every cut after its entry, both books) are cached in `research/bl187/out/dir_cuts.csv`.
+- 2026-10-29 Phase 2: all arms, both books. R14 FAIL on (a), (c), (d); Core likewise. Findings pages updated (Dir exit time, Widesl entry time, Dir early exit). Stage 2 not run (gated). Generated files (`out/`, `variants/`) are git-ignored; `out/summary.md` is the full printout.
+- 2026-10-29 Count correction: Phase 0 said seven arms are read; the table lists eight besides B (R14, R1430, R1500, F1400, F1430, F1500, X14, P14) and the 14:47-out sensitivity. Only R14 could pass, so the rule is unaffected.

@@ -110,3 +110,7 @@ result files (`research/bl147/out/`) are git-ignored; regenerate with `research/
 
 [bl147]: ../../../backlog/BL-147-directional-early-exit.md
 [bl096]: ../../../backlog/BL-096-directional-parameter-sweep.md
+
+## Later: ending the Dir for a late Widesl (BL-187)
+
+Ending the picked Dir two minutes before the strongest late Widesl enters (14:00 to 15:15) costs −₹43 [−68, −20] net per margin lot-day on the Dir's last hour, the same direction as above; the Widesl that replaces it earns +₹75 [+44, +106], so the book reads +₹32 [−11, +74] with a deeper drawdown, and the gain is gone at about ₹115 of late-fill cost per swapped-in lot ([BL-187](../../../backlog/BL-187-dir-cut-late-widesl.md); 434 Adaptive pick days, after charges, seen data).
