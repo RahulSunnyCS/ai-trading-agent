@@ -18,10 +18,10 @@ made on 2026-10-19 (`tests/fixtures/quantiply/`, contract in `docs/algotest-exec
 A mapping taken from the web app's code but never seen saved would go in `Export.unconfirmed`,
 which the uploader refuses; none is left.
 
-Anything else that is set (a target, re-entry asap or on target, roll, a peak trail, a stop
-judged on the close, a range breakout on the index or with a gap or valid-until, next-weekly or
-monthly expiry, complete square-off, `no_reentry_after`, an overall target, historical lot
-sizing) raises `Unmappable` naming the field: never dropped, never guessed.
+Anything else that is set (a target, re-entry asap or on target, roll, a peak trail, a
+stop-and-reverse, a stop judged on the close, a range breakout on the index or with a gap or
+valid-until, next-weekly or monthly expiry, complete square-off, `no_reentry_after`, an overall
+target, historical lot sizing) raises `Unmappable` naming the field: never dropped, never guessed.
 
 Leg ids are derived from the strategy and leg ids, so a strategy always exports to the same body."""
 
@@ -113,6 +113,8 @@ def _leg(spec: LegwiseStrategy, leg: Leg, unconfirmed: list[str]) -> dict:
         raise _refuse(where, "roll")
     if leg.trail_peak is not None:
         raise _refuse(where, "trail_peak")
+    if leg.reverse_on_sl is not None:
+        raise _refuse(where, "reverse_on_sl")
     if leg.stop_on != "tick":
         raise _refuse(where, f"stop_on: {leg.stop_on}")
 
