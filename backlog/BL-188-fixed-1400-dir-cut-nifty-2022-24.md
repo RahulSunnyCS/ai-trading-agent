@@ -109,3 +109,5 @@ None blocking.
 ## Log
 
 - 2026-10-29 Registered (Phase 0) before any run. Owner: "Yeah, we can run that."
+- 2026-10-29 Slippage read (before the backtest): `obt rotation live-compare` over 2026-10-21 → 2026-10-28 has 23 Widesl copies (Quantiply and AlgoTest), all entering 10:17–13:17; none at 14:00 or later. Per lot, live minus paper: median about −₹7, mean dragged by single copies of −₹3,608 and +₹1,703 (stop fills). The live capture cannot measure 14:00 slippage yet; the ₹300 allowance stands as registered.
+- 2026-10-29 Phase 1: the N22 set built (`research/bl188/n22.py`): 322 NIFTY variants × 699 days (2022-01-03 → 2024-10-31), no variant-day dropped; 682 attribute days to 2024-10-08 (the first count of 681 missed one; the set is what `backtest_days` returns). Gates: (1) 5,474 variant-days 2024-10-09 → 2024-10-31 equal A0 (largest gross difference ₹0.00); (2) band and NIFTY label equal the stored `days.csv` on all 500 stored days. PASS. Shared code for BL-188/189/190 in `research/common/books.py`.
