@@ -58,6 +58,8 @@ A warning badge on a block means its master switch holds it back.
 
 - Under each list (Adaptive and Tuned Adaptive), its capital and the month so far on paper, as a share of it (`Capital ₹8.5 L` / `October +₹26,634 (+3.1%)`). A list's capital is the capital of the accounts whose rows upload it, each counted once.
 - In your own chat only, the total capital and what you really made this month, from the contract notes (the [Trade book](app:/tradebook/fno)'s figures), per broker, up to the last day with a note. Today's notes arrive after midnight, so the 16:00 message runs to the session before.
+  - The month's profit is after the notes' charges (brokerage, STT, exchange and SEBI fees, GST, stamp duty) and the algo fees.
+  - It does not take off the collateral interest from the brokers' ledger or the other debits (the Trade book's estimate of about ₹1,000 a year per F&O broker), so the message lists both and the profit **after debits**. Deposits are never counted as profit.
 - The friends' group sees the per-list lines, never the real money.
 
 **Pause uploads and deploys.** Below the blocks, pick a day, or press **Skip next session**, to stop every upload, top-up and deploy for each session up to and including that day. **Clear pause** removes it.

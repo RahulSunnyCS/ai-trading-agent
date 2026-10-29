@@ -135,18 +135,24 @@ def test_a_month_that_cannot_be_read_leaves_only_its_lines_out(tmp_path, monkeyp
 def test_the_real_month_lines():
     real = result.RealMonth(
         date(2026, 10, 28),
-        34557.63,
+        25000.40,
         1_700_000,
-        {"Angel One": -6046.56, "Shoonya": 41729.19},
+        {"Angel One": -5000.25, "Shoonya": 30000.65},
         date(2026, 10, 28),
         1,
+        700.30,
+        100.10,
     )
     assert messages.real_lines(real) == [
         "💼 Total capital ₹17 L",
-        "   Real, October +₹34,558 (+2.0%)",
-        "   Angel One −₹6,047 · Shoonya +₹41,729",
+        "   Real, October +₹25,000 (+1.5%) after charges & algo fees",
+        "   Angel One −₹5,000 · Shoonya +₹30,001",
+        "   Interest −₹700 · other debits −₹100 (est.)",
+        "   After debits +₹24,200 (+1.4%)",
         "   contract notes to Wed 28 Oct · 1 day not in yet",
     ]
+    no_debits = result.RealMonth(date(2026, 10, 28), 1000.0, 1_700_000, {}, date(2026, 10, 28))
+    assert not any("debits" in line for line in messages.real_lines(no_debits))
     empty = result.RealMonth(date(2026, 11, 2), 0.0, 1_700_000, {}, None)
     assert messages.real_lines(empty) == [
         "💼 Total capital ₹17 L",

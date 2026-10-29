@@ -306,8 +306,9 @@ def months_to_date(
 
 @dataclass(frozen=True)
 class RealMonth:
-    """The real money from the 1st of the month: the contract notes' profit (after charges and
-    algo fees), every F&O account and per broker, against every account's capital added up."""
+    """The real money from the 1st of the month: the contract notes' profit (after the notes'
+    charges and the algo fees), every F&O account and per broker, against every account's capital
+    added up; and beside it what the profit leaves out (the Trade book's summary)."""
 
     day: date
     total: float
@@ -318,6 +319,16 @@ class RealMonth:
     through: date | None
     #: sessions this month whose notes are not all in, left out of `total`
     open_days: int = 0
+    #: collateral interest from the brokers' ledger e-mails, not in `total`
+    interest: float = 0.0
+    #: the Trade book's estimate of the accounts' small debits (₹1,000 a year per F&O broker),
+    #: not in `total`
+    other_debits: float = 0.0
+
+    @property
+    def after_debits(self) -> float:
+        """`total` less the interest and the other debits: the Trade book's net after debits."""
+        return self.total - self.interest - self.other_debits
 
 
 def real_month(day: date, capital: float, root: Path | None = None) -> RealMonth:
@@ -337,13 +348,16 @@ def real_month(day: date, capital: float, root: Path | None = None) -> RealMonth
             name = BROKER_NAMES.get(broker, broker)
             brokers[name] = brokers.get(name, 0.0) + float(sum(p for p in got if p is not None))
     noted = [r.day for r in rows if r.notes]
+    figures = ratios.summary(rows)
     return RealMonth(
         day,
-        float(sum(r.profit for r in rows if r.profit is not None)),
+        figures["net"],
         capital,
         brokers,
         max(noted) if noted else None,
         sum(1 for r in rows if r.open),
+        figures["interest"],
+        figures["other_debits"],
     )
 
 

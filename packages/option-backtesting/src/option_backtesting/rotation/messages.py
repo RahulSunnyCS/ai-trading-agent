@@ -314,18 +314,33 @@ def month_lines(month) -> list[str]:
     return [f"   Capital {lakhs(month.capital)}", line]
 
 
+def _share(value: float, capital: float) -> str:
+    """`+2.0%`, `−1.2%`, `0.0%`: `value` as a share of `capital`, one decimal."""
+    share = round(100 * value / capital, 1)
+    sign = "+" if share > 0 else MINUS if share < 0 else ""
+    return f"{sign}{abs(share):.1f}%"
+
+
 def real_lines(real) -> list[str]:
     """The owner's real money this month (`result.RealMonth`): every account's capital added up,
-    the contract notes' profit from the 1st as a share of it, and per broker."""
-    share = round(100 * real.total / real.capital, 1)
-    sign = "+" if share > 0 else MINUS if share < 0 else ""
+    the contract notes' profit from the 1st (after charges and algo fees) as a share of it, per
+    broker, then what that leaves out (collateral interest, the estimated other debits) and the
+    net after them."""
     if real.through is None:
         head = f"   Real, {real.day:%B}: no contract notes yet"
     else:
-        head = f"   Real, {real.day:%B} {rupees(real.total)} ({sign}{abs(share):.1f}%)"
+        head = f"   Real, {real.day:%B} {rupees(real.total)} ({_share(real.total, real.capital)})"
+        head += " after charges & algo fees"
     out = [f"💼 Total capital {lakhs(real.capital)}", head]
     if real.brokers:
         out.append("   " + " · ".join(f"{n} {rupees(v)}" for n, v in sorted(real.brokers.items())))
+    if real.interest or real.other_debits:
+        debits = rupees(-real.other_debits)
+        out.append(f"   Interest {rupees(-real.interest)} · other debits {debits} (est.)")
+        out.append(
+            f"   After debits {rupees(real.after_debits)} "
+            f"({_share(real.after_debits, real.capital)})"
+        )
     if real.through is not None:
         note = f"   contract notes to {day_text(real.through)}"
         if real.open_days:
