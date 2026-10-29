@@ -88,10 +88,10 @@ equal the stored rotation results on all 75,450 slot-days (0 differ).
 | T1, all 435 | +1,495 / 25,887 / −7,573 | +1,442 / 29,005 / −8,601 | −53 [−170, +71] | 147 |
 | Forward (13 days): Core +390 [−345, +1,229], T1 +275 [−275, +839] | | | | |
 
-**By the registered rule (P2): kill, for both.** Core −₹72 a day; T1 −₹146 a day with the interval wholly
+**By the registered rule (P2): kill, for both.** Core −₹72 a day (the interval includes zero: not a significant loss, but no gain); T1 −₹146 a day with the interval wholly
 below zero, a drawdown 19% deeper and a worse 5th-percentile day. Keep ₹2,500.
 
-**Standalone, per family** (every slot-day, ₹ per strategy-day, ₹2,500 → ₹3,000): the average rises by
+**Standalone, per family** (every slot-day from 2024-10-09; the expiry / non-expiry split in `study.json` covers the replay's days from 2025-01-10 only; ₹ per strategy-day, ₹2,500 → ₹3,000): the average rises by
 ₹2 to ₹11 (NIFTY OTM1 217 → 226, ₹80 182 → 185, ₹100 183 → 194; SENSEX OTM2 104 → 102, ₹250 99 → 103,
 ₹320 96 → 106); the 5th-percentile day is 14–16% deeper in every family (about −₹2,800 → −₹3,200); the
 stop fires about 25% less. So each strategy alone gains a little and loses deeper on bad days, and the
