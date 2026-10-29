@@ -1,0 +1,111 @@
+# BL-188 — Fixed 14:00 Dir cut with the strongest 14:02 Widesl, tested on unseen NIFTY 2022-24
+
+| | |
+|---|---|
+| **Priority** | P1 — the one lead BL-187 left; the owner asked to run it (2026-10-29) |
+| **Status** | In progress — Phase 0 registered 2026-10-29, before any run |
+| **Type** | research |
+| **Area** | options |
+| **Created** | 2026-10-29 |
+| **Depends on** | BL-187 (the rule, its F1400 arm and the code in `research/bl187/`), BL-185 (A0, the Adaptive replay), BL-034 (NIFTY 2022-24 in the lake), BL-141 (the live capture) |
+| **TODO.md row** | 3.10.51 |
+
+## Context
+
+BL-187 (2026-10-29) failed its registered rule, but its arm F1400 — cut the picked Dir at 14:00 and run
+the strongest Widesl that starts at 14:02 — read +₹40 [−2, +82] net per margin lot-day on T1's 434
+pick days, +₹50 [+7, +92] at ₹5 an order. That reading came from seen data with nine arms read, so it
+is a lead only. The owner (2026-10-29): "Yeah, we can run that", on "register the fixed 14:00 cut with
+the 14:02 Widesl as its own item, with the late-fill slippage measured from live capture first".
+
+Two things settle it: what a late Widesl really costs to enter (BL-187's gain was gone at about ₹115
+a swapped-in lot), and whether the rule holds on days nobody has looked at.
+
+## Goal
+
+(1) Measure the live entry slippage of Widesl copies from the live capture, by entry time. (2) Test
+F1400 against the book as picked on NIFTY 2022-01-03 → 2024-10-08, which no Adaptive-book item has
+read, with nothing re-tuned.
+
+## Out of scope
+
+The ranking, the picks, the Buy add-on, the book stops, the live plumbing. A pass starts nothing live;
+it goes to the owner as a candidate.
+
+## Plan
+
+### Phase 0 — Pre-register (registered 2026-10-29, before any run; frozen)
+
+**Slippage, measured first (descriptive).** Every Widesl copy in `obt rotation live-compare` over every
+captured day (2026-10-21 → 2026-10-28): slippage per lot (live per lot − paper per lot, signed, + =
+live did better), median and mean, by entry slot before 12:00, 12:00–13:59, 14:00 and later. Read
+before the backtest (2026-10-29, Log): 23 Widesl copies over six days, all entering 10:17–13:17,
+none at 14:00 or later, so the live capture cannot measure 14:00 slippage yet. The cost allowance of
+the pass rule therefore stays at BL-187's ₹300 a swapped-in lot, set before this read and not moved.
+
+**Data (the clean set).** NIFTY only, 2022-01-03 → 2024-10-08: the 681 weekdays with option and index
+bars that `data_quality` does not exclude. Every NIFTY variant of Core-298 (149) and of T1's 223 extras
+(173) simulated over it with the same engine, sizing (`lot_sizing: current`, sizing date 2026-10-12),
+reference fallback (`research/common/early_ref.py`) and charges (`ruletest/charges.py`, ₹13 an order,
+the day's own STT) as BL-185's A0 — the **N22 set**, one CSV a variant, git-ignored, built by
+`research/bl188/n22.py`. Day attributes: weekday, the 09:15 India VIX open and its band
+(`rotation/attrs.py`), NIFTY's days to the nearest listed expiry on the weekday basis (`dte.py`);
+SENSEX's label is a constant (no SENSEX variant is in the pool).
+
+**Books.** Two NIFTY-only books: **T1-N** (all 322 NIFTY variants; primary) and **Core-N** (the 149;
+reported, never decides). List C's composite on gross, `score.select` (three core picks, Widesl
+minimum two), 63-day warm-up, no Buy add-on, no expiry-only rule — BL-187's replay unchanged, on this
+pool. Per margin lot-day = book ÷ 3. **B** = the three picks to their own exits.
+
+**The rule (F1400, from BL-187, unchanged).** On a day whose picks hold a Dir that enters before
+14:00: the Dir's `exit_time` becomes 14:00 (engine re-run, nothing else changed) and the strongest
+Widesl by the same morning composite among the 14:02 slots, not already picked, is added at 1 lot and
+held to its own exit. Otherwise the day is as picked. Beside it, descriptive only: BL-187's R14 (the
+strongest Widesl from 14:02, the Dir cut two minutes before it) and X14 (R14's cut, nothing added).
+
+**Pass rule (F1400 − B, T1-N).** All of: (a) the 90 % lower bound is above zero over all pick days
+(circular 5-day block bootstrap, 2,000 resamples, seed 20261028); (b) the point estimate is above zero
+in each half of the pick days (split at the middle pick day); (c) F1400's max drawdown (net,
+cumulative per margin lot-day) is no deeper than B's; (d) the point estimate is still above zero with
+₹300 charged per swapped-in Widesl. Pass = a candidate for the owner; fail = the lead is closed.
+Reported beside: net at ₹5 and ₹20 an order, ₹100 allowance, by expiry day, by year, Core-N.
+
+**Parity gates (before any arm is read).** (1) The N22 rows for 2024-10-09 → 2024-10-31 (simulated
+past the end for this check only) equal A0's rows for the same variants and days (gross within ₹1,
+orders equal). (2) The day attributes computed for 2024-10-09 → 2026-10-27 the same way equal the
+stored `rotation/days.csv` (band and NIFTY label) on every stored day. (3) BL-187's cut gates (original
+exit reproduces N22; the cut curve is identical before the cut) on 20 sampled Dir picks. A failed gate
+stops the item until fixed and logged.
+
+**Red-team.**
+- *Look-ahead:* the picks and the Widesl come from the morning composite (history before the day); the
+  14:00 cut is fixed; nothing of the afternoon is read to choose.
+- *Survivorship:* none; every variant is a fixed file, simulated on every day.
+- *Data-snooping:* the rule was found on 2025-26 data (BL-187) and is carried over unchanged; N22 is
+  read for the first time by an Adaptive book. One primary arm. The 2022-24 data were used before only
+  as a confirmation set for intraday triggers (BL-083) and for single strategies, never for this rule.
+- *Different market:* 2022-24 NIFTY had Thursday weekly expiries, higher VIX in 2022, and a smaller
+  lot (the run uses today's lot on every day, as AlgoTest does); vendor 1-minute data (BL-034), no
+  spread. Read as a different regime, which is the point of a clean test.
+- *Not modelled:* book stops, the Buy add-on, the expiry-only rule, real 14:00 spreads (the allowance).
+
+### Phase 1 — Build the N22 set and its gates (shared with BL-189 and BL-190)
+`research/bl188/n22.py` (simulate, day attributes, the parity gates). Done when the gates pass.
+
+### Phase 2 — Run, read, record
+F1400 on T1-N and Core-N; findings pages (`directional/exit-time.md`, `widesl/entry-time.md`); item
+closed.
+
+## Risks
+
+- The 2022-24 vendor data may differ from Fyers data in ways the gates do not see; the gates check the
+  engine and attributes, not the vendor.
+- 14:00 slippage stays unmeasured until the owner trades a late Widesl live.
+
+## Open questions
+
+None blocking.
+
+## Log
+
+- 2026-10-29 Registered (Phase 0) before any run. Owner: "Yeah, we can run that."

@@ -44,6 +44,9 @@ Sorted by priority (P0 first), then ID.
 | [BL-173](BL-173-fewer-telegram-messages.md) | Fewer Telegram messages: one morning confirmation, the pick, the result and failures; a "failures only" level per type | P1 | In progress | improvement | notify |
 | [BL-174](BL-174-rotation-day-60-readout.md) | Options rotation: the registered read-out at 60 trading days of the forward journal (due ~early Jan 2027) | P1 | Planned | research | options |
 | [BL-176](BL-176-momentum-search-on-f6-ranking.md) | Momentum: re-run the strategy search on the F6-fixed (point-in-time) ranking | P1 | Planned | research | momentum |
+| [BL-188](BL-188-fixed-1400-dir-cut-nifty-2022-24.md) | Fixed 14:00 Dir cut with the strongest 14:02 Widesl (BL-187's lead), live slippage first, tested on unseen NIFTY 2022-24 | P1 | In progress | research | options |
+| [BL-189](BL-189-strict-two-widesl-one-dir.md) | Strictly two Widesl and one Dir every day, or keep "at least two Widesl" | P1 | In progress | research | options |
+| [BL-190](BL-190-replace-early-stopped-pick.md) | A pick stopped out by 12:15: start the strongest later Widesl or Dir in its place | P1 | In progress | research | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
