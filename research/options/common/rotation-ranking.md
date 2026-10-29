@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-10-28
+**Status:** Tested · **Last updated:** 2026-10-29
 
 ## What it is
 
@@ -55,6 +55,8 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-154 | Adaptive's weekday / DTE / VIX fits shrunk toward the variant's own window mean by n/(n+10); plus opening-gap and previous-day-range bands (÷ ATR, terciles) at weight 10 from weekday; P1 decides, 20 label shuffles | **Killed**: on P1 shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above it, drawdown 21% deeper; labels −₹20 [−91, +48]. Out of P1 shrinkage is wholly negative (P2 −₹172 [−321, −38], whole span −₹71 [−146, −1]); the more weight on the plain mean, the worse. Today's fits beat all 20 label shuffles on P2 and the whole span (17 of 20 on P1). Gross, 431 days 2025-01 → 2026-10 | [BL-154][bl154] |
 | BL-090 | A cap in `select`: no two core picks above trailing 63-day Pearson 0.5 / 0.6 / 0.7, lists A / B / C / REF, on BL-075's P1 / P2 / P3 (248 variants, P3 NIFTY only); pass = drawdown 10% shallower with net at most 5% lower in 2 of 3 periods | **Killed** for all 12 cells (best: 1 period). Drawdown is often shallower but net falls; in P2 every cap loses 28%–105% of net. Before charges, lists in-sample | [BL-090][bl090] |
 | BL-167 | ITM2 Dir added to the Adaptive universe (Core-298; Core-298 + T1), in-sample, 431 days | **No gain**: Core −₹57 a day (interval −235 to +118), T1 −₹74 (−258 to +108); Core drawdown 25% shallower, T1's 11% deeper; 75–78% of Core's ITM1 picks and 51–58% of its ATM picks are dropped (ITM2 enters in their place) | [BL-167][bl167] |
+| BL-189 | `select`'s Widesl minimum: exactly two Widesl + one Dir every day (the best Dir forced in on three-Widesl days) vs at least two | **Keep as it is**: T1 2025-26 −₹55 [−97, −18] net per margin lot-day for the strict rule (68 of 434 days differ); NIFTY 2022-24 T1-N +₹4 [−19, +29], Core-N +₹66 [+36, +100] | [BL-189][bl189] |
+| BL-190 | A pick finished by 12:15 (stopped, no entry left) replaced by the strongest later Widesl or Dir by the morning composite | **Killed**: T1 2025-26 Widesl −₹9 [−56, +38], Dir −₹10 [−55, +35] (95 %), drawdown deeper; NIFTY 2022-24 +₹9 / +₹7; no better than a random replacement | [BL-190][bl190] |
 
 ## What we know
 
@@ -69,6 +71,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
   in 2022–24. Lists A, B and C keep it small (0–15%) for that reason; REF keeps the old 33%.
 - The rule is fragile: few weight cells are above chance in every period, and which one is best is not
   knowable from one year (PBO near 0.5). Adding Dir ITM1 made it much less fragile (58% of cells).
+- The book's shape (BL-189, BL-190): on three-Widesl days the third Widesl that outranks every Dir is worth keeping on T1 (+₹1,168 a lot against the best Dir's +₹119 over 68 days, 2025-26); forcing a Dir in helped only Core-N in 2022-24. Re-using a stopped pick's lot the same morning adds nothing and deepens the worst run. Registered, after charges.
 - Charges: lists A / B / C / REF pay ₹80–81k each in P1 at ₹13 an order ([charges](charges.md)).
 - In-sample comparison only, not BL-100's test: over 2025-10-09 → 2026-10-09 the full pool earned more
   per lot-day than both restricted pools for every list (A ₹383.6 full vs ₹309.1 / ₹268.6), gross
@@ -113,3 +116,5 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl180]: ../../../backlog/BL-180-evening-prediction-vs-0916-pick.md
 [bl090]: ../../../backlog/BL-090-strategy-correlation-and-diverse-baskets.md
 [bl167]: ../../../backlog/BL-167-itm2-in-adaptive-and-t1.md
+[bl189]: ../../../backlog/BL-189-strict-two-widesl-one-dir.md
+[bl190]: ../../../backlog/BL-190-replace-early-stopped-pick.md

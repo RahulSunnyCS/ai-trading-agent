@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — decides the shape of the book the owner trades every day |
-| **Status** | In progress — Phase 0 registered 2026-10-29, before any run |
+| **Status** | Done 2026-10-29: **keep the rule as it is** (at least two Widesl, a third allowed). Forcing a Dir in on three-Widesl days costs T1 −₹55 [−97, −18] net per margin lot-day on 2025-26 (the third Widesl earned +₹1,168 a lot on those 68 days, the best Dir +₹119); on NIFTY 2022-24 T1-N is level (+₹4 [−19, +29]) and Core-N favours the strict rule (+₹66 [+36, +100]). |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -66,6 +66,30 @@ and Core-N.
 ### Phase 1 — Run, read, record
 `research/bl189/run.py` on both sets; findings page `research/options/common/` (book shape); closed.
 
+## Result (2026-10-29)
+
+Per margin lot-day (book ÷ 3), net after ₹13 an order, 90 % 5-day block bootstrap. The books differ
+only on three-Widesl days.
+
+| Book | Days | Three-Widesl days | B net | S21 net | S21 − B | B drawdown | S21 drawdown |
+|---|---|---|---|---|---|---|---|
+| **T1, 2025-26 (seen; primary)** | 434 | 68 (16 %) | +505 | +451 | **−55 [−97, −18]** | −8,536 | −8,860 |
+| Core, 2025-26 | 434 | 78 (18 %) | +298 | +273 | −25 [−69, +18] | −13,788 | −13,355 |
+| T1-N, NIFTY 2022-24 (clean) | 618 | 120 (19 %) | +213 | +217 | +4 [−19, +29] | −18,045 | −15,205 |
+| Core-N, NIFTY 2022-24 | 618 | 127 (21 %) | +222 | +288 | +66 [+36, +100] | −8,843 | −6,208 |
+
+- **Pass rule (adopt S21):** (a) T1 lower bound above zero: no (the whole interval is below zero);
+  (b) T1-N above zero: yes (+4); (c) drawdown no deeper on T1: no. **Keep as it is.**
+- **On the three-Widesl days, ₹ a lot, net:** T1 2025-26: third Widesl +1,168, best Dir +119 (the Dir better on
+  40 %); T1-N 2022-24: +108 against +170 (50 %); Core-N 2022-24: −221 against +736 (58 %). The third
+  Widesl that outranks every Dir earned well in 2025-26 and badly in Core-N's 2022-24.
+- **Expiry days** are where forcing the Dir hurts most in every book but Core-N (T1 −2,126 a lot over
+  35 days; T1-N −920 over 18); on other days the Dir is level or better (T1 +92, T1-N +235, Core-N
+  +904). Descriptive, small subsets, not tested.
+
+**Reading.** On the book the owner trades (T1) the current rule is better, with an interval wholly on
+its side; on 2022-24 it is level for T1. Only Core-N in 2022-24 says otherwise. No change.
+
 ## Risks
 
 Small number of differing days; the answer may be "can't tell".
@@ -77,3 +101,5 @@ None. Owner confirmed the reading (2026-10-29): today's rule vs strict two Wides
 ## Log
 
 - 2026-10-29 Registered (Phase 0) before any run; the reading confirmed by the owner.
+- 2026-10-29 Phase 1 run: keep as it is (S21 − B −55 [−97, −18] on T1). Findings page updated. Item closed.
+- 2026-10-29 Correction to the red-team, after the run: NIFTY 2022-04-05 → 2024-10-08 is BL-071's hold-out P3, and BL-075 kept list C's weight cell partly because it was above chance there, so the ranking itself has seen P3. The book rules tested here had not been run on it. No rule or verdict changes.

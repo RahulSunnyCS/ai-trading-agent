@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner asked; frees a margin lot on stopped days |
-| **Status** | In progress — Phase 0 registered 2026-10-29, before any run |
+| **Status** | Done 2026-10-29: **FAIL** for both. A pick finished by 12:15 (about one day in five) replaced by the strongest later Widesl reads −₹9 [−56, +38] (95 %) net per margin lot-day on T1, by the strongest Dir −₹10 [−55, +35]; both deepen the drawdown (−10,010 / −11,371 against −8,536). On NIFTY 2022-24 both are slightly positive (+₹9, +₹7); Core-N's Dir replacement +₹35 [+3, +74] (90 %) is the only interval above zero. |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -77,6 +77,35 @@ every pick re-simulated. A failure stops the item.
 ### Phase 1 — Build, gate, run, record
 `research/bl190/run.py`; findings page `research/options/common/` (re-entry after a stop); closed.
 
+## Result (2026-10-29)
+
+Parity: every pick re-simulated equals its stored row (1,302 per seen book, 1,854 per clean book;
+largest gross difference ₹0.00). Per margin lot-day (book ÷ 3), net after ₹13 an order.
+
+How often: picks finished by 12:15 (no entry left): T1 96 of 1,302 (Widesl by the overall stop 68,
+legs 4; Dir by the overall stop 16, legs 8); Core 129; T1-N 74 of 1,854; Core-N 102. The stopped
+pick had already lost about ₹3,000–3,450 a lot by then.
+
+| Arm − B (net) | T1 2025-26 (primary, 95 %) | Core 2025-26 (90 %) | T1-N 2022-24 (90 %) | Core-N 2022-24 (90 %) |
+|---|---|---|---|---|
+| **RW12** strongest Widesl, stop by 12:15 | **−9 [−56, +38]** | +10 [−19, +40] | +9 [−8, +25] | +7 [−16, +29] |
+| **RD12** strongest Dir, stop by 12:15 | **−10 [−55, +35]** | −25 [−73, +20] | +7 [−19, +34] | +35 [+3, +74] |
+| RF12 same kind as the stopped pick | −1 | +11 | +8 | +13 |
+| RW11 / RD11 stop by 11:15 | −25 / −29 | −4 / −31 | −1 / −2 | −6 / +30 |
+| PW12 / PD12 a random eligible one | +4 / +4 | +8 / +7 | +7 / +4 | +2 / +14 |
+
+- **Pass rule (T1):** RW12: (a) no (−56), (b) yes (+9), (c) no (−10,010 against −8,536), (d) no (−16 at
+  ₹100). RD12: (a) no, (b) yes (+7), (c) no (−11,371), (d) no (−18). **Both FAIL.**
+- **What the replacement earns** (₹ a lot, net): T1 Widesl −119, Dir −138; Core Widesl +106, Dir −249;
+  T1-N Widesl +235, Dir +165; Core-N Widesl +123, Dir +640. A day with a pick stopped out by noon is
+  a moving day, and a fresh short entry earns about the average or less.
+- **The ranking does not help here:** the strongest replacement does no better than a random eligible
+  one (PW12 / PD12 within ₹10 of RW12 / RD12 or above them on T1).
+
+**Reading.** Replacing a stopped pick adds nothing on the book the owner trades and makes the worst
+run deeper, because a second short on a day that already stopped one out is exposed to the same move.
+Not adopted.
+
 ## Risks
 
 Few replacements in window 11; Dir replacements late in the morning may be few.
@@ -88,3 +117,5 @@ None. Owner (2026-10-29): replacement both a strong Dir and a strong Widesl; win
 ## Log
 
 - 2026-10-29 Registered (Phase 0) before any run; the owner's answers recorded.
+- 2026-10-29 Phase 1 run: RW12 and RD12 FAIL. Findings page updated. Item closed.
+- 2026-10-29 Correction to the red-team, after the run: NIFTY 2022-04-05 → 2024-10-08 is BL-071's hold-out P3, and BL-075 kept list C's weight cell partly because it was above chance there, so the ranking itself has seen P3. The book rules tested here had not been run on it. No rule or verdict changes.

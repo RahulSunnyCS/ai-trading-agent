@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the one lead BL-187 left; the owner asked to run it (2026-10-29) |
-| **Status** | In progress — Phase 0 registered 2026-10-29, before any run |
+| **Status** | Done 2026-10-29: **FAIL**, the lead is closed. On unseen NIFTY 2022-24 (T1-N, 618 pick days) the fixed 14:00 Dir cut with the strongest 14:02 Widesl reads −₹44 [−78, −12] net per margin lot-day, negative in both halves and every year; Core-N −₹11 [−42, +21]. The live capture has no Widesl entry after 13:17, so 14:00 slippage stays unmeasured. |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -96,6 +96,36 @@ stops the item until fixed and logged.
 F1400 on T1-N and Core-N; findings pages (`directional/exit-time.md`, `widesl/entry-time.md`); item
 closed.
 
+## Result (2026-10-29)
+
+Gates passed before any arm was read (Log; cut gates 20 of 20 on each book). The seen-set rows
+reproduce BL-187 exactly (F1400 +40, R14 +32 on T1), a check on the code. Per margin lot-day (book ÷ 3),
+net after ₹13 an order, 90 % 5-day block bootstrap.
+
+**T1-N, NIFTY 2022-04-05 → 2024-10-08 (618 pick days; the primary test)**
+
+| Arm | Net | Gross | Swap days | Max drawdown | Arm − B net | +₹300 a swapped Widesl |
+|---|---|---|---|---|---|---|
+| B (as picked) | +213 | +314 | 0 | −18,045 | | |
+| **F1400** | +169 | +289 | 487 | −16,639 | **−44 [−78, −12]** | −123 [−158, −90] |
+| R14 (BL-187's rule) | +180 | +300 | 490 | −16,093 | −33 [−61, −7] | −112 [−141, −86] |
+| X14 (cut, nothing added) | +147 | +245 | 490 | −20,498 | −66 [−87, −44] | |
+
+- **Pass rule (F1400, T1-N):** (a) lower bound above zero: no (−78); (b) above zero in both halves: no
+  (−38, −50); (c) drawdown no deeper: yes (−16,639 against −18,045); (d) above zero with ₹300: no.
+  **FAIL.** By year −8 (2022), −60 (2023), −58 (2024); expiry days −70, other days −37. At ₹5 an order
+  −35 [−69, −4].
+- **Core-N:** F1400 − B −11 [−42, +21], R14 −12, X14 −46 [−68, −24]. FAIL.
+- **Same shape as BL-187, different sign:** cutting the Dir's last hour again loses (−66 T1-N, −46
+  Core-N, as −43 on 2025-26), but in 2022-24 the late Widesl added earned too little to cover it (R14 − X14
+  +33 on T1-N against +75 on 2025-26).
+- **Slippage:** 23 live Widesl copies over 2026-10-21 → 28, all entering 10:17–13:17: live minus paper
+  median −₹6.5 a lot, mean −₹100 (two stop fills of −₹3,608 and +₹1,703). Nothing after 14:00, so the
+  ₹115 break-even of BL-187 can be neither confirmed nor ruled out live.
+
+**Reading.** BL-187's afternoon swap was a 2025-26 effect. On days that no book rule had been tried on
+it loses, before any late-fill cost. Not adopted; the lead is closed.
+
 ## Risks
 
 - The 2022-24 vendor data may differ from Fyers data in ways the gates do not see; the gates check the
@@ -111,3 +141,5 @@ None blocking.
 - 2026-10-29 Registered (Phase 0) before any run. Owner: "Yeah, we can run that."
 - 2026-10-29 Slippage read (before the backtest): `obt rotation live-compare` over 2026-10-21 → 2026-10-28 has 23 Widesl copies (Quantiply and AlgoTest), all entering 10:17–13:17; none at 14:00 or later. Per lot, live minus paper: median about −₹7, mean dragged by single copies of −₹3,608 and +₹1,703 (stop fills). The live capture cannot measure 14:00 slippage yet; the ₹300 allowance stands as registered.
 - 2026-10-29 Phase 1: the N22 set built (`research/bl188/n22.py`): 322 NIFTY variants × 699 days (2022-01-03 → 2024-10-31), no variant-day dropped; 682 attribute days to 2024-10-08 (the first count of 681 missed one; the set is what `backtest_days` returns). Gates: (1) 5,474 variant-days 2024-10-09 → 2024-10-31 equal A0 (largest gross difference ₹0.00); (2) band and NIFTY label equal the stored `days.csv` on all 500 stored days. PASS. Shared code for BL-188/189/190 in `research/common/books.py`.
+- 2026-10-29 Phase 2: F1400 FAIL on T1-N (−44 [−78, −12]) and Core-N; the seen set reproduces BL-187. Findings pages updated. Item closed.
+- 2026-10-29 Correction to the red-team, after the run: NIFTY 2022-04-05 → 2024-10-08 is BL-071's hold-out P3, and BL-075 kept list C's weight cell partly because it was above chance there, so the ranking itself has seen P3. The book rules tested here had not been run on it. No rule or verdict changes.

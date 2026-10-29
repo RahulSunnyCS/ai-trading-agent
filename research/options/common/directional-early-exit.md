@@ -1,6 +1,6 @@
 # Options: closing the directional strategies at 14:55 instead of 15:28
 
-**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-24
+**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-29
 
 ## What it is
 
@@ -114,3 +114,5 @@ result files (`research/bl147/out/`) are git-ignored; regenerate with `research/
 ## Later: ending the Dir for a late Widesl (BL-187)
 
 Ending the picked Dir two minutes before the strongest late Widesl enters (14:00 to 15:15) costs −₹43 [−68, −20] net per margin lot-day on the Dir's last hour, the same direction as above; the Widesl that replaces it earns +₹75 [+44, +106], so the book reads +₹32 [−11, +74] with a deeper drawdown, and the gain is gone at about ₹115 of late-fill cost per swapped-in lot ([BL-187](../../../backlog/BL-187-dir-cut-late-widesl.md); 434 Adaptive pick days, after charges, seen data).
+
+On NIFTY 2022-24 (618 pick days, data no book rule had run on) the fixed 14:00 version loses −₹44 [−78, −12], and ending the Dir alone −₹66 [−87, −44] ([BL-188](../../../backlog/BL-188-fixed-1400-dir-cut-nifty-2022-24.md)). The Dir's afternoon is worth keeping in both periods.
