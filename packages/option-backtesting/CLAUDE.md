@@ -159,6 +159,15 @@ Otherwise:
   (`daylog._rescore`, `explain`, `rankic`), `tomorrow.expected_picks` uses `rule_index(next session)`, and
   reconstructed history never applies it. Kill switch `ROTATION_EXPIRY_ONLY_FROM` (`YYYY-MM-DD` | `off`, read
   at call time; any other value makes the pick fail loudly).
+- `rotation/sl150_cap.py` — the SL150% cap (BL-192, owner 2026-10-30; BL-191 Amendment 2's arm D2): from
+  `CAP_FROM` (Fri 2026-10-30), on a day NIFTY does not expire, list C holds at most one `N_wide-t1s4` (T1's
+  SL150% NIFTY OTM1 Widesl; Core has none, so Core never changes). A FILTER like BL-122's: only when the
+  selected core holds two or more copies, the best-ranked stays and `score.select` runs again without the
+  others. Applied by `pick.score_history` (the block then carries `sl150_capped`, the core before the cap),
+  `pick.next_best` (never a capped-out copy) and the morning rule (`morning._reproduces` / `choose`, a kept
+  09:17 copy stays). It is decided by the day itself, so every re-derivation applies it and days before the
+  start are unchanged. Kill switch `ROTATION_SL150_CAP_FROM` (`YYYY-MM-DD` | `off`, read at call time; any
+  other value makes the pick fail loudly).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
