@@ -14,6 +14,10 @@ square-off only the stopped leg closes; the other runs on. The trail moves this 
 115% on both NIFTY legs; SENSEX call 114%, put 115% (`sensex_widesl_917_otm2.yaml`, as set in
 AlgoTest). Every rotation Widesl file keeps its base file's stops.
 
+T1 (BL-113, traded since 2026-10-19) adds two NIFTY OTM1 settings with other stops, each at the 25 rotation
+start times: `N_wide-t1s4` at 150% (trail 25/15, RE cost ×1, MTM ₹4,000) and `N_wide-t1s8` at 60% (trail
+15/10, MTM ₹3,000); `N_p150-t1s11` is the ₹150-premium Widesl at 60%, `S_p285-t1s22` SENSEX ₹285 at 40%.
+
 ## Tested
 
 | Item | Values tried | Data / period | Verdict | Evidence |

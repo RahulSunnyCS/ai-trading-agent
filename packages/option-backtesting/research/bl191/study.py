@@ -117,7 +117,7 @@ def verdict(base: dict, arm: dict, diff: dict) -> dict:
     """The Phase 0 rule: return (mean >= -50 and upper >= 0), risk (drawdown or p5 day >= 10% better)."""
     ret = diff["mean"] >= -50 and diff["upper"] >= 0
     dd = arm["max_drawdown"] <= 0.9 * base["max_drawdown"]
-    p5 = arm["p5_day"] >= 0.9 * base["p5_day"]  # both negative: 10% less negative
+    p5 = arm["p5_day"] >= base["p5_day"] + 0.1 * abs(base["p5_day"])  # 10% of its size better
     word = "pass" if ret and (dd or p5) else "kill" if not ret else "no difference"
     return {"return_ok": ret, "drawdown_10pct": dd, "p5_10pct": p5, "verdict": word}
 
@@ -130,16 +130,30 @@ def window(rows: list[dict], lo: date, hi: date, only_non_expiry: bool = False) 
     ]
 
 
-def compare(series: dict, lo: date, hi: date, only_non_expiry: bool = False) -> dict:
+def compare(
+    series: dict, lo: date, hi: date, only_non_expiry: bool = False, decide: bool = False
+) -> dict:
+    """Each arm against T1 over the window. Only P2 carries the registered verdict (`decide`).
+    On non-expiry days alone arm B is arm A by construction, so only A is compared, and the
+    drawdown is left out: over a subset of days it is not a drawdown any book had."""
     base = window(series["t1"], lo, hi, only_non_expiry)
-    out = {"t1": metrics(base)}
+
+    def figures(rows: list[dict]) -> dict:
+        m = metrics(rows)
+        if only_non_expiry:
+            del m["max_drawdown"]
+        return m
+
+    out = {"t1": figures(base)}
     b = np.array([r["net"] for r in base])
-    for arm in ("drop", "expiry"):
+    for arm in ("drop",) if only_non_expiry else ("drop", "expiry"):
         rows = window(series[arm], lo, hi, only_non_expiry)
         assert [r["day"] for r in rows] == [r["day"] for r in base]
-        m = metrics(rows)
+        m = figures(rows)
         d = interval(np.array([r["net"] for r in rows]) - b)
-        out[arm] = {"metrics": m, "diff": d, **verdict(out["t1"], m, d)}
+        out[arm] = {"metrics": m, "diff": d}
+        if decide:
+            out[arm].update(verdict(out["t1"], m, d))
     return out
 
 
@@ -188,7 +202,7 @@ def main(check: bool, out_path: pathlib.Path) -> None:
         "window": [series["t1"][0]["day"], series["t1"][-1]["day"]],
         "parity_bl167": parity,
         "P1": compare(series, *P1),
-        "P2": compare(series, *P2),
+        "P2": compare(series, *P2, decide=True),
         "P2_non_expiry": compare(series, *P2, only_non_expiry=True),
         "forward": compare(series, FORWARD_FROM, last),
         "all": compare(series, date(2000, 1, 1), last),
@@ -216,15 +230,17 @@ def main(check: bool, out_path: pathlib.Path) -> None:
     print(json.dumps({k: res[k] for k in ("window", "parity_bl167")}))
     for key in ("P1", "P2", "P2_non_expiry", "forward", "all"):
         t = res[key]["t1"]
-        print(
-            f"{key}: T1 {t['days']} days, mean {t['mean']:.0f}, dd {t['max_drawdown']:,.0f}, p5 {t['p5_day']:,.0f}"
-        )
+        dd = f", dd {t['max_drawdown']:,.0f}" if "max_drawdown" in t else ""
+        print(f"{key}: T1 {t['days']} days, mean {t['mean']:.0f}{dd}, p5 {t['p5_day']:,.0f}")
         for arm in ("drop", "expiry"):
+            if arm not in res[key]:
+                continue
             a = res[key][arm]
             m, d = a["metrics"], a["diff"]
+            dd = f"  dd {m['max_drawdown']:,.0f}" if "max_drawdown" in m else ""
             print(
                 f"  {arm:6s} mean {m['mean']:.0f}  diff {d['mean']:+.0f} [{d['lower']:+.0f}, {d['upper']:+.0f}]"
-                f"  dd {m['max_drawdown']:,.0f}  p5 {m['p5_day']:,.0f}  worst {m['worst_day']:,.0f}  -> {a['verdict']}"
+                f"{dd}  p5 {m['p5_day']:,.0f}  worst {m['worst_day']:,.0f}  -> {a.get('verdict', 'reported')}"
             )
 
 

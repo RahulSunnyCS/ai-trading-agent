@@ -99,7 +99,7 @@ and ₹653,498, equal to BL-167's T1 base. List C, 3 core picks, 1 lot each, net
 |---|---|---|---|---|---|---|
 | **P2 (decides)**, 238 days | +1,672 | **−116 [−365, +96]** | 24,188 / −7,448 | **+55 [−92, +198]** | 24,188 / −6,986 | 24,435 / −6,340 |
 | P1 (chosen on it), 184 days | +1,242 | −212 [−489, +28] | 29,885 / −8,354 | −120 [−256, +17] | 27,187 / −8,782 | 25,887 / −8,782 |
-| P2 non-expiry days only, 187 | +1,171 | +70 [−121, +263] | 20,834 / −7,279 | +70 [−121, +263] | 20,834 / −7,279 | 30,711 / −6,576 |
+| P2 non-expiry days only, 187 (A = B here) | +1,171 | +70 [−121, +263] | — / −7,279 | (same as A) | — / −7,279 | — / −6,576 |
 | Forward, 13 days | +1,826 | +98 [−38, +234] | 10,472 / −8,626 | +97 [−38, +233] | 10,479 / −8,628 | 10,479 / −8,628 |
 | All 435 days | +1,495 | −150 [−324, +16] | 29,885 / −7,935 | −18 [−118, +86] | 27,187 / −7,907 | 25,887 / −7,573 |
 
@@ -115,8 +115,9 @@ and ₹653,498, equal to BL-167's T1 base. List C, 3 core picks, 1 lot each, net
   101; with two or more: 15 (8 of them non-expiry days).
 - Swaps: without it, 131 SL150 picks leave and other Widesl (153) and a few Dir enter; the picks differ
   on 154 days (A) and 111 days (B).
-- On P2's non-expiry days alone both arms gain +₹70 and cut the drawdown by 32%, but the 5th-percentile
-  day is worse; a subset of days, not the rule.
+- On P2's non-expiry days alone the arms are the same (B leaves the setting out there by
+  construction): +₹70 [−121, +263] with a worse 5th-percentile day. No drawdown is given for a subset
+  of days: it would join days that were not consecutive.
 - **Two or more copies on a non-expiry day (post hoc, small):** 8 days in all. T1 averaged **−₹4,208**
   (3 of 8 positive, worst −₹14,092 on 2026-09-11); the same days without the setting −₹1,148 (worst
   −₹9,276). P2: 5 days, −₹6,795 against −₹2,307. T1's worst day of all (2026-09-11, two SL150 copies
@@ -140,3 +141,4 @@ in the replay. Nothing live changes.
 
 - 2026-10-29 — created and pre-registered from the owner's question (Phase 0 committed before any run).
 - 2026-10-29 — run (`research/bl191/study.py`), parity with BL-167 exact. P2: A (drop) killed, −₹116 a day [−365, +96]; B (expiry only) no difference, +₹55 [−92, +198], drawdown 1% shallower and the 5th-percentile day worse. T1 stays as it is. Post hoc: the 8 non-expiry days with two or more SL150 copies averaged −₹4,208 (−₹1,148 without); a one-copy cap is a separate registration if wanted.
+- 2026-10-29 — after review (PR 388): only P2 carries a verdict in `study.json`; the non-expiry subset compares A only (B equals A there) and gives no drawdown (over non-consecutive days it is not one); the 5th-percentile rule is written by size (`+ 10% of |p5|`), so it cannot flip on a positive base. Figures and verdicts unchanged. Not done: the replay helpers shared with BL-167 are still copied, not moved to `research/common/`.
