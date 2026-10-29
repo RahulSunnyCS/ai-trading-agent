@@ -311,6 +311,8 @@ def evening(tmp_path, monkeypatch):
         "next_session_picks",
         lambda today, root=None, track=None: t1_next if track else nxt,
     )
+    capital = {"adaptive": 850_000, "t1": 900_000, "total": 1_750_000}
+    monkeypatch.setattr(deliver, "message_capital", lambda: capital)
     return root
 
 
@@ -336,9 +338,11 @@ def test_the_evening_message_has_both_lists_and_tomorrow_and_a_retry_sends_nothi
     )
     assert "➡️ Wed 21 Oct" in private and private.rstrip().endswith("MTMSL4000")
     # each list's capital and month to date (one recorded day so far), in both chats
-    assert private.count("   Capital ₹8.5 L") == 2
-    assert "   October +₹300 (0.0%)" in private and "   October −₹150 (0.0%)" in private
-    assert group == private  # no live capture here, so nothing is the owner's alone
+    assert "   Capital ₹8.5 L\n   October +₹300 (0.0%)" in private
+    assert "   Capital ₹9 L\n   October −₹150 (0.0%)" in private
+    # the real month is the owner's alone (no contract notes in this store); no live capture here
+    assert "💼 Total capital ₹17.5 L\n   Real, October: no contract notes yet" in private
+    assert group == "\n\n".join(p for p in private.split("\n\n") if not p.startswith("💼"))
     assert _send(evening, sent) == 0  # a retry
     assert len(sent.messages) == 2
 
@@ -367,7 +371,7 @@ def test_t1_not_ready_waits_until_the_deadline_then_goes_without_it_and_t1_follo
     assert (c1, c2) == (None, "-456") and again == follow
     assert follow.startswith("📊 Tue 20 Oct · Tuned Adaptive result")
     assert "🎯" not in follow and "−₹150" in follow
-    assert "   Capital ₹8.5 L\n   October −₹150 (0.0%)" in follow
+    assert "   Capital ₹9 L\n   October −₹150 (0.0%)" in follow and "💼" not in follow
     assert _send(evening, sent) == 0 and len(sent.messages) == 4  # and never again
 
 

@@ -130,3 +130,45 @@ def test_a_month_that_cannot_be_read_leaves_only_its_lines_out(tmp_path, monkeyp
     assert result.months_to_date(today, None, tmp_path) == {"adaptive": None, "t1": None}
     text = result.render(today, months=result.months_to_date(today, None, tmp_path))
     assert "Capital" not in text and "🎯 Adaptive" in text
+
+
+def test_the_real_month_lines():
+    real = result.RealMonth(
+        date(2026, 10, 28),
+        34557.63,
+        1_700_000,
+        {"Angel One": -6046.56, "Shoonya": 41729.19},
+        date(2026, 10, 28),
+        1,
+    )
+    assert messages.real_lines(real) == [
+        "💼 Total capital ₹17 L",
+        "   Real, October +₹34,558 (+2.0%)",
+        "   Angel One −₹6,047 · Shoonya +₹41,729",
+        "   contract notes to Wed 28 Oct · 1 day not in yet",
+    ]
+    empty = result.RealMonth(date(2026, 11, 2), 0.0, 1_700_000, {}, None)
+    assert messages.real_lines(empty) == [
+        "💼 Total capital ₹17 L",
+        "   Real, November: no contract notes yet",
+    ]
+
+
+def test_capital_comes_from_the_accounts_that_upload_each_list():
+    from option_backtesting.rotation import automation_settings as auto
+
+    settings = json.loads(json.dumps(auto.DEFAULT))
+    for row in settings["rows"].values():
+        row.update(list="none", upload=False)
+    settings["rows"]["quantiply.angelone"].update(list="core", upload=True)
+    settings["rows"]["quantiply.finvasia"].update(list="t1", upload=True)
+    settings["rows"]["algotest.finvasia"].update(list="t1", upload=True)  # same money, once
+    assert auto.capital(settings) == {"finvasia": 850_000, "angelone": 850_000}  # none saved yet
+    settings["capital"] = {"finvasia": 900_000, "angelone": "lots"}  # a bad figure: the default
+    assert auto.capital(settings) == {"finvasia": 900_000, "angelone": 850_000}
+    assert auto.book_capital(settings, "t1") == 900_000
+    assert auto.book_capital(settings, "core") == 850_000
+    settings["rows"]["quantiply.angelone"]["upload"] = False  # nobody uploads Core: the default
+    assert auto.book_capital(settings, "core") == 850_000
+    settings["rows"]["algotest.angelone"].update(list="t1", upload=True)
+    assert auto.book_capital(settings, "t1") == 1_750_000

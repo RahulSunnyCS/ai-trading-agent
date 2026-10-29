@@ -444,3 +444,39 @@ describe('Dir ×2 on non-expiry days (BL-183)', () => {
     expect(effective(checked.settings, 'algotest.finvasia').dirBoost).toBe(false);
   });
 });
+
+describe('capital per broker account (owner, 2026-10-29)', () => {
+  it('settings saved before the field read as ₹8.5 lakh an account', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { capital?: unknown };
+    old.capital = undefined;
+    const filled = withDefaults(JSON.parse(JSON.stringify(old)));
+    expect(filled.capital).toEqual({ finvasia: 850_000, angelone: 850_000 });
+    const partial = withDefaults({
+      ...clone(DEFAULT_SETTINGS),
+      capital: { angelone: 1_000_000 },
+    } as unknown as AutomationSettings);
+    expect(partial.capital).toEqual({ finvasia: 850_000, angelone: 1_000_000 });
+  });
+
+  it('a save must give each account whole rupees in range, and no other account', () => {
+    for (const bad of [undefined, 0, 9_999, 100_000_001, 850_000.5, '850000', null]) {
+      const s = clone(DEFAULT_SETTINGS) as unknown as { capital: Record<string, unknown> };
+      s.capital.finvasia = bad;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain('capital.finvasia');
+    }
+    const extra = clone(DEFAULT_SETTINGS) as unknown as { capital: Record<string, unknown> };
+    extra.capital.kite = 500_000;
+    const refused = validate(extra);
+    expect('errors' in refused && refused.errors.join()).toContain('unknown capital account: kite');
+    const missing = { ...clone(DEFAULT_SETTINGS), capital: undefined } as unknown;
+    expect('errors' in validate(missing)).toBe(true);
+    const ok = clone(DEFAULT_SETTINGS);
+    ok.capital = { finvasia: 900_000, angelone: 800_000 };
+    const checked = validate(ok);
+    expect('settings' in checked && checked.settings.capital).toEqual({
+      finvasia: 900_000,
+      angelone: 800_000,
+    });
+  });
+});

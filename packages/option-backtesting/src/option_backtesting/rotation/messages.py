@@ -314,6 +314,26 @@ def month_lines(month) -> list[str]:
     return [f"   Capital {lakhs(month.capital)}", line]
 
 
+def real_lines(real) -> list[str]:
+    """The owner's real money this month (`result.RealMonth`): every account's capital added up,
+    the contract notes' profit from the 1st as a share of it, and per broker."""
+    share = round(100 * real.total / real.capital, 1)
+    sign = "+" if share > 0 else MINUS if share < 0 else ""
+    if real.through is None:
+        head = f"   Real, {real.day:%B}: no contract notes yet"
+    else:
+        head = f"   Real, {real.day:%B} {rupees(real.total)} ({sign}{abs(share):.1f}%)"
+    out = [f"💼 Total capital {lakhs(real.capital)}", head]
+    if real.brokers:
+        out.append("   " + " · ".join(f"{n} {rupees(v)}" for n, v in sorted(real.brokers.items())))
+    if real.through is not None:
+        note = f"   contract notes to {day_text(real.through)}"
+        if real.open_days:
+            note += f" · {real.open_days} day{'s' if real.open_days > 1 else ''} not in yet"
+        out.append(note)
+    return out
+
+
 def result_block(
     emoji: str,
     name: str,
@@ -354,6 +374,7 @@ def render_result(
     boost: dict[str, bool] | None = None,
     traded: dict[str, tuple[int, float] | None] | None = None,
     months: dict | None = None,
+    real=None,
 ) -> str:
     """The evening message. `adaptive` and `t1` are (total, [(strategy, rupees)]); either may be
     None to leave that list out (the T1 follow-up has no Adaptive), and
@@ -362,7 +383,8 @@ def render_result(
     BL-141's live-vs-paper block (`live_compare.message_lines`), for the owner's copy only.
     BL-183: `boost` ({'adaptive', 't1'}) adds tomorrow's lots line for a list that trades the Dir
     ×2 rule; `traded` ({'adaptive', 't1'}: (lots, rupees)) adds a day's as-traded line. `months`
-    ({'adaptive', 't1'}: `result.MonthToDate`) adds each list's capital and month to date."""
+    ({'adaptive', 't1'}: `result.MonthToDate`) adds each list's capital and month to date; `real`
+    (`result.RealMonth`, the owner's copy only) the total capital and the real month."""
     boost, traded, months = boost or {}, traded or {}, months or {}
     lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs"]
     if adaptive is not None:
@@ -376,6 +398,8 @@ def render_result(
         lines += ["", t1]
     elif t1 is not None:
         lines += ["", *result_block("🧪", T1_NAME, *t1, traded.get("t1"), months.get("t1"))]
+    if real is not None:
+        lines += ["", *real_lines(real)]
     if live:
         lines += ["", *live]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)

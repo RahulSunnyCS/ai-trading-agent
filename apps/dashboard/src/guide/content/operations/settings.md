@@ -54,6 +54,12 @@ Three master switches, then one block per platform and broker.
 
 A warning badge on a block means its master switch holds it back.
 
+**Capital.** Below the blocks, the money in each broker account: **Angel One** and **Shoonya**, in whole rupees (₹8.5 lakh each until you change them). The page shows their total. They feed the 16:00 result message on Telegram:
+
+- Under each list (Adaptive and Tuned Adaptive), its capital and the month so far on paper, as a share of it (`Capital ₹8.5 L` / `October +₹26,634 (+3.1%)`). A list's capital is the capital of the accounts whose rows upload it, each counted once.
+- In your own chat only, the total capital and what you really made this month, from the contract notes (the [Trade book](app:/tradebook/fno)'s figures), per broker, up to the last day with a note. Today's notes arrive after midnight, so the 16:00 message runs to the session before.
+- The friends' group sees the per-list lines, never the real money.
+
 **Pause uploads and deploys.** Below the blocks, pick a day, or press **Skip next session**, to stop every upload, top-up and deploy for each session up to and including that day. **Clear pause** removes it.
 
 - The evening jobs prepare the next trading session; the 09:16–09:21 top-ups and deploys are for today. A pause through Monday therefore also holds Friday's evening jobs.

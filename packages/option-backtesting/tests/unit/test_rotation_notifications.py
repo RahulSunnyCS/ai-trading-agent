@@ -160,9 +160,12 @@ def test_result_goes_to_private_chat_and_group(telegram, evening_store):
         assert "➡️ Wed 14 Oct" in text
         assert "Steady" not in text and "Calendar" not in text and "Baseline" not in text
         assert "parse_mode" not in request
-    # both say T1 was not recorded (the group gets the owner's message, with no live lines here)
-    assert "🧪 Tuned Adaptive (In Testing phase) · not recorded today" in telegram[0]["text"]
-    assert telegram[1]["text"] == telegram[0]["text"]
+    # both say T1 was not recorded; the group gets the owner's message without the real-money
+    # block (and the live lines, none here)
+    owner, group = telegram[0]["text"], telegram[1]["text"]
+    assert "🧪 Tuned Adaptive (In Testing phase) · not recorded today" in owner
+    assert "💼 Total capital" in owner and "💼" not in group
+    assert group == "\n\n".join(p for p in owner.split("\n\n") if not p.startswith("💼"))
 
 
 def test_result_is_not_sent_twice(telegram, evening_store):
