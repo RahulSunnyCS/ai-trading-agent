@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the owner's call (2026-10-28) |
-| **Status** | Done (2026-10-29): killed — no filtered reversal beats the plain exit; keep the plain leg stop |
+| **Status** | Done (2026-10-29): killed — no filtered reversal beats the plain exit; keep the plain leg stop. Amendment 1 (2026-10-29, owner's request): a cheaper long, pre-registered below; the verdict above stands whatever it finds |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -256,3 +256,95 @@ None open; answered 2026-10-28 (Log).
   RE COST); no live work follows. If the idea is ever revived, the descriptive lead is C1 held to the exit
   (main +₹231 [−28, +491], hold-out +₹342), which needs its own pre-registration and a drawdown answer. Item
   closed; findings in `research/options/strategies/directional/stop-and-reverse.md`.
+
+## Amendment 1 (2026-10-29): a cheaper long (about ₹50 premium), the long's stop, a re-sale toggle
+
+Written and committed **before any amendment cell is run**. Phase 0, the main-period result, the hold-out and the
+**killed** verdict above are not edited; they stay the item's verdict whatever this amendment finds.
+
+`override: owner asked 2026-10-29 to test a cheaper long (about ₹50 premium) and another long stop; Phase 0 had
+listed other strikes for the long under 'Will not run'`
+
+**Why.** The killed arms bought back the same contract, which by then is about 21% above its entry and decays
+fast; the long itself earned (+₹104 to +₹135 a Dir pick) but the book lost more (a whipsawed long pushes it into
+the ₹5,000 stop, and the reversed leg is not re-sold). A cheap long should lose less on a whipsaw. One narrow
+test, not a new sweep. Claude's prior: a modest chance; the drawdown that killed C1 is mostly the
+bought leg's size in the MTM and a cheaper long may not fix it.
+
+**What changes.** Only the long's contract, its stop and the re-sale toggle. Everything else is BL-186's:
+T1's Adaptive picks, Dir picks changed (Widesl and Buy carried), 1 lot, leg stops on tick, overall stop ₹5,000,
+net after ₹20 + GST an order, the **C1 opening-range-break filter only** (the only arm that held up), the
+comparator **A5**. No other filter, no other size, no trail, no 20 / 45-minute stop.
+
+### Cells (6 new, all registered here; BL-186 simulated 43)
+
+| Cell | The long | Its stop | Its exit |
+|---|---|---|---|
+| `L50_S30_T30` | ~₹50 strike | 30% | 30-minute time stop |
+| `L50_S30_HOLD` | ~₹50 strike | 30% | held to 15:28 |
+| `L50_S50_T30` | ~₹50 strike | 50% | 30-minute time stop |
+| `L50_S50_HOLD` | ~₹50 strike | 50% | held to 15:28 |
+| `R-<best>` | the best L50 cell above, **chosen on the main period only** (largest point-estimate book ₹ a day minus A5, 2025-01-10 → 2026-07-22) | as that cell | as that cell, **plus** RE COST re-sells the stopped leg after the long has closed |
+| `R-C1_T30` | the same contract (BL-186's C1_T30) | 30% | 30-minute time stop, **plus** the re-sale |
+
+Reference cells, **not re-run**, taken from BL-186's stored simulations (`out/sims.jsonl`): A5, `C1_T30`
+(same contract, 30%, 30 minutes) and `C1_HOLD` (same contract, 30%, held to 15:28).
+
+### Rules of the long (fixed now)
+
+- **Which contract (L50).** At the stop minute m (the stopped sold leg's stop fills inside bar m), among the
+  collected strikes of the stopped leg's **expiry and option type**, those with a price at m (`price_at(m)` =
+  the close of bar m − 1; nothing from bar m on is read): pick the one **closest to ₹50**, an exact tie to the
+  lower premium (the engine's closest-premium rule), if its price is within **₹35–₹70**. No strike in that
+  band, or the pick is the stopped contract itself: **no reversal** (RE COST arms as for a plain stop; these
+  days are counted and reported).
+- **Fill.** At the picked contract's **close of bar m** (`price_at(m + 1)`), not at the pre-stop price: the
+  stopped leg moved inside bar m and its option moved with it, so the earlier price would be optimistic. The
+  long is judged from bar m + 1; its time stop is N minutes after that fill (m + 1 + N). No price at m + 1 (or
+  m + 1 past the session) = no reversal, counted.
+- **Size.** 1 lot of the same expiry (the stopped leg's lot size); `lots_ratio` 1.
+- **The re-sale toggle.** The stopped leg arms RE COST as its file says (count as in the file), but it
+  does not re-sell until the long has closed. A re-sold leg's later stop is not reversed again (one reversal a
+  leg a day, as in BL-186).
+- **The 1% slippage-on-the-buy, BL-063 statutory-charges and expiry-days-excluded lines** are reported for each
+  cell as in BL-186.
+
+### The primary measure and the family
+
+- **Primary:** the T1 book's mean daily net ₹ (after ₹20 + GST an order) minus A5's, per cell; 90% paired
+  circular block bootstrap (5-session blocks, 2,000 resamples, seed 20261028), two-sided p.
+- **Holm family:** the nine primary comparisons against A5 now registered: BL-186's C1_T30, C2_T30, C3_T30 (their
+  stored cells, recomputed on this amendment's period) and this amendment's six. α 0.10. The new cells are
+  counted in the family; the family does not restart.
+- **Ledger count:** 49 cells simulated across BL-186 and this amendment (43 + 6); nine primary comparisons.
+  Cells of the original 43 that were secondary stay descriptive.
+
+### Which data judges it (the hold-out is burnt)
+
+The hold-out (2026-07-23 → 2026-10-22) was read for this idea in BL-186, so it cannot be an unseen test here.
+**The amendment is judged on the full period, 2025-01-10 → 2026-10-22.** The main-period and hold-out figures are
+reported beside it separately, the hold-out **labelled exploratory**. The "best" L50 cell is chosen on the main
+period alone, before the toggle cell is run.
+
+### Kill rule
+
+A cell is **killed** unless all four hold over the full period:
+
+1. the long's own net is above zero per Dir pick (after its two orders);
+2. the book's mean daily net is above A5's and the difference is significant under Holm (nine comparisons);
+3. its maximum drawdown is shallower than A5's;
+4. the hold-out difference against A5 does not have the opposite sign to the full-period one (a sign flip kills).
+
+The amendment's verdict is the best-cell verdict. **Even a cell that passes is only a lead:** the hold-out is
+spent, so it needs a forward shadow (paper picks recorded before the open) before anything live, and the live
+platforms have no form for a conditional buy on a stop fill. BL-186's verdict stays "killed".
+
+### Engine (Phase 3, off by default)
+
+`legs[].reverse_on_sl` gains `strike_premium` (the target premium; the band is 0.7× to 1.4× of it, ₹35–₹70 for
+₹50) and `resell_after_reverse`. Neither changes the engine's behaviour when unset, they stay out of the dump at
+their defaults, and the AlgoTest and Quantiply exports refuse them (they refuse `reverse_on_sl` already).
+
+### Log
+
+- 2026-10-29 — Amendment 1 pre-registered before any run, at the owner's request (the `override:` above).
