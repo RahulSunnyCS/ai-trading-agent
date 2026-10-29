@@ -235,7 +235,7 @@ days to move the risk bar. Keep T1 as it is unless the owner chooses otherwise.
 
 **Reported, not deciding:**
 - Days changed: D1 15 of 435 (7 expiry, 8 non-expiry), D2 8. On the changed days D2 gains +₹1,100 on
-  average (6 of 8 better: 2026-10-01 +4,326, 2026-09-11 +1,956, 2026-05-29 +1,524,
+  average (7 of 8 better: 2026-10-01 +4,326, 2026-09-11 +1,956, 2026-05-29 +1,524,
   2026-06-12 +1,449, 2025-05-02 +1,281; 2025-07-16 −1,914). On expiry days the cap hurts (2025-01-30
   −11,670, 2026-02-03 −5,925): D1's extra expiry days cost more than they save.
 - D2 on P2 is the only figure in this item whose interval is wholly above zero (+₹40 [+8, +77]); it is one
