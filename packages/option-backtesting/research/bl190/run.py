@@ -32,7 +32,8 @@ def finished_at(strat, r) -> tuple[int | None, str]:
     if not r.trades:
         return None, ""
     if r.stopped_by and r.stopped_by.startswith("overall"):
-        return max(t.exit_min for t in r.trades), "overall stop"
+        why = "overall target" if "target" in r.stopped_by else "overall stop"
+        return max(t.exit_min for t in r.trades), why
     last = 0
     for leg in strat.legs:
         allowed = 1 + (leg.reentry_on_sl.count if leg.reentry_on_sl else 0)

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner asked; frees a margin lot on stopped days |
-| **Status** | Done 2026-10-29: **FAIL** for both. A pick finished by 12:15 (about one day in five) replaced by the strongest later Widesl reads −₹9 [−56, +38] (95 %) net per margin lot-day on T1, by the strongest Dir −₹10 [−55, +35]; both deepen the drawdown (−10,010 / −11,371 against −8,536). On NIFTY 2022-24 both are slightly positive (+₹9, +₹7); Core-N's Dir replacement +₹35 [+3, +74] (90 %) is the only interval above zero. |
+| **Status** | Done 2026-10-29: **FAIL** for both. A pick finished by 12:15 (96 replacements over T1's 434 pick days, 129 on Core) replaced by the strongest later Widesl reads −₹9 [−56, +38] (95 %) net per margin lot-day on T1, by the strongest Dir −₹10 [−55, +35]; both deepen the drawdown (−10,010 / −11,371 against −8,536). On NIFTY 2022-24 both are slightly positive (+₹9, +₹7); Core-N's Dir replacement +₹35 [+3, +74] (90 %) is the only interval above zero. |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -119,3 +119,4 @@ None. Owner (2026-10-29): replacement both a strong Dir and a strong Widesl; win
 - 2026-10-29 Registered (Phase 0) before any run; the owner's answers recorded.
 - 2026-10-29 Phase 1 run: RW12 and RD12 FAIL. Findings page updated. Item closed.
 - 2026-10-29 Correction to the red-team, after the run: NIFTY 2022-04-05 → 2024-10-08 is BL-071's hold-out P3, and BL-075 kept list C's weight cell partly because it was above chance there, so the ranking itself has seen P3. The book rules tested here had not been run on it. No rule or verdict changes.
+- 2026-10-29 Code review of PR 386: N22 gate 1 now also fails on an A0 day missing from N22 (re-run: 0 missing, PASS); an overall target is labelled as such (no variant has one); `run_jobs` refuses a tagged job without `path_of`; this status line counts replacements, not days; the re-entry pages for Widesl and Dir now cite this item. Not changed: BL-188's cut gate still samples the 14:00 cut only (R14 / X14 are descriptive); the seen-set ranking is still computed per driver.

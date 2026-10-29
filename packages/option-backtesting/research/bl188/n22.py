@@ -98,7 +98,7 @@ def gates() -> list[str]:
     equal the stored days.csv (band, NIFTY label) on every stored day."""
     L = ["## N22 parity gates", ""]
     ok = True
-    n_cmp = bad = 0
+    n_cmp = bad = missing = 0
     worst = 0.0
     files = sorted(N22.glob("*.csv"))
     for f in files:
@@ -107,21 +107,26 @@ def gates() -> list[str]:
             raise SystemExit(f"no A0 row file {a0f}: set BL187_A0")
         with open(a0f) as fh:
             a0 = {r["day"]: r for r in csv.DictReader(fh)}
+        want = {k for k in a0 if END < date.fromisoformat(k) <= GATE_END}
+        seen = set()
         with open(f) as fh:
             for r in csv.DictReader(fh):
                 d = date.fromisoformat(r["day"])
                 if d <= END or r["day"] not in a0:
                     continue
+                seen.add(r["day"])
                 n_cmp += 1
                 g = abs(float(r["gross"]) - float(a0[r["day"]]["gross"]))
                 worst = max(worst, g)
                 if g > 1.0 or r["orders"] != a0[r["day"]]["orders"]:
                     bad += 1
-    ok &= bad == 0 and n_cmp > 0
+        missing += len(want - seen)
+    g1 = bad == 0 and missing == 0 and n_cmp > 0
+    ok &= g1
     L.append(
         f"1. {len(files)} variants, {n_cmp} variant-days 2024-10-09 → 2024-10-31 against A0: "
-        f"{n_cmp - bad} equal (gross within ₹1, orders equal); largest gross difference "
-        f"₹{worst:.2f}. {'PASS' if bad == 0 and n_cmp else 'FAIL'}"
+        f"{n_cmp - bad} equal (gross within ₹1, orders equal), {missing} A0 days missing from N22; "
+        f"largest gross difference ₹{worst:.2f}. {'PASS' if g1 else 'FAIL'}"
     )
     root = data_dir()
     stored = store.read_days(root, "weekdays")

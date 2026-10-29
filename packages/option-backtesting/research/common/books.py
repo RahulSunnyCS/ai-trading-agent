@@ -171,7 +171,7 @@ def row(book: dict, name: str, d: date) -> np.ndarray:
 # --- engine re-runs -------------------------------------------------------------------------
 
 
-def run_jobs(jobs, path_of=strategy_file):
+def run_jobs(jobs, path_of=None):
     """{(name, tag, day): (DayResult, charges)} for jobs (name, tag, day); `path_of(name, tag)`
     gives the strategy file (tag None = the variant as it is). Days are loaded once each."""
     root, ref = sr.data_dir(), early_reference()
@@ -184,6 +184,8 @@ def run_jobs(jobs, path_of=strategy_file):
             data_key, data = (u, d), load_day(root, u, d)
         k = (name, tag)
         if k not in cache:
+            if tag is not None and path_of is None:
+                raise ValueError(f"job {name} has tag {tag!r} but no path_of was given")
             cache[k] = load_legwise(strategy_file(name) if tag is None else path_of(name, tag))
         r = simulate_day(cache[k], data, ref, sr.SIZING)
         orders, buy, sell = trade_values(r.trades)
