@@ -1,6 +1,6 @@
 # Widesl: leg stop
 
-**Status:** Tested · **Last updated:** 2026-10-23
+**Status:** Tested · **Last updated:** 2026-10-30
 
 ## What it is
 
@@ -14,6 +14,11 @@ square-off only the stopped leg closes; the other runs on. The trail moves this 
 115% on both NIFTY legs; SENSEX call 114%, put 115% (`sensex_widesl_917_otm2.yaml`, as set in
 AlgoTest). Every rotation Widesl file keeps its base file's stops.
 
+T1 (BL-113, traded since 2026-10-19) adds two NIFTY OTM1 settings with other stops, each at the 25 rotation
+start times: `N_wide-t1s4` at 150% (trail 25/15, RE cost ×1, MTM ₹4,000) and `N_wide-t1s8` at 60% (trail
+15/10, MTM ₹3,000); `N_p150-t1s11` is the ₹150-premium Widesl at 60%, `S_p285-t1s22` SENSEX ₹285 at 40%.
+From 2026-10-30 T1 holds at most one `N_wide-t1s4` on a day NIFTY does not expire (BL-192).
+
 ## Tested
 
 | Item | Values tried | Data / period | Verdict | Evidence |
@@ -24,6 +29,7 @@ AlgoTest). Every rotation Widesl file keeps its base file's stops.
 | BL-128 | SENSEX ₹240 / ₹300 / ₹350 × SL 60, 70, 80, 90, 100, 115 % (same value on both legs), trail 15/10, MTM ₹2,500, all 25 slots; a stop chosen per premium on the first year, then the best two in Adaptive on the second | Selection 2024-10-09 → 2025-10-08, test 2025-10-09 → 2026-10-16, gross (no charges) | Selection year: SL 60 % best at all three premiums, the grid's lowest (₹240 +153, ₹300 +160, ₹350 +155 per lot-day, vs +86 / +103 / +92 at 115 %; drawdown 68–78 % of the 115 % cell's; positive at 22–25 of 25 slots). Test year, Adaptive with the best two (₹300, ₹240 at 60 %) added: −₹2 [−88, +79], drawdown deeper. **Not positive** (one replay; the interval includes zero) | [BL-128][bl128] |
 | BL-155 | Stop set by the morning type at 11:00 (range so far vs the last 20 mornings): quiet 100 %, normal 80 %, wide 60 %; vs fixed 60 / 80 / 100 % and the reversed rule | Heatmap ATM straddles 11:15–14:45, exit 15:15, after charges; NIFTY 2025-01 → 2026-10 decides; NIFTY 2022–24 and SENSEX reported | **Killed**: +₹40 vs +₹32–35 a lot-day, every interval includes zero, below shuffled labels; the real-Widesl step was not run | [BL-155][bl155] |
 | BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹432 a day on the book (−₹591 to −₹272), in every half-year; Widesl: −₹95 a pick | [BL-156][bl156] |
+| BL-191 | T1's SL150% NIFTY OTM1 setting (`N_wide-t1s4`: SL150 %, trail 25/15, RE cost ×1, MTM ₹4,000, 25 slots) removed from T1's ranking, or allowed on NIFTY expiry days only | Adaptive (list C) over T1, 2025-01-10 → 2026-10-29, 1 lot, after brokerage; 2025-10-09 → 2026-10-09 decides | **Drop killed**: −₹116 a day [−365, +96], −₹150 over all days with a deeper drawdown. **Expiry only: no difference**: +₹55 [−92, +198], drawdown 1% shallower, 5th-percentile day worse. Post hoc (8 days): two or more copies on a non-expiry day −₹4,208 a day vs −₹1,148 without. **Amendment 1**: in its place on non-expiry days a 115% Widesl at a ₹3,000 overall stop (trail 15/10, or 25/15 with RE cost): +₹24 / +₹25 [−95, +144], **no difference** (drawdown 5% shallower, 5th-percentile day 7% worse). **Amendment 2**: at most one copy a day, no difference by the rule; capped on non-expiry days only +₹40 [+8, +77], 8 of 435 days changed. **Amendment 3**: none on non-expiry days, +₹111 [+12, +220] on 2025-10 → 2026-10 but −₹88 on the year before; no difference by the rule | [BL-191][bl191] |
 
 Leg-stop rows in the post-charge top four (holdout, mean over the band's start-time files):
 
@@ -48,6 +54,16 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 - One holdout year, one factor at a time, ranked after viewing the holdout. Nothing is adopted.
 - NIFTY closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-127): the stop chosen per premium (₹80 SL 80 %, ₹100 SL 70 %, ₹120 SL 70 %) beat 115 % on the mean (+₹23 to +₹51 per lot-day; not every 70–80 % cell did: ₹120 at 80 % equals 115 %) and cut the drawdown to roughly 35–60 % of it, positive at all 25 slots. That did not carry into Adaptive on the next year (adding the two chosen stops: −₹10, interval includes zero, deeper drawdown). Standalone benefit, no Adaptive benefit; the test year had already been seen by BL-098 and BL-126.
 - SENSEX closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-128): at ₹240, ₹300 and ₹350 the tightest stop tried (60 %) beat 115 % on the mean by +₹57 to +₹67 per lot-day and cut the drawdown by a fifth to a third, but the optimum is at the grid's edge and the cells are cells positive at only 18–25 of 25 slots across the grid, 22–25 for the 60 % winners (NIFTY: all 25). As for NIFTY it did not carry into Adaptive on the next year (adding the two chosen stops: −₹2, interval includes zero, deeper drawdown; either alone +₹20 / +₹25, intervals include zero). A second index with the same answer; the test year is the one BL-127 and BL-126 had already read.
+
+- A 150 % stop inside T1 (BL-191): T1's SL150 % NIFTY OTM1 setting (`N_wide-t1s4`) earns its place in the
+  ranking; taking it out costs about ₹116–150 a day (a deeper drawdown on the first year and overall, not on
+  2025-10 → 2026-10), and keeping it for expiry days only changes nothing measurable. Its risk is concentration:
+  on the 8 non-expiry days T1 held two or more copies it averaged −₹4,208 (worst −₹14,092), against −₹1,148 for
+  the same days without it. Swapping it for a 115% / ₹3,000 Widesl on non-expiry days changes nothing measurable
+  (+₹24 a day, interval includes zero). Allowing one copy on a non-expiry day (D2) gains +₹40 a day on
+  2025-10 → 2026-10 (5 changed days, all better) and −₹3 the year before; allowing none (D0) +₹111 and −₹88.
+  Over all days they are level (+₹20 / +₹24). None passes the registered risk bar. **D2 is live in T1 from
+  2026-10-30 (BL-192).**
 
 - By morning type (BL-155, heatmap ATM straddles from 11:15, descriptive): after a **quiet** morning the
   widest stop (100 %) is best on NIFTY in both periods (+₹96 vs +₹61 at 60 %, 2025–26). After a **normal**
@@ -76,3 +92,4 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 [bl127]: ../../../../backlog/BL-127-nifty-premium-widesl-sl-selection.md
 [bl128]: ../../../../backlog/BL-128-sensex-premium-widesl-sl-selection.md
 [bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md
+[bl191]: ../../../../backlog/BL-191-t1-without-sl150-widesl.md
