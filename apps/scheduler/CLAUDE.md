@@ -71,8 +71,10 @@ summary flags anything but `main`).
   the 09:00 summary says a pause is on (`pauseNotice`).
 - `src/automation.ts` — BL-140's automation settings. Three master switches (logins, uploads, deploy) and one
   row per platform + broker (`algotest|quantiply` × `finvasia|angelone`: login, list none/core/t1, upload,
-  `multiplier` 1-10, `addon`, `dirBoost` (BL-183: the picked Dir at 2 lots on a non-expiry day), `mtmSl`) and a
-  `pause.until` day, validated (unknown keys refused). Versions saved before Phase 4 lack the new fields and read as
+  `multiplier` 1-10, `addon`, `dirBoost` (BL-183: the picked Dir at 2 lots on a non-expiry day), `mtmSl`), a
+  `pause.until` day and `capital` (rupees per broker account, `finvasia` / `angelone`, ₹10,000 to ₹10 crore; ₹8.5 lakh
+  each before the field, owner 2026-10-29: the evening result message's capital lines), validated (unknown keys
+  refused). Versions saved before Phase 4 lack the new fields and read as
   1, yes and no pause (`withDefaults`); before BL-183, `dirBoost` off.
   - Every save is a new version in `scheduler.db` (`automation_settings`). Only the `github` outcome column is
     ever written after the insert.

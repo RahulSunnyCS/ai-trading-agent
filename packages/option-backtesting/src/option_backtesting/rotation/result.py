@@ -12,6 +12,7 @@ from pathlib import Path
 
 from ..fyers.daily import data_dir
 from . import journal, messages, store
+from .automation_settings import BROKER_NAMES, DEFAULT_CAPITAL
 from .lists import DISPLAY_NAMES, PUBLIC_KEYS
 
 RESULT_KEYS = PUBLIC_KEYS
@@ -222,6 +223,144 @@ def as_traded(result: DailyResult) -> tuple[int, float] | None:
     return sum(lots.values()), sum(value * lots[name] for name, value in rows)
 
 
+def _day_as_traded(result: DailyResult, root: Path | None) -> float:
+    """A past day's paper net at the lots its exports recorded (BL-183: the Dir ×2 picks, from
+    either platform's manifest for the list), 1 lot a pick where none was recorded."""
+    from .live_compare import export_lots
+
+    book = result.track or "core"
+    lots: dict[str, int] = {}
+    for platform in ("quantiply", "algotest"):
+        for name, n in export_lots(platform, result.day, book, root).items():
+            lots[name] = max(lots.get(name, 1), n)
+    return sum(value * lots.get(name, 1) for name, value in _total_and_rows(result)[1])
+
+
+@dataclass(frozen=True)
+class MonthToDate:
+    """A list's paper net from the 1st of the month to the day, as traded (owner, 2026-10-29)."""
+
+    day: date
+    total: float
+    #: the accounts' capital behind the list (Settings › Automation)
+    capital: float = DEFAULT_CAPITAL
+    #: recorded days of the month whose results are not all stored, left out of `total`
+    unscored: int = 0
+
+
+def month_to_date(
+    result: DailyResult,
+    root: Path | None = None,
+    boosted_today: bool = False,
+    capital: float = DEFAULT_CAPITAL,
+) -> MonthToDate:
+    """The month's total for `result`'s list (its track's journal): every recorded day from the
+    1st up to `result.day`. The day itself counts as the message shows it (its as-traded figure
+    when `boosted_today`, else 1 lot a pick); an earlier day at the lots its exports recorded. A
+    day whose results are incomplete is counted in `unscored`, never as zero."""
+    root = root or data_dir()
+    first = result.day.replace(day=1)
+    days = sorted(
+        {
+            date.fromisoformat(e["day"])
+            for e in journal.read(store.journal_path(root, result.track))
+            if first.isoformat() <= str(e.get("day", "")) < result.day.isoformat()
+        }
+    )
+    traded = as_traded(result) if boosted_today else None
+    total = traded[1] if traded is not None else _total_and_rows(result)[0]
+    unscored = 0
+    for day in days:
+        try:
+            total += _day_as_traded(calculate(day, root, result.track), root)
+        except ResultUnavailable:
+            unscored += 1
+    return MonthToDate(result.day, total, capital, unscored)
+
+
+def months_to_date(
+    adaptive: DailyResult | None,
+    t1: DailyResult | str | None,
+    root: Path | None = None,
+    boost: dict[str, bool] | None = None,
+    capital: dict[str, float] | None = None,
+    echo=print,
+) -> dict[str, MonthToDate | None]:
+    """{'adaptive', 't1'} -> the list's month to date for the message, against `capital` (by the
+    same keys, default ₹8.5 lakh); None for a list whose month cannot be read: the message must
+    always go, so a failure only leaves the lines out, and says why through `echo`."""
+    boost, capital = boost or {}, capital or {}
+    out: dict[str, MonthToDate | None] = {}
+    for key, r in (("adaptive", adaptive), ("t1", t1)):
+        try:
+            out[key] = (
+                month_to_date(r, root, bool(boost.get(key)), capital.get(key, DEFAULT_CAPITAL))
+                if isinstance(r, DailyResult)
+                else None
+            )
+        except Exception as error:  # noqa: BLE001
+            echo(f"the {key} month to date could not be read: {error}")
+            out[key] = None
+    return out
+
+
+@dataclass(frozen=True)
+class RealMonth:
+    """The real money from the 1st of the month: the contract notes' profit (after the notes'
+    charges and the algo fees), every F&O account and per broker, against every account's capital
+    added up; and beside it what the profit leaves out (the Trade book's summary)."""
+
+    day: date
+    total: float
+    capital: float
+    #: {broker name: profit}, brokers with a note this month
+    brokers: dict[str, float]
+    #: the last session with a contract note (today's arrive after midnight); None = none yet
+    through: date | None
+    #: sessions this month whose notes are not all in, left out of `total`
+    open_days: int = 0
+    #: collateral interest from the brokers' ledger e-mails, not in `total`
+    interest: float = 0.0
+    #: the Trade book's estimate of the accounts' small debits (₹1,000 a year per F&O broker),
+    #: not in `total`
+    other_debits: float = 0.0
+
+    @property
+    def after_debits(self) -> float:
+        """`total` less the interest and the other debits: the Trade book's net after debits."""
+        return self.total - self.interest - self.other_debits
+
+
+def real_month(day: date, capital: float, root: Path | None = None) -> RealMonth:
+    """The contract-notes store (`realised/`, the Trade book's figures) from the 1st of `day`'s
+    month to `day`."""
+    from ..realised import ratios
+    from ..realised import store as notes
+
+    book = notes.load_cached(root or data_dir())
+    first = day.replace(day=1)
+    rows = ratios.daily(book, start=first, end=day)
+    brokers: dict[str, float] = {}
+    for account in book.accounts():
+        got = [r.profit for r in ratios.daily(book, account=account, start=first, end=day)]
+        if any(p is not None for p in got):
+            broker = account.split("/", 1)[0]
+            name = BROKER_NAMES.get(broker, broker)
+            brokers[name] = brokers.get(name, 0.0) + float(sum(p for p in got if p is not None))
+    noted = [r.day for r in rows if r.notes]
+    figures = ratios.summary(rows)
+    return RealMonth(
+        day,
+        figures["net"],
+        capital,
+        brokers,
+        max(noted) if noted else None,
+        sum(1 for r in rows if r.open),
+        figures["interest"],
+        figures["other_debits"],
+    )
+
+
 def render(
     result: DailyResult,
     t1: DailyResult | str | None = None,
@@ -229,11 +368,15 @@ def render(
     tomorrow_t1=None,
     live: list[str] | None = None,
     boost: dict[str, bool] | None = None,
+    months: dict[str, MonthToDate | None] | None = None,
+    real: RealMonth | None = None,
 ) -> str:
     """The evening message (BL-125): Adaptive's result, T1's (or the note saying why it is not
     there), BL-141's live-vs-paper lines (`live`, the owner's copy only), then tomorrow's
     strategies in full. `tomorrow` / `tomorrow_t1` are `tomorrow.NextPicks` (or a note for T1);
-    without `tomorrow` there is no section."""
+    without `tomorrow` there is no section. `months` (from `months_to_date()`) adds each list's
+    capital and month-to-date lines; `real` (`real_month()`, the owner's copy only) the total
+    capital and the real month from the contract notes."""
     t1_part = _total_and_rows(t1) if isinstance(t1, DailyResult) else t1
     boost = boost or {}
     traded = {
@@ -249,11 +392,16 @@ def render(
         live=live,
         boost=boost,
         traded=traded,
+        months=months,
+        real=real,
     )
 
 
 def render_t1_followup(
-    t1: DailyResult, tomorrow_t1=None, boost: dict[str, bool] | None = None
+    t1: DailyResult,
+    tomorrow_t1=None,
+    boost: dict[str, bool] | None = None,
+    month: MonthToDate | None = None,
 ) -> str:
     """T1's result as a message of its own, for when it was not ready for the main message."""
     boost = boost or {}
@@ -266,4 +414,5 @@ def render_t1_followup(
         heading="Tuned Adaptive result",
         boost={"t1": boost.get("t1", False)},
         traded={"t1": as_traded(t1) if boost.get("t1") else None},
+        months={"t1": month},
     )

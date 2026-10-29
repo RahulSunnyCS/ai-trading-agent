@@ -7,6 +7,9 @@ import { apiPost, apiPut } from '../../lib/api';
 import {
   type AutomationSettings,
   type AutomationView,
+  BROKERS,
+  CAPITAL_MAX,
+  CAPITAL_MIN,
   LIST_LABEL,
   type List,
   MASTER_LABEL,
@@ -20,12 +23,14 @@ import {
   describeChanges,
   githubOutcome,
   heldByMaster,
+  totalCapital,
+  withCapital,
   withMaster,
   withPause,
   withRow,
   withViewDefaults,
 } from '../../lib/automation';
-import { formatDay, formatIstDateTime } from '../../lib/format';
+import { formatDay, formatInr, formatIstDateTime } from '../../lib/format';
 import { SCHEDULER_API, runNowError } from '../../lib/scheduler';
 import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
@@ -271,6 +276,40 @@ export function AutomationSettingsCard() {
                 </div>
               );
             })}
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-4" aria-label="Capital">
+            <div>
+              <p className="text-sm font-medium text-foreground">Capital</p>
+              <p className="text-xs text-muted">
+                The money in each broker account. The evening result message shows each list against
+                the capital of the accounts that upload it, and your real month to date (from the
+                contract notes) against the total, now {formatInr(totalCapital(draft))}.
+              </p>
+            </div>
+            {BROKERS.map(({ key, label }) => (
+              <div
+                key={key}
+                className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <label htmlFor={`capital-${key}`} className="text-sm font-medium text-foreground">
+                  {label} (₹)
+                  <span className="ml-2 text-xs font-normal text-muted">
+                    Whole rupees, {formatInr(CAPITAL_MIN)} to {formatInr(CAPITAL_MAX)}.
+                  </span>
+                </label>
+                <NumberField
+                  id={`capital-${key}`}
+                  className="w-36"
+                  min={CAPITAL_MIN}
+                  max={CAPITAL_MAX}
+                  step={50_000}
+                  value={draft.capital[key]}
+                  disabled={saving}
+                  onChange={(rupees) => setDraft(withCapital(draft, key, Math.round(rupees)))}
+                />
+              </div>
+            ))}
           </section>
 
           <section className="space-y-3 border-t border-border pt-4" aria-label="Pause">

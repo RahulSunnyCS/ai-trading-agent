@@ -274,6 +274,32 @@ def message_boost() -> dict[str, bool]:
     return automation_settings.dir_boost_lists(settings, automation_settings.env_uploads_on())
 
 
+def message_capital() -> dict[str, float]:
+    """The capital the evening message shows (Settings › Automation, owner 2026-10-29):
+    {'adaptive', 't1'}: the accounts that upload each list; 'total': every account added up.
+    Settings that cannot be read give the defaults: the message must always go."""
+    from . import automation_settings as auto
+
+    try:
+        settings, _ = auto.read()
+    except Exception:  # noqa: BLE001
+        settings = auto.DEFAULT
+    return {
+        "adaptive": auto.book_capital(settings, "core"),
+        "t1": auto.book_capital(settings, "t1"),
+        "total": sum(auto.capital(settings).values()),
+    }
+
+
+def _real_month(day, capital, root, echo):
+    """The owner's real month from the contract notes; None (the lines left out) on any error."""
+    try:
+        return result.real_month(day, capital, root)
+    except Exception as error:  # noqa: BLE001
+        echo(f"the real month from the contract notes could not be read: {error}")
+        return None
+
+
 def _severity(entry: dict) -> str:
     return "info" if entry.get("before_first_entry") else "warn"
 
@@ -464,8 +490,15 @@ def _send_result_locked(
         # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
         live = live_compare.owner_lines(day, root, echo)
         boost = message_boost()
-        private = result.render(adaptive, t1_part, next_adaptive, next_t1, live, boost=boost)
-        group = result.render(adaptive, t1_part, next_adaptive, next_t1, boost=boost)
+        capital = message_capital()
+        # each list's capital and month to date, in both chats; the real month, the owner's only
+        # (owner, 2026-10-29)
+        months = result.months_to_date(adaptive, t1_part, root, boost, capital, echo)
+        real = _real_month(day, capital["total"], root, echo)
+        private = result.render(
+            adaptive, t1_part, next_adaptive, next_t1, live, boost=boost, months=months, real=real
+        )
+        group = result.render(adaptive, t1_part, next_adaptive, next_t1, boost=boost, months=months)
         echo(private)
         if not telegram:
             return 0
@@ -511,7 +544,9 @@ def _send_result_locked(
         echo(f"T1 result still not ready: {t1}")
     elif owed:
         next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None
-        text = result.render_t1_followup(t1, next_t1, boost=message_boost())
+        boost = message_boost()
+        month = result.months_to_date(None, t1, root, boost, message_capital(), echo)["t1"]
+        text = result.render_t1_followup(t1, next_t1, boost=boost, month=month)
         echo(text)
         for chat, marker in owed:
             if send(text, chat_id=chat):
