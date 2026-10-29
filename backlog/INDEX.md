@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-28
+Last updated: 2026-10-30
 
 ## Open
 
@@ -87,6 +87,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-192](BL-192-t1-sl150-cap.md) | T1: at most one SL150% Widesl on a non-expiry day, live from Fri 2026-10-30 | Done: `rotation/sl150_cap.py`, a filter of the ranking in the 09:16 pick, its next-best line and the morning rule; kill switch `ROTATION_SL150_CAP_FROM`; recent entries re-score unchanged | 2026-10-30 |
 | [BL-186](BL-186-dir-stop-and-reverse.md) | Directional stop-and-reverse: on a leg stop, buy the stopped option (blanket, filtered, half size) against a plain exit, on T1's Dir picks | Killed: C1 / C2 / C3 with a 30-minute exit do not beat the plain exit at ₹5,000 on net ₹ a day (−153 to +45, not significant under Holm) and all draw down deeper; the reversal leg nets +₹116 to +₹230 a trade on its own, but the rest of the Dir book gives up more; hold-out agrees; the plain leg stop with RE COST stays; engine option `reverse_on_sl` kept, off. Amendment 1 (owner's request, same day): a ₹50 long, its stop and a re-sale toggle, six cells, all killed (− A5 +₹39 to +₹133 a day, none significant, drawdowns deeper) | 2026-10-29 |
 | [BL-104](BL-104-full-parameter-sweep.md) | Full-factorial parameter sweep over Widesl (incl. ATM), Dir and Buy: strike, stops, trail, MTM, exit, re-entry, range and target at 7 slots × 2 indices (63,384 cells), Calmar-gated Martin ranking with a plateau rule; absorbs BL-096/097/098 Phase 3 | Done on the advisory result: Stages 1–3 and the 2022–24 advisory run; one band passes all eight rules (Buy SENSEX 09:17–10:02, in-sample); no forward test (T1 and the BL-106 pool carry it); finalists' correlation, Buy ₹1-per-fill and bootstrap vs BL-099 not run; tail gate and Buy 60 % cap never registered, descriptive only | 2026-10-28 |
 | [BL-091](BL-091-straddle-premium-exhaustion-study.md) | Straddle premium exhaustion: learn the peak rule from ≥ 25-point rises of the rolling NIFTY ATM straddle (P2 + P3), test once on P1, and remove the losing re-entries of the owner's stopped wide sell (derivatives, persistence, retracement, IV, spot activity, nearby strikes as candidates) | A lead, not a result: no registered arm passed; F1450 a post-hoc lead among 31 arms; the 13 time-gate arms ran without an owner `override:` (gate breach, descriptive only); P1 unread | 2026-10-28 |
