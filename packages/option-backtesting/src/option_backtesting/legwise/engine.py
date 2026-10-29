@@ -74,6 +74,14 @@ backtest (TODO.md 3.10.7):
   leg that reversed is not re-entered; at most one reversal per leg a day; a
   stop that does not reverse (a subclass's `_reverse_allowed` said no) arms
   RE COST as usual, and a later stop of the re-sold leg may reverse.
+  Amendment 1: with `strike_premium` the long is a different contract (same expiry and
+  option type): of the strikes priced before the stop minute (`price_at(m)`), the one closest
+  to that premium, within 0.7x-1.4x of it (a tie to the lower; none, or the stopped contract,
+  = no reversal and the stop arms RE COST as for a plain stop; a note says which). It fills at
+  the close of the stop bar (`price_at(m + 1)`: the stopped leg's move in that bar is in the
+  price), is judged from the next bar, and its time stop counts from that fill.
+  With `resell_after_reverse` the stopped leg also arms RE COST, which waits until the long has
+  closed.
 """
 
 from __future__ import annotations
@@ -194,6 +202,7 @@ class _LegRun:
     reversed: bool = False  # BL-186: this sold leg has turned long today
     time_stop_min: int | None = None  # BL-186: a reversal long's time stop (minute index)
     parent: _LegRun | None = None  # BL-186: set on a reversal long, the sold leg it came from
+    child: _LegRun | None = None  # BL-186: set on a sold leg that reversed, its long
 
     @property
     def sign(self) -> int:
@@ -488,6 +497,19 @@ class _DaySim:
             return False
         assert run.series is not None and run.contract is not None
         spec = run.spec
+        contract, series, raw, fill_at = run.contract, run.series, run.exit_raw, minute
+        if rev.strike_premium is not None:
+            picked = self._pick_premium(run, minute, rev.strike_premium)
+            if picked is None:
+                return False
+            contract, series = picked
+            raw = (
+                series.price_at(minute + 1) if minute + 1 < N_MINUTES else None
+            )  # the stop bar's close
+            if raw is None:
+                self.notes.append(f"{spec.id}: reverse skipped, the {contract} has no price yet")
+                return False
+            fill_at = minute  # judged from the next bar, like an intrabar entry
         long_spec = Leg(
             id=f"{spec.id}_rev",
             lots=spec.lots,
@@ -502,14 +524,46 @@ class _DaySim:
             stop_on=spec.stop_on,
         )
         long = _LegRun(long_spec, run.qty * rev.lots_ratio if rev.lots_ratio != 1 else run.qty)
-        long.contract, long.series, long.parent = run.contract, run.series, run
-        raw = run.exit_raw
-        self._enter(long, minute, raw, intrabar=raw != run.series.open[minute])
+        long.contract, long.series, long.parent = contract, series, run
+        if rev.strike_premium is None:
+            self._enter(long, minute, raw, intrabar=raw != series.open[minute])
+        else:
+            self._enter(long, fill_at, raw, intrabar=True)
         if rev.time_stop_minutes is not None:
-            long.time_stop_min = minute + rev.time_stop_minutes
+            long.time_stop_min = (
+                minute + (0 if rev.strike_premium is None else 1) + (rev.time_stop_minutes)
+            )
         run.reversed = True
+        run.child = long
         self.legs.append(long)  # stepped from the next leg in this minute's loop on
+        if rev.resell_after_reverse:
+            self._arm_reentry(run, minute, "sl")  # waits in _step_reentry until the long is closed
         return True
+
+    def _pick_premium(self, run: _LegRun, minute: int, target: float) -> tuple | None:
+        """Amendment 1: the long's contract, the strike priced closest to `target` before `minute`
+        among the stopped leg's expiry and option type, within 0.7x-1.4x of it; None (with a
+        note) when there is none or it is the stopped contract itself."""
+        spec = run.spec
+        assert run.contract is not None
+        expiry = run.contract[0]
+        low, high = 0.7 * target, 1.4 * target
+        priced = [
+            (abs(p - target), p, k)
+            for k, series in self.data.chain.items()
+            if k[0] == expiry
+            and k[2] == spec.option_type
+            and (p := series.price_at(minute)) is not None
+            and low - _EPS <= p <= high + _EPS
+        ]
+        if not priced:
+            self.notes.append(f"{spec.id}: reverse skipped, no strike priced {low:g}-{high:g}")
+            return None
+        key = min(priced)[2]
+        if key == run.contract:
+            self.notes.append(f"{spec.id}: reverse skipped, the closest strike is the stopped one")
+            return None
+        return key, self.data.chain[key]
 
     def _time_stop(self, run: _LegRun, minute: int) -> bool:
         """BL-186: a reversal long past its time stop exits at the price at that time."""
@@ -538,6 +592,8 @@ class _DaySim:
         if minute > self.last_reentry_min:
             run.state = "done"
             return
+        if run.child is not None and run.child.state != "done":
+            return  # BL-186 Amendment 1: re-sell only after the long has closed
         if run.reentry_mode == "asap":
             if self._select(run, minute):
                 self._enter(run, minute, run.series.open[minute], intrabar=False)  # type: ignore[union-attr,arg-type]
