@@ -119,7 +119,13 @@ def run(rec, results, holidays, wide: list[str], extra: dict) -> dict[str, list[
                 net += gross - lot_plans.brokerage(n)
             if net is not None:
                 out[arm].append(
-                    {"day": day.isoformat(), "net": net, "picks": core, "expiry": a["dte_n"] == "0"}
+                    {
+                        "day": day.isoformat(),
+                        "net": net,
+                        "picks": core,
+                        "expiry": str(a["dte_n"]) == "0",
+                        "expiry_s": str(a["dte_s"]) == "0",
+                    }
                 )
     return out
 
@@ -148,7 +154,7 @@ def compare(series: dict, base: str, arm: str, lo: date, hi: date, decide: bool)
     out = {
         "base": bm, "arm": am, "diff": {"mean": mean, "lower": lower, "upper": upper},
         "days_picks_differ": sum(
-            [x.replace("-m3k_", "_") for x in r["picks"]] != s["picks"]
+            {x.replace("-m3k_", "_") for x in r["picks"]} != set(s["picks"])
             for r, s in zip(a_rows, b_rows, strict=True)
         ),
     }  # fmt: skip
@@ -164,19 +170,20 @@ def compare(series: dict, base: str, arm: str, lo: date, hi: date, decide: bool)
     return out
 
 
-def standalone(wide: list[str], extra: dict, expiry: dict[date, bool]) -> dict:
+def standalone(wide: list[str], extra: dict, expiry: dict[str, dict[date, bool]]) -> dict:
     """Per family: the stored ₹2,500 (the -m25 copy, equal to it) against ₹3,000, every slot-day."""
     fams: dict[str, list[str]] = {}
     for n in wide:
         fams.setdefault(n.rsplit("_", 1)[0], []).append(n)
     out = {}
     for fam, names in sorted(fams.items()):
+        exp = expiry[fam[0]]
         for label, keep in (
             ("all", lambda d: True),
             ("P1", lambda d: P1[0] <= d <= P1[1]),
             ("P2", lambda d: P2[0] <= d <= P2[1]),
-            ("non_expiry", lambda d: d in expiry and not expiry[d]),
-            ("expiry", lambda d: d in expiry and expiry[d]),
+            ("non_expiry", lambda d, exp=exp: d in exp and not exp[d]),
+            ("expiry", lambda d, exp=exp: d in exp and exp[d]),
         ):
             a, b, sa, sb = [], [], 0, 0
             for n in names:
@@ -215,7 +222,11 @@ def main() -> None:
     m3 = {k: v for k, v in extra.items() if "-m3k_" in k}
     series = run(rec, daylog._Results(root), daylog.holiday_names(), wide, m3)
     last = date.fromisoformat(series["K0"][-1]["day"])
-    expiry = {date.fromisoformat(r["day"]): r["expiry"] for r in series["K0"]}
+    # each family's own index: NIFTY's expiry for N_, SENSEX's for S_ (replay days, from 2025-01-10)
+    expiry = {
+        "N": {date.fromisoformat(r["day"]): r["expiry"] for r in series["K0"]},
+        "S": {date.fromisoformat(r["day"]): r["expiry_s"] for r in series["K0"]},
+    }
     res: dict = {
         "window": [series["K0"][0]["day"], series["K0"][-1]["day"]],
         "engine_parity": parity,

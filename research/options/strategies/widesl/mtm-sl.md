@@ -10,7 +10,8 @@ the end of the 1-minute bar, so on fast days the realised loss overshoots the le
 
 ## Live value
 
-₹2,500 per lot in all three live Widesl files and every rotation Widesl file.
+₹2,500 per lot in all three live Widesl files and every Core rotation Widesl file. T1's own Widesl settings
+use ₹3,000 (`N_wide-t1s8`) or ₹4,000 (`N_wide-t1s4`, `N_p150-t1s11`, `S_p285-t1s22`).
 
 ## Tested
 
@@ -19,7 +20,7 @@ the end of the 1-minute bar, so on fast days the realised loss overshoots the le
 | BL-070 | ₹2,500 vs no overall stop (leg stops kept), all 150 Widesl variants | 2025-09-01 → 2026-10-08, 1 lot, before charges | **Keep only for SENSEX OTM2**; elsewhere the stop costs more than it saves | [BL-070][bl070] |
 | BL-098 Phase 2 | none, ₹1,000, ₹1,500, ₹2,000, ₹2,500, ₹3,000, ₹3,500, ₹4,000 | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive ranking; Phase 3 pending | [BL-098 report][bl098q] |
 | BL-156 | Overall stop checked at each 1-minute candle close (the engine) vs on every tick (live; modelled from each minute's high / low, calibrated on the 23 Oct live stop) | T1's and Core's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **No meaningful difference**: close +₹56 / day on T1, 90% [−17, +144]; Core +₹38 [−35, +130] | [BL-156][bl156] |
-| BL-193 | ₹3,000 instead of ₹2,500 on all 150 Core Widesl files (NIFTY OTM1 / ₹80 / ₹100, SENSEX OTM2 / ₹250 / ₹320, 25 slots each), standalone and in Adaptive (Core and T1) | 2024-10-09 → 2026-10-29, 1 lot, after brokerage; 2025-10-09 → 2026-10-09 decides | **Killed**: Core −₹72 a day [−204, +49], T1 −₹146 [−241, −62] (drawdown 19% deeper). Standalone +₹2 to +₹11 a strategy-day, 5th-percentile day 14–16% deeper, stop fires ~25% less | [BL-193][bl193] |
+| BL-193 | ₹3,000 instead of ₹2,500 on all 150 Core Widesl files (NIFTY OTM1 / ₹80 / ₹100, SENSEX OTM2 / ₹250 / ₹320, 25 slots each), standalone and in Adaptive (Core and T1) | Standalone 2024-10-09 → 2026-10-29; Adaptive replay 2025-01-10 → 2026-10-29; 1 lot, after brokerage; 2025-10-09 → 2026-10-09 decides | **Killed**: Core −₹72 a day [−204, +49], T1 −₹146 [−241, −62] (drawdown 19% deeper). Standalone −₹2 to +₹11 a strategy-day (five of six rise), 5th-percentile day 14–16% deeper, stop fires ~25% less | [BL-193][bl193] |
 
 Family means, 1 lot, with ₹2,500 → without ([BL-070][bl070], before charges):
 
@@ -47,7 +48,7 @@ baseline ₹13,883 in the afternoon.
 - In the rotation the stops help the ranking: every DRB list earns less on the no-stop results although
   the variants earn more (BL-070). The stop is part of what the ranking learns to pick.
 
-- **₹3,000 instead of ₹2,500 (BL-193):** each Widesl alone gains a little (+₹2 to +₹11 a day) but its bad
+- **₹3,000 instead of ₹2,500 (BL-193):** each Widesl alone moves by −₹2 to +₹11 a day (five of six families rise; three fall on 2025-10 → 2026-10) but its bad
   days are 14–16% deeper, and Adaptive does worse with them (Core −₹72, T1 −₹146 a day on 2025-10 →
   2026-10). ₹2,500 stays.
 
