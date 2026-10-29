@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 with real money and is uneasy about this setting |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -89,6 +89,47 @@ it allowed only on NIFTY expiry days (arm B), and whether either makes the book 
   findings page `research/options/strategies/widesl/leg-sl.md` row, TODO and INDEX.
 - **Done when:** the rule above is applied and recorded.
 
+## Result (2026-10-29)
+
+`research/bl191/study.py`; output `results/study.json` and `results/daily.json` (git-ignored). 435
+sessions, 2025-01-10 → 2026-10-29, per arm. **Parity:** the T1 arm over BL-167's window is 431 days
+and ₹653,498, equal to BL-167's T1 base. List C, 3 core picks, 1 lot each, net after brokerage, ₹ a day.
+
+| Period | T1 mean | A drop: diff [90%] | A max DD / p5 day | B expiry only: diff [90%] | B max DD / p5 day | T1 max DD / p5 day |
+|---|---|---|---|---|---|---|
+| **P2 (decides)**, 238 days | +1,672 | **−116 [−365, +96]** | 24,188 / −7,448 | **+55 [−92, +198]** | 24,188 / −6,986 | 24,435 / −6,340 |
+| P1 (chosen on it), 184 days | +1,242 | −212 [−489, +28] | 29,885 / −8,354 | −120 [−256, +17] | 27,187 / −8,782 | 25,887 / −8,782 |
+| P2 non-expiry days only, 187 | +1,171 | +70 [−121, +263] | 20,834 / −7,279 | +70 [−121, +263] | 20,834 / −7,279 | 30,711 / −6,576 |
+| Forward, 13 days | +1,826 | +98 [−38, +234] | 10,472 / −8,626 | +97 [−38, +233] | 10,479 / −8,628 | 10,479 / −8,628 |
+| All 435 days | +1,495 | −150 [−324, +16] | 29,885 / −7,935 | −18 [−118, +86] | 27,187 / −7,907 | 25,887 / −7,573 |
+
+**By the registered rule (P2):**
+- **A (drop): kill.** Mean −₹116 a day, below the −₹50 bar. The setting earns its place in T1 on the
+  whole: without it P1 is −₹212 and all days −₹150, with a deeper drawdown.
+- **B (expiry only): no difference.** Return holds (+₹55, interval includes zero) but the book is not
+  safer: drawdown 1% shallower (bar 10%), 5th-percentile day 10% worse (−₹6,986 vs −₹6,340). Keep T1
+  as it is.
+
+**Reported, not deciding:**
+- Use: `N_wide-t1s4` is 131 of 1,305 core picks (10%); 44 of them on expiry days. Days with one copy:
+  101; with two or more: 15 (8 of them non-expiry days).
+- Swaps: without it, 131 SL150 picks leave and other Widesl (153) and a few Dir enter; the picks differ
+  on 154 days (A) and 111 days (B).
+- On P2's non-expiry days alone both arms gain +₹70 and cut the drawdown by 32%, but the 5th-percentile
+  day is worse; a subset of days, not the rule.
+- **Two or more copies on a non-expiry day (post hoc, small):** 8 days in all. T1 averaged **−₹4,208**
+  (3 of 8 positive, worst −₹14,092 on 2026-09-11); the same days without the setting −₹1,148 (worst
+  −₹9,276). P2: 5 days, −₹6,795 against −₹2,307. T1's worst day of all (2026-09-11, two SL150 copies
+  plus `N_wide_1002`) and its fourth worst (2026-06-12, the same shape) are such days. One copy on a
+  non-expiry day is fine (71 days, +₹1,421 against +₹1,269 without). This was found after the run, on
+  8 days, and decides nothing; a cap of one SL150 copy on non-expiry days needs its own registration.
+- Five worst T1 days: −14,092 (two SL150), −13,223, −12,277, −11,060 (two SL150), −10,479; the arms
+  differ only on the two SL150 days (−9,276 and −8,161).
+
+**Caveats:** P2 is not a clean hold-out (read by BL-113, 145, 146, 167, 180 and by the look that
+prompted this item); no spread or slippage; the Buy add-on and the BL-122 expiry-only rule are not
+in the replay. Nothing live changes.
+
 ## Risks
 
 - The decision period is not truly unseen (above). A pass is a reason to look forward, not proof.
@@ -98,3 +139,4 @@ it allowed only on NIFTY expiry days (arm B), and whether either makes the book 
 ## Log
 
 - 2026-10-29 — created and pre-registered from the owner's question (Phase 0 committed before any run).
+- 2026-10-29 — run (`research/bl191/study.py`), parity with BL-167 exact. P2: A (drop) killed, −₹116 a day [−365, +96]; B (expiry only) no difference, +₹55 [−92, +198], drawdown 1% shallower and the 5th-percentile day worse. T1 stays as it is. Post hoc: the 8 non-expiry days with two or more SL150 copies averaged −₹4,208 (−₹1,148 without); a one-copy cap is a separate registration if wanted.
