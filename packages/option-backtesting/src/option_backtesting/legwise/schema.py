@@ -130,12 +130,31 @@ class ReverseOnSL(_Model):
     and an optional peak trail; else it is held to the strategy's exit. It counts in the overall
     MTM like any leg. A leg that has reversed is not sold again by `reentry_on_sl`; at most one
     reversal per leg a day. Off unless set; no platform form is captured, so the AlgoTest and
-    Quantiply exports refuse it."""
+    Quantiply exports refuse it.
+
+    BL-186 Amendment 1: `strike_premium` buys a different contract of the stopped leg's expiry and
+    option type instead: the collected strike whose price before the stop minute is closest to it
+    (within 0.7x-1.4x of it; none, or the stopped contract itself = no reversal), filled at the
+    close of the stop bar. `resell_after_reverse` lets RE COST re-sell the stopped leg once the long
+    has closed (else a reversed leg is not re-sold)."""
 
     lots_ratio: float = Field(default=1.0, allow_inf_nan=False)
     stop_loss_percent: float | None = Field(default=30.0, gt=0, lt=100, allow_inf_nan=False)
     time_stop_minutes: int | None = Field(default=None, ge=1, le=375)
     trail_peak: TrailPeak | None = None
+    strike_premium: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    resell_after_reverse: bool = False
+
+    @model_serializer(mode="wrap")
+    def _omit_amendment_fields_at_default(self, handler):
+        """Keep the Amendment 1 options out of the dump while unset, so a BL-186 strategy keeps its
+        spec hash."""
+        data = handler(self)
+        if data.get("strike_premium") is None:
+            data.pop("strike_premium", None)
+        if data.get("resell_after_reverse") is False:
+            data.pop("resell_after_reverse", None)
+        return data
 
     @field_validator("lots_ratio")
     @classmethod

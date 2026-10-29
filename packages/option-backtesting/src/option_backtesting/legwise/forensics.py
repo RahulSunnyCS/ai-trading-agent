@@ -88,13 +88,19 @@ def build_forensics(
 
     per_order = strategy.execution.cost_per_order_inr
     attribution = []
-    for leg in strategy.legs:
-        mine = [t for t in result.trades if t.leg_id == leg.id]
+    # a leg that can reverse (BL-186) has its long, `<id>_rev`, as a row of its own
+    rows = [
+        leg_id
+        for leg in strategy.legs
+        for leg_id in ([leg.id, f"{leg.id}_rev"] if leg.reverse_on_sl else [leg.id])
+    ]
+    for leg_id in rows:
+        mine = [t for t in result.trades if t.leg_id == leg_id]
         pnl = sum(t.pnl for t in mine)
         costs = len(mine) * 2 * per_order
         attribution.append(
             {
-                "leg": leg.id,
+                "leg": leg_id,
                 "trades": len(mine),
                 "gross": round(pnl, 2),
                 "costs": round(costs, 2),
