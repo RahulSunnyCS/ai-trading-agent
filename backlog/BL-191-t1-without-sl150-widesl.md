@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 with real money and is uneasy about this setting |
-| **Status** | In progress (Amendment 3) |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -257,6 +257,25 @@ days to move the risk bar. Keep T1 as it is unless the owner chooses otherwise.
   `N_wide_1032` (SL115%, trail 15/10, MTM ₹2,500) in place of `N_wide-t1s4_1032`. At a 14.5 open T1 holds
   one copy only, nothing changes.
 
+## Result, Amendment 3 (2026-10-30)
+
+`research/bl191/amend3.py`; output `results/amend3.json` (git-ignored).
+
+| Period | D0 mean / max DD / p5 day | D0 vs T1 [90%] | D0 vs D2 [90%] | D0 vs B [90%] | Days changed (vs T1) |
+|---|---|---|---|---|---|
+| **P2 (decides)**, 238 | +1,784 / 23,110 / −6,805 | **+111 [+12, +220]** | +72 [−14, +159] | +56 [−22, +146] | 32 (+₹829 on them) |
+| P1, 184 | +1,154 / 26,793 / −8,782 | −88 [−199, +15] | −85 [−193, +14] | +32 [−53, +122] | 31 (−₹523) |
+| Forward, 13 | +1,831 / 10,479 / −8,628 | +5 | +5 | −92 | 1 |
+| All 435 | +1,519 / 26,793 / −7,767 | +24 [−44, +98] | +4 [−61, +69] | +42 [−18, +104] | 64 (+₹162) |
+
+**By the registered rule (P2): no difference.** Return holds (+₹111, interval above zero), but the book is
+not 10% safer: drawdown 5% shallower (23,110 vs 24,435), 5th-percentile day 7% worse.
+
+**Reported, not deciding:** D0 changes 64 of 435 days (D2: 8). It is the best arm on P2 and the worst
+non-removal arm on P1 (−₹88; D2 −3), where the setting was chosen and also earned on non-expiry days;
+over all days D0 and D2 are level (+₹4). D2 is the steadier of the two across the periods. For Fri
+2026-10-30 at a 15.12 open D0 would pick `S_ditm1-t1s44_0917`, `N_wide_1032`, `N_p80_1032`.
+
 ## Risks
 
 - The decision period is not truly unseen (above). A pass is a reason to look forward, not proof.
@@ -273,3 +292,4 @@ days to move the risk bar. Keep T1 as it is unless the owner chooses otherwise.
 - 2026-10-29 — Amendment 2 registered before any run (owner): at most one `N_wide-t1s4` pick a day (D1 every day, D2 non-expiry days only), as a filter of the same composite.
 - 2026-10-29 — Amendment 2 run. P2: D1 (cap every day) +₹15 a day [−43, +65], D2 (non-expiry days) +₹40 [+8, +77]; both no difference by the rule (drawdown 5% shallower, 5th-percentile day unchanged). D2 changes 8 of 435 days, +₹1,100 on them; capping expiry days costs. T1 unchanged pending the owner.
 - 2026-10-30 — Amendment 3 registered before any run (owner): D0, no `N_wide-t1s4` on a non-expiry day, as a filter of the same composite.
+- 2026-10-30 — Amendment 3 run. P2: D0 +₹111 a day [+12, +220] vs T1, no difference by the rule (drawdown 5% shallower, 5th-percentile day 7% worse); P1 −₹88; all days +₹24, level with D2 (+₹4). 64 days changed (D2: 8).
