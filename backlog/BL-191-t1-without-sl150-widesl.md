@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 with real money and is uneasy about this setting |
-| **Status** | Done |
+| **Status** | In progress (Amendment 2) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -114,6 +114,30 @@ this in non expiries." The arms below are new; Phase 0's arms and rule are uncha
 - **Will not run:** other stops or trails, a C1 / C2 on SENSEX, a one-copy cap. `override: <reason>`
   in the Log for any.
 
+### Amendment 2 — at most one SL150% Widesl a day (2026-10-29, before any run)
+
+Owner, 2026-10-29, after Amendment 1: "Or let's do one more research: at max only 150% Widesl per day."
+Phase 0's rule and Amendment 1 are unchanged.
+
+- **Hypothesis:** capping T1 at one `N_wide-t1s4` pick a day keeps its return and removes the
+  doubled-strangle days (8 non-expiry days in Phase 1, −₹4,208 on average; T1's worst day among them).
+- **The cap** (a filter of the same ranking, the way BL-122's `expiry.filter_picks` works): T1's list C
+  composite is computed as today over every column, never recomputed. If the selected core holds two or
+  more `N_wide-t1s4_*`, the one with the highest composite stays and the others leave the candidate pool;
+  `score.select` then chooses the three core picks from what is left (the same top-3, at least two
+  Widesl rule).
+- **Arms:** **D1** — the cap on every day (primary, the owner's words). **D2** — the cap on non-expiry
+  NIFTY days only (the setting was chosen as the expiry-day winner), secondary.
+- **Pass / kill rule:** Phase 0's, on P2, each arm against T1. Reported, not deciding: P1, forward, all
+  days; the days the cap changes the picks and the mean difference on those days; against Amendment 1's
+  C2 arm. The cap touches few days (15 of 435 had two copies), so the interval will be narrow and the
+  risk bar (10% better drawdown or 5th-percentile day) may not be reachable; that is accepted as
+  registered.
+- **Look-ahead check:** as Phase 0; the cap uses only the day's own composite and DTE label. The idea
+  comes from the post-hoc two-copy figure, which covers both periods: P2 is not clean for it either.
+- **Will not run:** a cap on other settings, a cap of one Widesl of any kind per start time, a cap
+  per index. `override: <reason>` in the Log for any.
+
 ### Phase 1 — Replay and read-out
 
 - **Tasks:** `research/bl191/study.py` (reuses BL-167's replay), `--check` smoke, full run, figures here.
@@ -206,3 +230,4 @@ Keep T1 as it is.
 - 2026-10-29 — after review (PR 388): only P2 carries a verdict in `study.json`; the non-expiry subset compares A only (B equals A there) and gives no drawdown (over non-consecutive days it is not one); the 5th-percentile rule is written by size (`+ 10% of |p5|`), so it cannot flip on a positive base. Figures and verdicts unchanged. Not done: the replay helpers shared with BL-167 are still copied, not moved to `research/common/`.
 - 2026-10-29 — Amendment 1 registered before any run (owner): C1 = Core Widesl 115% at a ₹3,000 stop, C2 = `N_wide-t1s4` at 115% and ₹3,000, each in place of `N_wide-t1s4` on non-expiry days.
 - 2026-10-29 — Amendment 1 run: engine parity exact (0 of 25,100 slot-days differ). P2: C1 +₹24 a day [−95, +144], C2 +₹25 [−90, +136], both no difference (drawdown 5% shallower, 5th-percentile day 7% worse). T1 stays as it is.
+- 2026-10-29 — Amendment 2 registered before any run (owner): at most one `N_wide-t1s4` pick a day (D1 every day, D2 non-expiry days only), as a filter of the same composite.
