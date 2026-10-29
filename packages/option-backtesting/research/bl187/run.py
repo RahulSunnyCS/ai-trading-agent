@@ -3,7 +3,8 @@ place (rule and arms: backlog/BL-187 Phase 0).
 
     BL187_A0=<A0 csv folder> uv run python research/bl187/run.py [--jobs-only | --gates-only]
 
-Reads BL-185's A0 (Core-298 + T1 re-simulated with charges: one CSV a variant), replays list C's
+Reads BL-185's A0 (Core-298 + T1 re-simulated with charges: one CSV a variant, git-ignored;
+regenerate with `uv run python research/common/two_session/a0.py`, or point BL187_A0 at an existing folder), replays list C's
 picks and composite per book, simulates the picked Dir with `exit_time` moved to each possible cut
 (only on the days it was picked; resumable, out/dir_cuts.csv), runs the parity gates, then the arms.
 """
@@ -11,6 +12,7 @@ picks and composite per book, simulates the picked Dir with `exit_time` moved to
 from __future__ import annotations
 
 import csv
+import functools
 import os
 import sys
 import time
@@ -96,6 +98,7 @@ def dir_file(name: str) -> Path:
     return p if p.exists() else sr.ROTATION.parent / "rotation_t1" / f"{name}.yaml"
 
 
+@functools.cache
 def dir_entry(name: str) -> int:
     h, m = yaml.safe_load(dir_file(name).read_text())["strategy"]["entry_time"].split(":")
     return int(h) * 60 + int(m)
@@ -157,6 +160,7 @@ def simulate_cuts(jobs: set[tuple[str, int | None, date]]) -> None:
     strat: dict[tuple[str, int | None], object] = {}
     new = not DIR_CUTS_CSV.exists()
     t0, last_day, data = time.time(), None, {}
+    skipped: list = []
     with open(DIR_CUTS_CSV, "a", newline="") as f:
         w = csv.writer(f)
         if new:
@@ -174,6 +178,7 @@ def simulate_cuts(jobs: set[tuple[str, int | None, date]]) -> None:
             try:
                 r = simulate_day(strat[key], data[u], ref, sr.SIZING)
             except MissingReferenceData:
+                skipped.append((name, cut, d))
                 continue
             orders, buy, sell = trade_values(r.trades)
             ch = day_charges(u, d.isoformat(), orders, buy, sell).total
@@ -182,6 +187,8 @@ def simulate_cuts(jobs: set[tuple[str, int | None, date]]) -> None:
             if (i + 1) % 200 == 0:
                 f.flush()
                 print(f"  {i + 1}/{len(todo)}, {time.time() - t0:.0f} s", flush=True)
+    if skipped:
+        print(f"  {len(skipped)} runs skipped for missing reference data, e.g. {skipped[:3]}")
 
 
 # --- parity gates ---------------------------------------------------------------------------
@@ -220,31 +227,34 @@ def run_gates(a0: dict[str, rp.Series], books: dict) -> list[str]:
         f"1. Original exit, {len(g1)} sampled Dir picks: gross and orders equal to A0 on "
         f"{len(g1) - bad1}; largest gross difference Rs {worst1:.2f}. {'PASS' if bad1 == 0 else 'FAIL'}"
     )
-    cut = 14 * 60 + 15
-    g2 = [(n, d) for n, d in sample if dir_entry(n) < cut][:: max(1, len(sample) // 10)][:10]
-    worst2, tail, bad2 = 0.0, [], 0
-    for name, d in g2:
-        u = underlying_of(name)
-        data = load_day(root, u, d)
-        orig = simulate_day(load_legwise(dir_file(name)), data, ref, sr.SIZING)
-        cutr = simulate_day(load_legwise(cut_file(name, cut)), data, ref, sr.SIZING)
-        n = len(cutr.mtm)
-        a = np.array([x[1] for x in orig.mtm[:n]])
-        b = np.array([x[1] for x in cutr.mtm[:n]])
-        m = min(len(a), len(b))
-        dd = float(np.abs(a[:m] - b[:m]).max()) if m else 0.0
-        worst2 = max(worst2, dd)
-        if dd > 1e-6:
-            bad2 += 1
-        if len(a) >= n and n:
-            tail.append(cutr.gross - float(a[n - 1]))
+    worst2, tail, bad2, n2 = 0.0, [], 0, 0
+    for cut in CUTS:
+        early = [(n, d) for n, d in sample if dir_entry(n) < cut]
+        for name, d in early[:: max(1, len(early) // 5)][:5]:
+            n2 += 1
+            u = underlying_of(name)
+            data = load_day(root, u, d)
+            orig = simulate_day(load_legwise(dir_file(name)), data, ref, sr.SIZING)
+            cutr = simulate_day(load_legwise(cut_file(name, cut)), data, ref, sr.SIZING)
+            n = len(cutr.mtm)
+            a = np.array([x[1] for x in orig.mtm[:n]])
+            b = np.array([x[1] for x in cutr.mtm[:n]])
+            m = min(len(a), len(b))
+            dd = float(np.abs(a[:m] - b[:m]).max()) if m else 0.0
+            worst2 = max(worst2, dd)
+            if dd > 1e-6:
+                bad2 += 1
+            if len(a) >= n and n:
+                tail.append(cutr.gross - float(a[n - 1]))
     ok &= bad2 == 0
+    tail_txt = (
+        f"mean Rs {np.mean(tail):+.1f}, largest {max(tail, key=abs):+.1f}" if tail else "no days"
+    )
     L.append(
-        f"2. Cut at 14:15, {len(g2)} sampled days: MTM curves identical before the cut on "
-        f"{len(g2) - bad2}; largest difference Rs {worst2:.4f}. The cut run's gross minus the "
-        f"original curve's last bar before the cut: mean Rs {np.mean(tail):+.1f}, "
-        f"largest {max(tail, key=abs):+.1f} (the exit fills at the previous bar's close, BL-009). "
-        f"{'PASS' if bad2 == 0 else 'FAIL'}"
+        f"2. Each of the {len(CUTS)} cuts, {n2} sampled runs in all: MTM curves identical before the "
+        f"cut on {n2 - bad2}; largest difference Rs {worst2:.4f}. The cut run's gross minus the "
+        f"original curve's last bar before the cut: {tail_txt} "
+        f"(the exit fills at the previous bar's close, BL-009). {'PASS' if bad2 == 0 else 'FAIL'}"
     )
     L.append(
         "3. Charges: a cut Dir's charges come from `day_charges` on its own trades; "
@@ -262,9 +272,9 @@ def run_gates(a0: dict[str, rp.Series], books: dict) -> list[str]:
 # --- the arms -------------------------------------------------------------------------------
 
 
-def book_arms(label: str, pool, rep, attrs, cuts) -> dict:
+def book_arms(pool, rep, cuts) -> dict:
     names = rep["names"]
-    days = [d for d in sorted(rep["picks"])]
+    days = sorted(rep["picks"])
     series = {s.name: s for s in pool}
 
     def row(n, d):  # (gross, net, orders)
@@ -272,6 +282,10 @@ def book_arms(label: str, pool, rep, attrs, cuts) -> dict:
         return np.array([r[0], r[1], r[2]], dtype=float)
 
     def cut_row(n, c, d):
+        if (n, c, d) not in cuts:
+            raise SystemExit(
+                f"no Dir cut run for {n} cut {swap.cut_label(c)} on {d} (skipped for missing data?)"
+            )
         g, _ch, net, o = cuts[(n, c, d)]
         return np.array([g, net, o], dtype=float)
 
@@ -280,7 +294,8 @@ def book_arms(label: str, pool, rep, attrs, cuts) -> dict:
 
     def new(name):
         arms[name] = {"v": np.zeros((len(days), 3)), "swap": np.zeros(len(days), bool),
-                      "S": [None] * len(days), "dir": [None] * len(days)}  # fmt: skip
+                      "S": [None] * len(days), "dir": [None] * len(days),
+                      "added": np.zeros(len(days), bool)}  # fmt: skip
         return arms[name]
 
     for arm in ("B", "R14", "R1430", "R1500", "F1400", "F1430", "F1500", "X14", "P14",
@@ -306,6 +321,7 @@ def book_arms(label: str, pool, rep, attrs, cuts) -> dict:
             v = base[d] - orig + cut_row(D, c, d) + (row(names[S], d) if add_widesl else 0)
             arms[arm_name]["v"][i] = v
             arms[arm_name]["swap"][i] = True
+            arms[arm_name]["added"][i] = add_widesl
             arms[arm_name]["S"][i] = names[S]
             arms[arm_name]["dir"][i] = D
 
@@ -343,7 +359,7 @@ def book_arms(label: str, pool, rep, attrs, cuts) -> dict:
 
 def daily(a: dict, extra_cost: float = 0.0) -> dict:
     g, n, o = a["v"][:, 0], a["v"][:, 1], a["v"][:, 2]
-    n = n - extra_cost * a["swap"] / MARGIN_LOTS
+    n = n - extra_cost * a["added"] / MARGIN_LOTS  # only where a Widesl was added
     return {"gross": g, "net": n, "net5": n + (13.0 - 5.0) * o * GST,
             "net20": n + (13.0 - 20.0) * o * GST}  # fmt: skip
 
@@ -480,6 +496,10 @@ def main() -> None:
     attrs = store.read_days(data_dir(), "weekdays")
     days_all = sorted(attrs)
     a0 = rp.pool_from_csv(A0)
+    if not a0:
+        raise SystemExit(
+            f"no A0 CSVs in {A0}: run research/common/two_session/a0.py (BL-185) or set BL187_A0"
+        )
     pools = {"t1": a0, "core": [s for s in a0 if "-t1s" not in s.name]}
     books = {}
     for k, pool in pools.items():
@@ -498,12 +518,10 @@ def main() -> None:
         print("\n".join(gates))
         return
     L = ["# BL-187 — cut the Dir, start the strongest late Widesl", ""] + gates
-    results = {}
     for k in ("t1", "core"):
-        res = book_arms(k, pools[k], books[k], attrs, cuts)
-        lines, extra = report_book(k.upper() if k == "t1" else "Core", res, attrs)
+        res = book_arms(pools[k], books[k], cuts)
+        lines, _ = report_book(k.upper() if k == "t1" else "Core", res, attrs)
         L += lines
-        results[k] = (res, extra)
         with open(OUT / f"daily_{k}.csv", "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["day", *(f"{a}_net" for a in res["arms"])])
