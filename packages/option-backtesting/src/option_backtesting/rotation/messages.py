@@ -49,6 +49,10 @@ def rupees(value: float) -> str:
     return f"{sign}₹{abs(rounded):,}"
 
 
+#: the line a T1 entry the BL-192 cap changed adds to the morning message
+SL150_CAP_LINE = "✂️ One SL150% Widesl only (non-expiry day)"
+
+
 def expiry_day_line(index: str) -> str:
     """The one line a BL-122 rule day adds to the morning message."""
     return f"⚡ Expiry day · {index} only"
@@ -211,6 +215,8 @@ def _t1_block(
     lines = [head]
     if entry.get("expiry_only"):  # BL-122 restricts T1 as well, so its block says so too
         lines.append(expiry_day_line(entry["expiry_only"]))
+    if (entry.get("lists", {}).get(ADAPTIVE_KEY) or {}).get("sl150_capped"):  # BL-192
+        lines.append(SL150_CAP_LINE)
     # inside the combined message; a T1 message of its own carries LATE as its first line instead
     if not dated and not entry.get("before_first_entry", True):
         lines.append(f"   {LATE_LINE}")

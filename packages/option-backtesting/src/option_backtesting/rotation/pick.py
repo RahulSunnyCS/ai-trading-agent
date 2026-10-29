@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 
 from ..fyers.daily import data_dir
-from . import expiry, journal, messages, store
+from . import expiry, journal, messages, sl150_cap, store
 from .attrs import last_collected_before
 from .dte import DTE_BASIS
 from .lists import LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
@@ -173,22 +173,32 @@ def score_history(
     `expiry_only` ('NIFTY' | 'SENSEX', BL-122): the lists in `expiry.RULE_LISTS` (Adaptive) take
     only that index's variants (a filter of the same ranking, `expiry.filter_picks`), and their
     block also carries `unfiltered` (the picks without the rule) and `expiry_only`. None, the
-    default, is the ranking exactly as before; reconstructed history never passes it."""
+    default, is the ranking exactly as before; reconstructed history never passes it.
+
+    BL-192: on a day `sl150_cap.applies` (from 2026-10-30, NIFTY not expiring), a rule list holds at
+    most one `N_wide-t1s4` (`sl150_cap.cap_picks`, a filter like the expiry rule's); its block then
+    carries `sl150_capped` (the core before the cap). Decided by the day itself, so reconstructed
+    history gets it too, and every day before 2026-10-30 stays as it was."""
     _check_expiry_only(expiry_only)
+    cap = sl150_cap.applies(day, dte["dte_n"])
     out = {}
     for key, cols, comp, picks in _rank(hist, day, vix_open, dte):
         chosen = picks
         if expiry_only and key in expiry.RULE_LISTS:
             chosen = expiry.filter_picks(comp, cols, picks, expiry_only)
+        elif cap and key in expiry.RULE_LISTS:
+            chosen = sl150_cap.cap_picks(comp, cols, picks)
         out[key] = {
             "core": chosen.core,
             "buy": chosen.buy,
             "overridden": chosen.overridden,
             "composite": {k: round(v, 4) for k, v in chosen.composite.items()},
         }
-        if chosen is not picks:
+        if chosen is not picks and expiry_only:
             out[key]["unfiltered"] = {"core": picks.core, "buy": picks.buy}
             out[key]["expiry_only"] = expiry_only
+        elif chosen is not picks:  # BL-192: the SL150% cap changed the picks
+            out[key]["sl150_capped"] = {"core": picks.core}
     return out
 
 
@@ -210,6 +220,9 @@ def next_best(
         if expiry_only and key in expiry.RULE_LISTS:
             chosen = expiry.filter_picks(comp, cols, picks, expiry_only)
             out[key] = expiry.filtered_runners_up(comp, cols, chosen, expiry_only)
+        elif key in expiry.RULE_LISTS and sl150_cap.applies(day, dte["dte_n"]):
+            capped = sl150_cap.cap_picks(comp, cols, picks)
+            out[key] = sl150_cap.capped_runners_up(comp, cols, picks, capped)
         else:
             out[key] = runners_up(comp, cols, picks)
     return out
@@ -261,6 +274,7 @@ def record(
     # BL-122: from 2026-10-19, on a day exactly one index expires, Adaptive takes only its
     # strategies. Read before any network wait, so a bad kill-switch value fails at once, loudly.
     rule = expiry.rule_index(day, dte)
+    sl150_cap.effective_from()  # BL-192: a bad kill-switch value fails here, before any wait
     commit = code_commit()
     try:
         hist = load_history(day, root, names)
