@@ -335,6 +335,9 @@ def test_the_evening_message_has_both_lists_and_tomorrow_and_a_retry_sends_nothi
         and "🧪 Tuned Adaptive (In Testing phase)   −₹150" in private
     )
     assert "➡️ Wed 21 Oct" in private and private.rstrip().endswith("MTMSL4000")
+    # each list's capital and month to date (one recorded day so far), in both chats
+    assert private.count("   Capital ₹8.5 L") == 2
+    assert "   October +₹300 (0.0%)" in private and "   October −₹150 (0.0%)" in private
     assert group == private  # no live capture here, so nothing is the owner's alone
     assert _send(evening, sent) == 0  # a retry
     assert len(sent.messages) == 2
@@ -364,6 +367,7 @@ def test_t1_not_ready_waits_until_the_deadline_then_goes_without_it_and_t1_follo
     assert (c1, c2) == (None, "-456") and again == follow
     assert follow.startswith("📊 Tue 20 Oct · Tuned Adaptive result")
     assert "🎯" not in follow and "−₹150" in follow
+    assert "   Capital ₹8.5 L\n   October −₹150 (0.0%)" in follow
     assert _send(evening, sent) == 0 and len(sent.messages) == 4  # and never again
 
 

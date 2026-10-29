@@ -274,7 +274,12 @@ Otherwise:
   --track t1` checks the T1 journal. Nothing in them touches a pick, a score, a hash or a journal field. The messages
   call T1 `messages.T1_NAME`, "Tuned Adaptive (In Testing phase)"; alerts and logs still say T1.
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs) for the live list or
-  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming). Sent markers are per
+  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming).
+  Under each list's rows the message (both chats, owner 2026-10-29) gives `Capital ₹8.5 L` (`result.CAPITAL_INR`,
+  one fixed figure per book, Core and T1) and the month to date with its share of that capital
+  (`month_to_date`: every journal day from the 1st, today as the message shows it, earlier days at the lots their
+  Quantiply / AlgoTest export manifests recorded (Dir ×2), a day with results missing counted as `not scored`,
+  never zero; a failure leaves only those lines out). Sent markers are per
   destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`, `.group-t1-owed.sent`, `.group-t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
   covers owner + group), so a retry never double-sends and a late T1 result still follows as its own message; `obt rotation result --force` resends.
   Days to expiry in the rotation are **weekdays** (Monday to Friday dates after the session up to the expiry;

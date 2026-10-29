@@ -298,18 +298,38 @@ def _result_rows(strategies: Sequence[tuple[str, float]]) -> list[str]:
     return out
 
 
+def lakhs(value: float) -> str:
+    """`₹8.5 L`, `₹10 L`."""
+    return f"₹{value / 100_000:.2f}".rstrip("0").rstrip(".") + " L"
+
+
+def month_lines(month) -> list[str]:
+    """A list's capital and its paper net from the 1st of the month as a share of it
+    (`result.MonthToDate`): `Capital ₹8.5 L` / `October +₹23,400 (+2.7%)`."""
+    share = round(100 * month.total / month.capital, 1)
+    sign = "+" if share > 0 else MINUS if share < 0 else ""
+    line = f"   {month.day:%B} {rupees(month.total)} ({sign}{abs(share):.1f}%)"
+    if month.unscored:
+        line += f" · {month.unscored} day{'s' if month.unscored > 1 else ''} not scored"
+    return [f"   Capital {lakhs(month.capital)}", line]
+
+
 def result_block(
     emoji: str,
     name: str,
     gain: float,
     strategies: Sequence[tuple[str, float]],
     traded: tuple[int, float] | None = None,
+    month=None,
 ) -> list[str]:
     """A list's paper result at 1 lot a strategy; `traded` (BL-183: (lots, rupees) on a day the
-    list's accounts traded the Dir at 2 lots) adds what those lots made."""
+    list's accounts traded the Dir at 2 lots) adds what those lots made, and `month`
+    (`result.MonthToDate`) the list's capital and month to date."""
     out = [f"{emoji} {name.ljust(8)}   {rupees(gain)}", *_result_rows(strategies)]
     if traded is not None:
         out.append(f"   As traded (Dir ×2, {traded[0]} lots): {rupees(traded[1])}")
+    if month is not None:
+        out += month_lines(month)
     return out
 
 
@@ -333,6 +353,7 @@ def render_result(
     live: Sequence[str] | None = None,
     boost: dict[str, bool] | None = None,
     traded: dict[str, tuple[int, float] | None] | None = None,
+    months: dict | None = None,
 ) -> str:
     """The evening message. `adaptive` and `t1` are (total, [(strategy, rupees)]); either may be
     None to leave that list out (the T1 follow-up has no Adaptive), and
@@ -340,15 +361,21 @@ def render_result(
     `tomorrow.NextPicks` (T1's may be a note); with neither there is no tomorrow section. `live` is
     BL-141's live-vs-paper block (`live_compare.message_lines`), for the owner's copy only.
     BL-183: `boost` ({'adaptive', 't1'}) adds tomorrow's lots line for a list that trades the Dir
-    ×2 rule; `traded` ({'adaptive', 't1'}: (lots, rupees)) adds a day's as-traded line."""
-    boost, traded = boost or {}, traded or {}
+    ×2 rule; `traded` ({'adaptive', 't1'}: (lots, rupees)) adds a day's as-traded line. `months`
+    ({'adaptive', 't1'}: `result.MonthToDate`) adds each list's capital and month to date."""
+    boost, traded, months = boost or {}, traded or {}, months or {}
     lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs"]
     if adaptive is not None:
-        lines += ["", *result_block("🎯", "Adaptive", *adaptive, traded.get("adaptive"))]
+        lines += [
+            "",
+            *result_block(
+                "🎯", "Adaptive", *adaptive, traded.get("adaptive"), months.get("adaptive")
+            ),
+        ]
     if isinstance(t1, str):
         lines += ["", t1]
     elif t1 is not None:
-        lines += ["", *result_block("🧪", T1_NAME, *t1, traded.get("t1"))]
+        lines += ["", *result_block("🧪", T1_NAME, *t1, traded.get("t1"), months.get("t1"))]
     if live:
         lines += ["", *live]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)

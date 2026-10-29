@@ -464,8 +464,12 @@ def _send_result_locked(
         # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
         live = live_compare.owner_lines(day, root, echo)
         boost = message_boost()
-        private = result.render(adaptive, t1_part, next_adaptive, next_t1, live, boost=boost)
-        group = result.render(adaptive, t1_part, next_adaptive, next_t1, boost=boost)
+        # each list's capital and month to date, in both chats (owner, 2026-10-29)
+        months = result.months_to_date(adaptive, t1_part, root, boost)
+        private = result.render(
+            adaptive, t1_part, next_adaptive, next_t1, live, boost=boost, months=months
+        )
+        group = result.render(adaptive, t1_part, next_adaptive, next_t1, boost=boost, months=months)
         echo(private)
         if not telegram:
             return 0
@@ -511,7 +515,9 @@ def _send_result_locked(
         echo(f"T1 result still not ready: {t1}")
     elif owed:
         next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None
-        text = result.render_t1_followup(t1, next_t1, boost=message_boost())
+        boost = message_boost()
+        month = result.months_to_date(adaptive, t1, root, boost)["t1"]
+        text = result.render_t1_followup(t1, next_t1, boost=boost, month=month)
         echo(text)
         for chat, marker in owed:
             if send(text, chat_id=chat):
