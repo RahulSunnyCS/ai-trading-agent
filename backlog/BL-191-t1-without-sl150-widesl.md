@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 with real money and is uneasy about this setting |
-| **Status** | Done |
+| **Status** | In progress (Amendment 1) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -82,6 +82,38 @@ it allowed only on NIFTY expiry days (arm B), and whether either makes the book 
   rule (not applied, as BL-113 / BL-167, so P1 / P2 are comparable with them). Running any needs
   `override: <reason>` in the Log.
 
+### Amendment 1 — replace it on non-expiry days with a 115% Widesl at a ₹3,000 stop (2026-10-29, before any run)
+
+Owner, 2026-10-29, after the result below: "Do one more study with Widesl 115 with 3k SL instead of
+this in non expiries." The arms below are new; Phase 0's arms and rule are unchanged.
+
+- **Hypothesis:** on non-expiry days, a Widesl at a 115% leg stop with a ₹3,000 overall stop in place of
+  `N_wide-t1s4` earns as much as T1 with a shallower tail.
+- **New variants** (NIFTY OTM1, the 25 rotation start times 09:17 → 15:17, stored-result format, run
+  through the engine as `obt rotation update` runs them; files in `research/bl191/variants/`, git-ignored):
+  - **C1** `N_wide-c1_<HHMM>` — the Core Widesl file `strategies/rotation/N_wide_<HHMM>.yaml`
+    (SL115%, trail 15/10, no re-entry) with the overall stop **₹3,000** instead of ₹2,500. The owner's
+    words read literally: the regular Widesl at 115% with a 3k stop. **Primary.**
+  - **C2** `N_wide-c2_<HHMM>` — `N_wide-t1s4_<HHMM>` with only the leg stop **115%** (from 150%) and
+    the overall stop **₹3,000** (from ₹4,000); trail 25/15 and RE cost ×1 kept. Secondary.
+- **Engine parity first:** unchanged copies of `N_wide_<HHMM>` and `N_wide-t1s4_<HHMM>` run by the same
+  script must equal the stored rotation results (net, every day, every slot) before C1 / C2 are read.
+- **Arms** (as Phase 0: list C, 3 core picks, 1 lot each, net after brokerage):
+  - **C1 arm** — on a NIFTY expiry day T1 as it is; on any other day the 25 `N_wide-t1s4_*` columns
+    are left out and the 25 C1 columns put in their place (each with its full stored history, as the
+    ranking would have it).
+  - **C2 arm** — the same with the C2 columns.
+- **Look-ahead check:** as Phase 0 (each day ranks on earlier days only; the day's DTE label decides
+  which columns are in). The new settings were not chosen on any period, but they were proposed after
+  reading Phase 1's result and the standalone figures, which cover P1 and P2.
+- **Pass / kill rule:** Phase 0's, on P2, each arm against T1: return (mean ≥ −₹50 a day and upper bound
+  ≥ 0) and risk (max drawdown or 5th-percentile day at least 10% better). Pass / kill / no difference
+  as there. Also reported, not deciding: each arm against arm B (non-expiry days without any
+  replacement), P1, forward, all days, how often C1 / C2 are picked and on how many non-expiry days
+  twice.
+- **Will not run:** other stops or trails, a C1 / C2 on SENSEX, a one-copy cap. `override: <reason>`
+  in the Log for any.
+
 ### Phase 1 — Replay and read-out
 
 - **Tasks:** `research/bl191/study.py` (reuses BL-167's replay), `--check` smoke, full run, figures here.
@@ -142,3 +174,4 @@ in the replay. Nothing live changes.
 - 2026-10-29 — created and pre-registered from the owner's question (Phase 0 committed before any run).
 - 2026-10-29 — run (`research/bl191/study.py`), parity with BL-167 exact. P2: A (drop) killed, −₹116 a day [−365, +96]; B (expiry only) no difference, +₹55 [−92, +198], drawdown 1% shallower and the 5th-percentile day worse. T1 stays as it is. Post hoc: the 8 non-expiry days with two or more SL150 copies averaged −₹4,208 (−₹1,148 without); a one-copy cap is a separate registration if wanted.
 - 2026-10-29 — after review (PR 388): only P2 carries a verdict in `study.json`; the non-expiry subset compares A only (B equals A there) and gives no drawdown (over non-consecutive days it is not one); the 5th-percentile rule is written by size (`+ 10% of |p5|`), so it cannot flip on a positive base. Figures and verdicts unchanged. Not done: the replay helpers shared with BL-167 are still copied, not moved to `research/common/`.
+- 2026-10-29 — Amendment 1 registered before any run (owner): C1 = Core Widesl 115% at a ₹3,000 stop, C2 = `N_wide-t1s4` at 115% and ₹3,000, each in place of `N_wide-t1s4` on non-expiry days.
