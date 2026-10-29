@@ -84,3 +84,4 @@ None blocking. Defaults taken and stated above: T1 as the primary book, R14 as t
 ## Log
 
 - 2026-10-29 Registered (Phase 0) before any run.
+- 2026-10-29 Phase 1 built; gate (2) sharpened before any arm was read: instead of a Rs 1 match to one bar of the original curve, the cut run's MTM curve must equal the original's at every bar before the cut (the engine is deterministic), and the cut run's gross is reported against the original curve's last bar before the cut. Gates 1-3 pass: 40 of 40 original-exit runs equal A0 (largest gross difference Rs 0.00); 10 of 10 cut curves identical (largest difference Rs 0.0000), the cut gross equals the last bar's MTM exactly. 3,613 Dir cut runs (every picked Dir at every cut after its entry, both books) are cached in `research/bl187/out/dir_cuts.csv`.
