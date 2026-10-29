@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the owner's call (2026-10-28) |
-| **Status** | Done (2026-10-29): killed — no filtered reversal beats the plain exit; keep the plain leg stop. Amendment 1 (2026-10-29, owner's request): a cheaper long, pre-registered below; the verdict above stands whatever it finds |
+| **Status** | Done (2026-10-29): killed — no filtered reversal beats the plain exit; keep the plain leg stop. Amendment 1 (2026-10-29, owner's request): a cheaper ₹50 long, its stop and a re-sale toggle, pre-registered and run: all six cells killed, nothing changes |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -160,7 +160,7 @@ so does its drawdown. C2's VWAP proxy and a plain TWAP give the same answer (−
 
 **Evidence:** `packages/option-backtesting/research/bl186/`: `sar.py` (the arms and filters), `run.py`
 (`simulate`, `report --period main|holdout`), `test_filters.py` (look-ahead, 66 cases); `out/main.json`,
-`out/sims.jsonl`, `out/picks.json` (not committed; regenerate with `run.py simulate`, about 70 minutes with one
+`out/sims.jsonl`, `out/picks.json` (not committed; regenerate with `run.py simulate`, about 30 minutes with one
 worker).
 
 ## Hold-out (2026-07-23 → 2026-10-22), read after the verdict above
@@ -345,6 +345,65 @@ platforms have no form for a conditional buy on a stop fill. BL-186's verdict st
 ₹50) and `resell_after_reverse`. Neither changes the engine's behaviour when unset, they stay out of the dump at
 their defaults, and the AlgoTest and Quantiply exports refuse them (they refuse `reverse_on_sl` already).
 
+### Result (2026-10-29): all six cells killed
+
+Run with one worker: four L50 cells over the main period (375 days, 96 s wall), the best chosen on it
+(`L50_S50_HOLD`, +₹111 a day against A5, the largest of four), then the two toggle cells (94 s), then the
+hold-out (8 s). Same data, picks, charges and bootstrap as the original result. The engine re-run with the
+new options unset reproduced BL-186's stored `C1_T30` on 36 sampled Dir pick-days (0 differences). On
+**363 Dir pick-days** (full period, 2025-01-10 → 2026-10-22; 431 days) the C1 filter allowed **168** stops in
+the L50 cells, and **14** of them (8%) had no reversal because no strike priced ₹35–₹70 (or the closest was the
+stopped contract); the other 154 reversed.
+
+Full period, the judged one (A5: +₹1,549 a day, max drawdown −₹26,213, 3.3% of Dir pick-days stopped by the
+overall stop). ₹ a day; "− A5" is the book's mean daily net minus A5's, 90% block-bootstrap interval; Holm over
+the nine comparisons (α 0.10, smallest p 0.164 against 0.011 needed):
+
+| Cell | Book ₹ / day | − A5 [90%] | p | Max drawdown | Long's net a Dir pick | Main − A5 | Hold-out − A5 (exploratory) |
+|---|---|---|---|---|---|---|---|
+| `L50_S30_T30` | +1,588 | +39 [−60, +135] | 0.48 | −36,184 | +41 | +34 | +67 |
+| `L50_S30_HOLD` | +1,660 | +111 [−25, +249] | 0.18 | −38,202 | +131 | +101 | +177 |
+| `L50_S50_T30` | +1,591 | +42 [−61, +137] | 0.50 | −36,184 | +43 | +39 | +58 |
+| `L50_S50_HOLD` (best on main) | +1,682 | +133 [−24, +289] | 0.16 | −39,011 | +163 | +111 | +283 |
+| `R-L50_S50_HOLD` (+ re-sale) | +1,661 | +112 [−36, +266] | 0.23 | −37,384 | +163 | +93 | +237 |
+| `R-C1_T30` (same contract, + re-sale) | +1,643 | +94 [−44, +231] | 0.29 | −31,717 | +93 | +109 | −11 |
+| *reference, not re-run:* `C1_T30` | +1,599 | +50 [−109, +205] | 0.60 | −41,238 | +93 | +45 | +85 |
+| *reference:* `C1_HOLD` | +1,794 | +245 (not in the family) | | −49,987 | +309 | | |
+
+**Kill rule, per cell (full period): every cell fails clause 2 (nothing is significant under Holm) and clause
+3 (every drawdown is deeper than A5's −26,213).** Clause 1 (the long nets above zero) holds for all six, clause
+4 (the hold-out sign) holds for five; `R-C1_T30`'s hold-out is −₹11 against +₹94 over the full period, a flip.
+**Verdict: killed; no lead survives.** BL-186's verdict stands.
+
+Read (descriptive, not new tests):
+
+- **The cheap long does what was asked of it and it is not enough.** Against the same contract held to the exit
+  (`C1_HOLD`: long +₹309 a pick, drawdown −₹50.0k), the ₹50 long earns less (+₹163) and draws down less
+  (−₹39.0k), and its win rate is 28% to 42%. The book's drawdown is still ₹10k to ₹13k deeper
+  than A5's: a reversal adds a leg to the MTM that a plain exit does not have, however cheap.
+- **The long's own stop hardly matters:** `S30` and `S50` give the same book to within ₹3 a day at 30 minutes and
+  ₹22 a day held (why was not investigated).
+- **Holding to 15:28 beats 30 minutes in every pair** (+₹72 to +₹91 a day), as with the same-contract C1; and the
+  extra drawdown grows with it (−₹36.2k → −₹38.2k / −₹39.0k).
+- **The re-sale toggle** moves the same-contract cell the most (`R-C1_T30` +₹94 against `C1_T30` +₹50 a day,
+  drawdown −₹31.7k against −₹41.2k, the shallowest of any reversal cell), but its hold-out difference is −₹11 and its
+  drawdown is still deeper than A5's. On `L50_S50_HOLD` it lowers the net (+₹112 against +₹133).
+- **The hold-out is burnt and all but one cell read positive there** (+₹58 to +₹283), which changes no verdict:
+  nothing is significant over 56 days either, and the full-period figures are the registered ones.
+- Counts: 49 cells simulated across BL-186 and this amendment (43 + 6); nine primary comparisons in the Holm
+  family; the amendment's own hold-out was read once, after the main-period result and the best cell were fixed.
+
+Evidence: `research/bl186/amend1.py` (`simulate`, `best`, `report --period main|holdout|full`, `parity`);
+outputs `out/amend1.jsonl`, `out/amend1_{main,holdout,full,kill}.json` and `out/amend1_best.json` (not committed;
+`amend1.py` reads BL-186's `out/sims.jsonl` and `out/picks.json`, so regenerate those first with `run.py
+simulate`, about 30 minutes, then `amend1.py simulate`, about 4 minutes).
+
 ### Log
 
 - 2026-10-29 — Amendment 1 pre-registered before any run, at the owner's request (the `override:` above).
+- 2026-10-29 — Amendment 1 run (one worker, about 4 minutes in all) and read: **all six cells killed**. Full
+  period, − A5 per day: +39, +111, +42, +133 (best on main), +112 with the re-sale, +94 for the same contract with
+  the re-sale; none significant under Holm over nine (smallest p 0.16), every drawdown deeper than A5's; one
+  hold-out sign flip (`R-C1_T30`). No lead; BL-186 stays killed. Also done with it: day forensics now lists the
+  `<leg>_rev` trades as an attribution row (PR 382's review), and the run-time note above is corrected to the
+  file times (about 30 minutes, not 70).
