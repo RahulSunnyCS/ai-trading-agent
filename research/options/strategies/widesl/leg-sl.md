@@ -1,6 +1,6 @@
 # Widesl: leg stop
 
-**Status:** Tested · **Last updated:** 2026-10-29
+**Status:** Tested · **Last updated:** 2026-10-30
 
 ## What it is
 
@@ -17,6 +17,7 @@ AlgoTest). Every rotation Widesl file keeps its base file's stops.
 T1 (BL-113, traded since 2026-10-19) adds two NIFTY OTM1 settings with other stops, each at the 25 rotation
 start times: `N_wide-t1s4` at 150% (trail 25/15, RE cost ×1, MTM ₹4,000) and `N_wide-t1s8` at 60% (trail
 15/10, MTM ₹3,000); `N_p150-t1s11` is the ₹150-premium Widesl at 60%, `S_p285-t1s22` SENSEX ₹285 at 40%.
+From 2026-10-30 T1 holds at most one `N_wide-t1s4` on a day NIFTY does not expire (BL-192).
 
 ## Tested
 
@@ -55,12 +56,14 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 - SENSEX closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-128): at ₹240, ₹300 and ₹350 the tightest stop tried (60 %) beat 115 % on the mean by +₹57 to +₹67 per lot-day and cut the drawdown by a fifth to a third, but the optimum is at the grid's edge and the cells are cells positive at only 18–25 of 25 slots across the grid, 22–25 for the 60 % winners (NIFTY: all 25). As for NIFTY it did not carry into Adaptive on the next year (adding the two chosen stops: −₹2, interval includes zero, deeper drawdown; either alone +₹20 / +₹25, intervals include zero). A second index with the same answer; the test year is the one BL-127 and BL-126 had already read.
 
 - A 150 % stop inside T1 (BL-191): T1's SL150 % NIFTY OTM1 setting (`N_wide-t1s4`) earns its place in the
-  ranking; taking it out costs about ₹116–150 a day and deepens the drawdown, and keeping it for expiry days only
-  changes nothing measurable. Its risk is concentration: on the 8 non-expiry days T1 held two or more copies it
-  averaged −₹4,208 (worst −₹14,092), against −₹1,148 for the same days without it. Post hoc, not a rule. Swapping
-  it for a 115% / ₹3,000 Widesl on non-expiry days changes nothing measurable either (+₹24 a day, interval
-  includes zero). Allowing only one copy on a non-expiry day (expiry days unchanged) is the best of the
-  variants tried, +₹40 a day on 2025-10 → 2026-10, on 8 changed days; capping expiry days costs.
+  ranking; taking it out costs about ₹116–150 a day (a deeper drawdown on the first year and overall, not on
+  2025-10 → 2026-10), and keeping it for expiry days only changes nothing measurable. Its risk is concentration:
+  on the 8 non-expiry days T1 held two or more copies it averaged −₹4,208 (worst −₹14,092), against −₹1,148 for
+  the same days without it. Swapping it for a 115% / ₹3,000 Widesl on non-expiry days changes nothing measurable
+  (+₹24 a day, interval includes zero). Allowing one copy on a non-expiry day (D2) gains +₹40 a day on
+  2025-10 → 2026-10 (5 changed days, all better) and −₹3 the year before; allowing none (D0) +₹111 and −₹88.
+  Over all days they are level (+₹20 / +₹24). None passes the registered risk bar. **D2 is live in T1 from
+  2026-10-30 (BL-192).**
 
 - By morning type (BL-155, heatmap ATM straddles from 11:15, descriptive): after a **quiet** morning the
   widest stop (100 %) is best on NIFTY in both periods (+₹96 vs +₹61 at 60 %, 2025–26). After a **normal**

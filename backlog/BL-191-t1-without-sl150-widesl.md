@@ -193,7 +193,7 @@ and ₹653,498, equal to BL-167's T1 base. List C, 3 core picks, 1 lot each, net
   non-expiry day is fine (71 days, +₹1,421 against +₹1,269 without). This was found after the run, on
   8 days, and decides nothing; a cap of one SL150 copy on non-expiry days needs its own registration.
 - Five worst T1 days: −14,092 (two SL150), −13,223, −12,277, −11,060 (two SL150), −10,479; the arms
-  differ only on the two SL150 days (−9,276 and −8,161).
+  differ on the two SL150 days (−9,276 and −8,161), and arm A by ₹7 on 2026-10-27.
 
 **Caveats:** P2 is not a clean hold-out (read by BL-113, 145, 146, 167, 180 and by the look that
 prompted this item); no spread or slippage; the Buy add-on and the BL-122 expiry-only rule are not
@@ -243,15 +243,18 @@ equals Phase 1's day for day.
 
 **By the registered rule (P2): D1 and D2 both "no difference".** Return holds for both; the book is not
 10% safer (drawdown 5% shallower, 5th-percentile day unchanged). As registered, the cap touches too few
-days to move the risk bar. Keep T1 as it is unless the owner chooses otherwise.
+days to move the risk bar. **Owner, 2026-10-30: D2 adopted live from the 09:16 pick of 2026-10-30
+(BL-192).**
 
 **Reported, not deciding:**
 - Days changed: D1 15 of 435 (7 expiry, 8 non-expiry), D2 8. On the changed days D2 gains +₹1,100 on
   average (7 of 8 better: 2026-10-01 +4,326, 2026-09-11 +1,956, 2026-05-29 +1,524,
   2026-06-12 +1,449, 2025-05-02 +1,281; 2025-07-16 −1,914). On expiry days the cap hurts (2025-01-30
   −11,670, 2026-02-03 −5,925): D1's extra expiry days cost more than they save.
-- D2 on P2 is the only figure in this item whose interval is wholly above zero (+₹40 [+8, +77]); it is one
-  of six arms, the intervals are not adjusted, and the idea came from a post-hoc look at these days.
+- D2's P2 interval (+₹40 [+8, +77]) is above zero because all 5 days it changed on P2 were positive
+  (+159 to +4,326), so every resample is at least zero; it rests on those 5 days. Amendment 3's D0 is also
+  above zero on P2. Seven arms now sit on the same P2, each chosen after reading it, and the intervals are
+  not adjusted (Bonferroni over seven: D0 [−44, +270], D2 [+1, +100]).
 - Against Amendment 1's C2 arm: D1 −11 / D2 +14 a day on P2, +9 / +40 over all days.
 - For Fri 2026-10-30 at a 15.12 open: D1 / D2 keep `S_ditm1-t1s44_0917` and `N_wide-t1s4_1017` and put
   `N_wide_1032` (SL115%, trail 15/10, MTM ₹2,500) in place of `N_wide-t1s4_1032`. At a 14.5 open T1 holds
@@ -293,3 +296,5 @@ over all days D0 and D2 are level (+₹4). D2 is the steadier of the two across 
 - 2026-10-29 — Amendment 2 run. P2: D1 (cap every day) +₹15 a day [−43, +65], D2 (non-expiry days) +₹40 [+8, +77]; both no difference by the rule (drawdown 5% shallower, 5th-percentile day unchanged). D2 changes 8 of 435 days, +₹1,100 on them; capping expiry days costs. T1 unchanged pending the owner.
 - 2026-10-30 — Amendment 3 registered before any run (owner): D0, no `N_wide-t1s4` on a non-expiry day, as a filter of the same composite.
 - 2026-10-30 — Amendment 3 run. P2: D0 +₹111 a day [+12, +220] vs T1, no difference by the rule (drawdown 5% shallower, 5th-percentile day 7% worse); P1 −₹88; all days +₹24, level with D2 (+₹4). 64 days changed (D2: 8).
+- 2026-10-30 — owner adopted D2 live from 2026-10-30 (BL-192, PR 389). The replay scripts set `ROTATION_SL150_CAP_FROM=off`, so T1 is replayed uncapped as registered; every output re-ran byte-identical on the merged code.
+- 2026-10-30 — after the Opus review (PR 388): Phase 0's parity was checked on BL-167's day count and total (431 days, ₹653,498), not day by day as registered: BL-167 saved no daily series. D2's interval rests on 5 positive P2 days; seven arms in all (Bonferroni noted in Amendment 2's result). Numbers unchanged.

@@ -6,8 +6,8 @@ BL-181's runner (research/bl181/run_batch.py), NIFTY only.
 
 One index at a time: each day is loaded once and every variant of that index is simulated on it
 (the method of `obt rotation update`). Writes results/<variant>.csv with the columns of
-research/bl080/run_batch.py (day, net, gross, costs, worst_mtm, stopped_by, n_trades). NIFTY and
-SENSEX 2024-10-09 -> the last collected day. Lot sizing is 'current' (today's lot on every day) via
+research/bl080/run_batch.py (day, net, gross, costs, worst_mtm, stopped_by, n_trades). NIFTY only,
+2024-10-09 -> the last collected day. Lot sizing is 'current' (today's lot on every day) via
 the same research-only reference override as BL-080/BL-071. `--smoke` runs 6 days and prints only
 counts and timing. A variant's finished file is never re-run (delete it to redo).
 """

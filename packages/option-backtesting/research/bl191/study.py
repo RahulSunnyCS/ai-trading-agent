@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 from datetime import date, timedelta
 
@@ -27,6 +28,9 @@ import numpy as np
 from option_backtesting.fyers.daily import data_dir
 from option_backtesting.rotation import daylog, lot_plans, pick, readout, variants
 
+# BL-192 put the SL150% cap inside `pick.score_history` from 2026-10-30; the replay ranks T1 as
+# registered (uncapped), so the cap is switched off for this process (amend*.py import this module).
+os.environ["ROTATION_SL150_CAP_FROM"] = "off"
 HERE = pathlib.Path(__file__).parent
 SEED, RESAMPLES, BLOCK, LEVEL = 20261029, 2000, 5, 0.90
 SETTING = "N_wide-t1s4_"
