@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 with real money and is uneasy about this setting |
-| **Status** | Done |
+| **Status** | In progress (Amendment 3) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -138,6 +138,18 @@ Phase 0's rule and Amendment 1 are unchanged.
 - **Will not run:** a cap on other settings, a cap of one Widesl of any kind per start time, a cap
   per index. `override: <reason>` in the Log for any.
 
+### Amendment 3 — no SL150% Widesl on a non-expiry day, as a filter (2026-10-30, before any run)
+
+Owner, 2026-10-30, after Amendment 2: "What if D2 max cap 0 for non-expiry days." Earlier rules unchanged.
+
+- **Arm D0:** as Amendment 2's filter, with a cap of zero on non-expiry NIFTY days: list C's composite is
+  computed over every T1 column as today; on a non-expiry day every `N_wide-t1s4_*` leaves the candidate
+  pool and `score.select` picks from the rest (only when the core held one or more). NIFTY expiry days
+  unchanged. It differs from Phase 0's arm B only in that B removed the columns before the composite.
+- **Rule:** Phase 0's, on P2, against T1. Reported, not deciding: against D2 and B; P1, forward, all days;
+  the days changed and the mean difference on them.
+- **Look-ahead:** as before. The idea follows Amendments 1–2's results on the same periods: not clean.
+
 ### Phase 1 — Replay and read-out
 
 - **Tasks:** `research/bl191/study.py` (reuses BL-167's replay), `--check` smoke, full run, figures here.
@@ -260,3 +272,4 @@ days to move the risk bar. Keep T1 as it is unless the owner chooses otherwise.
 - 2026-10-29 — Amendment 1 run: engine parity exact (0 of 25,100 slot-days differ). P2: C1 +₹24 a day [−95, +144], C2 +₹25 [−90, +136], both no difference (drawdown 5% shallower, 5th-percentile day 7% worse). T1 stays as it is.
 - 2026-10-29 — Amendment 2 registered before any run (owner): at most one `N_wide-t1s4` pick a day (D1 every day, D2 non-expiry days only), as a filter of the same composite.
 - 2026-10-29 — Amendment 2 run. P2: D1 (cap every day) +₹15 a day [−43, +65], D2 (non-expiry days) +₹40 [+8, +77]; both no difference by the rule (drawdown 5% shallower, 5th-percentile day unchanged). D2 changes 8 of 435 days, +₹1,100 on them; capping expiry days costs. T1 unchanged pending the owner.
+- 2026-10-30 — Amendment 3 registered before any run (owner): D0, no `N_wide-t1s4` on a non-expiry day, as a filter of the same composite.
