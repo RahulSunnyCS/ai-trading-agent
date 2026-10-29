@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 with real money and is uneasy about this setting |
-| **Status** | In progress (Amendment 1) |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-29 |
@@ -163,6 +163,36 @@ and ₹653,498, equal to BL-167's T1 base. List C, 3 core picks, 1 lot each, net
 prompted this item); no spread or slippage; the Buy add-on and the BL-122 expiry-only rule are not
 in the replay. Nothing live changes.
 
+## Result, Amendment 1 (2026-10-29)
+
+`research/bl191/make_variants.py`, `run_batch.py` (BL-181's runner, NIFTY), `amend1.py`; output
+`results/amend1.json`, `amend1_daily.json` (git-ignored). 100 variants x 503 NIFTY days (2024-10-09 →
+2026-10-29). **Engine parity:** the unchanged copies equal the stored results on every day
+(`N_wide_*` 12,575 slot-days, `N_wide-t1s4_*` 12,525, 0 differ); the replay's T1 arm equals Phase 1's
+day for day.
+
+| Period | T1 mean | C1 (115%, ₹3,000, trail 15/10): vs T1 [90%] | C2 (115%, ₹3,000, trail 25/15, RE): vs T1 [90%] | C1 / C2 max DD | C1 / C2 p5 day | T1 max DD / p5 day |
+|---|---|---|---|---|---|---|
+| **P2 (decides)**, 238 days | +1,672 | **+24 [−95, +144]** | **+25 [−90, +136]** | 23,110 / 23,110 | −6,805 / −6,805 | 24,435 / −6,340 |
+| P1, 184 days | +1,242 | −74 [−239, +105] | −79 [−214, +57] | 25,701 / 26,925 | −8,917 / −8,917 | 25,887 / −8,782 |
+| Forward, 13 days | +1,826 | +121 [0, +241] | +9 [0, +18] | 10,479 / 10,479 | −8,628 / −8,628 | 10,479 / −8,628 |
+| All 435 days | +1,495 | −15 [−115, +83] | −19 [−104, +66] | 25,701 / 26,925 | −7,974 / −7,767 | 25,887 / −7,573 |
+
+Against arm B (the setting out on non-expiry days, nothing in its place), P2: C1 −31 [−103, +45],
+C2 −30 [−104, +46]; all days +3 / −2.
+
+**By the registered rule (P2): C1 and C2 both "no difference".** Return holds (+₹24 / +₹25, the
+intervals include zero); the book is not 10% safer: drawdown 5% shallower, 5th-percentile day 7% worse.
+Keep T1 as it is.
+
+**Reported, not deciding:**
+- Non-expiry picks over all days: T1's SL150% 87 (on 8 days two or more, those days −₹4,208); C1 64
+  (one day with two, −₹8,883); C2 72 (5 days with two, −₹3,384).
+- For Fri 2026-10-30 (VIX close 15.12, NIFTY 2 to expiry), the C1 and C2 arms both pick
+  `S_ditm1-t1s44_0917`, `N_wide_1032` and `N_p100_1032` (Core's 115% / ₹2,500 Widesl, not C1 or C2
+  itself) where T1 picks the Dir and two SL150% copies. At a 14.5 open: the NIFTY Dir 09:32 with
+  `N_wide-c1_1347` (or `-c2_`) and `N_wide_1347`.
+
 ## Risks
 
 - The decision period is not truly unseen (above). A pass is a reason to look forward, not proof.
@@ -175,3 +205,4 @@ in the replay. Nothing live changes.
 - 2026-10-29 — run (`research/bl191/study.py`), parity with BL-167 exact. P2: A (drop) killed, −₹116 a day [−365, +96]; B (expiry only) no difference, +₹55 [−92, +198], drawdown 1% shallower and the 5th-percentile day worse. T1 stays as it is. Post hoc: the 8 non-expiry days with two or more SL150 copies averaged −₹4,208 (−₹1,148 without); a one-copy cap is a separate registration if wanted.
 - 2026-10-29 — after review (PR 388): only P2 carries a verdict in `study.json`; the non-expiry subset compares A only (B equals A there) and gives no drawdown (over non-consecutive days it is not one); the 5th-percentile rule is written by size (`+ 10% of |p5|`), so it cannot flip on a positive base. Figures and verdicts unchanged. Not done: the replay helpers shared with BL-167 are still copied, not moved to `research/common/`.
 - 2026-10-29 — Amendment 1 registered before any run (owner): C1 = Core Widesl 115% at a ₹3,000 stop, C2 = `N_wide-t1s4` at 115% and ₹3,000, each in place of `N_wide-t1s4` on non-expiry days.
+- 2026-10-29 — Amendment 1 run: engine parity exact (0 of 25,100 slot-days differ). P2: C1 +₹24 a day [−95, +144], C2 +₹25 [−90, +136], both no difference (drawdown 5% shallower, 5th-percentile day 7% worse). T1 stays as it is.
