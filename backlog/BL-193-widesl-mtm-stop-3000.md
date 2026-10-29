@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades these stops with real money and asked |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-30 |
@@ -70,6 +70,35 @@ decides after the result).
   the result here, the findings page row, TODO and INDEX.
 - **Done when:** the rule is applied and recorded.
 
+## Result (2026-10-30)
+
+`research/bl193/` (make_variants.py, run_batch.py, study.py); output `results/` (git-ignored). 300
+variants x 503 days per index (2024-10-09 → 2026-10-29). **Engine parity:** the 150 unchanged copies
+equal the stored rotation results on all 75,450 slot-days (0 differ).
+
+**Adaptive (list C), ₹ a day, 1 lot a pick, net after brokerage:**
+
+| Universe, period | ₹2,500 mean / max DD / p5 day | ₹3,000 mean / max DD / p5 day | Difference [90%] | Picks differ |
+|---|---|---|---|---|
+| **Core, P2 (decides)**, 238 days | +987 / 35,929 / −6,748 | +915 / 35,730 / −7,056 | **−72 [−204, +49]** | 122 days |
+| Core, P1, 184 | +669 / 42,326 / −8,746 | +760 / 52,466 / −9,491 | +91 [−206, +418] | 116 |
+| Core, all 435 | +852 / 42,326 / −8,090 | +863 / 52,466 / −8,267 | +11 [−142, +173] | 245 |
+| **T1, P2 (decides)**, 238 days | +1,672 / 24,435 / −6,340 | +1,526 / 29,005 / −6,986 | **−146 [−241, −62]** | 69 |
+| T1, P1, 184 | +1,242 / 25,887 / −8,782 | +1,286 / 28,663 / −9,536 | +45 [−186, +296] | 73 |
+| T1, all 435 | +1,495 / 25,887 / −7,573 | +1,442 / 29,005 / −8,601 | −53 [−170, +71] | 147 |
+| Forward (13 days): Core +390 [−345, +1,229], T1 +275 [−275, +839] | | | | |
+
+**By the registered rule (P2): kill, for both.** Core −₹72 a day; T1 −₹146 a day with the interval wholly
+below zero, a drawdown 19% deeper and a worse 5th-percentile day. Keep ₹2,500.
+
+**Standalone, per family** (every slot-day, ₹ per strategy-day, ₹2,500 → ₹3,000): the average rises by
+₹2 to ₹11 (NIFTY OTM1 217 → 226, ₹80 182 → 185, ₹100 183 → 194; SENSEX OTM2 104 → 102, ₹250 99 → 103,
+₹320 96 → 106); the 5th-percentile day is 14–16% deeper in every family (about −₹2,800 → −₹3,200); the
+stop fires about 25% less. So each strategy alone gains a little and loses deeper on bad days, and the
+ranking does worse with them: deeper losses on the days a picked strategy goes wrong cost more than the
+small average gain.
+
 ## Log
 
 - 2026-10-30 — created and pre-registered from the owner's request (Phase 0 committed before any run).
+- 2026-10-30 — run; engine parity exact (75,450 slot-days). P2: Core −₹72 a day [−204, +49], T1 −₹146 [−241, −62]: kill for both, keep ₹2,500. Standalone +₹2 to +₹11 a strategy-day with a 14–16% deeper 5th-percentile day.
