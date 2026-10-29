@@ -31,6 +31,7 @@ does not expire, exactly as BL-191's D2 replayed it; everything before that day 
   `sl150_capped` (the core before the cap). `pick.record` reads the switch before any wait.
 - `morning._reproduces` / `choose` apply it, so the 09:19 / 09:21 top-up switches off last evening's
   second copy and switches on its replacement (a kept 09:17 copy stays).
+- The T1 block of the 09:16 message adds "✂️ One SL150% Widesl only (non-expiry day)" when the cap changed the picks.
 - Tests: `tests/unit/test_rotation_sl150_cap.py`.
 
 ## Checks (2026-10-30, before merge)
@@ -49,4 +50,4 @@ does not expire, exactly as BL-191's D2 replayed it; everything before that day 
 
 ## Log
 
-- 2026-10-30 — owner chose D2 over the C2 swap; built, tested, merged the same night.
+- 2026-10-30 — owner chose D2 over the C2 swap; built and tested the same night, PR 389. After review: an unknown NIFTY label is left uncapped (as BL-122), and the T1 message says when the cap acted.

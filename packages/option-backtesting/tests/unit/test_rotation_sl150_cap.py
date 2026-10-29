@@ -14,7 +14,7 @@ from datetime import date
 import numpy as np
 import pytest
 
-from option_backtesting.rotation import morning, pick, sl150_cap
+from option_backtesting.rotation import messages, morning, pick, sl150_cap
 from option_backtesting.rotation.algtst_export import DayPicks
 from option_backtesting.rotation.score import select
 
@@ -63,7 +63,8 @@ def comp(scores: dict[str, float] = SCORES) -> np.ndarray:
         (FIRST, "0", False),  # NIFTY expires: two copies stay allowed
         (BEFORE, "2", False),  # before the start: as recorded
         (date(2026, 11, 2), "1", True),
-        (FIRST, "unknown", True),  # not shown to expire
+        (FIRST, "unknown", False),  # might be an expiry day: uncapped, like BL-122
+        (FIRST, "7+", True),
     ],
 )
 def test_applies(day, dte_n, want):
@@ -180,3 +181,12 @@ def test_morning_rebuild_reproduces_a_capped_entry():
     }
     assert morning._reproduces(block, NAMES, c, None, cap=True) == ""
     assert morning._reproduces(block, NAMES, c, None) != ""
+
+
+def test_the_t1_message_says_the_cap_acted():
+    block = {"core": ["S_ditm1-t1s44_0917", "N_wide-t1s4_1017", "N_wide_1032"], "buy": []}
+    entry = {"day": FIRST.isoformat(), "lists": {"C": block}, "track": "t1"}
+    assert messages.SL150_CAP_LINE not in messages._t1_block(entry, None)
+    capped = {**block, "sl150_capped": {"core": ["x", "y", "z"]}}
+    entry["lists"] = {"C": capped}
+    assert messages.SL150_CAP_LINE in messages._t1_block(entry, None)

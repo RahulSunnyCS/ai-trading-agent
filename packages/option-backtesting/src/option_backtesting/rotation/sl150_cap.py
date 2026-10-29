@@ -9,7 +9,8 @@ Like the expiring-index rule (`expiry.py`, BL-122) the cap is a FILTER of the ra
 re-ranking: the composite is computed over the full universe exactly as before. Only when the
 selected core holds two or more `N_wide-t1s4`, the one with the highest composite stays, the others
 leave the candidate pool, and `score.select` runs again over the rest (top three, at least two
-Widesl). The Buy add-on is never touched. On a NIFTY expiry day (DTE label "0") nothing changes.
+Widesl). The Buy add-on is never touched. On a NIFTY expiry day (DTE label "0"), or a day whose
+NIFTY label is not known, nothing changes.
 
 The kill switch is the environment variable `ROTATION_SL150_CAP_FROM`, read at call time:
 `YYYY-MM-DD` moves the start, `off` disables the cap. Anything else raises, so a typo stops the
@@ -23,6 +24,7 @@ from datetime import date
 
 import numpy as np
 
+from .expiry import _known
 from .score import Picks, runners_up, select
 
 #: the first session whose 09:16 pick applies the cap (owner, 2026-10-30)
@@ -53,9 +55,11 @@ def effective_from() -> date | None:
 
 
 def applies(day: date, dte_n: object) -> bool:
-    """True on `day` when the cap is on and NIFTY does not expire (its label is not "0")."""
+    """True on `day` when the cap is on and NIFTY is known not to expire (a known label other than
+    "0"; an unknown label might be an expiry day, so it is left uncapped, like BL-122's rule)."""
     start = effective_from()
-    return start is not None and day >= start and str(dte_n) != "0"
+    label = str(dte_n)
+    return start is not None and day >= start and _known(label) and label != "0"
 
 
 def _keep(comp: np.ndarray, names: list[str], core: list[str]) -> list[int] | None:
