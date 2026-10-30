@@ -16,7 +16,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import daylog
+from . import daylog, store
 from .matrix import NAMED
 
 SPANS = ("P1", "P2", "recent")
@@ -25,7 +25,7 @@ BAND_LABEL = {"A": "09:17–10:02", "B": "10:17–12:02", "C": "12:17–14:02", 
 #: how long a built log is reused; the files change once a night and at 09:16
 LOG_SECONDS = 30.0
 _lock = threading.Lock()
-_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+_cache: dict[tuple[str, str, float], tuple[float, dict]] = {}
 
 
 def span_bounds(span: str):
@@ -39,7 +39,7 @@ def daily_log(root: Path, span: str) -> dict:
     """`daylog.build_log(source="all")` over the span, reused for `LOG_SECONDS`."""
     if span not in SPANS:
         raise ValueError(f"span must be one of {', '.join(SPANS)}")
-    key = (str(root), span)
+    key = (str(root), span, store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)

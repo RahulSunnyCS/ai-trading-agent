@@ -2,7 +2,8 @@
 
 The strategies you run on AlgoTest and Quantiply are the same ones the backtest scores every
 evening. This card puts the two side by side, so you can see how much the real fills cost compared
-with the paper result. That gap is **slippage**.
+with the paper result. That gap is **slippage**. The paper side here never carries the Rotation
+page's 0.5% Slippage switch, so the gap is the whole difference the real fills made.
 
 At 15:40 on each trading day the scheduler reads what each platform shows for the day's tool
 strategies and writes one file per day. This card reads those files and the stored paper results.

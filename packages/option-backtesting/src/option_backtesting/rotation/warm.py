@@ -10,6 +10,7 @@ a repeat request while the first is still running joins it instead of starting a
 
 from __future__ import annotations
 
+import contextvars
 import threading
 from collections.abc import Callable, Hashable
 from typing import Any
@@ -29,7 +30,13 @@ class _Job:
 
 def run_within(key: Hashable, fn: Callable[[], Any], wait: float | None = None) -> tuple[bool, Any]:
     """`(True, result)` when `fn` finished within the wait (its exception is re-raised), else
-    `(False, None)` while it keeps running. A call with a key already running joins that job."""
+    `(False, None)` while it keeps running. A call with a key already running joins that job.
+    The work runs in a copy of the caller's context, so it reads the results at the caller's
+    slippage (`store.slipped`), and a job is only joined by a caller reading at the same one."""
+    from . import store
+
+    key = (key, store.reading_slip())
+    context = contextvars.copy_context()
     with _lock:
         job = _jobs.get(key)
         starter = job is None
@@ -50,7 +57,9 @@ def run_within(key: Hashable, fn: Callable[[], Any], wait: float | None = None) 
                         del _jobs[key]
                 job.done.set()
 
-        threading.Thread(target=work, daemon=True, name="portfolio-warm").start()
+        threading.Thread(
+            target=context.run, args=(work,), daemon=True, name="portfolio-warm"
+        ).start()
 
     if not job.done.wait(WAIT_SECONDS if wait is None else wait):
         return False, None

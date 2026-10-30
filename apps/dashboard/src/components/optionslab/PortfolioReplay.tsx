@@ -15,6 +15,8 @@ import { getChartTheme, getSeriesPalette, pickSeries, withAlpha } from '../../li
 import { formatDay, formatInr } from '../../lib/format';
 import { type PortfolioStopSetting, buttonLabel, isOn } from '../../lib/portfolioStop';
 import { listLabel } from '../../lib/rotationListNames';
+import { grossLabel } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { RotationListKey, RotationLogSource } from '../../types/rotationDailyLog';
 import type { PortfolioDay } from '../../types/rotationPortfolio';
 import { Button } from '../ui/Button';
@@ -141,15 +143,19 @@ export function PortfolioReplay({
   list,
   source,
   setting,
+  track,
   onClose,
 }: {
   day: string;
   list: RotationListKey;
   source: RotationLogSource;
   setting: PortfolioStopSetting;
+  /** A parallel track's journal (`t1`: Adaptive Tuned); absent = the live journal. */
+  track?: 't1' | undefined;
   onClose: () => void;
 }) {
-  const res = useRotationPortfolioDay(day, list, source, setting);
+  const res = useRotationPortfolioDay(day, list, source, setting, track);
+  const slippage = useRotationSlippage();
   // Only an answer for this day, list and setting is drawn (the hook keeps the previous one).
   const d = res.data !== null && res.data.day === day && res.data.list === list ? res.data : null;
   return (
@@ -160,7 +166,8 @@ export function PortfolioReplay({
             {listLabel(list)} as one basket · {formatDay(day)}
           </h3>
           <p className="text-xs text-muted">
-            {buttonLabel(setting)}. Replayed from the strategy files, gross, minute close.
+            {buttonLabel(setting)}. Replayed from the strategy files, {grossLabel(slippage)}, minute
+            close.
           </p>
         </div>
         <Button size="icon" variant="ghost" aria-label="Close the list replay" onClick={onClose}>

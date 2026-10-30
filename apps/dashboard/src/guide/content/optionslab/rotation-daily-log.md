@@ -26,6 +26,15 @@ From Monday 19 October 2026, on a day when exactly one of NIFTY and SENSEX expir
 only that index's strategies (the expiry rule); the journal also keeps what it would have picked
 without the rule, and Reconstructed days are always re-scored without it.
 
+## Which journal
+
+The page's **Show** selector decides whose days these are. **Adaptive Tuned** (the default) reads
+the T1 track's own journal: its recorded days from 19 Oct 2026, under Adaptive Tuned's portfolio
+stop, with the live column comparing the T1 book. A track has no reconstructed history and no
+placement record, so the Recorded / Reconstructed switch is not offered and a day's drawer does not
+offer *Marking what you placed*. **Adaptive Classic** reads the live journal as below. The **Fixed
+base** has no daily picks, so the log is replaced by a short note.
+
 ## The two views
 
 | View | What it shows |
@@ -155,7 +164,7 @@ drawer shows after a save is what the server answered, not what you typed; a ref
 why in red and the message goes away when you edit the field. If a line of the placement file
 cannot be read (a hand edit, a torn write) the log says how many are left out.
 
-A placement can only be marked on a day with a recorded entry.
+A placement can only be marked on a day with a recorded entry, and only for Adaptive Classic.
 
 ## What it does not tell you
 

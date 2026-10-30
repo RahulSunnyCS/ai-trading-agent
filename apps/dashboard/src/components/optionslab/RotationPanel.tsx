@@ -12,10 +12,17 @@
  * Experiments (Lot plans and the ideas being watched). The
  * diagnostics sit in closed accordions that mount their widget only when opened.
  *
- * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
+ * Gross only: the stored costs are zero. The Slippage switch (on by default, display only) reads
+ * every paper figure with each entry and exit filled 0.5% against the trade; the picks are ranked
+ * without it. Lists are alternative baskets and are never added up.
  * Rupee totals are at 1 lot a strategy (`lots=1`, display only: the per-lot figures, the verdict
  * and the journal's recorded 2 lots do not change). Adaptive Classic's portfolio stop is the one
  * every widget below follows; Adaptive Tuned and the Fixed base have their own, on their rows only.
+ * The Show selector (owner, 2026-10-30; first on the bar, kept per browser in
+ * `store/rotationBook.ts`) picks the book the page leads with: Adaptive Tuned (the default),
+ * Adaptive Classic or the Fixed base. The hero chart, the Books table's order and focus row, the
+ * Daily log and calendar (Tuned reads the T1 track's journal) and the order of the latest baskets
+ * follow it. The diagnostics that exist only for Adaptive Classic stay on it and say so.
  * Nothing on this page changes a list, a weight or the journal.
  */
 
@@ -55,6 +62,7 @@ import {
   stopNote,
   unmatched,
 } from '../../lib/rotationPortfolioView';
+import { SLIPPAGE_TEXT } from '../../lib/rotationSlippage';
 import {
   BENCHMARKS,
   BENCHMARK_LABEL,
@@ -64,8 +72,11 @@ import {
   heroSeries,
   lotsWord,
 } from '../../lib/rotationView';
+import { type RotationBookView, useRotationBook } from '../../store/rotationBook';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { RotationListKey } from '../../types/rotation';
 import { Accordion } from '../ui/Accordion';
+import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
@@ -89,11 +100,40 @@ import { RotationHero } from './rotation/RotationHero';
 import { PlanPickLine, RotationTomorrow, recordedSession } from './rotation/RotationPlan';
 import { RotationReadoutChip } from './rotation/RotationReadout';
 import { RotationVerdict } from './rotation/RotationVerdict';
+import { SlippageSwitch } from './rotation/SlippageSwitch';
 
 const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = BENCHMARKS.map((value) => ({
   value,
   label: BENCHMARK_LABEL[value],
 }));
+
+/** The Show selector: which book the page leads with (Tuned first, the owner's primary). */
+const VIEW_OPTIONS: SegmentedOption<RotationBookView>[] = [
+  { value: 'tuned', label: ADAPTIVE_CARD.tuned.name },
+  { value: 'core', label: ADAPTIVE_CARD.classic.name },
+  { value: 'base', label: BASE_CARD.name },
+];
+
+/** The Tuned view's hero draws the T1 track's list C under Adaptive Tuned's name. */
+const TUNED_SHOWN: ReadonlySet<RotationListKey> = new Set<RotationListKey>(['C']);
+const NO_LISTS: ReadonlySet<RotationListKey> = new Set<RotationListKey>();
+const tunedName = (k: RotationListKey): string =>
+  k === 'C' ? ADAPTIVE_CARD.tuned.name : listName(k);
+const noop = () => undefined;
+
+/** The line on a diagnostic that reads Adaptive Classic only, when the page leads with another
+ * book; null in the Classic view. */
+function classicOnlyNote(view: RotationBookView): string | null {
+  if (view === 'core') return null;
+  return view === 'tuned'
+    ? `${ADAPTIVE_CARD.classic.name} only: these reads have no ${ADAPTIVE_CARD.tuned.name} history yet.`
+    : `${ADAPTIVE_CARD.classic.name} only: the fixed base has no picks for these reads to explain.`;
+}
+
+function ClassicOnlyNote({ view }: { view: RotationBookView }) {
+  const note = classicOnlyNote(view);
+  return note ? <p className="mb-3 text-xs text-muted">{note}</p> : null;
+}
 
 /** The owner trades one lot a pick (2026-10-19): every rupee total on the page is at 1 lot. */
 const ONE_LOT: RotationReadOptions = { lots: ROTATION_PAGE_LOTS };
@@ -131,6 +171,10 @@ export function RotationPanel() {
   const [portfolio, setPortfolio] = usePortfolioStop();
   const [tunedStop, setTunedStop] = usePortfolioStop(T1_STOP_KEYS);
   const [baseStop, setBaseStop] = usePortfolioStop(BASE_STOP_KEYS);
+  // Display only: every paper figure below is read after 0.5% slippage while this is on.
+  const slippage = useRotationSlippage();
+  // Which book the page leads with (Adaptive Tuned by default).
+  const [view, setView] = useRotationBook();
 
   const readoutDays = overview.data?.readout_days ?? 60;
   const s = summary.data;
@@ -173,6 +217,14 @@ export function RotationPanel() {
 
   const visible = useMemo(() => new Set<RotationListKey>([...shown, focus]), [shown, focus]);
   const points = useMemo(() => (shown_s ? heroSeries(shown_s, focus) : []), [shown_s, focus]);
+  // The Tuned view: the T1 track's list C (under its own stop) with the base over its days.
+  const tunedPoints = useMemo(() => (tunedShown ? heroSeries(tunedShown, 'C') : []), [tunedShown]);
+  // The Fixed base view: the base alone (under its own stop) over Classic's scored sessions.
+  const basePoints = useMemo(
+    () =>
+      baseShown ? heroSeries(baseShown, 'C').map((p) => ({ ...p, lists: {}, band: null })) : [],
+    [baseShown],
+  );
   const verdictFor = useMemo(() => (s ? buildVerdict(s, focus) : null), [s, focus]);
 
   const lines = useMemo((): BookLine[] => {
@@ -189,12 +241,12 @@ export function RotationPanel() {
               error: false,
             }
           : null;
-    return [
+    const books: BookLine[] = [
       {
         row: listBook('C', shown_s ?? null, s, benchmark),
         name: ADAPTIVE_CARD.classic.name,
         note: ADAPTIVE_CARD.classic.note,
-        focus: true,
+        focus: view === 'core',
         stop: {
           setting: portfolio,
           onChange: setPortfolio,
@@ -218,7 +270,7 @@ export function RotationPanel() {
         row: listBook('T1', tunedShown ?? null, t ?? null, benchmark),
         name: ADAPTIVE_CARD.tuned.name,
         note: ADAPTIVE_CARD.tuned.note,
-        focus: false,
+        focus: view === 'tuned',
         message: tunedMessage,
         stop: {
           setting: tunedStop,
@@ -243,7 +295,7 @@ export function RotationPanel() {
         row: baseBook(baseShown ?? null),
         name: BASE_CARD.name,
         note: BASE_CARD.note,
-        focus: false,
+        focus: view === 'base',
         stop: {
           setting: baseStop,
           onChange: setBaseStop,
@@ -264,7 +316,10 @@ export function RotationPanel() {
         },
       },
     ];
+    // The book the page leads with comes first; the others keep their order.
+    return [...books.filter((l) => l.focus), ...books.filter((l) => !l.focus)];
   }, [
+    view,
     s,
     t,
     shown_s,
@@ -317,17 +372,143 @@ export function RotationPanel() {
       ? (name: string) => <PlanPickLine plan={plan} session={tunedSession} book="t1" name={name} />
       : undefined;
 
+  // A const, so the baskets card's callbacks keep its narrowing.
+  const ovData = overview.data;
+  const slipText = slippage ? ` After ${SLIPPAGE_TEXT} slippage on every entry and exit.` : '';
+
+  /** The late and waiting days a read-out leaves out, under its chart. */
+  const leftOut = (r: NonNullable<typeof s>) => (
+    <>
+      {r.late_entries.length > 0 ? (
+        <p className="mt-3 text-xs text-warning">
+          Left out as late (recorded after 09:17, not forward): {r.late_entries.join(', ')}.
+        </p>
+      ) : null}
+      {Object.keys(r.pending_reasons).length > 0 ? (
+        <ul className="mt-3 space-y-0.5 text-xs text-muted">
+          {Object.entries(r.pending_reasons).map(([day, why]) => (
+            <li key={day}>
+              <span className="font-mono">{day}</span> waiting: {why}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+
+  /** The hero chart for the book the page leads with (called only once Classic's read-out has
+   * scored days: the Fixed base is drawn over Classic's sessions). */
+  const hero = () => {
+    if (!s) return null;
+    if (view === 'base') {
+      return (
+        <Card>
+          <CardHeader
+            title={`Cumulative gross, ${BASE_CARD.name}`}
+            description={`${s.n_days} scored forward sessions (Adaptive Classic's), ${lotsWord(s.settings?.lots_per_strategy)} per strategy, 3 strategies a day, no ranking.${slipText}${baseShown !== s ? ' With its portfolio stop applied.' : ''}`}
+          />
+          <RotationHero
+            points={basePoints}
+            focus="C"
+            shown={NO_LISTS}
+            onToggle={noop}
+            showBase
+            onToggleBase={noop}
+            baseOnly
+          />
+        </Card>
+      );
+    }
+    if (view === 'tuned') {
+      if (!t) {
+        return tuned.error ? (
+          <StateMessage
+            variant="error"
+            title={`Could not read ${ADAPTIVE_CARD.tuned.name}'s read-out`}
+            description={tuned.error}
+          />
+        ) : (
+          <SkeletonRows rows={4} />
+        );
+      }
+      if (t.n_days === 0) {
+        return (
+          <Card className="py-4">
+            <p className="text-sm font-semibold text-foreground">
+              No scored {ADAPTIVE_CARD.tuned.name} session yet
+            </p>
+            <p className="mt-0.5 text-sm text-muted">
+              {Object.values(t.pending_reasons)[0] ??
+                'The first T1 entry is scored after the evening update.'}
+            </p>
+          </Card>
+        );
+      }
+      return (
+        <Card>
+          <CardHeader
+            title={`Cumulative gross, ${ADAPTIVE_CARD.tuned.name} and the fixed base`}
+            description={`${t.n_days} scored forward sessions${t.first_day ? ` from ${formatDay(t.first_day)}` : ''}, ${lotsWord(t.settings?.lots_per_strategy)} per strategy.${slipText}${tunedShown !== t ? ' With its portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
+          />
+          <RotationHero
+            points={tunedPoints}
+            focus="C"
+            shown={TUNED_SHOWN}
+            onToggle={noop}
+            showBase={showBase}
+            onToggleBase={() => setShowBase((v) => !v)}
+            nameOf={tunedName}
+          />
+          {leftOut(t)}
+        </Card>
+      );
+    }
+    return (
+      <Card>
+        <CardHeader
+          title={
+            SEVERAL_LISTS_VISIBLE
+              ? 'Cumulative gross by list'
+              : `Cumulative gross, ${ADAPTIVE_CARD.classic.name} and the fixed base`
+          }
+          description={`${s.n_days} scored forward sessions, ${lotsWord(s.settings?.lots_per_strategy)} per strategy.${slipText}${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
+        />
+        <RotationHero
+          points={points}
+          focus={focus}
+          shown={visible}
+          onToggle={toggle}
+          showBase={showBase}
+          onToggleBase={() => setShowBase((v) => !v)}
+        />
+        {leftOut(s)}
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <ListPicker
-          value={focus}
-          onChange={setFocus}
-          ariaLabel="Focus list"
-          label="Focus"
-          format={listWithUniverse}
-          single="text"
-        />
+        <div className="flex items-center gap-2 text-xs text-muted">
+          Show
+          <SegmentedControl
+            value={view}
+            options={VIEW_OPTIONS}
+            onChange={setView}
+            ariaLabel="Book shown"
+            size="sm"
+          />
+        </div>
+        {view === 'core' ? (
+          <ListPicker
+            value={focus}
+            onChange={setFocus}
+            ariaLabel="Focus list"
+            label="Focus"
+            format={listWithUniverse}
+            single="text"
+          />
+        ) : null}
         <div className="flex items-center gap-2 text-xs text-muted">
           Compare with
           <SegmentedControl
@@ -338,8 +519,9 @@ export function RotationPanel() {
             size="sm"
           />
         </div>
+        <SlippageSwitch />
         <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted">
-          Forward · gross · 1 lot per strategy
+          Forward · gross{slippage ? ` · ${SLIPPAGE_TEXT} slippage` : ''} · 1 lot per strategy
         </span>
         <RotationReadoutChip
           scoredDays={s ? s.n_days : null}
@@ -421,53 +603,21 @@ export function RotationPanel() {
                 vsHeader={vsHeader(benchmark)}
                 footer={verdictFor ? <RotationVerdict verdict={verdictFor} plain /> : null}
               />
-              <Card>
-                <CardHeader
-                  title={
-                    SEVERAL_LISTS_VISIBLE
-                      ? 'Cumulative gross by list'
-                      : `Cumulative gross, ${listName(focus)} and the fixed base`
-                  }
-                  description={`${s.n_days} scored forward sessions, ${lotsWord(s.settings?.lots_per_strategy)} per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
-                />
-                <RotationHero
-                  points={points}
-                  focus={focus}
-                  shown={visible}
-                  onToggle={toggle}
-                  showBase={showBase}
-                  onToggleBase={() => setShowBase((v) => !v)}
-                />
-                {s.late_entries.length > 0 ? (
-                  <p className="mt-3 text-xs text-warning">
-                    Left out as late (recorded after 09:17, not forward):{' '}
-                    {s.late_entries.join(', ')}.
-                  </p>
-                ) : null}
-                {Object.keys(s.pending_reasons).length > 0 ? (
-                  <ul className="mt-3 space-y-0.5 text-xs text-muted">
-                    {Object.entries(s.pending_reasons).map(([day, why]) => (
-                      <li key={day}>
-                        <span className="font-mono">{day}</span> waiting: {why}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </Card>
+              {hero()}
             </>
           )}
-          {overview.data ? (
+          {ovData ? (
             <Card>
               <CardHeader
                 title={
-                  overview.data.baskets.entry === null
+                  ovData.baskets.entry === null
                     ? 'Next entry'
                     : entryDay === istToday()
                       ? "Today's baskets"
                       : 'Latest baskets'
                 }
                 description={
-                  overview.data.baskets.entry === null
+                  ovData.baskets.entry === null
                     ? `${SEVERAL_LISTS_VISIBLE ? 'The lists' : 'The list'} to be recorded at 09:16, before the day's results are known.`
                     : entryDay === istToday()
                       ? "Recorded at 09:16, before the day's results were known; scored after the evening run. What each list holds and what changed since the entry before."
@@ -475,22 +625,28 @@ export function RotationPanel() {
                 }
               />
               <div className="grid gap-6 lg:grid-cols-2">
-                <RotationBaskets
-                  baskets={overview.data.baskets}
-                  specs={overview.data.lists}
-                  firstEntryDay={overview.data.first_entry_day}
-                  title={ADAPTIVE_CARD.classic.name}
-                  {...(coreDetail ? { detail: coreDetail } : {})}
-                />
-                {tunedBaskets?.entry ? (
-                  <RotationBaskets
-                    baskets={tunedBaskets}
-                    specs={overview.data.lists}
-                    firstEntryDay={overview.data.first_entry_day}
-                    title={ADAPTIVE_CARD.tuned.name}
-                    {...(tunedDetail ? { detail: tunedDetail } : {})}
-                  />
-                ) : null}
+                {/* the book the page leads with first; Tuned first in the Fixed base view too */}
+                {(view === 'core' ? ['core', 'tuned'] : ['tuned', 'core']).map((b) =>
+                  b === 'core' ? (
+                    <RotationBaskets
+                      key="core"
+                      baskets={ovData.baskets}
+                      specs={ovData.lists}
+                      firstEntryDay={ovData.first_entry_day}
+                      title={ADAPTIVE_CARD.classic.name}
+                      {...(coreDetail ? { detail: coreDetail } : {})}
+                    />
+                  ) : tunedBaskets?.entry ? (
+                    <RotationBaskets
+                      key="tuned"
+                      baskets={tunedBaskets}
+                      specs={ovData.lists}
+                      firstEntryDay={ovData.first_entry_day}
+                      title={ADAPTIVE_CARD.tuned.name}
+                      {...(tunedDetail ? { detail: tunedDetail } : {})}
+                    />
+                  ) : null,
+                )}
               </div>
               {plan ? (
                 <div className="mt-4">
@@ -516,12 +672,35 @@ export function RotationPanel() {
             What the list picked, what happened afterwards, and where the risk came from.
           </p>
         </header>
-        <RotationDailyLog focus={focus} portfolio={portfolio} />
+        {view === 'tuned' ? (
+          <RotationDailyLog
+            key="t1"
+            focus="C"
+            portfolio={tunedStop}
+            track="t1"
+            bookName={ADAPTIVE_CARD.tuned.name}
+          />
+        ) : view === 'core' ? (
+          <RotationDailyLog key="core" focus={focus} portfolio={portfolio} />
+        ) : (
+          <Card className="py-4">
+            <p className="text-sm text-muted">
+              The fixed base has no daily picks to log: it holds the same three strategies every
+              day. Its figures are in the Books table and the chart above.
+            </p>
+            <div className="mt-3">
+              <Button size="sm" onClick={() => setView('tuned')}>
+                Show {ADAPTIVE_CARD.tuned.name}
+              </Button>
+            </div>
+          </Card>
+        )}
         <Accordion
           title="Drawdowns and selection drift"
           description="How deep the falls were, and what the list has been holding"
           defaultOpen={false}
         >
+          <ClassicOnlyNote view={view} />
           <RotationDrawdowns list={focus} portfolio={portfolio} />
           <RotationDrift list={focus} />
         </Accordion>
@@ -557,6 +736,7 @@ export function RotationPanel() {
           description="The family pulse, a pick criterion by criterion, and rank correlation"
           defaultOpen={false}
         >
+          <ClassicOnlyNote view={view} />
           <RotationPulse focus={focus} />
           <RotationExplain list={focus} onList={setFocus} />
         </Accordion>
@@ -565,6 +745,7 @@ export function RotationPanel() {
           description="Forward days versus the research periods"
           defaultOpen={false}
         >
+          <ClassicOnlyNote view={view} />
           <RotationRegime />
         </Accordion>
       </section>
@@ -588,6 +769,7 @@ export function RotationPanel() {
           description="Unregistered candidates and trigger studies, each against what it replaced"
           defaultOpen={false}
         >
+          <ClassicOnlyNote view={view} />
           <RotationShadowScoreboard />
         </Accordion>
       </section>

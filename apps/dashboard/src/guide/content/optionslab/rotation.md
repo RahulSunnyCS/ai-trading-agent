@@ -21,7 +21,7 @@ premium at entry ([slippage](glossary:slippage)). A copy deployed at another tim
 as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). A copy that did not trade, or whose legs were still open when read, is
 named on its own line and left out, as is a copy of the tool's whose name the capture could not read (❓). "1x
 assumed" means the platform no longer showed its multiplier (a day read late). "Live · not captured" means the 15:40 read did not happen; the next evening reads
-that day, and `obt rotation live-compare --day` shows it (the 16:00 message is not sent again). When an account's Settings › Automation row has **Dir ×2 on non-expiry days** on, that list's block adds its lots (`🔢 4 lots · Dir ×2`, or `3 lots · expiry day` / `no Dir picked`) and marks the doubled Dir `· 2 lots`; the evening's tentative list does the same, and the 16:00 result adds an "As traded" line beside the 1-lot paper figure.
+that day, and `obt rotation live-compare --day` shows it (the 16:00 message is not sent again). When an account's Settings › Automation row has **Dir ×2 on non-expiry days** on, that list's block adds its lots (`🔢 4 lots · Dir ×2`, or `3 lots · expiry day` / `no Dir picked`) and marks the doubled Dir `· 2 lots`; the evening's tentative list does the same, and the 16:00 result adds an "As traded" line beside the 1-lot paper figure. The 16:00 result's paper figures (the day's and the month so far) include 0.5% [slippage](glossary:slippage) on every entry and exit, so they sit nearer what live fills get; this page's figures do too while its Slippage switch is on (the default). From November 2026 the 16:00 result also has the month so far (`📅 November so far`): each list's paper net from the 1st, one lot per strategy, and the days it won (a day still being scored is left out, never counted as zero), with the as-traded total for a Dir ×2 list; your copy (never the group's) adds your account's real profit from the contract notes, after charges, up to the last day whose notes are in (they arrive at 00:00, so it runs to the day before).
 
 | Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band |
 |---|---|---|---|---|---|---|
@@ -41,7 +41,8 @@ an entry can be matched to the journal.
 
 The screen is one page, in the order you read it:
 
-- **The run bar** — at the top: the list followed, *Compare with*, the read-out's day count
+- **The run bar** — at the top: *Show* (which book the page leads with, below), the list followed
+  (in the Adaptive Classic view), *Compare with*, the read-out's day count
   ("Day 10 of 60 · 12 Oct → 27 Oct") and the evening run. The evening run shows how the last run
   went (the scheduled 15:45 run, or one started here) and a *Run* button; *Evening run* opens the
   Fyers token state, the days collected, the Day field, *Collect data first*, *Send summary to
@@ -70,6 +71,26 @@ anything.
 
 ## What you see
 
+**Show.** The first control on the bar picks the book the page leads with: **Adaptive Tuned** (the
+default, since the owner is moving to it as the primary book, 30 Oct 2026), **Adaptive Classic** or
+the **Fixed base**. This browser remembers the choice. It moves:
+
+- the **cumulative chart**: Adaptive Tuned's line from the T1 track's own read-out (from its first
+  day, 19 Oct 2026) with the fixed base over the same days; Adaptive Classic as before, with the
+  *Focus* picker; or the fixed base's line alone, over Adaptive Classic's scored sessions;
+- the **Books table**: the chosen book's row comes first and is marked *focus*;
+- the **Daily log and calendar**: Adaptive Tuned reads the T1 track's journal (recorded days only;
+  a track has no reconstructed history) under Adaptive Tuned's portfolio stop; Adaptive Classic
+  reads the live journal as before; the fixed base has no daily picks to log, so it shows a short
+  note with a button back to Adaptive Tuned;
+- **Today's baskets**: the chosen book's basket comes first (Adaptive Tuned first in the Fixed base
+  view too).
+
+The diagnostics that only exist for Adaptive Classic (Drawdowns and selection drift, the family
+pulse, Why this pick and Does rank predict results, the forward-days market mix and the Shadow
+scoreboard) stay on Adaptive Classic, and say so in one line when another book is shown. Lot plans
+already shows both Adaptive books, and Live vs paper is unaffected.
+
 **Data health.** One line of checks: the latest session stored, how many of the 298 strategies have
 that day's result, whether today's entry was recorded on time, which source gave the 09:15 VIX open,
 and whether the journal's hash chain is intact. A problem names its fix underneath.
@@ -80,10 +101,21 @@ and whether the journal's hash chain is intact. A problem names its fix undernea
 fact; ₹ per lot-day, beats random baskets, the verdict and the 60-day read-out are the same at any
 number of lots, so none of them moves.
 
+**Slippage 0.5%.** The switch on the top bar (on by default) shows every paper figure on the page
+after 0.5% [slippage](glossary:slippage): each entry and exit is filled 0.5% against the trade, a
+sell lower and a buy higher. It covers the Books table, the chart, the Daily log and its replays, the
+drawdowns, the family pulse, Lot plans and the Shadow scoreboard; the Overview's rotation card, the
+Matrix and the Correlation page follow the same switch, and the chip beside it says
+`0.5% slippage` while it is on. Choose **Off** for the figures without it. It changes only what is
+shown: the 09:16 picks are ranked without slippage, so *Why this pick?*, *Does rank predict
+results?* and *Live vs paper* (whose live side has its own fills) always show figures without it and
+say so. This browser remembers the choice.
+
 **The Books table.** It comes first on the page, one row a book:
 
 - **Adaptive Classic** — Adaptive as the journal records it: the 298 tested variants (Core), list C
-  of the live journal. It is the *focus*: the chart and every widget below follow it.
+  of the live journal. In its view (Show › Adaptive Classic) it is the *focus*: the chart and every
+  widget below follow it.
 - **Adaptive Tuned** — the same picker with the 223 tuned-settings variants of the T1 track added,
   read from the T1 track's own journal (recorded at 09:16 like the live list, from 19 Oct 2026). Its
   figures start on its own first day, which the row says.
@@ -119,11 +151,13 @@ on the registered rule. It is never moved by a portfolio stop.
 luck gives. The picker switches the table's gap column; the registered comparison is always the
 one against the base.
 
-**Hero chart.** Cumulative gross of Adaptive and of the fixed base (a toggle), with a shaded band of
-the random baskets (10th to 90th percentile). Hover for a day, click to pin it, ← → to step, Esc to
+**Hero chart.** Cumulative gross of the book chosen under *Show* and of the fixed base (a toggle),
+with a shaded band of the random baskets (10th to 90th percentile); in the Fixed base view, the
+base's line alone. Hover for a day, click to pin it, ← → to step, Esc to
 close.
 
-**Today's baskets.** The latest entry of each Adaptive book, Classic and Tuned side by side: start
+**Today's baskets.** The latest entry of each Adaptive book side by side, the one chosen under
+*Show* first: start
 time, the strategy and its composite score. "Widesl min" marks a day where the rule that needs at least two Widesl strategies replaced a
 higher-ranked Dir pick. The line under the basket says what changed since the entry before, which
 is the work list for re-setting AlgoTest by hand.
@@ -157,9 +191,10 @@ Lock and trail):
 | Adaptive Tuned | **9,000 rupees** | `pfstop_t1`, `pftrail_t1` |
 | Fixed base | **8,000 rupees** | `pfstop_base`, `pftrail_base` |
 
-Adaptive Classic's stop also drives the **Daily log**, **Drawdown episodes** and, once there are
-forward sessions, its **row of the Books table and the cumulative chart**; Adaptive Tuned's and the
-Fixed base's change only their own row. The basket is replayed minute by minute and closed the first minute the stop is
+Adaptive Classic's stop also drives its **Daily log** (Show › Adaptive Classic), **Drawdown
+episodes** and, once there are forward sessions, its **row of the Books table and the cumulative
+chart**. Adaptive Tuned's drives its row, its chart and its Daily log (Show › Adaptive Tuned); the
+Fixed base's changes its row and its chart. The basket is replayed minute by minute and closed the first minute the stop is
 reached. See the [Daily log](guide:optionslab/rotation-daily-log) page for how the stop works. Your
 last setting is kept in this browser for each book separately (a stop kept from before 19 Oct 2026,
 when the default was 10,000 at 2 lots, is not carried over).
@@ -187,6 +222,7 @@ Some traders call this stop an MTM SL; it is the same thing.
 ## How to read it
 
 - **Gross only.** The stored costs are zero. Net figures need the charge model applied first.
+  With Slippage on, each entry and exit is also filled 0.5% against the trade.
 - **Missing is never zero.** A day not recorded, recorded late, or not yet scored is named, and
   left out of every figure.
 - **The rule that decides.** The list beats the base when the 5-day block-bootstrap 90% interval of

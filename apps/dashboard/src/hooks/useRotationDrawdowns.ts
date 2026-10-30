@@ -5,6 +5,7 @@
  */
 
 import { type PortfolioStopSetting, queryOf } from '../lib/portfolioStop';
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationListKey } from '../types/rotation';
 import type { DrawdownWindowId, RotationDrawdownsResponse } from '../types/rotationDrawdowns';
 import { ROTATION_PAGE_LOTS } from './useRotation';
@@ -32,7 +33,7 @@ export function useRotationDrawdowns(p: {
     if (stop || trail) q.set('lots', String(ROTATION_PAGE_LOTS));
   }
   return useWarmingResource<RotationDrawdownsResponse>(
-    `${BASE}/rotation/drawdowns?${q.toString()}`,
+    useSlippageUrl(`${BASE}/rotation/drawdowns?${q.toString()}`),
     { pending: (d) => d.with_stop_pending === true },
   );
 }

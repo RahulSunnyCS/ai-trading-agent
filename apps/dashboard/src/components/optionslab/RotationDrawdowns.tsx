@@ -36,6 +36,8 @@ import {
   readingLine,
 } from '../../lib/rotationDrawdownsView';
 import { listName } from '../../lib/rotationListNames';
+import { grossLabel } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { RotationListKey } from '../../types/rotation';
 import type { DrawdownEpisode, RotationDrawdownsResponse } from '../../types/rotationDrawdowns';
 import { Badge } from '../ui/Badge';
@@ -297,6 +299,7 @@ export function RotationDrawdowns({
   const window = asWindow(winQ);
   const minDepth = asDepth(depthQ);
   const res = useRotationDrawdowns({ list, window, minDepth, portfolio });
+  const slippage = useRotationSlippage();
   const d = res.data;
   const current =
     d !== null &&
@@ -324,7 +327,7 @@ export function RotationDrawdowns({
     <Card>
       <CardHeader
         title="Drawdown episodes"
-        description={`${listName(list)}, gross per lot-day: how deep each fall went, how long it took to come back, and what the fixed base did over the same days.`}
+        description={`${listName(list)}, ${grossLabel(slippage)} per lot-day: how deep each fall went, how long it took to come back, and what the fixed base did over the same days.`}
         actions={
           <span className="flex flex-wrap items-center gap-2">
             <SegmentedControl

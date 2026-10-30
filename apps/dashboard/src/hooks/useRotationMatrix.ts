@@ -5,6 +5,7 @@
  */
 
 import { toQuery } from '../lib/rotationMatrixView';
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { MatrixCellDetail, MatrixResult } from '../types/rotationMatrix';
 import { usePolledResource } from './usePolledResource';
 
@@ -15,7 +16,7 @@ export function useRotationMatrix(
   params: Record<string, string>,
   options: { enabled?: boolean } = {},
 ) {
-  return usePolledResource<MatrixResult>(`${BASE}${toQuery(params)}`, {
+  return usePolledResource<MatrixResult>(useSlippageUrl(`${BASE}${toQuery(params)}`), {
     cache: true,
     ...(options.enabled === undefined ? {} : { enabled: options.enabled }),
   });
@@ -26,5 +27,5 @@ export function useRotationMatrix(
  * calls it only while the drawer is open.
  */
 export function useRotationMatrixCell(params: Record<string, string>) {
-  return usePolledResource<MatrixCellDetail>(`${BASE}/cell${toQuery(params)}`);
+  return usePolledResource<MatrixCellDetail>(useSlippageUrl(`${BASE}/cell${toQuery(params)}`));
 }

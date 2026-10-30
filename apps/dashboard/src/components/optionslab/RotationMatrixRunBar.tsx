@@ -23,6 +23,7 @@ import { Card } from '../ui/Card';
 import { Drawer } from '../ui/Drawer';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { RotationMatrixControls } from './RotationMatrixControls';
+import { SlippageSwitch } from './rotation/SlippageSwitch';
 
 export function RotationMatrixRunBar({
   filters: f,
@@ -79,6 +80,7 @@ export function RotationMatrixRunBar({
           ariaLabel="Metric"
           size="sm"
         />
+        <SlippageSwitch />
         <p
           className="min-w-0 flex-1 truncate text-xs text-muted"
           title={hint ? `${summary}. ${hint}` : summary}

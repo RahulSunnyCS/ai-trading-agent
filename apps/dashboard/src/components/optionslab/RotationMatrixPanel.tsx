@@ -45,6 +45,8 @@ import {
   okMatrices,
   scaleNotes,
 } from '../../lib/rotationMatrixView';
+import { grossLabel, grossLabelSentence } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { MatrixGrid, MatrixResponse } from '../../types/rotationMatrix';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -155,6 +157,7 @@ export function RotationMatrixPanel() {
 
   // the previous grid stays on screen when a later request fails: say so, never show it as current
   const stale = result.error !== null && data !== null;
+  const slippage = useRotationSlippage();
   const hasDifference = r?.difference != null;
   useEffect(() => {
     if (!hasDifference) setShown('both');
@@ -189,7 +192,7 @@ export function RotationMatrixPanel() {
   ) =>
     setDrawer({
       title: `${rowLabel} · ${colLabel}`,
-      subtitle: `${heading} · gross per one-lot strategy-day`,
+      subtitle: `${heading} · ${grossLabel(slippage)} per one-lot strategy-day`,
       sections: periodIds.map((id) => ({
         ...(periodIds.length > 1 && r ? { heading: periodLabelOf(r, id) } : {}),
         params: cellParams(filters, row, col, id),
@@ -393,8 +396,9 @@ export function RotationMatrixPanel() {
           <Card className={stale ? 'opacity-60' : ''}>
             <CardHeader title="Reading this grid" description={`Pooling: ${r.aggregation}.`} />
             <p className="text-xs text-muted">
-              {METRIC_NOTE[r.metric]} Gross, per one lot, before costs. Alternative settings are not
-              a portfolio: no row or column is summed.
+              {METRIC_NOTE[r.metric]} {grossLabelSentence(slippage)}, per one lot, before{' '}
+              {slippage ? 'other ' : ''}costs. Alternative settings are not a portfolio: no row or
+              column is summed.
               {filters.list !== ANY
                 ? ` The marks are the ${listName(filters.list)} list's recorded picks, never reconstructed.`
                 : ''}

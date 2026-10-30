@@ -4,11 +4,12 @@
  * Refresh, not polled.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationRegimeResponse } from '../types/rotationRegime';
 import { usePolledResource } from './usePolledResource';
 
 const BASE = '/api/backtest/legwise';
 
 export function useRotationRegime() {
-  return usePolledResource<RotationRegimeResponse>(`${BASE}/rotation/regime`);
+  return usePolledResource<RotationRegimeResponse>(useSlippageUrl(`${BASE}/rotation/regime`));
 }

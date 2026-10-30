@@ -4,9 +4,10 @@
  * mount and on Reload, not polled.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationPlan } from '../types/rotationPlan';
 import { usePolledResource } from './usePolledResource';
 
 export function useRotationPlan() {
-  return usePolledResource<RotationPlan>('/api/backtest/legwise/rotation/plan');
+  return usePolledResource<RotationPlan>(useSlippageUrl('/api/backtest/legwise/rotation/plan'));
 }

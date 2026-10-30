@@ -287,6 +287,11 @@ describe('a response is only shown for the request it answers', () => {
     expect(logMatches(r, 'reconstructed', {})).toBe(false);
     expect(logMatches(r, 'recorded', { from: '2026-04-01' })).toBe(false);
     expect(logMatches({ ...r, from: '2026-04-01' }, 'recorded', { from: '2026-04-01' })).toBe(true);
+    // one journal's rows never sit under the other's name (the T1 track vs the live journal)
+    expect(logMatches({ ...r, track: 't1' }, 'recorded', {}, 't1')).toBe(true);
+    expect(logMatches({ ...r, track: 't1' }, 'recorded', {})).toBe(false);
+    expect(logMatches(r, 'recorded', {}, 't1')).toBe(false);
+    expect(logMatches({ ...r, track: null }, 'recorded', {})).toBe(true);
     expect(logMatches({ ...r, source: 'reconstructed' }, 'recorded', {})).toBe(false);
   });
 });

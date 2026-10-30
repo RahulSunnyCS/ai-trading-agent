@@ -14,7 +14,9 @@ It describes. A strong cell is something that happened, not a rule to change a r
 
 Every cell is **gross profit and loss per one-lot strategy-day**: one lot of one strategy file, on
 one day, before brokerage and charges. The list trades two lots per strategy; its figures are
-not these.
+not these. With the bar's **Slippage** switch on (the default, shared with the Rotation page) each
+entry and exit is filled 0.5% against the trade, and the note under the grid says so; **Off** shows
+the cells without it.
 
 | Word | Meaning |
 |---|---|

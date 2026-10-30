@@ -32,6 +32,8 @@ import {
   supportOf,
   whyLine,
 } from '../../lib/rotationExplainView';
+import { RANKING_NO_SLIPPAGE, noSlippageNote } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type {
   RotationExplain,
   RotationListKey,
@@ -450,6 +452,7 @@ function Body({
   onSelect: (variant: string) => void;
 }) {
   const differs = differsFromEntry(data);
+  const slippage = useRotationSlippage();
   const rows = useMemo(
     () => orderedRows(data.picks, data.top, differs ? data.recorded_picks : []),
     [data, differs],
@@ -549,6 +552,7 @@ function Body({
             Percentiles rank this variant among all {formatInt(data.n_variants)}; points are weight
             × percentile and add up to the composite. A window with no matching day is left out and
             the others are re-weighted. All figures are one lot, gross.
+            {noSlippageNote(slippage, RANKING_NO_SLIPPAGE)}
           </p>
         </div>
       ) : null}

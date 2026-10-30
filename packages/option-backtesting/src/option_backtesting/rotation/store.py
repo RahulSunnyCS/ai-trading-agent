@@ -3,6 +3,8 @@ TRADING_DATA_ROOT/rotation/ (not the catalog: it allows one writer, and `obt dai
 on this job).
 
     rotation/results/<variant>.csv   day,net,gross,costs,worst_mtm,stopped_by,n_trades
+    rotation/results/slip-0.5/<variant>.csv   the same after 0.5% slippage on every fill
+        (`slip_store`; one beside every results folder: a track's and the base's too)
     rotation/days.csv                day,weekday,vix_open,vix_band,dte_n,dte_s
     rotation/journal.jsonl           the hash chain (journal.py)
 """
@@ -13,6 +15,7 @@ import csv
 import fcntl
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -24,6 +27,43 @@ from .dte import from_calendar_label
 
 RESULT_COLUMNS = ["day", "net", "gross", "costs", "worst_mtm", "stopped_by", "n_trades"]
 DAY_COLUMNS = ["day", "weekday", "vix_open", "vix_band", "dte_n", "dte_s"]
+
+#: the slippage (% of price, every entry and exit) the results are read at: 0 reads them as
+#: stored; otherwise every reader of a results file reads its `slip_path` copy instead (owner,
+#: 2026-10-30: the dashboard's Rotation pages, display only). Set per request with `slipped`;
+#: the ranking never reads it (`pick`, `explain` and `live_compare` read with `slipped(0)`).
+_SLIP: ContextVar[float] = ContextVar("rotation_slippage", default=0.0)
+#: the slippages a copy is kept for
+SLIP_CHOICES = (0.0, 0.5)
+
+
+@contextmanager
+def slipped(pct: float) -> Iterator[None]:
+    """Read every results file at `pct` % slippage inside the block (0: as stored)."""
+    if pct not in SLIP_CHOICES:
+        raise ValueError(f"slippage must be one of {', '.join(f'{c:g}' for c in SLIP_CHOICES)}")
+    token = _SLIP.set(pct)
+    try:
+        yield
+    finally:
+        _SLIP.reset(token)
+
+
+def reading_slip() -> float:
+    return _SLIP.get()
+
+
+def slip_path(path: Path, pct: float) -> Path:
+    """A results file's copy at `pct` % slippage: `<folder>/slip-<pct>/<same name>`."""
+    return path.parent / f"slip-{pct:g}" / path.name
+
+
+def read_path(path: Path) -> Path:
+    """The file a reader opens for the stored results file `path`: its slippage copy while
+    `slipped` is in force, else `path` itself. A copy that is missing reads as no results (never
+    silently as the unslipped figures)."""
+    pct = _SLIP.get()
+    return slip_path(path, pct) if pct else path
 
 
 def rotation_dir(root: Path | None = None) -> Path:
@@ -72,8 +112,8 @@ def _write_lock(root: Path | None) -> Iterator[None]:
 
 
 def read_net(name: str, root: Path | None = None) -> dict[date, float]:
-    """{day: net P&L} of one variant."""
-    path = result_path(name, root)
+    """{day: net P&L} of one variant (at the slippage `slipped` is reading at)."""
+    path = read_path(result_path(name, root))
     if not path.exists():
         return {}
     with path.open() as f:
@@ -89,7 +129,7 @@ def append_result(name: str, row: dict, root: Path | None = None) -> bool:
     already there: a stored day is never rewritten."""
     path = result_path(name, root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with _write_lock(root):
+    with _write_lock(root), slipped(0.0):
         if str(row["day"]) in {d.isoformat() for d in read_net(name, root)}:
             return False
         new = not path.exists()

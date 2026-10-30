@@ -4,11 +4,14 @@
  * book changes and on Refresh, not polled.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { LotPlanBook, RotationLotPlansResponse } from '../types/rotationLotPlans';
 import { usePolledResource } from './usePolledResource';
 
 const BASE = '/api/backtest/legwise';
 
 export function useRotationLotPlans(book: LotPlanBook) {
-  return usePolledResource<RotationLotPlansResponse>(`${BASE}/rotation/lot-plans?book=${book}`);
+  return usePolledResource<RotationLotPlansResponse>(
+    useSlippageUrl(`${BASE}/rotation/lot-plans?book=${book}`),
+  );
 }

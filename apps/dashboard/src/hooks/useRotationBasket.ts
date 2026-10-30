@@ -4,6 +4,7 @@
  * changes and on Refresh, not polled.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type {
   BasketListKey,
   BasketWindowId,
@@ -20,5 +21,7 @@ export function useRotationBasket(p: {
 }) {
   const q = new URLSearchParams({ list: p.list, window: p.window });
   if (p.day && p.list !== 'BASE') q.set('day', p.day);
-  return usePolledResource<RotationBasketResponse>(`${BASE}/rotation/basket?${q.toString()}`);
+  return usePolledResource<RotationBasketResponse>(
+    useSlippageUrl(`${BASE}/rotation/basket?${q.toString()}`),
+  );
 }

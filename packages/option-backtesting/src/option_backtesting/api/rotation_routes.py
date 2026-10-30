@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import overview, readout
+from ..rotation import overview, readout, store
 from ..rotation.journal import JournalCorrupt
 
 router = APIRouter(prefix="/legwise/rotation")
@@ -60,6 +60,7 @@ def track_and_lots(track: str | None, lots: str | None) -> tuple[str | None, int
 
 
 def _cached(key: tuple, build):
+    key = (store.reading_slip(), *key)  # one answer per slippage the results are read at
     now = time.monotonic()
     hit = _cache.get(key)
     if hit is not None and now - hit[0] < CACHE_SECONDS:

@@ -28,8 +28,10 @@ import { type StartSpec, startToParams } from '../../lib/legwiseBuilder';
 import { lastResultOf, legsSummary } from '../../lib/optionsRuns';
 import { CARD_KEYS, type CardKey } from '../../lib/rotationListCards';
 import { LIST_INFO, UNIVERSE_LABEL, isVisibleList } from '../../lib/rotationListNames';
+import { grossLabelSentence } from '../../lib/rotationSlippage';
 import { buildPath } from '../../lib/routes';
 import { type BasketLine, basketLine } from '../../lib/strategiesBasketLine';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { SavedStrategy } from '../../types/legwise';
 import type { RotationSummary } from '../../types/rotation';
 import { Button } from '../ui/Button';
@@ -136,6 +138,8 @@ function BasketRow({
 }) {
   const info = LIST_INFO[listKey];
   const line = basketLine(summary, listKey, summaryError);
+  // The Today page's read-out, so it follows the Rotation pages' slippage switch too.
+  const slippage = useRotationSlippage();
   return (
     <section
       aria-label={`${info.name} basket`}
@@ -149,7 +153,7 @@ function BasketRow({
       </span>
       <span
         className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted"
-        title="Gross, one lot per strategy, forward days only, without a portfolio stop: the Today page's figures."
+        title={`${grossLabelSentence(slippage)}, one lot per strategy, forward days only, without a portfolio stop: the Today page's figures.`}
       >
         <BasketFigures line={line} />
         {info.weights ? (

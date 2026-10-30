@@ -32,6 +32,8 @@ import {
   sourceNote,
 } from '../../../lib/rotationBasketView';
 import { DEFAULT_LIST, listLabel } from '../../../lib/rotationListNames';
+import { grossLabel } from '../../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../../store/rotationSlippage';
 import type { CorrelationResponse } from '../../../types/legwise';
 import type { BasketPick, RotationBasketResponse } from '../../../types/rotationBasket';
 import { Badge } from '../../ui/Badge';
@@ -200,6 +202,7 @@ function Figures({ b, r }: { b: RotationBasketResponse; r: CorrelationResponse }
   const view = useMemo(() => reorder(matrix, r.names, r.order), [matrix, r.names, r.order]);
   const { average: avg, most: alike } = pairSummary(r, b.duplicates);
   const shown = hover ?? pinned;
+  const slippage = useRotationSlippage();
   const pair = shown ? pairReadout(r, view.index[shown[0]] ?? 0, view.index[shown[1]] ?? 0) : null;
   return (
     <div className={`space-y-5 ${b.enough ? '' : 'opacity-70'}`} data-thin={!b.enough}>
@@ -265,8 +268,8 @@ function Figures({ b, r }: { b: RotationBasketResponse; r: CorrelationResponse }
       </div>
       <p className="text-sm text-muted">{readingLine(b)}</p>
       <p className="text-xs text-faint">
-        In-sample, gross, one lot of each strategy. The same figures as the strategy picker for the
-        same names and dates.
+        In-sample, {grossLabel(slippage)}, one lot of each strategy. The same figures as the
+        strategy picker for the same names and dates.
       </p>
     </div>
   );

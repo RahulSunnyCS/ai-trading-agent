@@ -24,6 +24,8 @@ import {
   shapeThin,
   slippageText,
 } from '../../lib/rotationLiveView';
+import { LIVE_NO_SLIPPAGE, noSlippageNote } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { LiveDay, RotationLiveResponse } from '../../types/rotationLive';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader } from '../ui/Card';
@@ -220,13 +222,14 @@ function Shapes({ d }: { d: RotationLiveResponse }) {
 export function RotationLiveVsPaper() {
   const res = useRotationLive();
   const d = res.data;
+  const slippage = useRotationSlippage();
   const lines = useMemo(() => (d ? chartLines(d) : []), [d]);
   const empty = d ? emptyState(d) : null;
   return (
     <Card>
       <CardHeader
         title="Live vs paper"
-        description="What the platforms made on each captured day against the backtest for the same strategies, a lot at a time, after the same estimated costs. + means live did better. Contract notes are the ground truth."
+        description={`What the platforms made on each captured day against the backtest for the same strategies, a lot at a time, after the same estimated costs. + means live did better. Contract notes are the ground truth.${noSlippageNote(slippage, LIVE_NO_SLIPPAGE)}`}
         actions={<RefreshButton onClick={res.refetch} loading={res.loading} />}
       />
       {res.error ? (

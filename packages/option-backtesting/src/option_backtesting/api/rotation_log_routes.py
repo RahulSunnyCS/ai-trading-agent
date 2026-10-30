@@ -37,9 +37,9 @@ from ..legwise import store as legwise_store
 from ..legwise.engine import simulate_day
 from ..legwise.market import load_day
 from ..legwise.schema import load_legwise
-from ..rotation import daylog, journal, placements
+from ..rotation import daylog, journal, placements, store
 from ..rotation.lists import LISTS, SIZING_DATE
-from ..rotation.variants import strategy_path, variant_names
+from ..rotation.variants import TRACK_DIRS, strategy_path, track_names, variant_names
 from .rotation_routes import track_and_lots
 
 router = APIRouter(prefix="/legwise/rotation")
@@ -76,6 +76,7 @@ def log(
     to: str | None = None,
     source: str = "recorded",
     lots: str | None = None,
+    track: str | None = None,
 ) -> Any:
     window = _window(from_, to)
     if isinstance(window, JSONResponse):
@@ -83,28 +84,30 @@ def log(
     if source not in daylog.SOURCES:
         return _error(422, f"source must be one of {', '.join(daylog.SOURCES)}")
     try:
-        _, lots_ = track_and_lots(None, lots)
+        track_, lots_ = track_and_lots(track, lots)
     except ValueError as error:
         return _error(422, str(error))
     try:
-        return daylog.build_log(start=window[0], end=window[1], source=source, lots_per=lots_)
+        return daylog.build_log(
+            start=window[0], end=window[1], source=source, lots_per=lots_, track=track_
+        )
     except journal.JournalCorrupt as error:
         return _error(500, f"the journal cannot be read: {error}")
 
 
 @router.get("/day/{day}")
-def day_detail(day: str, lots: str | None = None) -> Any:
+def day_detail(day: str, lots: str | None = None, track: str | None = None) -> Any:
     parsed = _day(day, "day")
     if isinstance(parsed, JSONResponse):
         return parsed
     if parsed is None:
         return _error(422, "day must be YYYY-MM-DD")
     try:
-        _, lots_ = track_and_lots(None, lots)
+        track_, lots_ = track_and_lots(track, lots)
     except ValueError as error:
         return _error(422, str(error))
     try:
-        body = daylog.build_day(parsed, lots_per=lots_)
+        body = daylog.build_day(parsed, lots_per=lots_, track=track_)
     except journal.JournalCorrupt as error:
         return _error(500, f"the journal cannot be read: {error}")
     if body is None:
@@ -167,7 +170,9 @@ def variant_forensics(variant: str, day: str, cuts: str | None = None) -> Any:
     cannot open them. The simulation is the nightly update's own call (the same strategy file and
     the lot-sizing date the stored results were made with), and the response says whether its
     gross equals the stored one."""
-    if variant not in variant_names():  # matched against the enumerated files, never a path
+    # matched against the enumerated files (Core-298 and each track's own), never a path
+    known = set(variant_names()).union(*(track_names(t) for t in TRACK_DIRS))
+    if variant not in known:
         return _error(404, f"{variant!r} is not one of the rotation variants")
     parsed_day = _day(day, "day")
     if isinstance(parsed_day, JSONResponse):
@@ -182,6 +187,10 @@ def variant_forensics(variant: str, day: str, cuts: str | None = None) -> Any:
     except ValueError as error:
         return _error(422, str(error))
     spec = load_legwise(strategy_path(variant))
+    if slip := store.reading_slip():  # the Slippage switch: as the stored copy was made
+        spec = spec.model_copy(
+            update={"execution": spec.execution.model_copy(update={"slippage_pct": slip})}
+        )
     root = data_dir()
     try:
         data = load_day(root, spec.underlying, parsed_day)

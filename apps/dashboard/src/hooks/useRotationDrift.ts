@@ -4,6 +4,7 @@
  * and on Refresh, not polled.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationListKey } from '../types/rotation';
 import type { RotationDriftResponse } from '../types/rotationDrift';
 import { usePolledResource } from './usePolledResource';
@@ -11,5 +12,7 @@ import { usePolledResource } from './usePolledResource';
 const BASE = '/api/backtest/legwise';
 
 export function useRotationDrift(list: RotationListKey) {
-  return usePolledResource<RotationDriftResponse>(`${BASE}/rotation/drift?list=${list}`);
+  return usePolledResource<RotationDriftResponse>(
+    useSlippageUrl(`${BASE}/rotation/drift?list=${list}`),
+  );
 }

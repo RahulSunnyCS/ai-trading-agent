@@ -61,6 +61,7 @@ import { CorrelationBasket } from './correlation/CorrelationBasket';
 import { type Cell, CorrelationHeatmap } from './correlation/CorrelationHeatmap';
 import { BasketBuilder, DriftChart, PairCard, StrategyTable } from './correlation/CorrelationParts';
 import { StrategyMultiSelect } from './correlation/StrategyMultiSelect';
+import { SlippageSwitch } from './rotation/SlippageSwitch';
 
 const MEASURE_OPTIONS: SegmentedOption<CorrelationMeasure>[] = (
   ['pearson', 'spearman', 'loss'] as const
@@ -511,13 +512,16 @@ export function CorrelationPanel() {
   const mode: Mode = modeQ === 'basket' ? 'basket' : 'picker';
   return (
     <div className="space-y-5">
-      <SegmentedControl
-        value={mode}
-        options={MODE_OPTIONS}
-        onChange={(m) => setModeQ(m === 'basket' ? 'basket' : null)}
-        ariaLabel="What to compare"
-        size="sm"
-      />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <SegmentedControl
+          value={mode}
+          options={MODE_OPTIONS}
+          onChange={(m) => setModeQ(m === 'basket' ? 'basket' : null)}
+          ariaLabel="What to compare"
+          size="sm"
+        />
+        <SlippageSwitch />
+      </div>
       {mode === 'basket' ? (
         <CorrelationBasket
           onOpenCustom={(names, range) => {
