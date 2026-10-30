@@ -596,12 +596,30 @@ export function RotationPanel() {
                 </span>
               </div>
             </Card>
+          ) : null}
+          {s.n_days === 0 ? (
+            // Classic has nothing scored yet; Adaptive Tuned may (its own journal and read-out)
+            view === 'tuned' ? (
+              hero()
+            ) : null
           ) : (
             <>
               <RotationBooks
                 lines={lines}
                 vsHeader={vsHeader(benchmark)}
-                footer={verdictFor ? <RotationVerdict verdict={verdictFor} plain /> : null}
+                footer={
+                  verdictFor ? (
+                    <>
+                      {view === 'core' ? null : (
+                        <p className="mb-2 text-xs text-muted">
+                          {ADAPTIVE_CARD.classic.name}'s registered read-out;{' '}
+                          {ADAPTIVE_CARD.tuned.name}'s figures are in its row above.
+                        </p>
+                      )}
+                      <RotationVerdict verdict={verdictFor} plain />
+                    </>
+                  ) : null
+                }
               />
               {hero()}
             </>

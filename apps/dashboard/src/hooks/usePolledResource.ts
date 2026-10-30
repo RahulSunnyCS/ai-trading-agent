@@ -152,16 +152,44 @@ interface Subscription {
   entry: SharedRequest;
 }
 
+/**
+ * Query parameters that change what every figure in a response means (the Rotation pages'
+ * `slippage`): the previous URL's data is kept on screen while a new URL loads, except across a
+ * change of one of these, where a figure read on the other basis would sit under the new label.
+ */
+export const BASIS_PARAMS: readonly string[] = ['slippage'];
+
+function paramsOf(url: string): URLSearchParams {
+  const q = url.indexOf('?');
+  return new URLSearchParams(q === -1 ? '' : url.slice(q + 1));
+}
+
+/** Whether data read from `from` may be shown while `to` loads (same value of every basis param). */
+export function sameBasis(from: string, to: string): boolean {
+  const a = paramsOf(from);
+  const b = paramsOf(to);
+  return BASIS_PARAMS.every((k) => a.get(k) === b.get(k));
+}
+
+interface HookState<T> extends PolledResourceState<T> {
+  /** The URL whose response `data` is (null with no data). */
+  dataUrl: string | null;
+}
+
 export function usePolledResource<T>(
   url: string,
   opts: UsePolledResourceOptions = {},
 ): PolledResourceResult<T> {
   const { intervalMs, cache = false, enabled = true } = opts;
-  const [state, setState] = useState<PolledResourceState<T>>(() => ({
-    data: cache && responseCache.has(url) ? (responseCache.get(url) as T) : null,
-    loading: enabled,
-    error: null,
-  }));
+  const [state, setState] = useState<HookState<T>>(() => {
+    const hit = cache && responseCache.has(url);
+    return {
+      data: hit ? (responseCache.get(url) as T) : null,
+      dataUrl: hit ? url : null,
+      loading: enabled,
+      error: null,
+    };
+  });
 
   // In-flight guard for poll ticks (non-null = waiting) and the "am I still the current
   // request" check. A fresh object per run, so two runs on one shared request differ.
@@ -199,11 +227,15 @@ export function usePolledResource<T>(
         // the initial mount call, which starts from loading: true anyway)
         // is a real "the view is reloading" event, so it does. A cached response for a new
         // url replaces the previous url's data straight away.
-        setState((prev) => ({
-          data: cache && responseCache.has(url) ? (responseCache.get(url) as T) : prev.data,
-          loading: true,
-          error: null,
-        }));
+        setState((prev) => {
+          const hit = cache && responseCache.has(url);
+          return {
+            data: hit ? (responseCache.get(url) as T) : prev.data,
+            dataUrl: hit ? url : prev.dataUrl,
+            loading: true,
+            error: null,
+          };
+        });
       }
 
       const result = (await subscription.entry.promise) as ApiResult<T>;
@@ -225,7 +257,7 @@ export function usePolledResource<T>(
       }
 
       if (cache) responseCache.set(url, result.data);
-      setState({ data: result.data, loading: false, error: null });
+      setState({ data: result.data, dataUrl: url, loading: false, error: null });
     },
     [url, cache, dropCurrent],
   );
@@ -236,7 +268,7 @@ export function usePolledResource<T>(
       setState((prev) =>
         prev.data === null && !prev.loading && prev.error === null
           ? prev
-          : { data: null, loading: false, error: null },
+          : { data: null, dataUrl: null, loading: false, error: null },
       );
       return undefined;
     }
@@ -265,5 +297,8 @@ export function usePolledResource<T>(
     if (enabled) void run('manual');
   }, [run, enabled]);
 
-  return { ...state, refetch };
+  // Never show another basis's figures under this URL's (`BASIS_PARAMS`): loading until it lands.
+  const { dataUrl, ...rest } = state;
+  const shown = dataUrl === null || sameBasis(dataUrl, url) ? rest.data : null;
+  return { ...rest, data: shown, refetch };
 }

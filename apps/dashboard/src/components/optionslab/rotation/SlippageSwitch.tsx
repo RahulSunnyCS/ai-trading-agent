@@ -17,7 +17,8 @@ const OPTIONS: SegmentedOption<Choice>[] = [
   { value: 'off', label: 'Off' },
 ];
 
-export function SlippageSwitch() {
+/** `extra`: a sentence the page adds to the tooltip (what on it the switch does not reach). */
+export function SlippageSwitch({ extra }: { extra?: string } = {}) {
   const on = useRotationSlippage();
   const setOn = useRotationSlippageStore((state) => state.setOn);
   return (
@@ -30,7 +31,10 @@ export function SlippageSwitch() {
         ariaLabel="Slippage"
         size="sm"
       />
-      <InfoTooltip text={SLIPPAGE_HELP} label="About slippage" />
+      <InfoTooltip
+        text={extra ? `${SLIPPAGE_HELP} ${extra}` : SLIPPAGE_HELP}
+        label="About slippage"
+      />
     </div>
   );
 }

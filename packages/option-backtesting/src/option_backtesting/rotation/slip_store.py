@@ -147,7 +147,12 @@ def fill(
                     specs[name] = _spec_and_underlying(name)
                 spec, underlying = specs[name]
                 if underlying not in loaded:
-                    loaded[underlying] = load_day(root, underlying, date.fromisoformat(day))
+                    try:
+                        loaded[underlying] = load_day(root, underlying, date.fromisoformat(day))
+                    except Exception as error:  # noqa: BLE001 - remembered: tried once a day
+                        loaded[underlying] = error
+                if isinstance(loaded[underlying], Exception):
+                    raise loaded[underlying]
                 pending.setdefault(path, []).append(
                     slipped_row(row, spec, loaded[underlying], SLIP_PCT)
                 )

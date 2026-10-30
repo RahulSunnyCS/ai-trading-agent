@@ -520,7 +520,7 @@ export function CorrelationPanel() {
           ariaLabel="What to compare"
           size="sm"
         />
-        <SlippageSwitch />
+        <SlippageSwitch extra="It reaches the rotation variants and lists only: a saved leg-wise strategy's figures are always without it." />
       </div>
       {mode === 'basket' ? (
         <CorrelationBasket

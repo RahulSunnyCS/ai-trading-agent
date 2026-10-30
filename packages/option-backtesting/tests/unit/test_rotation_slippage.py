@@ -273,3 +273,18 @@ def test_a_background_replay_reads_at_its_callers_slippage():
     with store.slipped(0.5):
         assert warm.run_within("probe", store.reading_slip, wait=5) == (True, 0.5)
     assert warm.run_within("probe", store.reading_slip, wait=5) == (True, 0.0)
+
+
+def test_a_day_whose_bars_are_gone_is_tried_once(tmp_path, monkeypatch):
+    root = tmp_path / "TradingData"
+    _day(root, DAY, [400.0, -100.0, 100.0])
+    tries = []
+    monkeypatch.setattr(slip_store, "_spec_and_underlying", lambda name: (name, "NIFTY"))
+
+    def gone(root, u, d):
+        tries.append(d)
+        raise FileNotFoundError("no Fyers data")
+
+    monkeypatch.setattr("option_backtesting.legwise.market.load_day", gone)
+    out = slip_store.fill(root, log=lambda m: None)
+    assert tries == [DAY] and len(out["skipped"]) == 3

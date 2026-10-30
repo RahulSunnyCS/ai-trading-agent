@@ -8,7 +8,7 @@ look-alikes, and to build a basket whose parts are not.
 
 | Control | What it does |
 |---|---|
-| Slippage | **0.5%** (the default, shared with the Rotation page) reads every strategy's and list's daily figures with each entry and exit filled 0.5% against the trade; **Off** reads them without it. |
+| Slippage | **0.5%** (the default, shared with the Rotation page) reads the rotation variants' and lists' daily figures with each entry and exit filled 0.5% against the trade; **Off** reads them without it. A saved leg-wise strategy has no copy after slippage, so its figures are always without it: compare one with a variant with the switch Off. |
 | To compare | A tick list with two groups: the rotation **list** (Adaptive; Steady, Calendar and Baseline are still recorded in the journal but no longer shown) and every **strategy** that has results. The screen opens on your starred items; if nothing is starred it opens on three: NIFTY Widesl, Dir and Buy at 09:17 (and with a single starred item, those three are added to it so there is something to compare). Tick more to add them, or type in the box to narrow the list. |
 | Star | The star beside a list or strategy marks a favourite. Starred items are what the screen opens on, on any browser or device. **Reset to favourites** puts the ticks back to them. |
 | Start time | Adds a whole entry slot on top of the ticked strategies, e.g. every 09:32 variant. "Any start time" adds none (capped at 80 strategies at once). |
