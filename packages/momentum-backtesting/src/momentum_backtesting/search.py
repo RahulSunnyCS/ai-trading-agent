@@ -65,7 +65,21 @@ DERIVED_KEYS = {
     "off_band",
     "rebalance_offset_raw",
     "respect_circuits",  # lock_masks (UC blocks buys, LC blocks sells) on every run when true
+    "fill",  # BL-176: one of FILLS, resolved into signal_delay + execution (see _split_light)
 }
+#: BL-176: the fill day as one searched setting. A Monday fill is decided on Friday's close (signal
+#: delay 0) and fills on the first session after it; "next_fri_close" is a week's delay at Friday's
+#: close, the fill every earlier round pinned.
+FILLS = {
+    "next_fri_close": (1, "fri_close"),
+    "mon_open": (0, "mon_open"),
+    "mon_close": (0, "mon_close"),
+}
+#: Settings a space may fix that are not run_broad_backtest arguments. `universe_kind` replaces the
+#: arm's universe (BL-176 searches the point-in-time `turnover_rank` list directly; earlier rounds
+#: searched today's list and were re-scored point in time afterwards, `pit_rerun.py`).
+SPACE_KEYS = {"universe_kind"}
+UNIVERSE_KINDS = ("total_market", "all_liquid", "turnover_rank")
 ARMS = {
     "A": ("total_market", "on"),
     "B": ("total_market", "off"),
@@ -158,9 +172,33 @@ def load_space(path: Path) -> Space:
             f"sealed_from = {sealed_from!r}: fixed.end must be set and earlier than that date"
         )
     for key in fixed:
-        if key not in allowed and key not in HEAVY_KEYS:
+        if key not in allowed and key not in HEAVY_KEYS and key not in SPACE_KEYS:
             raise ValueError(f"fixed parameter {key!r} is not recognised")
+    if fixed.get("universe_kind", UNIVERSE_KINDS[0]) not in UNIVERSE_KINDS:
+        raise ValueError(f"universe_kind must be one of {UNIVERSE_KINDS}")
+    fill_dims = [d for d in light if d.name == "fill"]
+    if "fill" in fixed or fill_dims:
+        if (
+            "signal_delay" in fixed
+            or "execution" in fixed
+            or any(d.name in ("signal_delay", "execution") for d in light)
+        ):
+            raise ValueError("fill sets signal_delay and execution: do not set them as well")
+        for value in [fixed["fill"]] if "fill" in fixed else fill_dims[0].values:
+            if value not in FILLS:
+                raise ValueError(f"fill {value!r} is not one of {sorted(FILLS)}")
     return Space(raw.get("name", Path(path).stem), arm, fixed, heavy, light, sealed_from)
+
+
+def universe_of(space: Space) -> str:
+    """The universe a space's runs rank: its fixed `universe_kind`, else its arm's."""
+    return space.fixed.get("universe_kind") or ARMS[space.arm][0]
+
+
+def fill_session(kwargs: dict[str, Any]) -> str:
+    """The session an order fills on, for the circuit-lock masks: a Monday fill trades on the
+    first session after the signal Friday, a Friday fill on Friday's own (the API's rule)."""
+    return "first" if kwargs.get("execution", "fri_close") != "fri_close" else "last"
 
 
 # --- sampling -------------------------------------------------------------------------------
@@ -187,14 +225,37 @@ def halton(n: int, dims: int, rng: np.random.Generator) -> np.ndarray:
     return (points + rng.random(dims)) % 1.0
 
 
+def canonical_heavy(combo: dict[str, Any]) -> dict[str, Any]:
+    """The same ranking written one way (BL-176). `ranksum` reads neither `voladj` key, and
+    `voladj_skip` is read only when `voladj_lookbacks` is on, so those keys are set to their
+    defaults where they cannot matter: two combinations that build the same ranking become one.
+    A key the space does not search is left absent, so earlier spaces are unchanged."""
+    out = dict(combo)
+    if out.get("score") == "ranksum" and "voladj_lookbacks" in out:
+        out["voladj_lookbacks"] = False
+    if "voladj_skip" in out and (
+        out.get("score") == "ranksum" or not out.get("voladj_lookbacks", False)
+    ):
+        out["voladj_skip"] = "long"
+    return out
+
+
 def heavy_combinations(space: Space, count: int, seed: int) -> list[dict[str, Any]]:
-    """Up to `count` distinct combinations of the heavy dimensions (all of them if fewer)."""
+    """Up to `count` distinct combinations of the heavy dimensions (all of them if fewer).
+    Combinations that build the same ranking are counted once (`canonical_heavy`)."""
     if not space.heavy:
         return [{}]
     for dim in space.heavy:
         if dim.kind != "choice":
             raise ValueError(f"heavy parameter {dim.name!r} must be a choice list")
-    product = list(itertools.product(*(d.values for d in space.heavy)))
+    names = [d.name for d in space.heavy]
+    product, seen = [], set()
+    for combo in itertools.product(*(d.values for d in space.heavy)):
+        canon = canonical_heavy(dict(zip(names, combo, strict=True)))
+        key = tuple(canon[n] for n in names)
+        if key not in seen:
+            seen.add(key)
+            product.append(key)
     if len(product) > count:
         rng = np.random.default_rng([seed, 1])
         product = [product[i] for i in rng.choice(len(product), size=count, replace=False)]
@@ -366,27 +427,61 @@ def run_metrics(result, hold_idle: str) -> dict[str, float]:
     return {k: (round(float(v), 5) if isinstance(v, float) else v) for k, v in out.items()}
 
 
+#: The benchmark the rank measure is read against, and the indices the drawdown baskets name
+#: (criteria.json; the same names phase5.py and choose.py use).
+RANK_BENCHMARK = "Nifty200 Momentum 30 TRI"
+BASKET_INDICES = ("Nifty Midcap 150 TRI", "Nifty Smallcap 250 TRI")
+
+
+def rank_measures(equity: pd.Series, refs: pd.DataFrame) -> dict[str, Any] | None:
+    """BL-176: what the Stage 2 rule ranks a Stage 1 run by, read from the curve the run already
+    has, so no config is re-run to rank it: the excess over Nifty200 Momentum 30 TRI in each
+    complete financial year, their 25th percentile (the third-worst of nine, addendum 3's rank
+    measure, here on the run's own sampled Friday), and the drawdown baskets every fall passes.
+    None when the references are not loaded (a machine without `mbt stocks fetch-benchmarks`)."""
+    from . import choose, criteria
+
+    if refs is None or RANK_BENCHMARK not in refs or any(n not in refs for n in BASKET_INDICES):
+        return None
+    curve = equity.dropna()
+    fys = choose.complete_fys(curve.index)
+    if not fys:
+        return None
+    excess = choose.fy_excess(curve.to_frame("run"), refs[RANK_BENCHMARK], fys)["run"]
+    lower = float(choose.lower_bound(excess.to_frame("run"))["run"])
+    indices = {name: refs[name] for name in BASKET_INDICES}
+    return {
+        "lb_fy_excess": round(lower, 5),
+        "fy_excess": {str(fy): round(float(v), 5) for fy, v in zip(fys, excess, strict=True)},
+        "baskets": criteria.baskets_passed(curve, indices),
+    }
+
+
 def _split_light(space: Space, light: dict[str, Any]) -> dict[str, Any]:
     """Arguments for run_broad_backtest from a resolved light dict (+ the arm's own settings)."""
-    kwargs = {k: v for k, v in light.items() if k not in HEAVY_KEYS}
+    kwargs = {k: v for k, v in light.items() if k not in HEAVY_KEYS and k not in SPACE_KEYS}
     kwargs.pop("pool_top_n", None)
     kwargs.pop("pool_exit_rank", None)
+    if "fill" in kwargs:
+        kwargs["signal_delay"], kwargs["execution"] = FILLS[kwargs.pop("fill")]
     if ARMS[space.arm][1] == "off":  # category-layer arguments are errors in OFF mode
         for key in (
             "max_category",
             "mass_exit_response",
             "mass_exit_threshold",
             "mass_exit_throttle_fraction",
+            "top_sector_weight",
         ):
             kwargs.pop(key, None)
     kwargs["category_mode"] = ARMS[space.arm][1]
-    kwargs["category_tags"] = "extended" if space.arm in EXTENDED_TAG_ARMS else "curated"
+    # A space may fix the tag file (BL-176 runs arm A on both); otherwise the arm decides.
+    kwargs.setdefault("category_tags", "extended" if space.arm in EXTENDED_TAG_ARMS else "curated")
     return kwargs
 
 
 def run_group(task: dict[str, Any]) -> dict[str, Any]:
     """Build one base ranking and run every light point on it. Runs inside a worker process."""
-    from . import api
+    from . import api, reference_benchmarks
     from .categories import broad
     from .categories import circuit_exposure as cx
     from .categories.liquidity import LiquidityConfig
@@ -394,7 +489,7 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
     space: Space = load_space(Path(task["space_path"]))
     heavy = {**{k: v for k, v in space.fixed.items() if k in HEAVY_KEYS}, **task["heavy"]}
     out_path = Path(task["out_dir"]) / f"results-{os.getpid()}.jsonl"
-    universe_kind = ARMS[space.arm][0]
+    universe_kind = universe_of(space)
     t0 = time.time()
 
     lookbacks = tuple(heavy.get("lookbacks", (1, 4, 13, 26, 52)))
@@ -408,6 +503,10 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
         max_circuit_days=heavy.get("liq_max_circuit_days"),
     )
     outer = api.DATA.get()
+    try:
+        refs = reference_benchmarks.load_references()
+    except Exception:  # noqa: BLE001 - the rank measures are an addition; the run goes on
+        refs = None
     common = dict(
         outer_prices=outer,
         stocks_data_dir=api.DATA_DIR / "stocks",
@@ -430,7 +529,7 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
         base_kwargs["series_breaks"] = heavy["series_break_policy"]
     base = broad.compute_universe_base(**common, **base_kwargs)
 
-    locks: tuple[Any, Any] = (None, None)
+    locks: dict[str, tuple[Any, Any]] = {}  # by fill session (see fill_session)
     pools: dict[tuple[int, int], Any] = {}
     done = errors = 0
     with out_path.open("a", buffering=1) as sink:
@@ -456,9 +555,12 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
                 ranking = pools[pool]
                 kwargs = _split_light(space, merged)
                 if kwargs.pop("respect_circuits", False):
-                    if locks[0] is None:
-                        locks = cx.lock_masks(ranking.column_to_base_symbol, ranking.prices.index)
-                    kwargs["uc_locked"], kwargs["lc_locked"] = locks
+                    session = fill_session(kwargs)
+                    if session not in locks:
+                        locks[session] = cx.lock_masks(
+                            ranking.column_to_base_symbol, ranking.prices.index, session=session
+                        )
+                    kwargs["uc_locked"], kwargs["lc_locked"] = locks[session]
                 outcome = broad.run_broad_backtest(
                     **common,
                     curated_dir=api.CATEGORIES_CURATED_DIR,
@@ -472,6 +574,9 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
                     **kwargs,
                 )
                 row["metrics"] = run_metrics(outcome.result, IDLE)
+                measures = rank_measures(outcome.result.equity, refs)
+                if measures is not None:
+                    row["rank"] = measures
                 done += 1
             except Exception as error:  # noqa: BLE001 - recorded, never fatal to the search
                 row["error"] = f"{type(error).__name__}: {error}"[:300]

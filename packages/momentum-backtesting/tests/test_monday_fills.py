@@ -118,3 +118,69 @@ def test_a_live_decision_is_made_on_the_friday_close_twin_of_a_monday_request():
     assert api._decision_request(friday) is friday
     assert api._decision_request(monday).execution == "fri_close"
     assert monday.execution == "mon_open"  # the request itself is not changed
+
+
+# --- BL-176: the Monday close ------------------------------------------------------------------
+
+
+def moves_with_close(moves: dict[str, dict[str, float]]) -> daily_moves.DailyMoves:
+    """Like `moves_with`, but the values are the session's close move; the open gap is 0."""
+    built = moves_with(moves)
+    zeros = built.open_gap * 0.0
+    return daily_moves.DailyMoves(move=built.open_gap, open_gap=zeros, locked=built.locked)
+
+
+def test_a_monday_close_fill_moves_the_friday_close_by_the_first_sessions_close(
+    monkeypatch, tmp_path
+):
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 120.0, 130.0]}, index=FRIDAYS)
+    table = moves_with_close({"AAA": {"2024-01-08": 0.03, "2024-01-23": -0.04}})
+    monkeypatch.setattr(monday_fills.daily_moves, "daily_moves", lambda *a, **k: table)
+    close = monday_fills.build(
+        prices, {"AAA": "AAA"}, execution="mon_close", data_dir=tmp_path
+    ).prices
+    assert close["AAA"].iloc[0] == pytest.approx(100.0 * 1.03)  # Monday 01-08's close
+    assert close["AAA"].iloc[1] == pytest.approx(110.0)  # no move that Monday
+    assert close["AAA"].iloc[2] == pytest.approx(120.0 * 0.96)  # Tuesday 01-23 after the holiday
+    # The open reads the gap table, which is all 0 here: the two fills are built independently.
+    opened = monday_fills.build(prices, {"AAA": "AAA"}, data_dir=tmp_path).prices
+    assert opened["AAA"].tolist() == prices["AAA"].tolist()
+
+
+def test_a_column_with_a_daily_file_uses_its_monday_close(stub, tmp_path):
+    daily = tmp_path / "daily"
+    daily.mkdir()
+    days = pd.DatetimeIndex(["2024-01-05", "2024-01-08", "2024-01-12", "2024-01-15"])
+    pd.DataFrame(
+        {"open": [50.0, 51.0, 52.0, 53.0], "close": [50.5, 51.5, 52.5, 53.5]}, index=days
+    ).to_csv(daily / "Gold.csv")
+    prices = pd.DataFrame({"AAA": [100.0, 100.0], "Gold": [50.5, 52.5]}, index=FRIDAYS[:2])
+    stub({"AAA": {}})
+    built = monday_fills.build(prices, {"AAA": "AAA"}, execution="mon_close", data_dir=tmp_path)
+    assert built.prices["Gold"].tolist() == [51.5, 53.5]  # the two Mondays' closes
+
+
+def test_monday_fills_refuse_a_fill_they_cannot_build(tmp_path):
+    prices = pd.DataFrame({"AAA": [100.0]}, index=FRIDAYS[:1])
+    with pytest.raises(ValueError, match="no Monday fill"):
+        monday_fills.build(prices, {"AAA": "AAA"}, execution="fri_close", data_dir=tmp_path)
+
+
+def test_broad_refuses_a_monday_close_with_a_signal_delay():
+    common = dict(
+        outer_prices=pd.DataFrame(),
+        stocks_data_dir=Path("."),
+        categories_data_dir=Path("."),
+        curated_dir=Path("."),
+    )
+    with pytest.raises(ValueError, match="signal delay 0"):
+        broad.run_broad_backtest(**common, execution="mon_close", signal_delay=1)
+
+
+def test_the_api_accepts_a_monday_close_and_decides_it_on_friday():
+    from momentum_backtesting import api
+
+    monday = api.BacktestRequest.model_validate(
+        {"dataset": "broad", "universe": ["broad_momentum"], "execution": "mon_close"}
+    )
+    assert api._decision_request(monday).execution == "fri_close"

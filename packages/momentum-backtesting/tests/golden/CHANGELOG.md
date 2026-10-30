@@ -234,3 +234,11 @@ BL-001 F6: Broad ranks over the week's point-in-time members behind the gate onl
 | broad_eight_categories_one_pick | 26.32% -> 25.79% | -27.29% -> -26.92% |
 | broad_gates_loosened_and_tilted | 9.34% -> 8.31% | -27.78% -> -29.86% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 14.29% | -18.09% -> -18.68% |
+
+## 2026-10-31 (on top of `96a00ca0`)
+
+BL-176: Broad Monday-close fill, new scenario broad_monday_close; no other scenario moves
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_monday_close | n/a -> 15.38% | n/a -> -29.88% |

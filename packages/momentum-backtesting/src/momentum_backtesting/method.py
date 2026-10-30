@@ -91,10 +91,12 @@ def score_search(
     runner: dict[str, Any] | None = None,
     limit: int | None = None,
     max_rankings: int | None = None,
+    ids: set[str] | None = None,
     echo=print,
 ) -> None:
     """Re-run every config of a finished search on all its phases and keep the blended weekly
-    curves. One task per ranking; a finished task's files are not redone. `runner` passes
+    curves. `ids` scores only those configs (BL-176 Stage 3: each basket's top decile). One
+    task per ranking; a finished task's files are not redone. `runner` passes
     `universe_kind` / `category_tags` through to score the same configs on another universe.
     `max_rankings` stops after that many, for a machine that limits how long one job may run:
     a ranking is only saved whole, so a job cut off mid-way loses what it was working on."""
@@ -106,7 +108,7 @@ def score_search(
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if "metrics" not in rec:
+            if "metrics" not in rec or (ids is not None and rec["id"] not in ids):
                 continue
             key = json.dumps(rec["heavy"], sort_keys=True)
             group = groups.setdefault(key, {"heavy": rec["heavy"], "runs": {}})

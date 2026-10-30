@@ -300,3 +300,92 @@ def test_an_end_dated_snapshot_ignores_data_after_the_end(tmp_path, monkeypatch)
         part.to_parquet(path, index=False)
     capped = sr.data_snapshot(tmp_path, through="2022-12-31")
     assert capped["last_bar"] == "2022-12-29" and capped["last_week"] == "2022-12-30"
+
+
+# --- BL-176: round 8's settings ----------------------------------------------------------------
+
+SPACES = __import__("pathlib").Path(__file__).resolve().parents[1] / "search_spaces"
+
+
+def test_round8_spaces_load_with_the_registered_counts():
+    for name, arm, universe, light in (
+        ("round8_A_curated", "A", "turnover_rank", 15),
+        ("round8_A_extended", "A", "turnover_rank", 15),
+        ("round8_B", "B", "turnover_rank", 11),
+        ("round8_C1", "C1", "all_liquid", 15),
+    ):
+        space = sr.load_space(SPACES / f"{name}.toml")
+        assert (space.arm, sr.universe_of(space), len(space.light)) == (arm, universe, light)
+        # Seven lookback sets x three weights x three scores x the two voladj keys collapse to
+        # 147 distinct rankings (ranksum 21, voladj 63, blend 63), as registered.
+        assert len(sr.heavy_combinations(space, 10_000, 8)) == 147
+
+
+def test_earlier_spaces_keep_their_heavy_combinations():
+    space = sr.load_space(SPACES / "round7_A.toml")
+    assert len(sr.heavy_combinations(space, 10_000, 1)) == 45
+
+
+def test_canonical_heavy_collapses_only_inert_voladj_keys():
+    assert sr.canonical_heavy(
+        {"score": "ranksum", "voladj_lookbacks": True, "voladj_skip": "none"}
+    ) == {"score": "ranksum", "voladj_lookbacks": False, "voladj_skip": "long"}
+    fixed_window = {"score": "voladj", "voladj_lookbacks": False, "voladj_skip": "none"}
+    assert sr.canonical_heavy(fixed_window)["voladj_skip"] == "long"
+    live = {"score": "blend", "voladj_lookbacks": True, "voladj_skip": "none"}
+    assert sr.canonical_heavy(live) == live
+    assert sr.canonical_heavy({"score": "ranksum"}) == {"score": "ranksum"}  # absent stays absent
+
+
+def test_the_paired_arm_a_spaces_draw_the_same_points_with_different_ids():
+    curated = sr.load_space(SPACES / "round8_A_curated.toml")
+    extended = sr.load_space(SPACES / "round8_A_extended.toml")
+    one = sr.plan(curated, heavy_count=3, light_count=5, seed=8)
+    two = sr.plan(extended, heavy_count=3, light_count=5, seed=8)
+    assert [g["heavy"] for g in one] == [g["heavy"] for g in two]
+    assert [[r["light"] for r in g["runs"]] for g in one] == [
+        [r["light"] for r in g["runs"]] for g in two
+    ]
+    assert not {r["id"] for g in one for r in g["runs"]} & {r["id"] for g in two for r in g["runs"]}
+
+
+@pytest.mark.parametrize(
+    ("fill", "delay", "execution", "session"),
+    [
+        ("next_fri_close", 1, "fri_close", "last"),
+        ("mon_open", 0, "mon_open", "first"),
+        ("mon_close", 0, "mon_close", "first"),
+    ],
+)
+def test_fill_resolves_to_a_signal_delay_an_execution_and_a_circuit_session(
+    fill, delay, execution, session
+):
+    space = sr.Space("t", "A", {}, (), ())
+    kwargs = sr._split_light(space, {"fill": fill, "category_top_n": 4})
+    assert (kwargs["signal_delay"], kwargs["execution"]) == (delay, execution)
+    assert "fill" not in kwargs and sr.fill_session(kwargs) == session
+
+
+def test_split_light_keeps_a_fixed_tag_file_and_drops_space_only_keys():
+    fixed_tags = sr.Space("t", "A", {}, (), ())
+    kwargs = sr._split_light(
+        fixed_tags, {"category_tags": "extended", "universe_kind": "turnover_rank"}
+    )
+    assert kwargs["category_tags"] == "extended" and "universe_kind" not in kwargs
+    assert sr._split_light(fixed_tags, {})["category_tags"] == "curated"  # the arm's default
+    assert sr._split_light(sr.Space("t", "C1", {}, (), ()), {})["category_tags"] == "extended"
+    off = sr._split_light(sr.Space("t", "B", {}, (), ()), {"top_sector_weight": 2.0})
+    assert "top_sector_weight" not in off and off["category_mode"] == "off"
+
+
+def test_load_space_refuses_a_bad_fill_or_universe(tmp_path):
+    head = 'name = "t"\narm = "A"\n'
+    for bad in (
+        '[light]\nfill = { choice = ["mon_open", "tue_open"] }',
+        '[fixed]\nsignal_delay = 1\n[light]\nfill = { choice = ["mon_open"] }',
+        '[fixed]\nuniverse_kind = "nifty50"',
+    ):
+        with pytest.raises(ValueError):
+            _space(tmp_path, head + bad)
+    ok = _space(tmp_path, head + '[fixed]\nuniverse_kind = "turnover_rank"\nfill = "mon_close"')
+    assert sr.universe_of(ok) == "turnover_rank"

@@ -12,6 +12,7 @@ track
 execution
   fri_close  W's last close (the backtest's original assumption)
   mon_open   the open of the first trading day after W
+  mon_close  the close of that same first trading day (BL-176)
   mon_10am   the price at 10:00 on that day (needs `mbt fetch --intraday`); days without one
              fall back to that day's open and are counted in the notes
 
@@ -29,7 +30,7 @@ from .config import DATA_DIR
 from .fetch import Instrument, load_universe
 
 TRACKS = ("index", "etf")
-EXECUTIONS = ("fri_close", "mon_open", "mon_10am")
+EXECUTIONS = ("fri_close", "mon_open", "mon_close", "mon_10am")
 MAX_GAP_DAYS = 7  # a fill more than a week after the signal is treated as missing
 
 
@@ -87,6 +88,9 @@ def fills(
             out[week] = float("nan")
             continue
         day = after[0]
+        if execution == "mon_close":
+            out[week] = float(close[day])
+            continue
         price = float("nan")
         if execution == "mon_10am" and at_ten is not None:
             price = at_ten.get(day, float("nan"))

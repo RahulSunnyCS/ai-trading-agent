@@ -63,7 +63,7 @@ DefensiveMode = Literal["off", "ranked", "filter"]
 PortfolioRule = Literal["buffer", "slots"]
 EntryRule = Literal["wait", "make_room"]
 Track = Literal["index", "etf"]
-Execution = Literal["fri_close", "mon_open", "mon_10am"]
+Execution = Literal["fri_close", "mon_open", "mon_close", "mon_10am"]
 Score = Literal["ranksum", "voladj", "blend", "residual"]
 Rebalance = Literal["weekly", "monthly"]
 CostModel = Literal["flat", "itemised"]
@@ -255,7 +255,7 @@ class Config:
             raise ValueError("cap_band can't be negative")
         if self.track not in ("index", "etf"):
             raise ValueError(f"unknown track {self.track!r}")
-        if self.execution not in ("fri_close", "mon_open", "mon_10am"):
+        if self.execution not in ("fri_close", "mon_open", "mon_close", "mon_10am"):
             raise ValueError(f"unknown execution {self.execution!r}")
         if self.score not in ("ranksum", "voladj", "blend", "residual"):
             raise ValueError(f"unknown score {self.score!r}")

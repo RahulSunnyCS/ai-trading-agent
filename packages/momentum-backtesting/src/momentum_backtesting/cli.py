@@ -235,7 +235,7 @@ _TRACK = typer.Option(
     "always on the index.",
 )
 _EXECUTION = typer.Option(
-    "fri_close", help="Trades fill at: fri_close | mon_open | mon_10am (after the signal)."
+    "fri_close", help="Trades fill at: fri_close | mon_open | mon_close | mon_10am."
 )
 
 
@@ -1594,6 +1594,9 @@ def search_score(
     tags: str = typer.Option(None, help="Category tags to use: curated or extended."),
     limit: int = typer.Option(None, help="Only the first N configs of each ranking (a trial run)."),
     max_rankings: int = typer.Option(None, help="Score at most this many rankings, then stop."),
+    ids_file: Path = typer.Option(
+        None, "--ids", help="Score only the config ids listed in this file, one per line."
+    ),
 ) -> None:
     """Re-score every config of a finished search on all its rebalance phases and keep the
     weekly curves (BL-010 Phase 4), then report the probability of backtest overfitting.
@@ -1614,6 +1617,7 @@ def search_score(
         runner=runner,
         limit=limit,
         max_rankings=max_rankings,
+        ids=set(ids_file.read_text().split()) if ids_file else None,
         echo=typer.echo,
     )
     scores, curves = method.load_scores(dest)
