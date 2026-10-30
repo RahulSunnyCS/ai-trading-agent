@@ -1260,12 +1260,12 @@ def _stock_backtest(req: BacktestRequest) -> dict:
 
 
 def _refuse_monday_fill(req: BacktestRequest, dataset: str) -> None:
-    """Stock and Custom Index have no Monday-open fill yet (BL-036 Phase 2b); Broad and the ETF
+    """Stock and Custom Index have no Monday fill yet (BL-036 Phase 2b); Broad and the ETF
     dataset do. Refuse the option rather than run a Friday-close backtest under its name."""
     if req.execution != "fri_close":
         raise HTTPException(
             422,
-            f"Monday-open fills are not available for {dataset} yet; choose Friday close.",
+            f"Monday fills are not available for {dataset} yet; choose Friday close.",
         )
 
 

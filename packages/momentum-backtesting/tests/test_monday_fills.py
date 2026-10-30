@@ -184,3 +184,16 @@ def test_the_api_accepts_a_monday_close_and_decides_it_on_friday():
         {"dataset": "broad", "universe": ["broad_momentum"], "execution": "mon_close"}
     )
     assert api._decision_request(monday).execution == "fri_close"
+
+
+def test_a_score_folder_holds_one_set_of_ids(tmp_path):
+    from momentum_backtesting import method
+
+    results = tmp_path / "results"
+    results.mkdir()
+    space = Path(__file__).resolve().parents[1] / "search_spaces" / "round8_A_curated.toml"
+    dest = tmp_path / "scored"
+    method.score_search(space, results, dest, workers=1, ids={"a", "b"}, echo=lambda *_: None)
+    method.score_search(space, results, dest, workers=1, ids={"b", "a"}, echo=lambda *_: None)
+    with pytest.raises(SystemExit, match="another set of ids"):
+        method.score_search(space, results, dest, workers=1, ids={"a"}, echo=lambda *_: None)

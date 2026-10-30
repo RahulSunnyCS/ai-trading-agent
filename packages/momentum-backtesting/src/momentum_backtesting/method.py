@@ -101,6 +101,13 @@ def score_search(
     `max_rankings` stops after that many, for a machine that limits how long one job may run:
     a ranking is only saved whole, so a job cut off mid-way loses what it was working on."""
     dest.mkdir(parents=True, exist_ok=True)
+    # Score files are named by position in the (filtered) group list, so one folder holds one id
+    # set: a second, different list would skip or mix groups (BL-176 review).
+    marker = dest / "ids.json"
+    wanted = sorted(ids) if ids is not None else None
+    if marker.exists() and json.loads(marker.read_text()) != wanted:
+        raise SystemExit(f"{dest} was scored for another set of ids; use a new --dest")
+    marker.write_text(json.dumps(wanted) + "\n")
     groups: dict[str, dict] = {}
     for path in sorted(Path(results_dir).glob("results-*.jsonl")):
         for line in path.read_text().splitlines():

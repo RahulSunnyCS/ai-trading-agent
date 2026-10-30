@@ -112,3 +112,25 @@ def test_toml_values_round_trip(tmp_path, value):
     got = tomllib.loads(text)["v"]
     expected = "none" if value is None else list(value) if isinstance(value, tuple) else value
     assert got == expected
+
+
+def test_results_without_rank_measures_are_an_error_not_a_registered_outcome(tmp_path, capsys):
+    row = _row(0, 0.1, ["medium"])
+    del row["rank"]
+    folder = _write(tmp_path, [row])
+    out = tmp_path / "focus.toml"
+    assert focus.main([str(folder), "--space", str(SPACE), "--out", str(out)]) == 2
+    assert not out.exists() and "carries a rank measure" in capsys.readouterr().out
+
+
+def test_the_rule_reads_its_numbers_from_the_committed_criteria():
+    import json
+
+    keys = json.loads((ROOT / "search_spaces" / "bl176_criteria.json").read_text())["stage_2"][
+        "keys"
+    ]
+    assert (
+        keys["top_share"],
+        keys["min_kept"],
+        keys["seed"],
+    ) == (focus.TOP_SHARE, focus.MIN_KEPT, focus.SEED)

@@ -226,11 +226,20 @@ def halton(n: int, dims: int, rng: np.random.Generator) -> np.ndarray:
 
 
 def canonical_heavy(combo: dict[str, Any]) -> dict[str, Any]:
-    """The same ranking written one way (BL-176). `ranksum` reads neither `voladj` key, and
-    `voladj_skip` is read only when `voladj_lookbacks` is on, so those keys are set to their
-    defaults where they cannot matter: two combinations that build the same ranking become one.
-    A key the space does not search is left absent, so earlier spaces are unchanged."""
+    """The same ranking written one way (BL-176). `ranksum` reads neither `voladj` key;
+    `voladj_skip` is read only when `voladj_lookbacks` is on; and `voladj` without
+    `voladj_lookbacks` reads no weights at all (NSE's fixed 26/52-week method; the stock tilt gets
+    the lookbacks only). Those keys are set to their defaults where they cannot matter, so two
+    combinations that build the same ranking become one. A key the space does not search is left
+    absent, so earlier spaces are unchanged."""
     out = dict(combo)
+    if (
+        out.get("score") == "voladj"
+        and not out.get("voladj_lookbacks", False)
+        and "weight_scheme" in out
+        and "voladj_lookbacks" in out
+    ):
+        out["weight_scheme"] = "equal"
     if out.get("score") == "ranksum" and "voladj_lookbacks" in out:
         out["voladj_lookbacks"] = False
     if "voladj_skip" in out and (
@@ -433,6 +442,19 @@ RANK_BENCHMARK = "Nifty200 Momentum 30 TRI"
 BASKET_INDICES = ("Nifty Midcap 150 TRI", "Nifty Smallcap 250 TRI")
 
 
+def require_rank_references(refs: pd.DataFrame | None) -> pd.DataFrame:
+    """The references every run's rank measure needs, or an error naming what is missing: a
+    search without them would finish with no Stage 2 inputs and say nothing (BL-176 review)."""
+    needed = (RANK_BENCHMARK, *BASKET_INDICES)
+    missing = [n for n in needed if refs is None or n not in refs]
+    if missing:
+        raise RuntimeError(
+            f"no weekly series for {missing}: run `mbt stocks fetch-benchmarks` before a search "
+            "(each run's rank measure and drawdown baskets are read against them)"
+        )
+    return refs
+
+
 def rank_measures(equity: pd.Series, refs: pd.DataFrame) -> dict[str, Any] | None:
     """BL-176: what the Stage 2 rule ranks a Stage 1 run by, read from the curve the run already
     has, so no config is re-run to rank it: the excess over Nifty200 Momentum 30 TRI in each
@@ -503,10 +525,7 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
         max_circuit_days=heavy.get("liq_max_circuit_days"),
     )
     outer = api.DATA.get()
-    try:
-        refs = reference_benchmarks.load_references()
-    except Exception:  # noqa: BLE001 - the rank measures are an addition; the run goes on
-        refs = None
+    refs = require_rank_references(reference_benchmarks.load_references())
     common = dict(
         outer_prices=outer,
         stocks_data_dir=api.DATA_DIR / "stocks",
@@ -631,7 +650,13 @@ def run_search(
     limit_groups: int | None = None,
     echo=print,
 ) -> None:
+    from . import reference_benchmarks
+
     space = load_space(space_path)
+    try:
+        require_rank_references(reference_benchmarks.load_references())
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
     out_dir.mkdir(parents=True, exist_ok=True)
     seen = completed_ids(out_dir)
     snapshot = data_snapshot(through=space.fixed.get("end"))

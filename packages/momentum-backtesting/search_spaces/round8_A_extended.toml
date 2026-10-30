@@ -35,7 +35,7 @@ weight_scheme = { choice = ["equal", "recent", "long"] }
 score = { choice = ["voladj", "blend", "ranksum"] }
 voladj_lookbacks = { choice = [false, true] }   # BL-086: voladj follows the lookbacks and weights
 voladj_skip = { choice = ["long", "none"] }      # read only when voladj_lookbacks is on
-# 147 distinct rankings once the inert keys collapse (search.canonical_heavy); --heavy 100 samples.
+# 133 distinct rankings once the inert keys collapse (search.canonical_heavy); --heavy samples them.
 
 [light]
 coverage_floor = { float = [0.0, 0.5] }

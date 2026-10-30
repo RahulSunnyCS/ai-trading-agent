@@ -61,8 +61,12 @@
         "ranking": "extended"
       }
     },
-    "distinct_heavy_combinations": 147,
-    "light_axes": { "A": 15, "C1": 15, "B": 11 },
+    "distinct_heavy_combinations": 133,
+    "light_axes": {
+      "A": 15,
+      "C1": 15,
+      "B": 11
+    },
     "rank_measure_recorded_per_run": "search.rank_measures: FY excess over Nifty200 Momentum 30 TRI per complete financial year, its 25th percentile (lb_fy_excess), and the drawdown baskets every fall passes; pre-tax, the run's own sampled Friday",
     "expected_directions": {
       "voladj_lookbacks": "true loses (BL-086); its best cells on [13,26,52] and [26,52]",
@@ -82,7 +86,18 @@
     "numeric_axis": "pool's 10th to 90th percentile, clipped to Stage 1's range (ints widened to whole numbers); band axes read as exit minus top; rebalance_offset_raw keeps Stage 1's range",
     "choice_axis": "values held by at least 10% of the pool, light and heavy; heavy combinations = product of those values, inert ones removed, all run",
     "runs_per_heavy": "ceil(7000 / combinations), between 100 and 500",
-    "seed": 9
+    "seed": 9,
+    "keys": {
+      "top_share": 0.05,
+      "min_kept": 20,
+      "low_pct": 10,
+      "high_pct": 90,
+      "min_value_share": 0.1,
+      "target_runs": 7000,
+      "light_min": 100,
+      "light_max": 500,
+      "seed": 9
+    }
   },
   "stage_3": {
     "blend": "every config in the top decile of each basket (by lb_fy_excess) over Stages 1 and 2 pooled across the arms in a ranking is re-scored on all its offsets (`mbt search score --ids`) and judged as the all-Fridays blend; no single-offset figure reaches a ranking",

@@ -37,13 +37,16 @@ import numpy as np
 from momentum_backtesting import criteria
 from momentum_backtesting import search as sr
 
-TOP_SHARE = 0.05
-MIN_KEPT = 20
-LOW_PCT, HIGH_PCT = 10, 90
-MIN_VALUE_SHARE = 0.10
-TARGET_RUNS = 7000
-LIGHT_MIN, LIGHT_MAX = 100, 500
-SEED = 9
+# The rule's numbers are read from the committed criteria file, never restated here (the
+# package rule; BL-176 review).
+_KEYS = json.loads((criteria.SPACES / "bl176_criteria.json").read_text())["stage_2"]["keys"]
+TOP_SHARE = _KEYS["top_share"]
+MIN_KEPT = _KEYS["min_kept"]
+LOW_PCT, HIGH_PCT = _KEYS["low_pct"], _KEYS["high_pct"]
+MIN_VALUE_SHARE = _KEYS["min_value_share"]
+TARGET_RUNS = _KEYS["target_runs"]
+LIGHT_MIN, LIGHT_MAX = _KEYS["light_min"], _KEYS["light_max"]
+SEED = _KEYS["seed"]
 BANDS = {
     "pool_band": ("pool_top_n", "pool_exit_rank"),
     "category_band": ("category_top_n", "category_exit_rank"),
@@ -189,6 +192,9 @@ def main(argv: list[str] | None = None) -> int:
 
     space = sr.load_space(args.space)
     rows = load_rows(args.results)
+    if not rows:
+        print(f"no run in {args.results} carries a rank measure: not a Stage 1 result to rank")
+        return 2
     kept, report = pool(rows, list(criteria.load()["baskets"]))
     print(f"{len(rows)} Stage 1 runs with rank measures; kept per basket: {report}")
     if not kept:
