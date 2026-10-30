@@ -111,7 +111,11 @@ shown: the 09:16 picks are ranked without slippage, so *Why this pick?*, *Does r
 results?* and *Live vs paper* (whose live side has its own fills) always show figures without it and
 say so. This browser remembers the choice.
 
-**The Books table.** It comes first on the page, one row a book:
+**The Books table.** It comes first on the page, one row a book. All three rows (and the chart) run
+over the same sessions, from Adaptive Tuned's first scored day (19 Oct 2026), so the books compare
+like for like. Adaptive Classic's registered read-out (the verdict under the table, and the *Day N of
+60* chip) keeps its own first day, 12 Oct 2026: that test was registered before it started, so it
+does not move.
 
 - **Adaptive Classic** — Adaptive as the journal records it: the 298 tested variants (Core), list C
   of the live journal. In its view (Show › Adaptive Classic) it is the *focus*: the chart and every
@@ -127,7 +131,7 @@ say so. This browser remembers the choice.
 | Column | What it is |
 |---|---|
 | Latest day | The book's gross on the latest scored day (hover for the day) |
-| Since … | The total since the first scored forward day, 1 lot per strategy |
+| Since … | The total since Adaptive Tuned's first scored forward day, 1 lot per strategy |
 | ₹ / lot-day | Average gross per lot per day. The fair way to compare books, because a list holds 3 strategies, or 4 on a day its Buy add-on fires |
 | Max DD / lot | The largest fall of the running total per lot from its peak, the peak starting at zero: the unit the registered rule compares (hover for the basket's drawdown in rupees) |
 | vs base / lot-day | The book's ₹ per lot-day minus the benchmark's, over the same days. Follows *Compare with* |
