@@ -5,6 +5,7 @@
  */
 
 import { type PortfolioStopSetting, isOn, queryOf } from '../lib/portfolioStop';
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationListKey, RotationLogSource } from '../types/rotationDailyLog';
 import type { PortfolioDay, PortfolioDays } from '../types/rotationPortfolio';
 import { usePolledResource } from './usePolledResource';
@@ -55,7 +56,7 @@ export function useRotationPortfolioDays(
     track: opts.track,
     book: opts.book,
   };
-  return useWarmingResource<PortfolioDays>(`${BASE}/days${query(params)}`, {
+  return useWarmingResource<PortfolioDays>(useSlippageUrl(`${BASE}/days${query(params)}`), {
     enabled: isOn(setting),
   });
 }
@@ -68,10 +69,14 @@ export function useRotationPortfolioDay(
   list: RotationListKey,
   source: RotationLogSource,
   setting: PortfolioStopSetting,
+  /** A parallel track's journal (`t1`: Adaptive Tuned); absent = the live journal. */
+  track?: 't1',
 ) {
   const { stop, trail } = queryOf(setting);
   const lots = String(ROTATION_PAGE_LOTS);
   return usePolledResource<PortfolioDay>(
-    `${BASE}/day${query({ day, list, source: daySourceOf(source), stop, trail, lots })}`,
+    useSlippageUrl(
+      `${BASE}/day${query({ day, list, source: daySourceOf(source), stop, trail, lots, track })}`,
+    ),
   );
 }

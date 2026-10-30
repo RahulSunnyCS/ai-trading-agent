@@ -285,6 +285,21 @@ Otherwise:
   the evening run's last step, so a run that succeeds only on a late retry still sends that evening). `obt rotation verify
   --track t1` checks the T1 journal. Nothing in them touches a pick, a score, a hash or a journal field. The messages
   call T1 `messages.T1_NAME`, "Tuned Adaptive (In Testing phase)"; alerts and logs still say T1.
+  `rotation/month.py` (owner, 2026-10-30) adds the month so far from `MONTH_FROM` (2026-11-01): each list's paper
+  net and days won over the month's journal days (`result.calculate`; an unscored day left out, never zero; a Dir ×2
+  list's as-traded total by `result.as_traded`) in both copies, and the account's real month (`realised.views.days`'
+  `profit`, up to the day before, the notes arriving at 00:00) in the owner's only; a failure drops those lines, never
+  the message.
+  Slippage (owner, 2026-10-30): `rotation/slip_store.py` keeps a 0.5% slippage copy beside every results file
+  (`store.slip_path`, `<folder>/slip-0.5/`), written by `rotation update`, the base's scoring and `obt rotation
+  slippage-fill`. `store.slipped(pct)` (a context variable; the API's `slippage` parameter sets it per request in
+  `api/slippage_middleware.py`) makes every reader that goes through `store.read_path` / `read_net` /
+  `base.read_column` read the copy; a cache over results keys on `store.reading_slip()`. Anything that re-ranks
+  (`pick.load_history`, `lot_plans.Sources`, `daylog.reconstruction`) reads with `slipped(0)`, and `explain`,
+  `rankic` and `live_compare` read the stored files directly. A new direct reader of a results CSV must go through
+  `store.read_path` unless it re-ranks. The evening message (`rotation/slippage.py`) reads the copy too, copying a
+  missing pick first; a pick that cannot be copied sends the day unslipped, without the label, and drops the month.
+  Unit tests run with the message's slippage off (`tests/conftest.py`).
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs) for the live list or
   `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming). Sent markers are per
   destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`, `.group-t1-owed.sent`, `.group-t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still

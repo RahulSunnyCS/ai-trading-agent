@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import shadow
+from ..rotation import shadow, store
 
 router = APIRouter(prefix="/legwise/rotation/shadow")
 
@@ -53,7 +53,7 @@ def get_shadow(
     from ..fyers.daily import data_dir
 
     root = data_dir()
-    key = (root, start, end)
+    key = (root, start, end, store.reading_slip())
     now = time.monotonic()
     hit = _cache.get(key)
     if hit is not None and now - hit[0] < CACHE_SECONDS:

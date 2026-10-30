@@ -106,7 +106,8 @@ def load_history(day: date, root: Path, names: list[str], basis: str = "weekdays
     reach the last collected trading day."""
     if not names:
         raise PickError("no variant strategy files found")
-    m = store.load_matrix(names, root, through=day - timedelta(days=1))
+    with store.slipped(0.0):  # the ranking never reads the display-only slippage copy
+        m = store.load_matrix(names, root, through=day - timedelta(days=1))
     attrs = store.read_days(root, basis)
     keep = [i for i, d in enumerate(m.days) if d in attrs]
     days = [m.days[i] for i in keep]

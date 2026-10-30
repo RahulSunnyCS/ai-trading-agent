@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import drift, journal
+from ..rotation import drift, journal, store
 
 router = APIRouter(prefix="/legwise/rotation/drift")
 
@@ -35,7 +35,7 @@ def get_drift(list_: str = Query(default="A", alias="list")) -> Any:
     from ..fyers.daily import data_dir
 
     root = data_dir()
-    key = (root, list_)
+    key = (root, list_, store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)

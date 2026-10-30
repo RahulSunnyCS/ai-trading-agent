@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from ..rotation import journal, regime
+from ..rotation import journal, regime, store
 
 router = APIRouter(prefix="/legwise/rotation/regime")
 
@@ -33,7 +33,7 @@ def _error(status: int, message: str) -> JSONResponse:
 def get_regime() -> Any:
     from ..fyers.daily import data_dir
 
-    root = data_dir()
+    root = (data_dir(), store.reading_slip())  # one answer per slippage read at
     now = time.monotonic()
     with _lock:
         if (
@@ -43,7 +43,7 @@ def get_regime() -> Any:
         ):
             return _cache["value"]
     try:
-        value = regime.build(root)
+        value = regime.build(root[0])
     except journal.JournalCorrupt as error:
         return _error(500, f"the journal cannot be read: {error}")
     except (ValueError, KeyError, OSError) as error:  # a torn days.csv row, an unreadable file

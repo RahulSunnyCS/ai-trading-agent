@@ -622,6 +622,23 @@ def portfolio_warm(
         )
 
 
+@rotation_app.command("slippage-fill")
+def slippage_fill(
+    day: str = typer.Option(None, "--day", help="Only this day (default: every stored day)."),
+) -> None:
+    """Copy every stored result not yet in its 0.5% slippage copy (`slip_store`): what the Rotation
+    pages read with their Slippage switch on, and the evening message's figures. `rotation update`
+    copies each new day itself; run this once for the history, or after a missed copy. Never
+    changes a stored result; exit 1 when a day or file could not be copied."""
+    from . import slip_store
+
+    out = slip_store.fill(days=[date.fromisoformat(day)] if day else None, log=typer.echo)
+    for line in out["skipped"][:20]:
+        typer.echo(f"  skipped: {line}", err=True)
+    if out["skipped"]:
+        raise typer.Exit(1)
+
+
 @rotation_app.command()
 def readout(
     start: str = typer.Option(None, "--from", help="First forward day."),

@@ -27,7 +27,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import journal, live_compare, messages, result, store, tomorrow
+from . import journal, live_compare, messages, month, result, slippage, store, tomorrow
 from . import pick as pick_mod
 from .journal import AlreadyRecorded
 from .pick import PickError, PickResult
@@ -301,6 +301,16 @@ def _failed(error: Exception, day: date, alert_if, err: Echo, tag: str = "") -> 
 # -- evening ------------------------------------------------------------------------------------
 
 
+def _slipped(r: result.DailyResult, root: Path | None, err: Echo) -> result.DailyResult:
+    """`r` after the message's slippage (`slippage.apply`); unslipped, and the message then says
+    none, when the day's bars cannot be simulated again. Never stops the result going out."""
+    try:
+        return slippage.apply(r, root)
+    except Exception as error:  # noqa: BLE001
+        err(f"slippage not applied to {r.day}: {type(error).__name__}: {error}")
+        return r
+
+
 def _t1_state(day: date, root: Path | None, err: Echo):
     """('ready', DailyResult) | ('pending', reason) | ('none', reason) | ('error', reason).
 
@@ -308,7 +318,7 @@ def _t1_state(day: date, root: Path | None, err: Echo):
     appended) is 'error': logged, never allowed to stop Adaptive's result, and left unsettled so a
     later run delivers T1."""
     try:
-        return "ready", result.calculate(day, root, track="t1")
+        return "ready", _slipped(result.calculate(day, root, track="t1"), root, err)
     except result.NoEntry as error:
         return "none", str(error)
     except result.ResultUnavailable as error:
@@ -316,6 +326,25 @@ def _t1_state(day: date, root: Path | None, err: Echo):
     except Exception as error:  # noqa: BLE001 - T1 must never hold Adaptive's result back
         err(f"T1 result could not be read ({type(error).__name__}: {error}); sending without it")
         return "error", f"{type(error).__name__}: {error}"
+
+
+def _month_so_far(day: date, adaptive, t1, boost: dict[str, bool], root: Path | None, echo: Echo):
+    """((Adaptive's paper month, T1's), the account's real month) for the evening message; T1's
+    only when its day is in (`t1`), the real one for the owner's copy only. A failure here leaves
+    that part out, never the result."""
+    paper = [None, None]
+    real = None
+    try:
+        paper[0] = month.paper(day, root, boost=boost.get("adaptive", False), today=adaptive)
+        if t1 is not None:
+            paper[1] = month.paper(day, root, "t1", boost.get("t1", False), today=t1)
+    except Exception as error:  # noqa: BLE001
+        echo(f"month so far (paper) skipped: {type(error).__name__}: {error}")
+    try:
+        real = month.real(day, root)
+    except Exception as error:  # noqa: BLE001
+        echo(f"month so far (account) skipped: {type(error).__name__}: {error}")
+    return tuple(paper), real
 
 
 def _tomorrow_adaptive(today: date, root: Path | None, echo: Echo):
@@ -392,6 +421,7 @@ def send_result(
     except result.ResultUnavailable as error:
         echo(f"result not ready: {error}")
         return 2
+    adaptive = _slipped(adaptive, root, err)
     if not telegram:  # print only: no lock, no marker, nothing written
         return _send_result_locked(
             day,
@@ -464,8 +494,25 @@ def _send_result_locked(
         # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
         live = live_compare.owner_lines(day, root, echo)
         boost = message_boost()
-        private = result.render(adaptive, t1_part, next_adaptive, next_t1, live, boost=boost)
-        group = result.render(adaptive, t1_part, next_adaptive, next_t1, boost=boost)
+        t1_day = t1 if kind == "ready" else None
+        paper, real = _month_so_far(day, adaptive, t1_day, boost, root, echo)
+        private = result.render(
+            adaptive,
+            t1_part,
+            next_adaptive,
+            next_t1,
+            live,
+            boost=boost,
+            month=messages.month_lines(day, *paper, real),
+        )
+        group = result.render(
+            adaptive,
+            t1_part,
+            next_adaptive,
+            next_t1,
+            boost=boost,
+            month=messages.month_lines(day, *paper),
+        )
         echo(private)
         if not telegram:
             return 0

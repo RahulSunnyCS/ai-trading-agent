@@ -4,6 +4,7 @@
  * files behind it change once a night, so it is fetched on mount and on Refresh, not polled.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationShadowResponse } from '../types/rotationShadow';
 import { usePolledResource } from './usePolledResource';
 
@@ -17,6 +18,6 @@ export function useRotationShadow(
   if (range.to) q.set('to', range.to);
   const text = q.toString();
   return usePolledResource<RotationShadowResponse>(
-    `${BASE}/rotation/shadow${text ? `?${text}` : ''}`,
+    useSlippageUrl(`${BASE}/rotation/shadow${text ? `?${text}` : ''}`),
   );
 }

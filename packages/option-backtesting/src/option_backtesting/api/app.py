@@ -40,6 +40,7 @@ from .rotation_routes import router as rotation_router
 from .rotation_shadow_routes import router as rotation_shadow_router
 from .routes import router
 from .rule_routes import router as rule_router
+from .slippage_middleware import SlippageMiddleware
 
 
 def create_app(cache_dir: Path | None = None) -> FastAPI:
@@ -55,6 +56,8 @@ def create_app(cache_dir: Path | None = None) -> FastAPI:
     app.state.cache_dir = cache_dir or resolve_cache_dir()
     # Backtest results and day curves are large JSON; small bodies are not worth compressing.
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    # the Rotation pages' Slippage switch: `?slippage=0.5` reads the results' slippage copy
+    app.add_middleware(SlippageMiddleware)
 
     @app.exception_handler(InvalidUnderlyingError)
     async def _invalid_underlying(_request: Request, exc: InvalidUnderlyingError) -> JSONResponse:

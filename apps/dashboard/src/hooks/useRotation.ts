@@ -4,6 +4,7 @@
  * morning, so nothing polls fast; a person refreshes with the page's Reload.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationOverview, RotationSummary } from '../types/rotation';
 import { usePolledResource } from './usePolledResource';
 
@@ -11,7 +12,9 @@ const BASE = '/api/backtest/legwise/rotation';
 const HALF_MINUTE = 30_000;
 
 export function useRotationOverview() {
-  return usePolledResource<RotationOverview>(`${BASE}/overview`, { intervalMs: HALF_MINUTE });
+  return usePolledResource<RotationOverview>(useSlippageUrl(`${BASE}/overview`), {
+    intervalMs: HALF_MINUTE,
+  });
 }
 
 /** The owner trades one lot a pick (2026-10-19): the Rotation page shows every rupee figure at
@@ -37,7 +40,7 @@ export function readQuery(opts: RotationReadOptions = {}): string {
 }
 
 export function useRotationSummary(opts: RotationReadOptions = {}) {
-  return usePolledResource<RotationSummary>(`${BASE}/summary${readQuery(opts)}`, {
+  return usePolledResource<RotationSummary>(useSlippageUrl(`${BASE}/summary${readQuery(opts)}`), {
     intervalMs: HALF_MINUTE * 4,
   });
 }

@@ -13,7 +13,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearPolledResourceCache, fetchCached, usePolledResource } from '../usePolledResource';
+import {
+  clearPolledResourceCache,
+  fetchCached,
+  sameBasis,
+  usePolledResource,
+} from '../usePolledResource';
 
 interface PendingCall {
   url: string;
@@ -250,6 +255,34 @@ describe('usePolledResource', () => {
 
     act(() => ctl.calls[1]!.resolve({ x: 5 }));
     await waitFor(() => expect(result.current.data).toEqual({ x: 5 }));
+  });
+
+  it('keeps the previous data while a new url loads, but never across a slippage change', async () => {
+    const { result, rerender } = renderHook(({ url }) => usePolledResource<{ x: number }>(url), {
+      initialProps: { url: '/api/x?lots=1&slippage=0.5' },
+    });
+    await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    act(() => ctl.calls[0]!.resolve({ x: 1 }));
+    await waitFor(() => expect(result.current.data).toEqual({ x: 1 }));
+
+    rerender({ url: '/api/x?lots=2&slippage=0.5' }); // same basis: the old figures stay meanwhile
+    await waitFor(() => expect(ctl.calls).toHaveLength(2));
+    expect(result.current.data).toEqual({ x: 1 });
+    act(() => ctl.calls[1]!.resolve({ x: 2 }));
+    await waitFor(() => expect(result.current.data).toEqual({ x: 2 }));
+
+    rerender({ url: '/api/x?lots=2' }); // slippage off: figures after slippage never shown
+    await waitFor(() => expect(ctl.calls).toHaveLength(3));
+    expect(result.current.data).toBeNull();
+    expect(result.current.loading).toBe(true);
+    act(() => ctl.calls[2]!.resolve({ x: 3 }));
+    await waitFor(() => expect(result.current.data).toEqual({ x: 3 }));
+  });
+
+  it('sameBasis compares only the basis parameters', () => {
+    expect(sameBasis('/a?lots=1&slippage=0.5', '/a?lots=2&slippage=0.5')).toBe(true);
+    expect(sameBasis('/a?lots=1', '/a?lots=1&slippage=0.5')).toBe(false);
+    expect(sameBasis('/a', '/b')).toBe(true);
   });
 
   it('cache: a re-mounted view shows the last response at once, then revalidates', async () => {

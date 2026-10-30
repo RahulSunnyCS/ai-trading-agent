@@ -22,6 +22,8 @@ import {
 import { listLabel, listName } from '../../lib/rotationListNames';
 import type { LogLive } from '../../lib/rotationLiveView';
 import { stopFlag } from '../../lib/rotationPortfolioView';
+import { grossLabel } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { RotationListKey, RotationRow } from '../../types/rotationDailyLog';
 import { Badge, type Tone } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -140,6 +142,9 @@ export function RotationDailyLogTable({
   live?: ((day: string) => LogLive | null) | undefined;
 }) {
   const [all, setAll] = useState(false);
+  // The live read compares with paper without slippage (`/rotation/live` never takes it).
+  const slippage = useRotationSlippage();
+  const livePaper = slippage ? 'paper without slippage' : 'paper';
   const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
   const shown = all ? newestFirst : newestFirst.slice(0, SHOWN);
   return (
@@ -163,7 +168,11 @@ export function RotationDailyLogTable({
           ))}
           <Th dense>Flags</Th>
           {live ? (
-            <Th dense align="right" title="Live minus paper per lot-day, both after the same costs">
+            <Th
+              dense
+              align="right"
+              title={`Live minus ${livePaper} per lot-day, both after the same costs`}
+            >
               Live − paper
             </Th>
           ) : null}
@@ -244,9 +253,9 @@ export function RotationDailyLogTable({
         </tbody>
       </Table>
       <p className="mt-2 text-[11px] text-faint">
-        ₹ gross per lot-day, hover for the list's total.{' '}
+        ₹ {grossLabel(slippage)} per lot-day, hover for the list's total.{' '}
         {live
-          ? 'Live − paper: the 15:40 capture against paper per lot-day, after the same costs; + means live did better. '
+          ? `Live − paper: the 15:40 capture against ${livePaper} per lot-day, after the same costs; + means live did better. `
           : ''}
         <span className="font-semibold">W</span>: the Widesl minimum replaced a top-ranked Dir.{' '}
         <span className="font-semibold">B</span>: a Buy strategy qualified and was added.

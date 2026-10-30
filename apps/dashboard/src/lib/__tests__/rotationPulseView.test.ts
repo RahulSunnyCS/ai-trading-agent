@@ -321,6 +321,9 @@ describe('header texts and links', () => {
     expect(asOfLine(pulse())).toBe(
       'As of 09 Oct 2026 · ranking sees: the pick of 12 Oct 2026 · gross per lot-day',
     );
+    expect(asOfLine(pulse(), true)).toBe(
+      'As of 09 Oct 2026 · ranking sees: the pick of 12 Oct 2026 · gross after 0.5% slippage per lot-day',
+    );
     expect(bandText('09:17-10:02')).toBe('09:17–10:02');
   });
 

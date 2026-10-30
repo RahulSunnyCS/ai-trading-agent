@@ -162,7 +162,7 @@ def _number(text: str | None) -> float | None:
 def read_results(name: str, root: Path) -> dict[date, dict]:
     """{day: {gross, n_trades}} of one variant (Core or a track's, `store.result_path`). A row
     without a parseable gross or trade count is left out: missing, never zero."""
-    path = store.result_path(name, root)
+    path = store.read_path(store.result_path(name, root))
     if not path.exists():
         return {}
     out: dict[date, dict] = {}
@@ -212,7 +212,8 @@ class HistorySource:
         if not self.names:
             raise pick.PickError("no variant strategy files found")
         if self._matrix is None:
-            self._matrix = store.load_matrix(self.names, self.root)
+            with store.slipped(0.0):  # the entry ranked on the stored figures, never the copy
+                self._matrix = store.load_matrix(self.names, self.root)
         if basis not in self._attrs:
             self._attrs[basis] = store.read_days(self.root, basis)
         m, attrs = self._matrix, self._attrs[basis]
@@ -302,7 +303,7 @@ def _stamp(root: Path, names: list[str]) -> tuple:
     newest, count = 0, 0
     for n in names:
         try:
-            st = store.result_path(n, root).stat()
+            st = store.read_path(store.result_path(n, root)).stat()
         except OSError:
             continue
         newest = max(newest, st.st_mtime_ns)

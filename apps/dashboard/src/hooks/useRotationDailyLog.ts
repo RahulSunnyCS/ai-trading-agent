@@ -7,6 +7,7 @@
 import { useCallback, useState } from 'react';
 
 import { apiPost } from '../lib/api';
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type {
   PlacementStatus,
   PlacementWriteResult,
@@ -33,21 +34,28 @@ function query(params: Record<string, string | undefined>): string {
  * page is open. Poll ticks pause while the tab is hidden. */
 export const LOG_POLL_MS = 60_000;
 
+/** A parallel track's journal (`t1`: Adaptive Tuned, list C only, recorded days from 19 Oct; a
+ * track has no reconstructed research days). Absent = the live journal (Adaptive Classic). */
+export type RotationLogTrack = 't1';
+
 export function useRotationLog(
   source: RotationLogSource,
   range: { from?: string | undefined; to?: string | undefined } = {},
+  track?: RotationLogTrack,
 ) {
   return usePolledResource<RotationLog>(
-    `${BASE}/log${query({ source, from: range.from, to: range.to, lots: LOTS })}`,
+    useSlippageUrl(
+      `${BASE}/log${query({ source, from: range.from, to: range.to, lots: LOTS, track })}`,
+    ),
     { intervalMs: LOG_POLL_MS },
   );
 }
 
 /** One day in full. Always fetches: mount the component that calls it only once a day is picked.
  * Both it and the log show each list at the page's lots a strategy (ROTATION_PAGE_LOTS). */
-export function useRotationDay(day: string) {
+export function useRotationDay(day: string, track?: RotationLogTrack) {
   return usePolledResource<RotationDay>(
-    `${BASE}/day/${encodeURIComponent(day)}${query({ lots: LOTS })}`,
+    useSlippageUrl(`${BASE}/day/${encodeURIComponent(day)}${query({ lots: LOTS, track })}`),
   );
 }
 

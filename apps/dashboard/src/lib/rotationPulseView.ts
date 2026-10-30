@@ -19,6 +19,7 @@ import type {
 } from '../types/rotationPulse';
 import { EMPTY, formatDay, formatInr, formatInt, formatPct } from './format';
 import { VISIBLE_LIST_KEYS, listName } from './rotationListNames';
+import { grossLabel } from './rotationSlippage';
 
 /** The lists whose chips and weights the pulse shows: the shown ones (`VISIBLE_LIST_KEYS`). */
 export const PULSE_LISTS: readonly PulseListKey[] = VISIBLE_LIST_KEYS;
@@ -327,10 +328,11 @@ export function criterionNote(r: PulseAvailable): string {
   return `The family-band criterion carries ${share} of the composite in ${join(with_)}${tail}`;
 }
 
-/** One line under the title: the as-of session and the pick the rank is for. */
-export function asOfLine(r: PulseAvailable): string {
+/** One line under the title: the as-of session and the pick the rank is for; `slippage` when the
+ * figures were read with the Rotation pages' slippage switch on. */
+export function asOfLine(r: PulseAvailable, slippage = false): string {
   const next = r.next_pick_day ? ` · ranking sees: the pick of ${formatDay(r.next_pick_day)}` : '';
-  return `As of ${formatDay(r.as_of)}${next} · gross per lot-day`;
+  return `As of ${formatDay(r.as_of)}${next} · ${grossLabel(slippage)} per lot-day`;
 }
 
 export interface EmptyView {
