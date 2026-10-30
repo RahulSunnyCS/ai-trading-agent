@@ -186,6 +186,16 @@ describe('RotationPanel as one page', () => {
     expect(books.textContent).toMatch(/vs base \/ lot-day/);
   });
 
+  it("reads Classic and the base again from Tuned's first scored day, the verdict on its own", () => {
+    render(<RotationPanel />);
+    // the registered read-out (verdict, Day N of 60) and a read over the same days as Tuned
+    expect(mocks.summaryArgs).toContainEqual({ lots: 1 });
+    expect(mocks.summaryArgs).toContainEqual({ lots: 1, from: '2026-10-12' });
+    expect(
+      screen.getByText(/registered read-out, from 12 Oct 2026 \(the pre-registered test\)/),
+    ).toBeTruthy();
+  });
+
   it('reads both books at 1 lot, Tuned from the T1 track, each with its own stop', () => {
     render(<RotationPanel />);
     // the slippage switch is on by default, and the chip says so
