@@ -78,7 +78,8 @@
       "coverage_floor_above_0.3_and_lookbacks_1_4_13": "lose",
       "max_position_0.15": "smoother and poorer",
       "tags": "extended 4-11 CAGR points lower and 7-14 points deeper worst fall than curated at the same settings (BL-010 Log 2026-10-10)"
-    }
+    },
+    "tilt_rule": "the stock tilt needs a long lookback (26 or 52) and a short one; for [26, 52] and [1, 4, 13] the sampled stock_tilt and stock_tilt_screen_pct are set to 0 before the run id is made (search.without_impossible_tilt), so those groups run untilted and say so"
   },
   "stage_2": {
     "how": "scripts/bl176_focus.py, committed before Stage 1 runs; per arm and tag set",
@@ -106,7 +107,10 @@
     "followed_still_holds": "top half of the space by the pre-tax rank measure, AND +5 points over Nifty200 Momentum 30 TRI after tax (G1), AND worst fall inside -40%; read in both tag rankings; holding on curated but not extended is reported as 'holds only on hindsight tags'",
     "favourite_keeps_place": "its blend in the top decile of the space by the rank measure",
     "lookahead": "mbt audit lookahead-requests on the finalists at 2019-06-28, 2021-06-25, 2024-03-28 must be identical before the verdict",
-    "footnote": "round 7's 2026-10-08 top 10 placed in the new ranking, written after the pick is frozen"
+    "footnote": "round 7's 2026-10-08 top 10 placed in the new ranking, written after the pick is frozen",
+    "keys": {
+      "top_share": 0.1
+    }
   },
   "trial_count": "counted per ranking from the results files (curated about 30,000 in Stage 1, extended about 34,000, plus each one's Stage 2; the paired A runs count in both), plus round 7's 8,003 (and 4,754 on C1/C2) named as prior trials",
   "hold_out": "none unseen; 2012-2016 spent by BL-010 Phase 6; the forward journal (BL-024) is the only out-of-sample from here on",

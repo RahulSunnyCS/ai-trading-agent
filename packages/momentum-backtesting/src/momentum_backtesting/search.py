@@ -146,12 +146,23 @@ def _dim(name: str, spec: Any) -> Dim:
     raise ValueError(f"{name}: unknown kind {kind!r}")
 
 
+#: Settings whose own vocabulary has a value spelled "none" (not "no value"): the TOML convention
+#: above must not turn it into None (`voladj_skip="none"` is a rule the engine checks by name).
+LITERAL_NONE = {"voladj_skip"}
+
+
+def _literal_none(dim: Dim) -> Dim:
+    if dim.name not in LITERAL_NONE or dim.kind != "choice":
+        return dim
+    return Dim(dim.name, dim.kind, tuple("none" if v is None else v for v in dim.values))
+
+
 def load_space(path: Path) -> Space:
     raw = tomllib.loads(Path(path).read_text())
     arm = raw["arm"]
     if arm not in ARMS:
         raise ValueError(f"arm must be one of {sorted(ARMS)}")
-    heavy = tuple(_dim(k, v) for k, v in (raw.get("heavy") or {}).items())
+    heavy = tuple(_literal_none(_dim(k, v)) for k, v in (raw.get("heavy") or {}).items())
     light = tuple(_dim(k, v) for k, v in (raw.get("light") or {}).items())
     for dim in heavy:
         if dim.name not in HEAVY_KEYS:
@@ -371,6 +382,30 @@ def data_snapshot(root: Path | None = None, through: str | None = None) -> dict[
     return {"last_bar": str(last_bar), "last_week": str(last_week), "factors": digest}
 
 
+def tilt_possible(lookbacks) -> bool:
+    """Whether the stock tilt can run on a lookback set: it needs at least one long lookback
+    (26 or 52 weeks) and one short one (`levers.grouped_momentum_ranks` refuses otherwise)."""
+    from .levers import TILT_LONG_LOOKBACKS
+
+    lookbacks = tuple(lookbacks or ())
+    has_long = any(lb in TILT_LONG_LOOKBACKS for lb in lookbacks)
+    return has_long and any(lb not in TILT_LONG_LOOKBACKS for lb in lookbacks)
+
+
+def without_impossible_tilt(heavy: dict[str, Any], light: dict[str, Any], fixed: dict) -> dict:
+    """BL-176: a lookback set the tilt cannot use ([26, 52] has no short window, [1, 4, 13] no
+    long one) runs untilted, recorded as such: the sampled tilt and its screen become 0 before the
+    run id is made, as `canonical_heavy` does for keys a ranking cannot read. A set that can tilt,
+    or a space that does not search the tilt, is unchanged."""
+    lookbacks = heavy.get("lookbacks", fixed.get("lookbacks"))
+    if "stock_tilt" not in light or lookbacks is None or tilt_possible(lookbacks):
+        return light
+    out = {**light, "stock_tilt": 0.0}
+    if "stock_tilt_screen_pct" in out:
+        out["stock_tilt_screen_pct"] = 0.0
+    return out
+
+
 def plan(
     space: Space,
     heavy_count: int,
@@ -387,7 +422,7 @@ def plan(
         runs: list[dict[str, Any]] = []
         for row in points:
             sampled = {dim.name: dim.pick(u) for dim, u in zip(space.light, row, strict=True)}
-            light = resolve_light(space, sampled)
+            light = without_impossible_tilt(heavy, resolve_light(space, sampled), space.fixed)
             if not feasible(space.arm, {**space.fixed, **light}):
                 continue
             run = run_id(space.arm, heavy, light, space.fixed, snapshot)

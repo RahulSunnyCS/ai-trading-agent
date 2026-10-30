@@ -62,10 +62,16 @@ def high52_ranks(prices: pd.DataFrame, config: Config):
     return ranks, ranks.astype(float)
 
 
+#: The long half of the stock tilt's two rank-sums. A lookback set needs at least one of these and
+#: one other (short) lookback for the tilt to run (`grouped_momentum_ranks`,
+#: `search.tilt_possible`).
+TILT_LONG_LOOKBACKS = (26, 52)
+
+
 def grouped_momentum_ranks(
     prices: pd.DataFrame,
     config: Config,
-    long_lookbacks: tuple[int, ...] = (26, 52),
+    long_lookbacks: tuple[int, ...] = TILT_LONG_LOOKBACKS,
     tilt: float = 0.3,
     screen_top_pct: float = 0.0,
     cross_section: pd.DataFrame | None = None,

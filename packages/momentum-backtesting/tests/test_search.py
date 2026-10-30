@@ -497,3 +497,38 @@ def test_the_shared_runner_gives_a_monday_fill_monday_masks_not_the_callers_frid
     runner.run(base, heavy, {"fill": "next_fri_close"}, locks=friday_masks)
     assert sessions == ["first"]
     assert [c["uc_locked"] for c in calls] == ["UC-first", "UC-last"]
+
+
+def test_a_lookback_set_the_tilt_cannot_use_runs_untilted():
+    assert sr.tilt_possible([4, 13, 26]) and sr.tilt_possible([13, 26])
+    assert not sr.tilt_possible([26, 52]) and not sr.tilt_possible([1, 4, 13])
+    light = {"stock_tilt": 0.75, "stock_tilt_screen_pct": 0.3, "category_top_n": 4}
+    out = sr.without_impossible_tilt({"lookbacks": [26, 52]}, light, {})
+    assert out == {"stock_tilt": 0.0, "stock_tilt_screen_pct": 0.0, "category_top_n": 4}
+    assert sr.without_impossible_tilt({"lookbacks": [4, 13, 26]}, light, {}) == light
+    assert sr.without_impossible_tilt({"lookbacks": [26, 52]}, {"category_top_n": 4}, {}) == {
+        "category_top_n": 4
+    }
+
+
+def test_no_planned_round8_run_asks_for_a_tilt_its_lookbacks_cannot_make():
+    space = sr.load_space(SPACES / "round8_A_curated.toml")
+    groups = sr.plan(space, heavy_count=133, light_count=20, seed=8)
+    impossible = [g for g in groups if not sr.tilt_possible(g["heavy"]["lookbacks"])]
+    assert impossible  # [26, 52] and [1, 4, 13] are both drawn
+    for group in impossible:
+        assert all(r["light"]["stock_tilt"] == 0.0 for r in group["runs"])
+        assert len(group["runs"]) == 20  # still a full group
+    tilted = [r for g in groups for r in g["runs"] if r["light"]["stock_tilt"] > 0]
+    assert tilted and all(
+        sr.tilt_possible(g["heavy"]["lookbacks"]) for g in groups for r in g["runs"] if r in tilted
+    )
+
+
+def test_voladj_skip_none_stays_the_engines_word_not_null():
+    space = sr.load_space(SPACES / "round8_A_curated.toml")
+    skip = next(d for d in space.heavy if d.name == "voladj_skip")
+    assert skip.values == ("long", "none")
+    from momentum_backtesting.engine import Config
+
+    Config(score="voladj", voladj_lookbacks=True, voladj_skip=skip.values[1])  # accepted
