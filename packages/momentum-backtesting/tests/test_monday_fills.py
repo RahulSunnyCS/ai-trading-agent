@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -197,3 +198,26 @@ def test_a_score_folder_holds_one_set_of_ids(tmp_path):
     method.score_search(space, results, dest, workers=1, ids={"b", "a"}, echo=lambda *_: None)
     with pytest.raises(SystemExit, match="another set of ids"):
         method.score_search(space, results, dest, workers=1, ids={"a"}, echo=lambda *_: None)
+
+
+def test_bl176_scores_each_friday_as_a_whole_sleeve_blended_with_april_resets(tmp_path):
+    from momentum_backtesting import method
+
+    assert method.phase_capital(50_000, 4, per_sleeve=False) == 12_500  # BL-010: one book
+    assert method.phase_capital(50_000, 4, per_sleeve=True) == 50_000  # BL-176: one sleeve
+    weeks = pd.date_range("2023-03-03", periods=60, freq="W-FRI")
+    up = pd.Series(1.01 ** np.arange(60), index=weeks)
+    flat = pd.Series(1.0, index=weeks)
+    mean = method.blend_phases([up, flat], per_sleeve=False)
+    reset = method.blend_phases([up, flat], per_sleeve=True)
+    assert mean.iloc[-1] == pytest.approx((up.iloc[-1] + 1) / 2)
+    assert reset.iloc[-1] < mean.iloc[-1]  # the winner is cut back to half each April
+    assert method.blend_phases([up], per_sleeve=True).equals(method.blend_phases([up], False))
+
+    results = tmp_path / "results"
+    results.mkdir()
+    space = Path(__file__).resolve().parents[1] / "search_spaces" / "round8_A_curated.toml"
+    dest = tmp_path / "scored"
+    method.score_search(space, results, dest, workers=1, per_sleeve=True, echo=lambda *_: None)
+    with pytest.raises(SystemExit, match="another capital basis"):
+        method.score_search(space, results, dest, workers=1, echo=lambda *_: None)

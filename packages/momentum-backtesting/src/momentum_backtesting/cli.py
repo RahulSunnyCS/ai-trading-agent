@@ -1597,6 +1597,12 @@ def search_score(
     ids_file: Path = typer.Option(
         None, "--ids", help="Score only the config ids listed in this file, one per line."
     ),
+    per_sleeve: bool = typer.Option(
+        False,
+        "--per-sleeve",
+        help="The space's capital is one sleeve (BL-176): each Friday runs with all of it, "
+        "blended with equal capital reset each April.",
+    ),
 ) -> None:
     """Re-score every config of a finished search on all its rebalance phases and keep the
     weekly curves (BL-010 Phase 4), then report the probability of backtest overfitting.
@@ -1618,6 +1624,7 @@ def search_score(
         limit=limit,
         max_rankings=max_rankings,
         ids=set(ids_file.read_text().split()) if ids_file else None,
+        per_sleeve=per_sleeve,
         echo=typer.echo,
     )
     scores, curves = method.load_scores(dest)
