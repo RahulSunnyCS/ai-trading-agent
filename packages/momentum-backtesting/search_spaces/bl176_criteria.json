@@ -1,0 +1,125 @@
+{
+  "written_before_running": "2026-10-31T01:30:00+05:30",
+  "name": "BL-176 criteria: a fresh three-stage Broad search on the F6-fixed (point-in-time) ranking",
+  "source": "backlog/BL-176-momentum-search-on-f6-ranking.md, Phase 0; this file is the machine-readable copy of its rules",
+  "rule": "Committed before any BL-176 run beyond a one-group smoke. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason. Any departure is an `override: <reason>` line in the item.",
+  "reason": "BL-001's F6 fix (merged 2026-10-28, 778ba02e) changed the Broad ranking every BL-010 figure and the favourites' selection were made on. Owner, 2026-10-30: start from scratch (a fresh search and a fresh selection, not a measurement of the F6 effect), and do it more elaborately (every searchable axis).",
+  "applies_unchanged": [
+    "bl010_criteria.json: baskets, minimum bar (+5 points over Nifty200 Momentum 30 TRI after tax), comparators",
+    "bl010_criteria_addendum_3.json: the Phase 5 choice rule (rank measure, clusters at 0.9, medoid, 8-12 holdings preference, walk-forward kill)",
+    "bl010_criteria_addendum_4.json: the ensemble rule if the single pick is killed",
+    "bl010_criteria_addendum_6.json and _8.json: gates G1-G6 for the followed strategy"
+  ],
+  "owner_decisions_2026_10_30": {
+    "arms": "A, C1 and B; C2 stays unrun",
+    "tag_sets": "both, ranked separately: arm A runs every point under curated and under extended tags (paired: same seed, same points); B enters both rankings; C1 (extended only) enters the extended ranking only",
+    "return_basis": "mixed: every ranking step pre-tax after costs; every gate after tax at Rs 50,000 a sleeve; no walking down to the next cluster when a pick fails the after-tax bar",
+    "still_holds": "looser line for the followed strategy; favourites keep the top-decile line",
+    "run_slot": "Stage 1 from Saturday 2026-10-31, paused before Monday 07:30 if unfinished",
+    "stage_1_space": "confirmed as written, including capital Rs 50,000 and the Rs 5,000 price ceiling"
+  },
+  "stage_1": {
+    "spaces": {
+      "round8_A_curated.toml": {
+        "arm": "A",
+        "universe": "turnover_rank",
+        "tags": "curated",
+        "heavy": 100,
+        "light": 200,
+        "seed": 8,
+        "workers": 4,
+        "ranking": "curated"
+      },
+      "round8_A_extended.toml": {
+        "arm": "A",
+        "universe": "turnover_rank",
+        "tags": "extended",
+        "heavy": 100,
+        "light": 200,
+        "seed": 8,
+        "workers": 4,
+        "ranking": "extended"
+      },
+      "round8_B.toml": {
+        "arm": "B",
+        "universe": "turnover_rank",
+        "tags": "none (no category layer)",
+        "heavy": 100,
+        "light": 100,
+        "seed": 8,
+        "workers": 4,
+        "ranking": "curated and extended"
+      },
+      "round8_C1.toml": {
+        "arm": "C1",
+        "universe": "all_liquid",
+        "tags": "extended",
+        "heavy": 40,
+        "light": 100,
+        "seed": 8,
+        "workers": 3,
+        "ranking": "extended"
+      }
+    },
+    "distinct_heavy_combinations": 133,
+    "light_axes": {
+      "A": 15,
+      "C1": 15,
+      "B": 11
+    },
+    "rank_measure_recorded_per_run": "search.rank_measures: FY excess over Nifty200 Momentum 30 TRI per complete financial year, its 25th percentile (lb_fy_excess), and the drawdown baskets every fall passes; pre-tax, the run's own sampled Friday",
+    "expected_directions": {
+      "voladj_lookbacks": "true loses (BL-086); its best cells on [13,26,52] and [26,52]",
+      "fill": "mon_open more return and a deeper worst fall than next_fri_close (BL-158); mon_close between",
+      "max_category": "does nothing (caps page)",
+      "stock_tilt_screen_pct": "nothing or small",
+      "top_sector_weight": "2 helps (BL-116 development); the 2023-26 half is its confirmation and BL-116 Phase 2 closes on it",
+      "picks_per_category_4_and_category_top_n_8_plus": "flatter return, shallower falls (BL-010 F5)",
+      "coverage_floor_above_0.3_and_lookbacks_1_4_13": "lose",
+      "max_position_0.15": "smoother and poorer",
+      "tags": "extended 4-11 CAGR points lower and 7-14 points deeper worst fall than curated at the same settings (BL-010 Log 2026-10-10)"
+    },
+    "tilt_rule": "the stock tilt needs a long lookback (26 or 52) and a short one; for [26, 52] and [1, 4, 13] the sampled stock_tilt and stock_tilt_screen_pct are set to 0 before the run id is made (search.without_impossible_tilt), so those groups run untilted and say so"
+  },
+  "stage_2": {
+    "how": "scripts/bl176_focus.py, committed before Stage 1 runs; per arm and tag set",
+    "qualify": "per basket, the top 5% (rounded up) of the Stage 1 runs passing it, by lb_fy_excess; a basket qualifies with at least 20; the qualifying baskets' runs are pooled; no qualifying basket = no Stage 2 for that arm",
+    "numeric_axis": "pool's 10th to 90th percentile, clipped to Stage 1's range (ints widened to whole numbers); band axes read as exit minus top; rebalance_offset_raw keeps Stage 1's range",
+    "choice_axis": "values held by at least 10% of the pool, light and heavy; heavy combinations = product of those values, inert ones removed, all run",
+    "runs_per_heavy": "ceil(7000 / combinations), between 100 and 500",
+    "seed": 9,
+    "keys": {
+      "top_share": 0.05,
+      "min_kept": 20,
+      "low_pct": 10,
+      "high_pct": 90,
+      "min_value_share": 0.1,
+      "target_runs": 7000,
+      "light_min": 100,
+      "light_max": 500,
+      "seed": 9
+    }
+  },
+  "stage_3": {
+    "blend": "every config in the top decile of each basket (by lb_fy_excess) over Stages 1 and 2 pooled across the arms in a ranking is re-scored on all its offsets (`mbt search score --ids`) and judged as the all-Fridays blend; no single-offset figure reaches a ranking",
+    "selection": "the BL-010 machinery as written, once per tag ranking: baskets, addendum 3 rule, addendum 4 ensemble if killed, top 100 vs 100 random over FY windows, PBO on 16 blocks (kill above 0.3), fair placebo (100 seeds), nudge plateau, factor alpha; one pick, ensemble or none per basket per tag ranking, frozen with commit and data snapshot",
+    "locate": "the followed strategy, Five Sectors Rank Sum and the ten favourites: blend percentile in the space, basket, gates G1-G6",
+    "followed_still_holds": "top half of the space by the pre-tax rank measure, AND +5 points over Nifty200 Momentum 30 TRI after tax (G1), AND worst fall inside -40%; read in both tag rankings; holding on curated but not extended is reported as 'holds only on hindsight tags'",
+    "favourite_keeps_place": "its blend in the top decile of the space by the rank measure",
+    "lookahead": "mbt audit lookahead-requests on the finalists at 2019-06-28, 2021-06-25, 2024-03-28 must be identical before the verdict",
+    "footnote": "round 7's 2026-10-08 top 10 placed in the new ranking, written after the pick is frozen",
+    "keys": {
+      "top_share": 0.1
+    }
+  },
+  "trial_count": "counted per ranking from the results files (curated about 30,000 in Stage 1, extended about 34,000, plus each one's Stage 2; the paired A runs count in both), plus round 7's 8,003 (and 4,754 on C1/C2) named as prior trials",
+  "hold_out": "none unseen; 2012-2016 spent by BL-010 Phase 6; the forward journal (BL-024) is the only out-of-sample from here on",
+  "will_not_run": [
+    "a value outside the listed choices",
+    "a Stage 2 range chosen by hand, or a third search stage",
+    "realism as a search axis",
+    "levers killed after tax on Broad: cadence slower than 4 weeks, stops, inverse-vol sizing, residual momentum, the ETF blend, momentum sizing, mass-exit rules, feature tilts, chart patterns",
+    "arm C2",
+    "the 2012-2016 window"
+  ]
+}

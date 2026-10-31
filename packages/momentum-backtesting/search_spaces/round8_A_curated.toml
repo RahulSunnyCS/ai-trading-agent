@@ -1,0 +1,55 @@
+# BL-176 Stage 1 (wide screening), arm A: point-in-time pool, category layer ON, CURATED tags (paired with round8_A_extended: same seed, same points).
+# Registered in backlog/BL-176-momentum-search-on-f6-ranking.md (Phase 0) with
+# search_spaces/bl176_criteria.json. Never edited after a run starts: a change is a new file.
+#   uv run mbt search run search_spaces/round8_A_curated.toml --heavy 100 --light 200 --seed 8 --workers 4
+# Ranked pre-tax; every gate is judged after tax at Rs 50,000 a sleeve (decision 3).
+# TOML has no null: the string "none" means None.
+name = "round8_A_curated"
+arm = "A"
+
+[fixed]
+universe_kind = "turnover_rank"     # point-in-time list, searched directly (round 7 searched today's list)
+series_break_policy = "verified"
+start = "2017-01-01"
+cost_model = "itemised"
+slippage_bps = 15.0
+capital = 50000                     # one sleeve: the money runs as four Rs 50,000 sleeves
+respect_circuits = true
+min_ranked = 1
+momentum_sizing = false             # can lock the strategy in cash (TODO 3.9.25)
+cap_band = 0.05
+max_stock_price = 5000              # Rs 8-12k a name at 4-6 holdings a sleeve; round 7 had 10,000
+sell_every_week = false
+liq_min_turnover_cr = 2.0
+liq_min_price = 30.0
+liq_floor_ratio = 0.25
+liq_circuit = true
+liq_circuit_run = 3
+voladj_skip_recent_month = true
+category_tags = "curated"
+
+[heavy]
+# Round 7's five sets, plus NSE's own pair [26, 52] and the shortest set round 6 asked for.
+lookbacks = { choice = [[26, 52], [13, 26, 52], [4, 13, 26, 52], [1, 4, 13, 26, 52], [4, 13, 26], [13, 26], [1, 4, 13]] }
+weight_scheme = { choice = ["equal", "recent", "long"] }
+score = { choice = ["voladj", "blend", "ranksum"] }
+voladj_lookbacks = { choice = [false, true] }   # BL-086: voladj follows the lookbacks and weights
+voladj_skip = { choice = ["long", "none"] }      # read only when voladj_lookbacks is on
+# 133 distinct rankings once the inert keys collapse (search.canonical_heavy); --heavy samples them.
+
+[light]
+coverage_floor = { float = [0.0, 0.5] }
+pool_top_n = { int = [20, 400] }
+pool_band = { int = [0, 200] }
+category_top_n = { int = [1, 10] }
+category_band = { int = [0, 10] }
+picks_per_category = { int = [1, 4] }
+max_position = { choice = [0.15, 0.2, 0.25, 0.35, 0.5, "none"] }
+max_category = { choice = ["none", 0.3, 0.5] }
+rebalance_every = { choice = [1, 2, 4] }
+rebalance_offset_raw = { int = [0, 3] }
+entry = { choice = ["wait", "make_room"] }
+stock_tilt = { choice = [0.0, 0.25, 0.5, 0.75, 1.0] }
+stock_tilt_screen_pct = { choice = [0.0, 0.3] }
+top_sector_weight = { choice = [1.0, 1.5, 2.0] }  # BL-116 Phase 2
+fill = { choice = ["next_fri_close", "mon_open", "mon_close"] }

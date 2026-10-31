@@ -659,7 +659,10 @@ contract, not a shared service).
   feeds Custom Index only). A new dated row moves the live signal from its launch week on. Anything that *describes* the past
   with category membership must respect the date too: `exit_reasons.explain_exits(launches=...)` drops a
   dated category from a stock's tags for weeks before it launched, and `api._broad_parts` passes it.
-- `monday_fills.py` (BL-036 Phase 2, BL-010 E13) - Monday-open fills for a stock-based run.
+- `monday_fills.py` (BL-036 Phase 2, BL-010 E13) - Monday-open fills for a stock-based run;
+  BL-176 adds `execution="mon_close"` (`build(execution=)`: the session's close `move` instead of its
+  `open_gap`, the daily file's close for other columns; same delay-0 rule, same Monday lock session;
+  no `fill_companion`, which compares Friday close and Monday open only).
   `BacktestRequest.execution="mon_open"` on a **Broad** request builds a fill table (`run_backtest(
   trade_prices=...)`, the same hook the ETF dataset uses) from the weekly adjusted close times one
   plus the first following session's `open_gap` (`categories/daily_moves.py`); other columns use their

@@ -25,11 +25,27 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from . import bias, metrics, search
+from . import bias, choose, metrics, search
 
 PBO_BLOCKS = 16  # bl010_criteria.json: phase_4_method.pbo.blocks
 PBO_KILL = 0.3  # ...pbo.kill_above
 TRANCHE_KILL_PTS = 0.03  # ...offset_average.kill_if_tranche_mean_below_reported_pts
+
+
+def phase_capital(capital: float, every: int, per_sleeve: bool) -> float:
+    """What one calendar phase runs with: the space's capital split K ways (BL-010: one Rs 2 lakh
+    book in K tranches), or the whole of it when the space's capital is one sleeve (BL-176: four
+    Rs 50,000 sleeves, the money as it runs)."""
+    return capital if per_sleeve else capital / every
+
+
+def blend_phases(phases: list[pd.Series], per_sleeve: bool) -> pd.Series:
+    """The phases as one account: their plain mean (BL-010 Phase 4), or equal capital restored
+    each April, the rule the Saved runs page and the live group use (BL-176 Stage 3)."""
+    frame = pd.concat(phases, axis=1, keys=range(len(phases)))
+    if per_sleeve and len(phases) > 1:
+        return choose.ensemble_curve(frame.dropna(), list(frame.columns))
+    return frame.mean(axis=1)
 
 
 def _score_group(task: dict[str, Any]) -> dict[str, Any]:
@@ -37,6 +53,7 @@ def _score_group(task: dict[str, Any]) -> dict[str, Any]:
     space = search.load_space(Path(task["space_path"]))
     runner = bias.Runner(space, **task["runner"])
     dest = Path(task["dest"])
+    per_sleeve = bool(task.get("per_sleeve", False))
     base = runner.base(task["heavy"])
     locks = None
     curves: dict[str, pd.Series] = {}
@@ -56,11 +73,11 @@ def _score_group(task: dict[str, Any]) -> dict[str, Any]:
                     run["light"],
                     locks=locks,
                     rebalance_offset=offset,
-                    capital=capital / every,
+                    capital=phase_capital(capital, every, per_sleeve),
                 )
                 locks = locks or runner.locks(ranking)
                 phases.append(outcome.result.equity)
-            blend = pd.concat(phases, axis=1).mean(axis=1)
+            blend = blend_phases(phases, per_sleeve)
             cagrs = [float(metrics.cagr(p)) for p in phases]
             own = int(merged.get("rebalance_offset", 0))
             row.update(
@@ -91,14 +108,30 @@ def score_search(
     runner: dict[str, Any] | None = None,
     limit: int | None = None,
     max_rankings: int | None = None,
+    ids: set[str] | None = None,
+    per_sleeve: bool = False,
     echo=print,
 ) -> None:
     """Re-run every config of a finished search on all its phases and keep the blended weekly
-    curves. One task per ranking; a finished task's files are not redone. `runner` passes
+    curves. `ids` scores only those configs (BL-176 Stage 3: each basket's top decile). One
+    task per ranking; a finished task's files are not redone. `runner` passes
     `universe_kind` / `category_tags` through to score the same configs on another universe.
     `max_rankings` stops after that many, for a machine that limits how long one job may run:
-    a ranking is only saved whole, so a job cut off mid-way loses what it was working on."""
+    a ranking is only saved whole, so a job cut off mid-way loses what it was working on.
+    `per_sleeve` reads the space's capital as one sleeve: every phase runs with all of it and the
+    phases blend with equal capital reset each April (`phase_capital`, `blend_phases`)."""
     dest.mkdir(parents=True, exist_ok=True)
+    # Score files are named by position in the (filtered) group list, so one folder holds one id
+    # set: a second, different list would skip or mix groups (BL-176 review).
+    marker = dest / "ids.json"
+    wanted = sorted(ids) if ids is not None else None
+    if marker.exists() and json.loads(marker.read_text()) != wanted:
+        raise SystemExit(f"{dest} was scored for another set of ids; use a new --dest")
+    marker.write_text(json.dumps(wanted) + "\n")
+    basis = dest / "capital.json"
+    if basis.exists() and json.loads(basis.read_text())["per_sleeve"] != per_sleeve:
+        raise SystemExit(f"{dest} was scored with another capital basis; use a new --dest")
+    basis.write_text(json.dumps({"per_sleeve": per_sleeve}) + "\n")
     groups: dict[str, dict] = {}
     for path in sorted(Path(results_dir).glob("results-*.jsonl")):
         for line in path.read_text().splitlines():
@@ -106,7 +139,7 @@ def score_search(
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if "metrics" not in rec:
+            if "metrics" not in rec or (ids is not None and rec["id"] not in ids):
                 continue
             key = json.dumps(rec["heavy"], sort_keys=True)
             group = groups.setdefault(key, {"heavy": rec["heavy"], "runs": {}})
@@ -124,6 +157,7 @@ def score_search(
                 "heavy": groups[key]["heavy"],
                 "runs": runs,
                 "runner": runner or {},
+                "per_sleeve": per_sleeve,
             }
         )
     remaining = len(tasks)

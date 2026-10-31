@@ -116,6 +116,9 @@ def test_monday_fills_use_the_next_weekday_open_and_the_10am_price_when_known():
     at_ten = pd.Series({pd.Timestamp("2024-01-08"): 3.2})
     ten, fallbacks = fills(daily, weeks, "mon_10am", at_ten)
     assert list(ten[:2]) == [3.2, 5.0] and fallbacks == 1
+    close, fallbacks = fills(daily, weeks, "mon_close")  # BL-176
+    assert list(close[:2]) == [3.5, 5.5] and fallbacks == 0
+    assert pd.isna(close.iloc[2])
 
 
 def test_series_without_an_open_fill_at_that_days_close():

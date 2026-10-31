@@ -9,7 +9,7 @@ When a signal is traded, at what price, and what the P&L is measured on.
 | Parameter | Default (where) | Mechanism | Grade |
 |---|---|---|---|
 | `signal_delay` | 0 weeks (API range 0 to 4) | Trade N weeks after the signal | M, TODO 3.9.23 |
-| `execution` | `fri_close` (`mon_open`, `mon_10am`) | Fill time. `mon_10am` falls back to the open where no 10:00 prices exist | M, TODO 3.9.23, 3.9.18 |
+| `execution` | `fri_close` (`mon_open`, `mon_close`, `mon_10am`) | Fill time. `mon_close` (BL-176) is the close of the first session after the signal Friday, Broad and ETF; `mon_10am` falls back to the open where no 10:00 prices exist | M, TODO 3.9.23, 3.9.18 |
 | `track` | `index` in Config / API; `etf` in Live | P&L on the index or on the traded ETF | M, package README, TODO 3.9.23 |
 | `premium_warn_pct` | 1.0 (2.0 international) | The live job flags a buy whose ETF trades above NAV. Premium drag is a steady cost for momentum buying | R |
 
