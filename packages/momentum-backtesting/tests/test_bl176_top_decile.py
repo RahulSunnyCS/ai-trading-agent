@@ -12,8 +12,13 @@ top = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(top)
 
 
-def _row(rid: str, lb: float, baskets: list[str]) -> dict:
-    return {"id": rid, "metrics": {}, "rank": {"lb_fy_excess": lb, "baskets": baskets}}
+def _row(rid: str, lb: float, baskets: list[str], every: int = 1) -> dict:
+    return {
+        "id": rid,
+        "light": {"rebalance_every": every},
+        "metrics": {},
+        "rank": {"lb_fy_excess": lb, "baskets": baskets},
+    }
 
 
 def test_the_decile_is_pooled_across_folders_and_written_back_per_folder():
@@ -21,6 +26,17 @@ def test_the_decile_is_pooled_across_folders_and_written_back_per_folder():
     b = [_row(f"b{i}", 0.5 + i / 100, ["medium"]) for i in range(10)]  # 0.50 .. 0.59
     chosen = top.choose({"A": a, "B": b}, ["conservative", "medium"])
     assert chosen == {"A": set(), "B": {"b9", "b8"}}  # top 10% of 20 = 2, both from B
+
+
+def test_non_weekly_configs_enter_from_the_top_fifth_weekly_ones_from_the_top_tenth():
+    # 20 runs in one basket, best first: w0, f1, w2, f3, ... (weekly even, fortnightly/monthly odd)
+    rows = [
+        _row(f"r{i}", 1 - i / 100, ["medium"], 1 if i % 2 == 0 else (2, 4)[i % 4 == 3])
+        for i in range(20)
+    ]
+    chosen = top.choose({"A": rows}, ["medium"])
+    # top 10% = places 0-1, top 20% = places 0-3: weekly r0 only, non-weekly r1 and r3
+    assert chosen == {"A": {"r0", "r1", "r3"}}
 
 
 def test_a_run_in_two_baskets_is_chosen_once_and_an_empty_basket_adds_nothing():
