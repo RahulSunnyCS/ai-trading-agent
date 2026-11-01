@@ -67,3 +67,38 @@ def test_the_script_writes_one_id_file_per_folder_and_refuses_folders_without_ra
 def test_the_decile_is_read_from_the_committed_criteria():
     keys = json.loads((ROOT / "search_spaces" / "bl176_criteria.json").read_text())["stage_3"]
     assert keys["keys"]["top_share"] == top.TOP_SHARE
+
+
+def test_pass_one_takes_one_share_of_every_basket_whatever_the_cadence():
+    rows = [_row(f"r{i}", 1 - i / 100, ["medium"], 1 if i % 2 == 0 else 4) for i in range(10)]
+    chosen = top.choose({"A": rows}, ["medium"], share=0.3)
+    assert chosen == {"A": {"r0", "r1", "r2"}}
+
+
+def test_pass_two_keeps_each_basket_its_registered_size_in_the_new_order():
+    # 20 weekly runs at Rs 50k: the registered entry is 2 (10% of 20). Pass 1 re-ran the top 6;
+    # at Rs 2 lakh r5 and r4 now lead, and r0 has fallen out of the basket.
+    old = [_row(f"r{i}", 1 - i / 100, ["medium"]) for i in range(20)]
+    new = [_row(f"r{i}", i / 100, [] if i == 0 else ["medium"]) for i in range(6)]
+    chosen = top.choose({"A": old}, ["medium"], order={"A": new})
+    assert chosen == {"A": {"r5", "r4"}}
+
+
+def test_pass_two_reads_each_folders_rescoring_and_refuses_a_missing_one(tmp_path):
+    folder = tmp_path / "A"
+    folder.mkdir()
+    rows = [_row(f"r{i}", 1 - i / 100, ["medium"]) for i in range(10)]
+    (folder / "results-1.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    out, rerank = tmp_path / "ids", tmp_path / "rerank"
+    args = [str(folder), "--name", "curated", "--out", str(out), "--rerank", str(rerank)]
+    assert top.main(args) == 2
+    scored = rerank / "curated__A"
+    scored.mkdir(parents=True)
+    rescored = [
+        {"id": "r2", "every": 1, "rank": {"lb_fy_excess": 0.9, "baskets": ["medium"]}},
+        {"id": "r0", "every": 1, "rank": {"lb_fy_excess": 0.1, "baskets": ["medium"]}},
+        {"id": "r1", "every": 1, "error": "boom"},
+    ]
+    (scored / "scores-000.jsonl").write_text("\n".join(json.dumps(r) for r in rescored))
+    assert top.main(args) == 0
+    assert (out / "curated__A.ids").read_text() == "r2\n"  # 10% of 10 = 1, the new leader

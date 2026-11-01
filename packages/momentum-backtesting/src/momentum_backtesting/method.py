@@ -14,6 +14,7 @@ Three things the first scoring got wrong, and what this does instead:
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import json
 import math
@@ -30,6 +31,9 @@ from . import bias, choose, metrics, search
 PBO_BLOCKS = 16  # bl010_criteria.json: phase_4_method.pbo.blocks
 PBO_KILL = 0.3  # ...pbo.kill_above
 TRANCHE_KILL_PTS = 0.03  # ...offset_average.kill_if_tranche_mean_below_reported_pts
+#: The space settings a scoring may replace (BL-176 override, 2026-11-01: Stage 3 reads every
+#: config at Rs 2 lakh a sleeve and a Rs 10,000 ceiling). Realism only; never a searched axis.
+FIXED_OVERRIDES = ("capital", "max_stock_price")
 
 
 def phase_capital(capital: float, every: int, per_sleeve: bool) -> float:
@@ -49,11 +53,18 @@ def blend_phases(phases: list[pd.Series], per_sleeve: bool) -> pd.Series:
 
 
 def _score_group(task: dict[str, Any]) -> dict[str, Any]:
-    """One ranking, every config that shares it, each on all of its calendar phases."""
+    """One ranking, every config that shares it, each on all of its calendar phases (or, with
+    `own_phase`, only the Friday the search sampled)."""
+    from . import reference_benchmarks
+
     space = search.load_space(Path(task["space_path"]))
+    if task.get("fixed"):
+        space = dataclasses.replace(space, fixed={**space.fixed, **task["fixed"]})
     runner = bias.Runner(space, **task["runner"])
     dest = Path(task["dest"])
     per_sleeve = bool(task.get("per_sleeve", False))
+    own_phase = bool(task.get("own_phase", False))
+    refs = reference_benchmarks.load_references()
     base = runner.base(task["heavy"])
     locks = None
     curves: dict[str, pd.Series] = {}
@@ -63,10 +74,12 @@ def _score_group(task: dict[str, Any]) -> dict[str, Any]:
         merged = {**space.fixed, **run["light"]}
         every = int(merged.get("rebalance_every", 1))
         capital = float(merged.get("capital", 1_000_000.0))
+        own = int(merged.get("rebalance_offset", 0))
         row: dict[str, Any] = {"id": run["id"], "every": every}
         try:
             phases = []
-            for offset in range(every):
+            offsets = [own] if own_phase else range(every)
+            for offset in offsets:
                 outcome, ranking = runner.run(
                     base,
                     task["heavy"],
@@ -79,14 +92,18 @@ def _score_group(task: dict[str, Any]) -> dict[str, Any]:
                 phases.append(outcome.result.equity)
             blend = blend_phases(phases, per_sleeve)
             cagrs = [float(metrics.cagr(p)) for p in phases]
-            own = int(merged.get("rebalance_offset", 0))
             row.update(
                 cagr=float(metrics.cagr(blend)),
                 mdd=float(metrics.max_drawdown(blend)[0]),
-                cagr_own_phase=cagrs[own],
+                cagr_own_phase=cagrs[0 if own_phase else own],
                 cagr_best_phase=max(cagrs),
                 cagr_worst_phase=min(cagrs),
             )
+            # The search's rank measure on the scored curve, so a re-scored set can be ranked
+            # again at another size (BL-176 Stage 3's entry re-rank) without re-reading curves.
+            measures = search.rank_measures(blend, refs)
+            if measures is not None:
+                row["rank"] = measures
             curves[run["id"]] = blend
         except Exception as error:  # noqa: BLE001 - recorded; the rest of the group still runs
             row["error"] = f"{type(error).__name__}: {error}"[:300]
@@ -110,6 +127,8 @@ def score_search(
     max_rankings: int | None = None,
     ids: set[str] | None = None,
     per_sleeve: bool = False,
+    fixed: dict[str, Any] | None = None,
+    own_phase: bool = False,
     echo=print,
 ) -> None:
     """Re-run every config of a finished search on all its phases and keep the blended weekly
@@ -119,7 +138,14 @@ def score_search(
     `max_rankings` stops after that many, for a machine that limits how long one job may run:
     a ranking is only saved whole, so a job cut off mid-way loses what it was working on.
     `per_sleeve` reads the space's capital as one sleeve: every phase runs with all of it and the
-    phases blend with equal capital reset each April (`phase_capital`, `blend_phases`)."""
+    phases blend with equal capital reset each April (`phase_capital`, `blend_phases`).
+    `fixed` replaces space settings named in `FIXED_OVERRIDES` (BL-176 Stage 3: Rs 2 lakh and a
+    Rs 10,000 ceiling). `own_phase` runs each config on its sampled Friday only (the entry
+    re-rank). A folder holds one basis: a second call with other settings is refused."""
+    fixed = dict(fixed or {})
+    unknown = sorted(set(fixed) - set(FIXED_OVERRIDES))
+    if unknown:
+        raise SystemExit(f"cannot override {unknown}: only {list(FIXED_OVERRIDES)}")
     dest.mkdir(parents=True, exist_ok=True)
     # Score files are named by position in the (filtered) group list, so one folder holds one id
     # set: a second, different list would skip or mix groups (BL-176 review).
@@ -129,9 +155,12 @@ def score_search(
         raise SystemExit(f"{dest} was scored for another set of ids; use a new --dest")
     marker.write_text(json.dumps(wanted) + "\n")
     basis = dest / "capital.json"
-    if basis.exists() and json.loads(basis.read_text())["per_sleeve"] != per_sleeve:
-        raise SystemExit(f"{dest} was scored with another capital basis; use a new --dest")
-    basis.write_text(json.dumps({"per_sleeve": per_sleeve}) + "\n")
+    settings = {"per_sleeve": per_sleeve, "fixed": fixed, "own_phase": own_phase}
+    if basis.exists():
+        before = {"fixed": {}, "own_phase": False, **json.loads(basis.read_text())}
+        if before != settings:
+            raise SystemExit(f"{dest} was scored with another capital basis; use a new --dest")
+    basis.write_text(json.dumps(settings, sort_keys=True) + "\n")
     groups: dict[str, dict] = {}
     for path in sorted(Path(results_dir).glob("results-*.jsonl")):
         for line in path.read_text().splitlines():
@@ -158,6 +187,8 @@ def score_search(
                 "runs": runs,
                 "runner": runner or {},
                 "per_sleeve": per_sleeve,
+                "fixed": fixed,
+                "own_phase": own_phase,
             }
         )
     remaining = len(tasks)
@@ -187,6 +218,27 @@ def load_scores(dest: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         [pd.read_parquet(path) for path in sorted(dest.glob("curves-*.parquet"))], axis=1
     )
     return pd.DataFrame(rows).set_index("id"), curves.sort_index()
+
+
+def load_pooled(
+    pairs: list[tuple[Path, Path]],
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, dict[str, Any]]]:
+    """Several arms' scorings as one set (BL-176 Stage 3 ranks a tag ranking's arms together):
+    (scores, curves, search records) over every (results folder, scored folder) pair. Run ids
+    hash the arm, so arms never share one; a config scored twice (arm B enters both tag
+    rankings) is kept once, from the first pair."""
+    scores, curves, records = [], [], {}
+    for results, scored in pairs:
+        one_scores, one_curves = load_scores(scored)
+        scores.append(one_scores)
+        curves.append(one_curves)
+        found = bias.load_records(results, set(one_curves.columns))
+        records.update({cid: rec for cid, rec in found.items() if cid not in records})
+    score_frame = pd.concat(scores)
+    curve_frame = pd.concat(curves, axis=1)
+    score_frame = score_frame[~score_frame.index.duplicated()]
+    curve_frame = curve_frame.loc[:, ~curve_frame.columns.duplicated()]
+    return score_frame, curve_frame.sort_index(), records
 
 
 def pbo(log_returns: np.ndarray, blocks: int = PBO_BLOCKS) -> dict[str, float]:

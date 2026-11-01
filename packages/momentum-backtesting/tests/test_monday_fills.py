@@ -221,3 +221,73 @@ def test_bl176_scores_each_friday_as_a_whole_sleeve_blended_with_april_resets(tm
     method.score_search(space, results, dest, workers=1, per_sleeve=True, echo=lambda *_: None)
     with pytest.raises(SystemExit, match="another capital basis"):
         method.score_search(space, results, dest, workers=1, echo=lambda *_: None)
+
+
+def test_bl176_stage3_scores_at_another_size_and_only_on_the_sampled_friday(tmp_path, monkeypatch):
+    """The 2026-11-01 override: Stage 3 reads configs at Rs 2 lakh and a Rs 10,000 ceiling, and
+    its entry re-rank runs each config on its own Friday only."""
+    import json
+    from types import SimpleNamespace
+
+    from momentum_backtesting import bias, method, reference_benchmarks
+
+    seen: list[dict] = []
+    weeks = pd.date_range("2018-01-05", periods=120, freq="W-FRI")
+
+    class FakeRunner:
+        def __init__(self, space, **_):
+            self.space = space
+
+        def base(self, heavy):
+            return None
+
+        def locks(self, ranking):
+            return ("uc", "lc")
+
+        def run(self, base, heavy, light, *, locks=None, **window):
+            seen.append({**self.space.fixed, **light, **window})
+            equity = pd.Series(1.002 ** np.arange(len(weeks)), index=weeks)
+            return SimpleNamespace(result=SimpleNamespace(equity=equity)), None
+
+    monkeypatch.setattr(bias, "Runner", FakeRunner)
+    monkeypatch.setattr(reference_benchmarks, "load_references", lambda: {})
+    space = Path(__file__).resolve().parents[1] / "search_spaces" / "round8_A_curated.toml"
+    light = {"rebalance_every": 4, "rebalance_offset": 2}
+    task = {
+        "index": 0,
+        "space_path": str(space),
+        "dest": str(tmp_path),
+        "heavy": {"lookbacks": [13, 26]},
+        "runs": [{"id": "x", "light": light}],
+        "runner": {},
+        "per_sleeve": True,
+        "fixed": {"capital": 200_000.0, "max_stock_price": 10_000.0},
+        "own_phase": True,
+    }
+    method._score_group(task)
+    assert [(s["rebalance_offset"], s["capital"], s["max_stock_price"]) for s in seen] == [
+        (2, 200_000.0, 10_000.0)
+    ]
+    row = json.loads((tmp_path / "scores-000.jsonl").read_text())
+    assert row["every"] == 4 and "error" not in row
+
+    seen.clear()
+    method._score_group({**task, "fixed": {}, "own_phase": False})
+    assert [(s["rebalance_offset"], s["capital"], s["max_stock_price"]) for s in seen] == [
+        (k, 50_000, 5000) for k in range(4)
+    ]
+
+    results = tmp_path / "results"
+    results.mkdir()
+    dest = tmp_path / "scored"
+    with pytest.raises(SystemExit, match="cannot override"):
+        method.score_search(space, results, dest, workers=1, fixed={"top_n": 3}, echo=print)
+    big = {"capital": 200_000.0}
+    method.score_search(space, results, dest, workers=1, fixed=big, echo=lambda *_: None)
+    method.score_search(space, results, dest, workers=1, fixed=big, echo=lambda *_: None)
+    with pytest.raises(SystemExit, match="another capital basis"):
+        method.score_search(space, results, dest, workers=1, echo=lambda *_: None)
+    with pytest.raises(SystemExit, match="another capital basis"):
+        method.score_search(
+            space, results, dest, workers=1, fixed=big, own_phase=True, echo=lambda *_: None
+        )

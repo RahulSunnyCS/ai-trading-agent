@@ -1603,11 +1603,29 @@ def search_score(
         help="The space's capital is one sleeve (BL-176): each Friday runs with all of it, "
         "blended with equal capital reset each April.",
     ),
+    overrides: list[str] = typer.Option(
+        None,
+        "--set",
+        help="Replace a space setting, KEY=VALUE, repeatable: capital or max_stock_price only "
+        "(BL-176 Stage 3: --set capital=200000 --set max_stock_price=10000).",
+    ),
+    own_phase: bool = typer.Option(
+        False,
+        "--own-phase",
+        help="Run each config on the Friday the search sampled only (BL-176's entry re-rank).",
+    ),
 ) -> None:
     """Re-score every config of a finished search on all its rebalance phases and keep the
     weekly curves (BL-010 Phase 4), then report the probability of backtest overfitting.
     Resumable: a ranking already scored is skipped."""
     from . import method, reference_benchmarks
+
+    fixed: dict[str, float] = {}
+    for item in overrides or []:
+        key, sep, value = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--set needs KEY=VALUE, got {item!r}")
+        fixed[key.strip()] = float(value)
 
     dest = dest or out / "scored"
     runner = {}
@@ -1625,6 +1643,8 @@ def search_score(
         max_rankings=max_rankings,
         ids=set(ids_file.read_text().split()) if ids_file else None,
         per_sleeve=per_sleeve,
+        fixed=fixed,
+        own_phase=own_phase,
         echo=typer.echo,
     )
     scores, curves = method.load_scores(dest)
@@ -1647,16 +1667,28 @@ def search_choose(
     out: Path = typer.Argument(..., help="A finished search's results folder."),
     scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
     dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase5)."),
+    also: list[str] = typer.Option(
+        None,
+        "--also",
+        help="Another arm to choose among, RESULTS=SCORED, repeatable (BL-176: a tag ranking's "
+        "arms are ranked together).",
+    ),
 ) -> None:
     """BL-010 Phase 5: robustness over financial years, the walk-forward of the choice rule,
     the factor check and the choice per drawdown basket, as committed in criteria addendum 3.
     Reads stored curves only; writes report.json and report.md."""
-    from . import bias, choose, db_read, method, phase5, reference_benchmarks
+    from . import choose, db_read, method, phase5, reference_benchmarks
 
     scored = scored or out / "scored_pit"
     dest = dest or out / "phase5"
-    scores, curves = method.load_scores(scored)
-    facts = choose.config_facts(bias.load_records(out, set(curves.columns)))
+    pairs = [(out, scored)]
+    for item in also or []:
+        results, sep, scoring = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--also needs RESULTS=SCORED, got {item!r}")
+        pairs.append((Path(results), Path(scoring)))
+    scores, curves, records = method.load_pooled(pairs)
+    facts = choose.config_facts(records)
     refs = reference_benchmarks.load_references()
     closes = db_read.weekly_closes_from_db_or_none()
     if closes is None:
