@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-30
+Last updated: 2026-11-02
 
 ## Open
 
@@ -27,6 +27,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-044](BL-044-local-service-auth-and-network-hardening.md) | Local-service auth and network hardening: Host/Origin guards, OAuth state bound to the browser, an internal token, tunnel checks | P1 | Planned | improvement | cross-cutting |
 | [BL-074](BL-074-point-in-time-categories-nse-basic-industry.md) | Point-in-time categories from NSE's Basic Industry classification | P1 | Planned | research | momentum |
 | [BL-113](BL-113-t1-parallel-track.md) | T1 parallel track: Adaptive over Core-298 + 223 time-generic variants, own journal, private Telegram, 60-day read-out vs the live Adaptive (supersedes BL-112) | P1 | In progress | feature + research | options |
+| [BL-194](BL-194-t1-book-stop-dir2.md) | T1's book stop on Dir ×2 days: ₹9k–20k and none against today's ₹9k + the Dir's stop (₹13k) | P1 | Planned | research | options |
 | [BL-114](BL-114-momentum-correlation-widget.md) | Momentum correlation widget: how alike are the strategies we follow? (saved groups measure as 1.2 independent bets of 11) | P1 | Planned | feature | momentum |
 | [BL-116](BL-116-broad-sector-position-and-score.md) | Does the sector a pick came from (its position, its own average-weekly score) tell winning from losing Broad picks? | P1 | Sector position passes; sector score killed; Phase 2 (top-sector weight 2x) passes development, 2023-26 check not run, waits on BL-176 (owner, 2026-10-28) | research | momentum |
 | [BL-117](BL-117-live-desk-and-paper-agents.md) | Live desk: live NIFTY/SENSEX feed (Angel One WS / REST, a spike decides), live straddle view, a paper desk that steps the legwise engine on live bars (live = replay, first measured slippage), and pre-open agents (Clockwork, Placebo, the four lists, Meta slow/fast, Calendar-veto, LLM filter) tested over stored results before any forward run | P1 | Planned (Opus draft reworked by Fable; owner to read) | feature + research | options |
