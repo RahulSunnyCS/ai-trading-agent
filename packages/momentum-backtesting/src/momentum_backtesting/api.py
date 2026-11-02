@@ -650,7 +650,7 @@ class BacktestRequest(BaseModel):
     momentum_sizing_window: int = Field(10, ge=1, le=52)
     momentum_sizing_floor: float = Field(0.0, ge=0, le=1)
     track: Literal["index", "etf"] = "index"
-    execution: Literal["fri_close", "mon_open", "mon_10am"] = "fri_close"
+    execution: Literal["fri_close", "mon_open", "mon_close", "mon_10am"] = "fri_close"
     # Stock-momentum additions (engine.py Config fields; harmless defaults for ETF requests).
     score: Literal["ranksum", "voladj", "blend"] = "ranksum"
     voladj_skip_recent_month: bool = True
@@ -1260,12 +1260,12 @@ def _stock_backtest(req: BacktestRequest) -> dict:
 
 
 def _refuse_monday_fill(req: BacktestRequest, dataset: str) -> None:
-    """Stock and Custom Index have no Monday-open fill yet (BL-036 Phase 2b); Broad and the ETF
+    """Stock and Custom Index have no Monday fill yet (BL-036 Phase 2b); Broad and the ETF
     dataset do. Refuse the option rather than run a Friday-close backtest under its name."""
     if req.execution != "fri_close":
         raise HTTPException(
             422,
-            f"Monday-open fills are not available for {dataset} yet; choose Friday close.",
+            f"Monday fills are not available for {dataset} yet; choose Friday close.",
         )
 
 
@@ -1980,7 +1980,7 @@ def _run_broad(
         uc_locked, lc_locked = circuit_exposure_mod.lock_masks(
             ranking.column_to_base_symbol,
             ranking.prices.index,
-            session="first" if req.execution == "mon_open" else "last",
+            session="first" if req.execution in ("mon_open", "mon_close") else "last",
         )
     return broad.run_broad_backtest(
         outer_prices=outer_prices,
@@ -2150,7 +2150,10 @@ def _fill_companion(
     The ranking does not depend on the fill, so the run's own `ranking` is reused: one extra
     engine pass per sleeve. Never raises; a failure is reported in the payload instead."""
     if req.execution not in ("fri_close", "mon_open"):
-        return {"status": "not_applicable", "reason": "this fill is not a Friday or Monday fill"}
+        return {
+            "status": "not_applicable",
+            "reason": "the Friday-close and Monday-open comparison is shown for those two fills",
+        }
     if req.signal_delay != 0:
         return {
             "status": "not_applicable",

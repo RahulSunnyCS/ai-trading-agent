@@ -90,6 +90,11 @@ SCENARIOS: dict[str, dict] = {
         "$meta": "broad",
         "with": {"broad_universe": "total_market", "execution": "mon_open"},
     },
+    # BL-176: the same run filled at the close of that Monday session.
+    "broad_monday_close": {
+        "$meta": "broad",
+        "with": {"broad_universe": "total_market", "execution": "mon_close"},
+    },
     "broad_category_mode_off": {
         "$meta": "broad",
         "with": {

@@ -128,8 +128,12 @@ def nudges(rec: dict[str, Any], space: search.Space) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
 
     def add(kind: str, label: str, *, heavy_edit=None, light_edit=None, window=None) -> None:
-        new_light = {**light, **(light_edit or {})}
         new_heavy = {**heavy, **(heavy_edit or {})}
+        # A lookback set the tilt cannot use runs untilted, as the search recorded it (BL-176):
+        # a tilt nudge there is the base config again, and a lookback nudge into one drops it.
+        new_light = search.without_impossible_tilt(
+            new_heavy, {**light, **(light_edit or {})}, fixed
+        )
         if (new_light, new_heavy, window) == (light, heavy, None):
             return
         if not search.feasible(space.arm, {**fixed, **new_light}):

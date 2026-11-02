@@ -1,6 +1,6 @@
 # Momentum: score (ranksum, voladj, blend, and the variants tried)
 
-**Status:** Tested · **Last updated:** 2026-10-24
+**Status:** Tested · **Last updated:** 2026-11-02
 
 ## What it is
 
@@ -35,6 +35,7 @@ on the [skip-month](skip-month.md) page.
 | [BL-085](../../../backlog/BL-085-momentum-improvement-levers.md) L6 | residual momentum vs each config's own score | 11 Broad strategies, after tax at Rs 5 lakh; FY2018-22, FY2023-26 | Killed | -16.4 then -29.5 pts; less pain 0 of 11 in both windows; worst fall 12.7 and 25.4 pts deeper. [`bl085_result.json`](../../../packages/momentum-backtesting/search_spaces/bl085_result.json), [write-up](../../../packages/momentum-backtesting/docs/bl085-levers-2026-10-09.md) |
 | [BL-115](../../../backlog/BL-115-own-history-stock-features-winners-losers.md) | owner's absolute score: sum of each own lookback's average weekly return (return / weeks), no ranking against other stocks, as a trade-level separator (not a replacement rank) | Trio Fortnightly and Four Sectors Monthly, No Tilt, 2017-2022, 892 trades, outcome = return over Nifty 500 TRI | Killed (passes in Four Sectors only) | Four Sectors rho +0.15, t 3.9, worst fifth 60% vs 49% losers; Trio rho +0.08, t 1.7. Within the same decision week +0.18 / +0.08. The 13- and 26-week parts carry it (rho +0.16 / +0.17 in Four Sectors); 4 and 52 weeks little. [`bl115_result.json`](../../../packages/momentum-backtesting/search_spaces/bl115_result.json) |
 | [BL-116](../../../backlog/BL-116-broad-sector-position-and-score.md) H2 | the chosen sector's own average-weekly score (mean of its members' scores) as a separator of picks | Trio and Four Sectors Monthly, No Tilt, 2017-2022 | Killed | rho +0.12 (t 1.7) and -0.09 (t -1.1); about half the picks had no score (fewer than 3 members with a year of prices); +0.81 / +0.74 correlated with the stock's own score. [`bl116_result.json`](../../../packages/momentum-backtesting/search_spaces/bl116_result.json) |
+| [BL-176](../../../backlog/BL-176-momentum-search-on-f6-ranking.md) Stage 1 | `score`; `voladj_lookbacks` on/off; `voladj_skip` long/none; seven lookback sets | Broad, 2017-01 to 2026-10, F6 ranking, Stage 1 (one sampled Friday, ₹50k sleeve; 20,000 runs per arm A tag set, 10,000 B, 4,000 C1) | Descriptive. `voladj` best; `voladj_lookbacks` flat on A (expected to lose), loses on C1 and B; [26,52] best, [1,4,13] worst (as expected) | Median lower-bound excess, curated A: voladj −7.7, blend −9.9, ranksum −13.1; voladj_lookbacks on −9.6 vs off −9.8 (extended −9.4 vs −9.0, C1 −12.5 vs −10.0); [26,52] −4.5, [1,4,13] −18.2. `search_spaces/bl176_stage1_axes.csv` |
 
 ## What we know
 
