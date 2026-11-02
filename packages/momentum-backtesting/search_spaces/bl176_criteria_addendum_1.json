@@ -1,0 +1,63 @@
+{
+ "written_before_running": "2026-11-02T12:30:00+05:30",
+ "name": "BL-176 criteria, addendum 1: the finalist checks on the two ensembles (gates G1-G6 read for an ensemble)",
+ "adds_to": "bl176_criteria.json; the gate numbers are bl010_criteria_addendum_8.json's four_sectors_gates, read, not restated; the verdict rule is addendum 6's, unchanged",
+ "rule": "Committed before any finalist run. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason. Every stage runs once per ensemble; a run that errors or is repeated because data moved is logged, never swapped for a better one.",
+ "reason": "Stage 3 (2026-11-02): the Phase 5 rule (addendum 3) was killed in every basket of both tag rankings, and addendum 4's ensemble passed its walk-forward in both. bl176_criteria.json applies addendum 6's gates G1-G6 to the finalists, but addendum 6 wrote them for one config on four Fridays; an ensemble is four configs, each on all its Fridays. This file says how each gate reads for it, before anything is run.",
+ "subjects": {
+  "curated": "the four configs of data/search/round8_stage3/phase6/curated/ensemble.json 'pick' (full history): 42797fbde4d5, d8a3f07e9e34, 086b1949a637, 3d537a9932da",
+  "extended": "the four configs of data/search/round8_stage3/phase6/extended/ensemble.json 'pick': d5ad8da622e7, d7b06967be4e, 00d4034e807e, 02ff9a531230",
+  "note": "42797fbde4d5 and d5ad8da622e7 are one arm A point run under each tag set (paired files). Each config runs on its own arm's space (round8_<folder>.toml: universe, tags and realism), as it was searched and scored."
+ },
+ "money": {
+  "sleeve": "every config on all its Fridays (rebalance_every sleeves, rebalance_offset 0..K-1), Rs 2,00,000 a sleeve and a Rs 10,000 price ceiling (owner override 2026-11-01); a config's sleeves blended with equal capital restored each April, and the configs blended the same way (choose.ensemble_curve): the Stage 3 blend, as the account follows a group",
+  "registered_size_beside": "the same after tax at Rs 50,000 a sleeve and the space's Rs 5,000 ceiling, reported beside every gate, not judged",
+  "phase_slots": "addendum 4 trades each config on one Friday; BL-176 follows each on all its Fridays, the basis every Stage 3 figure was ranked on. The one-Friday ensemble is reported (each config on the phase_slot addendum 4 assigned), not judged"
+ },
+ "variants": {
+  "P0_as_ranked": "the ranking's own tags, pre-tax. Must reproduce the stored Stage 3 blend of every member within 0.1 point of CAGR; a larger gap is explained before anything else is read",
+  "P1_extended_tags": "extended tags, pre-tax. For the curated ensemble this is the hindsight check (its members on today's fuller tags); for the extended ensemble it is P0",
+  "T0_after_tax": "the ranking's tags, tax.TaxRules() on every sleeve (separate ledgers, as BL-087)",
+  "T_real": "extended tags and tax: the closest backtest to the real trade before the fill-day and share-count effects (addendum 6's A3). For the extended ensemble it is T0",
+  "T_real_50k": "T_real at Rs 50,000 a sleeve and the Rs 5,000 ceiling (reported)",
+  "M_monday_open_whole_shares": "addendum 6's M on every sleeve of every member: the audit replay (audit/replay.py) of P1's decisions filled at the next trading day's open in whole shares at the raw price, against the same decisions at the close in fractional shares, at Rs 2,00,000 a sleeve, blended as above; reported as the change in CAGR and worst fall. Pre-tax, applied to T_real as an estimate",
+  "E_expected_case": "T_real CAGR + M's CAGR change, T_real worst fall + M's change (addendum 6's E)"
+ },
+ "gates": {
+  "G1_minimum_bar": "E CAGR minus Nifty200 Momentum 30 TRI CAGR over the same weeks, at least g1_excess_over_mom30 (addendum 8)",
+  "G2_drawdown_basket": "criteria.basket_passes(T_real's ensemble curve, 'medium'), and E's worst fall inside the -40% hard ceiling; aggressive reported",
+  "G3_no_bad_year": "no complete financial year of T_real's ensemble trails Nifty200 Momentum 30 TRI by more than g3_worst_fy_vs_mom30",
+  "G4_plateau": "every one-step neighbour of every member (robust.nudges on the member's own space, every searched dimension, the offset and start nudges skipped since every Friday is already in the blend), run as P0 on all its Fridays. Each neighbour is compared with ITS OWN member's P0 (a gap in points) and with Mom30 TRI over the same weeks. Pooled over the four members: the median gap at least g4_median_gap_pts AND a share of at least g4_share_above_mom30 at least g4_above_mom30 above Mom30 TRI. Read per member, not on the ensemble with one member swapped, because swapping one of four dilutes a nudge four times and would make the gate weaker than addendum 6's. The swapped-ensemble figures and each member's own gap are reported",
+  "G5_alpha": "choose.factor_regression on T_real's ensemble weekly returns: alpha at least g5_alpha a year with |t| at least g5_abs_t",
+  "G6_fair_placebo": "100 seeds (0-99). For each seed every member runs on method.persistent_random_ranks(its own ranking's global ranks, seed), stock tilt off, on all its Fridays, as P0; the four placebo members form a placebo ensemble the same way. P0's ensemble CAGR beats the 95th percentile of the 100 placebo ensembles by at least g6_margin_over_p95. Each member's own placebo margin is reported"
+ },
+ "verdict": {
+  "rule": "addendum 6's: HOLDS_UP = G1, G2 and G3 pass and at most one of G4, G5, G6 fails; DOES_NOT_HOLD_UP = G1 fails, or two or more of G4, G5, G6 fail; MIXED otherwise",
+  "minimum_bar": "G1 is the registered minimum bar (+5 over Mom30 TRI after tax). No walking down: an ensemble that fails it is 'none after tax' for its ranking, reported with its tax drag; no other cluster or config is substituted",
+  "action": "none is automatic; the two ensembles are reported side by side (settings, weekly-return correlation) and the money decision stays the owner's"
+ },
+ "reported_not_judged": [
+  "P0, P1, T0, T_real, T_real_50k, E for each ensemble and each member: CAGR, worst fall, Ulcer index, turnover, tax drag in points",
+  "per-Friday spread of each member (each sleeve's CAGR and worst fall)",
+  "financial-year table of T_real and E against Mom30 TRI, Nifty 500 TRI, Midcap 150 TRI and Smallcap 250 TRI; rolling two- and three-year windows",
+  "stationary block bootstrap of T_real's ensemble (13 and 26 week blocks, 2,000 draws, seed 0)",
+  "contribution profile of T_real: top five companies' share of realised profit (flag above 50%), the largest single name",
+  "deflated Sharpe of P0's ensemble weekly excess over Mom30 TRI (final.deflated_sharpe), the trial count counted exactly from the ranking's Stage 1 and 2 results files (round 7's 8,003 and 4,754 named as prior trials), the spread from the ranking's Stage 3 blends; no threshold is registered, so it is reported",
+  "the one-Friday ensemble (addendum 4's phase slots), P0 and T_real",
+  "the weekly-return correlation between the two ensembles, and their settings side by side",
+  "number of backtests run, the code commit, the data version"
+ ],
+ "red_team": {
+  "look_ahead": "no new data path: the same engine, universe and tags as Stage 3, which the truncation audit (Phase 2 step 4, rerun as BL-176's lookahead step) covers. The Monday-open replay reads the open of the first session after the signal Friday, known only at the fill.",
+  "survivorship": "point-in-time turnover_rank universe (arm A); the all-liquid universe for the C1 member, gated week by week; untagged names (BSE does not list them) can never be picked, which favours the result",
+  "data_snooping": "the ensembles were chosen on the same 2017-2026 data they are judged on; PBO 0.43 (curated) and 0.55 (extended) over the Stage 3 blends; every figure is in-sample and labelled so. The plateau and placebo test the pick's shape, not its future"
+ },
+ "known_biases": [
+  "selected on the data it is judged on: the headline can only shrink toward the median config",
+  "today's classification in the extended tags; today's tax rates from 2017; delisted names valued at their last close",
+  "engine costs carry no brokerage (Kite delivery is free); STT, stamp duty, exchange, GST and the Rs 16 depository fee per sell are itemised",
+  "Rs 2,00,000 a sleeve is the owner's override; the registered Rs 50,000 is reported beside"
+ ],
+ "runs_allowed": 1,
+ "how_enforced": "scripts/bl176_finalists.py writes search_spaces/bl176_finalists_<ranking>.json once per ranking, with the commit and data version, and refuses to overwrite it. The results are committed. A fail is reported, not tuned around."
+}
