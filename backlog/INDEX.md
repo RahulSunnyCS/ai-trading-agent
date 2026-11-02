@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-30
+Last updated: 2026-11-02
 
 ## Open
 
@@ -44,6 +44,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-173](BL-173-fewer-telegram-messages.md) | Fewer Telegram messages: one morning confirmation, the pick, the result and failures; a "failures only" level per type | P1 | In progress | improvement | notify |
 | [BL-174](BL-174-rotation-day-60-readout.md) | Options rotation: the registered read-out at 60 trading days of the forward journal (due ~early Jan 2027) | P1 | Planned | research | options |
 | [BL-176](BL-176-momentum-search-on-f6-ranking.md) | Momentum: a fresh three-stage strategy search on the F6-fixed (point-in-time) ranking: wide screening over every searchable axis (`voladj` lookbacks and skip, fill day incl. a new Monday close, category cap, tilt screen, top-sector weight; sleeve realism ₹50k / ₹5k ceiling), a focused stage by rule, finalists as all-Fridays blends; favourites located afterwards | P1 | Run 2026-11-02: single pick killed (PBO 0.43 / 0.55); ensembles pass the walk-forward and are frozen, both MIXED on G1-G6 (about 24% a year after tax and fuller tags, worst fall about −28% to −30%); followed Four Sectors Monthly does not hold, Five Sectors Rank Sum holds only on hindsight tags; owner's money decision open | research | momentum |
+| [BL-197](BL-197-algotest-evening-setup-morning-activate.md) | AlgoTest: Setup Execution every evening (Trade monitoring on Candle Close), Activate right after the morning broker login; the evening list trades | P1 | In progress | feature | broker-login |
+| [BL-200](BL-200-momentum-rebalance-log.md) | Momentum: a rebalance log in the Trade book, one block per lot per due week (done / waiting / not done, net shares per stock, the lot's holding after), the raw fills collapsed below | P1 | In progress | feature | momentum |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |

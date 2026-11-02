@@ -9,6 +9,7 @@ import {
   parseCards,
   parseLive,
   planDeploy,
+  planSetup,
   repeating,
   secondsUntil,
   stillDeployed,
@@ -313,4 +314,137 @@ test('nothingOnAlgotest: the 15:35 check still runs after a deploy today', () =>
     nothingOnAlgotest([], 't1', true, ['2026-10-26'], '2026-10-27') ?? '',
     /deployed nothing today: nothing to check/,
   );
+});
+
+// /live's innerText on 2026-11-02 19:40 IST (trimmed): no "n/6 Strategy Deployed" any more, the
+// three evening uploads not yet set up.
+const PAGE_NOV = `Algo Trade
+Auto Activation
+History
+Broker Login 0/2
+Auto restart paused executions
+Total MTM
+Deployed Strategies
+
+Show archived
+
+Running
+Paused
+Sq Off
+Error
+Manual
+
+No strategies found
+
+Activation
+
+Strategies
+Portfolios
+RA Algos
+CryptoBazaar Algos
+
+Filter
+
+T1 · N_p80_0947
+
+NIFTY
+
+•
+INTRADAY
+
+Setup Pending
+
+0 Deployed
+
+-
+-
+-
+-
+-
+-
+-
+
+Setup Execution
+Activate
+T1 · N_p80_0932
+
+NIFTY
+
+•
+INTRADAY
+
+Setup Pending
+
+0 Deployed
+
+-
+-
+-
+-
+-
+-
+-
+
+Setup Execution
+Activate
+T1 · N_wide_0947
+
+NIFTY
+
+•
+INTRADAY
+
+Setup Pending
+
+0 Deployed
+
+-
+-
+-
+-
+-
+-
+-
+
+Setup Execution
+Activate`;
+
+const novPicks = [
+  { name: 'T1 · N_p80_0947', entry: minutesOf('09:47') },
+  { name: 'T1 · N_p80_0932', entry: minutesOf('09:32') },
+  { name: 'T1 · N_wide_0947', entry: minutesOf('09:47') },
+];
+
+test('parseLive reads a page without the strategy count as no limit', () => {
+  const live = parseLive(PAGE_NOV);
+  assert.equal(live.slotsMax, null);
+  assert.equal(live.brokersTotal, 2);
+  assert.deepEqual(
+    live.rows.map((r) => [r.name, r.status, r.deployed]),
+    novPicks.map((p) => [p.name, 'Setup Pending', 0]),
+  );
+});
+
+test('with no strategy count shown, every due pick is deployed (no slot limit invented)', () => {
+  const live = parseLive(PAGE_NOV.replace('Broker Login 0/2', 'Broker Login 2/2'));
+  const p = planDeploy(novPicks, live, minutesOf('08:20'));
+  assert.equal(p.refused, null);
+  assert.deepEqual(
+    p.deploy.map((d) => d.name),
+    ['T1 · N_p80_0932', 'T1 · N_p80_0947', 'T1 · N_wide_0947'],
+  );
+  assert.deepEqual(p.noSlot, []);
+});
+
+test('planSetup sets up every uploaded pick in entry order, never a deployed one', () => {
+  const live = parseLive(PAGE_NOV.replace(/(T1 · N_wide_0947[\s\S]*?)0 Deployed/, '$11 Deployed'));
+  const p = planSetup([...novPicks, { name: 'T1 · N_dir_1017', entry: minutesOf('10:17') }], live);
+  assert.deepEqual(
+    p.setup.map((d) => d.name),
+    ['T1 · N_p80_0932', 'T1 · N_p80_0947'],
+  );
+  assert.deepEqual(p.deployed, ['T1 · N_wide_0947']);
+  assert.deepEqual(p.missing, ['T1 · N_dir_1017']);
+  // the night page has no broker logged in: setting up does not need one
+  assert.equal(live.brokersLoggedIn, 0);
 });

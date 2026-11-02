@@ -1,0 +1,141 @@
+'use client';
+
+/**
+ * The Momentum rebalance log (BL-200): one block per lot per due week, newest first. What the
+ * lot was told to trade, what the Zerodha notes show it did (netted per stock), and what the
+ * lot holds after. A missed week says where it was folded in. Every figure is the server's.
+ */
+
+import { type TradeBookRange, useMomentumRebalanceLog } from '../../hooks/useTradeBook';
+import { EMPTY, formatDayShort, formatInr, formatInt } from '../../lib/format';
+import {
+  REBALANCE_TONE,
+  foldedLine,
+  holdingLine,
+  kiteCheckLine,
+  lineNote,
+  rebalanceStatusLabel,
+  rebalanceTitle,
+} from '../../lib/momentumRebalanceLog';
+import type { RebalanceBlock, RebalanceLogResponse } from '../../types/tradeBook';
+import { Badge } from '../ui/Badge';
+import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { Loaded, TradeBookWidget } from './parts';
+
+export function TradeBookRebalances({ range }: { range: TradeBookRange }) {
+  const res = useMomentumRebalanceLog(range);
+  const blocks = res.data?.groups.flatMap((g) => g.blocks) ?? [];
+  const through = res.data?.notes_through;
+  return (
+    <TradeBookWidget
+      title="Rebalances"
+      badge={res.data ? formatInt(blocks.length) : undefined}
+      description={`One block per lot on its Friday, newest first: the trades netted per stock and what the lot holds after. Zerodha notes read through ${
+        through ? formatDayShort(through, { weekday: true }) : EMPTY
+      }.`}
+    >
+      {() => (
+        <Loaded
+          data={res.data}
+          loading={res.loading}
+          error={res.error}
+          retry={res.refetch}
+          rows={4}
+        >
+          {(data) =>
+            blocks.length === 0 ? (
+              <p className="text-xs text-faint">
+                {data.paper_start
+                  ? 'No rebalance in this period.'
+                  : 'No paper start is set, so there are no lots to show.'}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <KiteCheck check={data.kite_check} />
+                {blocks.map((block) => (
+                  <RebalanceCard key={`${block.week}-${block.sleeve_id}`} block={block} />
+                ))}
+              </div>
+            )
+          }
+        </Loaded>
+      )}
+    </TradeBookWidget>
+  );
+}
+
+function KiteCheck({ check }: { check: RebalanceLogResponse['kite_check'] }) {
+  const line = kiteCheckLine(check);
+  if (!line) return null;
+  return <p className={check?.matches ? 'text-xs text-muted' : 'text-xs text-warning'}>{line}</p>;
+}
+
+function RebalanceCard({ block }: { block: RebalanceBlock }) {
+  const folded = foldedLine(block);
+  return (
+    <article
+      aria-label={rebalanceTitle(block)}
+      className="rounded-lg border border-border bg-surface-2/40 px-3 py-2.5"
+    >
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h4 className="text-sm font-semibold text-foreground">{rebalanceTitle(block)}</h4>
+        <Badge tone={REBALANCE_TONE[block.status]} dot>
+          {rebalanceStatusLabel(block.status)}
+        </Badge>
+        {block.new_lot ? (
+          <span className="text-xs text-faint">new lot, bought from cash</span>
+        ) : null}
+        {block.first_trade_day && block.first_trade_day !== block.week ? (
+          <span className="text-xs text-faint">
+            traded {formatDayShort(block.first_trade_day, { weekday: true })}
+          </span>
+        ) : null}
+      </header>
+      {block.lines.length > 0 ? (
+        <Table className="mt-2">
+          <THead>
+            <Th dense>Stock</Th>
+            <Th dense align="right">
+              Shares
+            </Th>
+            <Th dense align="right">
+              Value
+            </Th>
+            <Th dense>Side</Th>
+            <Th dense>Note</Th>
+          </THead>
+          <tbody>
+            {block.lines.map((line) => (
+              <TRow key={line.symbol} className="whitespace-nowrap">
+                <Td dense>{line.symbol}</Td>
+                <Td dense numeric align="right">
+                  {line.shares === null ? EMPTY : formatInt(line.shares)}
+                </Td>
+                <Td dense numeric align="right">
+                  {line.value === null ? EMPTY : formatInr(line.value)}
+                </Td>
+                <Td dense>
+                  <Badge tone={line.side === 'buy' ? 'info' : 'accent'}>{line.side}</Badge>
+                </Td>
+                <Td dense className="text-xs text-muted">
+                  {lineNote(line) ?? ''}
+                </Td>
+              </TRow>
+            ))}
+          </tbody>
+        </Table>
+      ) : null}
+      {folded ? <p className="mt-2 text-xs text-warning">{folded}</p> : null}
+      <p className="mt-2 text-xs text-muted">
+        <span className="text-faint">Holding after: </span>
+        {holdingLine(block)}
+      </p>
+      {block.bought || block.sold ? (
+        <p className="mt-0.5 text-xs text-faint">
+          Bought {formatInr(block.bought)} · sold {formatInr(block.sold)}
+          {block.charges ? ` · charges ${formatInr(block.charges)}` : ''}
+        </p>
+      ) : null}
+    </article>
+  );
+}

@@ -320,3 +320,57 @@ export interface TradeBookInputs {
   capital_total?: number | null;
   capital?: { finvasia?: number | null; angelone?: number | null } | null;
 }
+
+/** BL-200: GET /api/momentum/lots/rebalances, one block per lot per due week. */
+export type RebalanceStatus = 'done' | 'partly done' | 'waiting for notes' | 'not done';
+
+export interface RebalanceLine {
+  symbol: string;
+  side: 'buy' | 'sell';
+  /** Shares traded; null when the stock was asked for and not traded. */
+  shares: number | null;
+  /** Traded value, or the planned value for a stock not traded yet. */
+  value: number | null;
+  planned_shares: number | null;
+  /** forward_fills' per-stock status: done / shares differ / extra / missed. */
+  status: string;
+}
+
+export interface RebalanceBlock {
+  week: string;
+  week_no: number;
+  lot: string;
+  sleeve_id: string;
+  new_lot: boolean;
+  status: RebalanceStatus;
+  notes_final: boolean;
+  first_trade_day: string | null;
+  orders_at: string | null;
+  lines: RebalanceLine[];
+  bought: number;
+  sold: number;
+  charges: number | null;
+  holding_after: { symbol: string; shares: number }[];
+  folded_into: { week: string; week_no: number; scheduled: boolean } | null;
+}
+
+export interface RebalanceKiteCheck {
+  synced_at: string | null;
+  cash: number | null;
+  matches: boolean;
+  differences: { symbol: string; kite: number; lots: number }[];
+}
+
+export interface RebalanceLogResponse {
+  paper_start: string | null;
+  notes_through: string | null;
+  /** The latest stored Kite snapshot against what the lots hold now; null with no snapshot. */
+  kite_check: RebalanceKiteCheck | null;
+  groups: {
+    group_id: string;
+    name: string | null;
+    lots: number;
+    blocks: RebalanceBlock[];
+    outside_lots: number;
+  }[];
+}
