@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -24,7 +25,7 @@ from momentum_backtesting import search
 
 PKG = Path(__file__).resolve().parents[1]
 SPACES = PKG / "search_spaces"
-DATA = Path(__import__("os").environ.get("MOMENTUM_DATA_DIR", PKG / "data")) / "search"
+DATA = Path(os.environ.get("MOMENTUM_DATA_DIR", PKG / "data")) / "search"
 STAGE3 = DATA / "round8_stage3"
 ARMS = {
     "curated": ["round8_A_curated", "round8_B", "round8_A_curated_focus"],
@@ -120,7 +121,8 @@ def freeze(ranking: str, ensemble_commit: str, finalists_commit: str, lookahead:
         },
         "finalist_verdict": finalists["verdict"],
         "finalist_record": f"search_spaces/bl176_finalists_{ranking}.json",
-        "realistic": finalists["ensemble"].get("T_real") or finalists["ensemble"].get("T0_after_tax"),
+        "realistic": finalists["ensemble"].get("T_real")
+        or finalists["ensemble"].get("T0_after_tax"),
         "lookahead": {
             "method": "mbt audit lookahead (search runner, database truncated at each cut)",
             "cuts": ["2019-06-28", "2021-06-25", "2024-03-28"],
