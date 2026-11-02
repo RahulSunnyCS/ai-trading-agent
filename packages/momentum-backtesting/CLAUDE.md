@@ -284,6 +284,16 @@ to the data (lazy `api` import; the catalog open only for the reads): `mbt journ
 live, and `api._forward_score_line` adds `forward_run.headline_line()` to the headline's final
 message (a failure is a line saying so).
 
+**Rebalance log (BL-200).** `rebalance_log.py` is pure: over `forward_run.cached_fills()` (the same
+cached reconciliation the Journal page reads) it builds one block per lot per due week for the
+Trade book's Momentum tab: week number from the paper start, status (done / partly done / waiting
+for notes / not done: "waiting" until the Kite mailbox's last check, `contract-notes/cursor.json`,
+covers the first session after the Friday), the lines netted per stock, the lot's holding after
+(ledger before the Friday + the week's fills), where a missed week was folded in (the lot's next
+due week; orders never change), and the latest stored Kite snapshot against what the lots hold
+now. `GET /api/lots/rebalances?from=&to=` (`forward_run.rebalance_log`; proxied at
+`/api/momentum/lots/rebalances`), read-only.
+
 **Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
 parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into
 real values (e.g. `"2011-01-01"`) when its own CLI runner invokes the function. Calling them

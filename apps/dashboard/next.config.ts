@@ -195,6 +195,11 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/lots`,
             },
             {
+              // BL-200: the Trade book's Momentum rebalance log (read-only)
+              source: '/api/momentum/lots/rebalances',
+              destination: `${momentumDirectOrigin}/api/lots/rebalances`,
+            },
+            {
               // sync, paste, rules
               source: '/api/momentum/holdings/:path*',
               destination: `${momentumDirectOrigin}/api/holdings/:path*`,

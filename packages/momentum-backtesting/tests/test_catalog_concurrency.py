@@ -128,6 +128,7 @@ def test_read_endpoints_open_the_catalog_read_only(client, monkeypatch):
         ("/api/weekly/status", {}),
         ("/api/alerts", {}),
         ("/api/lots", {}),  # This week's Lots panel (BL-142 Phase 4)
+        ("/api/lots/rebalances", {}),  # Trade book's rebalance log (BL-200)
     ]:
         assert client.get(path, params=params).status_code == 200, path
     assert modes and all(modes), modes
