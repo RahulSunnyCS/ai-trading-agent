@@ -149,7 +149,10 @@ def normalise(dataset: str, config: dict[str, Any]) -> dict[str, Any] | None:
     for key, default in _LATER_DEFAULTS.items():
         if key in settings and settings[key] == default:
             settings.pop(key)
-    # `voladj_skip` is read only with `voladj_lookbacks` on (engine.compute_ranks).
+    # `voladj_lookbacks` is read only by the voladj and blend scores, `voladj_skip` only with it
+    # on (engine.compute_ranks; `search.canonical_heavy` drops them the same way).
+    if settings.get("score") == "ranksum":
+        settings.pop("voladj_lookbacks", None)
     if not settings.get("voladj_lookbacks"):
         settings.pop("voladj_skip", None)
     if "broad_liquidity_filter" in settings:

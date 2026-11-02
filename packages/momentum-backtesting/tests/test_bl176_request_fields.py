@@ -3,13 +3,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
 
-from momentum_backtesting import api, phase6, search
+from momentum_backtesting import api, search
 from momentum_backtesting.saved_identity import fingerprint
 
 SPACES = Path(__file__).resolve().parents[1] / "search_spaces"
@@ -47,20 +48,43 @@ def test_a_top_sector_weight_needs_the_category_layer():
         broad_category_mode="off",
         broad_top_sector_weight=1.5,
     )
+    # `_run_broad` is what every Broad path (backtest, weekly signal, orders, previews) calls.
     with pytest.raises(HTTPException) as caught:
-        api._broad_parts(req)
+        api._run_broad(req, ranking=None, outer_prices=None)
     assert caught.value.status_code == 422
+
+
+def test_ranksum_ignores_the_voladj_settings():
+    ranksum = {**BROAD, "score": "ranksum"}
+    on = {**ranksum, "voladj_lookbacks": True, "voladj_skip": "none"}
+    assert fingerprint("broad", on) == fingerprint("broad", ranksum)
+
+
+def test_the_save_script_refuses_an_api_that_lacks_the_fields(tmp_path):
+    script = _save_script()
+    old = {"components": {"schemas": {"BacktestRequest": {"properties": {"score": {}}}}}}
+    (tmp_path / "openapi.json").write_text(json.dumps(old))
+    assert script.live_api_missing((tmp_path / "openapi.json").as_uri()) == list(
+        script.NEEDED_FIELDS
+    )
+    assert script.live_api_missing("http://127.0.0.1:9/openapi.json") is None
+
+
+def _save_script():
+    path = SPACES.parent / "scripts" / "bl176_save_ensemble.py"
+    spec = importlib.util.spec_from_file_location("bl176_save_ensemble", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 @pytest.mark.parametrize("ranking", ["curated", "extended"])
 def test_the_frozen_ensembles_become_complete_requests(ranking):
     frozen = json.loads((SPACES / f"bl176_frozen_{ranking}.json").read_text())
+    script = _save_script()
     for config in frozen["configs"]:
         space = search.load_space(SPACES.parent / config["space"])
-        tags = space.fixed.get("category_tags") or "extended"
-        request = phase6.favourite_request(
-            config["fixed_settings"], config, universe=search.universe_of(space), tags=tags
-        )
+        request = script.sleeve_request(config)  # what --apply saves
         req = api.BacktestRequest.model_validate(request)  # nothing the model refuses
         heavy, light = config["heavy"], config["light"]
         assert req.broad_universe == search.universe_of(space)

@@ -1984,6 +1984,9 @@ def _run_broad(
     research scripts (BL-116, after-tax runs); the API's own Broad requests leave both unset."""
     if top_sector_weight is None:
         top_sector_weight = req.broad_top_sector_weight
+    if top_sector_weight != 1.0 and req.broad_category_mode != "on":
+        # Here, not in `_broad_parts`: the weekly signal, orders and previews call this directly.
+        raise HTTPException(422, "A top-sector weight needs the category layer on.")
     weights = tuple(req.weights) if req.weights else None
     stock_tilt_ranks = None
     if req.broad_reversal_tilt > 0:
@@ -2286,8 +2289,6 @@ def _broad_parts(
         raise HTTPException(422, "Top N can't be greater than the exit rank.")
     if req.broad_pool_top_n > req.broad_pool_exit_rank:
         raise HTTPException(422, "Pool top N can't be greater than the pool exit rank.")
-    if req.broad_top_sector_weight != 1.0 and not on:
-        raise HTTPException(422, "A top-sector weight needs the category layer on.")
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
         raise HTTPException(422, "Give one weight per lookback.")
     if not (

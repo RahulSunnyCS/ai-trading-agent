@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import urllib.request
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +29,10 @@ import pandas as pd
 from momentum_backtesting import api, bias, db_read, phase6, runs_store, search
 
 PKG = Path(__file__).resolve().parents[1]
+#: The running Momentum API (`mbt serve`, the launchd agent the weekly job also reaches).
+LIVE_OPENAPI = "http://127.0.0.1:8765/openapi.json"
+#: Request fields the saved sleeves need the live API to know (it ignores unknown fields).
+NEEDED_FIELDS = ("voladj_lookbacks", "voladj_skip", "broad_top_sector_weight")
 #: Equity curves are compared to this relative tolerance (float noise between the two paths).
 TOLERANCE = 1e-9
 
@@ -35,11 +40,11 @@ TOLERANCE = 1e-9
 def sleeve_request(config: dict) -> dict:
     """The API request for one frozen config: its space decides the universe and tag set."""
     space = search.load_space(PKG / config["space"])
-    tags = space.fixed.get("category_tags") or (
-        "extended" if space.arm in search.EXTENDED_TAG_ARMS else "curated"
-    )
     return phase6.favourite_request(
-        config["fixed_settings"], config, universe=search.universe_of(space), tags=tags
+        config["fixed_settings"],
+        config,
+        universe=search.universe_of(space),
+        tags=search.tags_of(space),
     )
 
 
@@ -70,6 +75,19 @@ def check(config: dict, summary: dict) -> str | None:
     return None if gap <= TOLERANCE else f"equity differs by up to {gap:.2e}"
 
 
+def live_api_missing(url: str = LIVE_OPENAPI) -> list[str] | None:
+    """The needed fields the running API's request model lacks; None when it cannot be read.
+    An older API would accept the saved configs and silently run them without these settings."""
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            schema = json.load(response)
+    except (OSError, ValueError):
+        return None
+    fields = schema.get("components", {}).get("schemas", {}).get("BacktestRequest", {})
+    known = set(fields.get("properties", {}))
+    return [name for name in NEEDED_FIELDS if name not in known]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--frozen", type=Path, required=True)
@@ -94,10 +112,19 @@ def main() -> int:
     if not args.apply:
         print("check only: nothing saved (pass --apply)")
         return 0
+    missing = live_api_missing()
+    if missing is None or missing:
+        print(
+            "refused: the running Momentum API "
+            + ("could not be read" if missing is None else f"does not know {missing}")
+            + "; merge, restart com.ai-trading-agent.momentum-api, then run --apply again"
+        )
+        return 2
     with db_read.open_catalog() as con:
         if args.status in runs_store.FOLLOWED:
             runs_store.ensure_followed_slot(con)
-        saved = []
+        saved: list[str] = []
+        group = None
         try:
             for n, (config, request, summary) in enumerate(sleeves, 1):
                 record = runs_store.save_run(
@@ -115,6 +142,8 @@ def main() -> int:
             if args.status != "watching":
                 group = runs_store.update_run(con, group["id"], status=args.status) or group
         except Exception:
+            if group is not None:  # members cannot be deleted while their group exists
+                runs_store.delete_run(con, group["id"])
             for run_id in saved:
                 runs_store.delete_run(con, run_id)
             raise

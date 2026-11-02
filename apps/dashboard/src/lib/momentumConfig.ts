@@ -161,6 +161,22 @@ export function describeConfig(
   if (!broad) {
     chips.push({ id: 'tax', label: config.tax ? 'After tax' : 'Pre-tax', section: 'costs' });
   }
+  // BL-176 settings the panel has no control for: shown here so a run carrying them says so.
+  if (broad && config.voladj_lookbacks === true) {
+    chips.push({
+      id: 'voladj_lookbacks',
+      label: 'Vol-adjusted on own lookbacks',
+      section: 'ranking',
+    });
+  }
+  const topWeight = Number(config.broad_top_sector_weight ?? 1);
+  if (broad && Number.isFinite(topWeight) && topWeight !== 1) {
+    chips.push({
+      id: 'top_sector_weight',
+      label: `Top category ${formatNumber(topWeight, 2, { trim: true })}× money`,
+      section: 'portfolio',
+    });
+  }
 
   return {
     period,
@@ -267,6 +283,9 @@ const KEYS: Record<string, KeyInfo> = {
     fraction: true,
     ...BROAD,
   },
+  voladj_lookbacks: { section: 'ranking', label: 'Vol-adjusted on own lookbacks', ...BROAD },
+  voladj_skip: { section: 'ranking', label: 'Lookbacks skipping the latest 4 weeks', ...BROAD },
+  broad_top_sector_weight: { section: 'portfolio', label: 'Top category money ×', ...BROAD },
 
   portfolio: { section: 'portfolio', label: 'Portfolio rule' },
   entry: { section: 'portfolio', label: 'New name, nothing sold' },
