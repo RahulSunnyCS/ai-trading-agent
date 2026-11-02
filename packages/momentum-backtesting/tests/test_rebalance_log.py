@@ -184,7 +184,7 @@ def test_kite_check_compares_the_snapshot_with_what_the_lots_hold_now():
     groups = [{"group_id": "g", "name": "F", "rebalances": rebalances, "outside_lots": []}]
     kite = {
         "synced_at": "2026-11-02T22:17",
-        "cash": 50429.0,
+        "cash": 40000.0,
         "holdings": {"NAZARA": 66, "LEDGERONLY": 4, "GRWRHITECH": 1},
     }
     out = rl.build(
@@ -198,5 +198,5 @@ def test_kite_check_compares_the_snapshot_with_what_the_lots_hold_now():
     )
     check = out["kite_check"]
     assert check["differences"] == [{"symbol": "GRWRHITECH", "kite": 1, "lots": 0.0}]
-    assert check["matches"] is False and check["cash"] == 50429.0
+    assert check["matches"] is False and check["cash"] == 40000.0
     assert rl.kite_check(None, {}) is None

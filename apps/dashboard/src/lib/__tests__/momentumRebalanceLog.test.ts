@@ -69,13 +69,13 @@ describe('momentumRebalanceLog', () => {
     expect(kiteCheckLine(null)).toBeNull();
     const check = {
       synced_at: '2026-11-02T22:17:12+05:30',
-      cash: 50429,
+      cash: 40000,
       matches: false,
       differences: [{ symbol: 'GRWRHITECH', kite: 3, lots: 2 }],
     };
     expect(kiteCheckLine(check)).toMatch(/differs from the lots: GRWRHITECH Kite 3, lots 2/);
     expect(kiteCheckLine({ ...check, matches: true, differences: [] })).toMatch(
-      /holds exactly what the lots hold · free cash ₹50,429\.$/,
+      /holds exactly what the lots hold · free cash ₹40,000\.$/,
     );
   });
 });
