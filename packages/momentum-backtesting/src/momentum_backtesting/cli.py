@@ -1662,6 +1662,17 @@ def search_score(
     )
 
 
+def _arm_pairs(out: Path, scored: Path, also: list[str] | None) -> list[tuple[Path, Path]]:
+    """`out`/`scored` plus each `--also RESULTS=SCORED`: the arms one tag ranking pools."""
+    pairs = [(out, scored)]
+    for item in also or []:
+        results, sep, scoring = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--also needs RESULTS=SCORED, got {item!r}")
+        pairs.append((Path(results), Path(scoring)))
+    return pairs
+
+
 @search_app.command("choose")
 def search_choose(
     out: Path = typer.Argument(..., help="A finished search's results folder."),
@@ -1681,13 +1692,7 @@ def search_choose(
 
     scored = scored or out / "scored_pit"
     dest = dest or out / "phase5"
-    pairs = [(out, scored)]
-    for item in also or []:
-        results, sep, scoring = item.partition("=")
-        if not sep:
-            raise typer.BadParameter(f"--also needs RESULTS=SCORED, got {item!r}")
-        pairs.append((Path(results), Path(scoring)))
-    scores, curves, records = method.load_pooled(pairs)
+    scores, curves, records = method.load_pooled(_arm_pairs(out, scored, also))
     facts = choose.config_facts(records)
     refs = reference_benchmarks.load_references()
     closes = db_read.weekly_closes_from_db_or_none()
@@ -1709,6 +1714,12 @@ def search_ensemble(
     freeze: bool = typer.Option(
         False, "--freeze", help="Write search_spaces/bl010_phase6_frozen.json if the rule passes."
     ),
+    also: list[str] = typer.Option(
+        None,
+        "--also",
+        help="Another arm to pick among, RESULTS=SCORED, repeatable (BL-176, as `choose`). "
+        "Not with --freeze: a pooled pick spans several spaces.",
+    ),
 ) -> None:
     """BL-010 Phase 6 step 0: the ensemble criteria addendum 4 picks, after its own
     walk-forward. Reads stored curves only; writes ensemble.json and ensemble.md, and with
@@ -1721,8 +1732,14 @@ def search_ensemble(
 
     scored = scored or out / "scored_pit"
     dest = dest or out / "phase6"
-    scores, curves = method.load_scores(scored)
-    records = bias.load_records(out, set(curves.columns))
+    if also and freeze:
+        typer.echo("--freeze reads one search's space: a pick pooled with --also is frozen apart")
+        raise typer.Exit(1)
+    if also:
+        scores, curves, records = method.load_pooled(_arm_pairs(out, scored, also))
+    else:
+        scores, curves = method.load_scores(scored)
+        records = bias.load_records(out, set(curves.columns))
     facts = choose.config_facts(records)
     refs = reference_benchmarks.load_references()
     series = {name: refs[name] for name in (phase5.MOM30, phase5.MIDCAP, phase5.SMALLCAP)}

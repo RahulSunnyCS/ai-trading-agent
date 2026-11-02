@@ -84,3 +84,39 @@ def test_config_facts_reads_a_direct_rank_config():
     assert facts.at["b", "holdings"] == 12
     assert facts.at["b_small_pool", "holdings"] == 20
     assert facts.at["b", "simplicity"][1] == 0
+
+
+def test_arm_pairs_parses_also_and_refuses_a_bare_path(tmp_path):
+    import pytest
+    import typer
+
+    from momentum_backtesting import cli
+
+    a, s = tmp_path / "A", tmp_path / "A_scored"
+    pairs = cli._arm_pairs(a, s, [f"{tmp_path / 'B'}={tmp_path / 'B_scored'}"])
+    assert pairs == [(a, s), (tmp_path / "B", tmp_path / "B_scored")]
+    assert cli._arm_pairs(a, s, None) == [(a, s)]
+    with pytest.raises(typer.BadParameter):
+        cli._arm_pairs(a, s, [str(tmp_path / "B")])
+
+
+def test_ensemble_refuses_freeze_with_pooled_arms(tmp_path):
+    from typer.testing import CliRunner
+
+    from momentum_backtesting import cli
+
+    done = CliRunner().invoke(
+        cli.app,
+        [
+            "search",
+            "ensemble",
+            str(tmp_path),
+            "--space",
+            str(tmp_path / "x.toml"),
+            "--freeze",
+            "--also",
+            f"{tmp_path}={tmp_path}",
+        ],
+    )
+    assert done.exit_code == 1
+    assert "frozen apart" in done.output
