@@ -106,7 +106,10 @@ function RebalanceCard({ block }: { block: RebalanceBlock }) {
           </THead>
           <tbody>
             {block.lines.map((line) => (
-              <TRow key={line.symbol} className="whitespace-nowrap">
+              <TRow
+                key={`${line.symbol}-${line.side}-${line.status}`}
+                className="whitespace-nowrap"
+              >
                 <Td dense>{line.symbol}</Td>
                 <Td dense numeric align="right">
                   {line.shares === null ? EMPTY : formatInt(line.shares)}
