@@ -12,6 +12,10 @@ lot's due week to the Kite contract-note fills and gives every stock a status; t
 - **Missed weeks:** a `not done` week says where it was folded in: the lot's next due week. Orders
   are not changed: a lot rebalances in full the next time it is due (owner, 2026-11-02).
 - **Holding after:** the lot's shares from the ledger before that Friday, plus that week's fills.
+- **Every trade of the week:** a block covers its Friday 14:00 to the next Friday 14:00 and also
+  lists the fills no lot's orders claim (owner, 2026-11-02: the log shows whatever was bought or
+  sold that week, in the strategy or not), as `outside` lines. They count in the week's bought and
+  sold, never in the lot's status or holding.
 - **Kite check:** the latest stored Kite snapshot (read-only, BL-142) against what the lots hold
   now (each lot's newest holding after, or its ledger when it has no block). Kite's holdings
   include trades the contract notes have not brought in yet, so a difference is either such a
@@ -29,8 +33,12 @@ from typing import Any
 from .forward_score import IST
 
 DONE, PARTLY, WAITING, NOT_DONE = "done", "partly done", "waiting for notes", "not done"
+#: A week no lot was due, shown because the account traded in it.
+NO_LOT = "no lot due"
 #: Stock statuses (`forward_fills._status`) that mean the stock was traded this week.
 TRADED = {"done", "shares differ", "extra"}
+#: A line for a fill no lot's orders claim.
+OUTSIDE = "outside"
 #: Ledger events that are not a booking of fills (`seed` and `attributed` book what Kite showed
 #: after trades, which the week's fills already count): an owner's own correction.
 CORRECTIONS = {"assigned", "manual"}
@@ -107,9 +115,77 @@ def _lines(rebalance: dict) -> list[dict]:
     return lines
 
 
+def _friday_of(day: str, time: str | None) -> str:
+    """The Friday whose week (its 14:00 to the next Friday's 14:00) holds this moment."""
+    when = date.fromisoformat(day)
+    back = (when.weekday() - 4) % 7  # days since the last Friday (0 on a Friday)
+    friday = when - timedelta(days=back)
+    if back == 0 and (time or "00:00") < "14:00":
+        friday -= timedelta(weeks=1)
+    return friday.isoformat()
+
+
+def _outside_lines(fills: list[dict]) -> list[dict]:
+    """The week's fills no lot claims, netted per stock and side (a buy and a later sell of the
+    same stock stay two lines, so a round trip inside the week still shows)."""
+    by: dict[tuple[str, str], dict] = {}
+    for f in fills:
+        line = by.setdefault(
+            (f["symbol"], f["side"]),
+            {
+                "symbol": f["symbol"],
+                "side": f["side"],
+                "shares": 0.0,
+                "value": 0.0,
+                "planned_shares": None,
+                "status": OUTSIDE,
+            },
+        )
+        line["shares"] += float(f["qty"])
+        line["value"] += float(f["qty"]) * float(f["price"])
+    return sorted(by.values(), key=lambda x: (x["symbol"], x["side"]))
+
+
+def _add_outside(blocks: list[dict], fills: list[dict], paper_start: str) -> None:
+    """Put each fill no lot claims into the block of its week; a week with no block gets one
+    with no lot (nothing was due, but the account traded)."""
+    by_week: dict[str, list[dict]] = defaultdict(list)
+    for f in fills:
+        week = _friday_of(f["day"], f.get("time"))
+        if week >= paper_start:
+            by_week[week].append(f)
+    for week, week_fills in by_week.items():
+        lines = _outside_lines(week_fills)
+        block = next(
+            (b for b in sorted(blocks, key=lambda b: b["lot"] or "") if b["week"] == week), None
+        )
+        if block is None:
+            block = {
+                "week": week,
+                "week_no": week_number(week, paper_start),
+                "lot": None,
+                "sleeve_id": None,
+                "new_lot": False,
+                "status": NO_LOT,
+                "notes_final": True,
+                "first_trade_day": min(f["day"] for f in week_fills),
+                "orders_at": None,
+                "lines": [],
+                "bought": 0.0,
+                "sold": 0.0,
+                "charges": None,
+                "holding_after": [],
+                "folded_into": None,
+            }
+            blocks.append(block)
+        block["lines"].extend(lines)
+        block["bought"] += sum(x["value"] for x in lines if x["side"] == "buy")
+        block["sold"] += sum(x["value"] for x in lines if x["side"] == "sell")
+
+
 def _status(lines: list[dict], final: bool) -> str:
     """Done only when the fills cover every order: a stock traded in other shares than the
-    orders said leaves the week partly done (owner, 2026-11-02)."""
+    orders said leaves the week partly done (owner, 2026-11-02). Outside lines never count."""
     traded = sum(1 for line in lines if line["status"] in TRADED)
     short = sum(1 for line in lines if line["status"] in ("missed", "shares differ"))
     if traded and not short:
@@ -241,10 +317,11 @@ def build(
             )
         for symbol, shares in _lots_now(blocks, events.get(group["group_id"], [])).items():
             held_now[symbol] += shares
+        _add_outside(blocks, group.get("outside_lots") or [], paper_start)
         blocks = [
             b for b in blocks if (not start or b["week"] >= start) and (not end or b["week"] <= end)
         ]
-        blocks.sort(key=lambda b: (b["week"], b["lot"]), reverse=True)
+        blocks.sort(key=lambda b: (b["week"], b["lot"] or ""), reverse=True)
         out["groups"].append(
             {
                 "group_id": group["group_id"],
