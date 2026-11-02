@@ -417,8 +417,12 @@ contract, not a shared service).
 - **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
   4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-086, a heavy key in the
-  rank-cache key) makes it follow them; tested and killed (short lookbacks without the skip-month
-  chase reversing spikes), so it stays off.
+  rank-cache key) makes it follow them; tested and killed as a default (short lookbacks without
+  the skip-month chase reversing spikes), so it stays off by default. Since BL-176 it is a Broad
+  request field (`voladj_lookbacks`, with `voladj_skip` and `broad_top_sector_weight`): three of
+  the four sleeves of the frozen round 8 ensemble (`search_spaces/bl176_frozen_extended.json`,
+  saved by `scripts/bl176_save_ensemble.py`) set it, so never drop it. At their defaults the
+  three fields leave every saved fingerprint unchanged (`saved_identity._LATER_DEFAULTS`).
 - **Broad ranks over the week's point-in-time members (BL-001 F6, 2026-10-25):** `engine.compute_ranks(prices, config, cross_section=)` takes a week x column boolean table; `broad.cross_section_mask(stock_membership, frame)` builds it (members behind the gate, plus the atomic instruments) and `UniverseRanking.cross_section()` hands it to anything that ranks the same frame again (the stock tilt in `levers.grouped_momentum_ranks`). A new Broad ranking path must pass it, or a stock that joins the universe years later moves earlier weeks' ranks. `build_stock_weekly_prices(fill_internal_gaps=False)` (Broad only) forward-fills only after a stale column's last real price. `mbt audit lookahead-requests` is the check. `score="residual"` and Custom Index do not take it yet.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,

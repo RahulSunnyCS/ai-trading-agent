@@ -532,8 +532,16 @@ def _split_light(space: Space, light: dict[str, Any]) -> dict[str, Any]:
             kwargs.pop(key, None)
     kwargs["category_mode"] = ARMS[space.arm][1]
     # A space may fix the tag file (BL-176 runs arm A on both); otherwise the arm decides.
-    kwargs.setdefault("category_tags", "extended" if space.arm in EXTENDED_TAG_ARMS else "curated")
+    kwargs.setdefault("category_tags", tags_of(space))
     return kwargs
+
+
+def tags_of(space: Space) -> str:
+    """The tag set a space's runs use: the one it fixes (BL-176 runs arm A on both), else its
+    arm's."""
+    return space.fixed.get("category_tags") or (
+        "extended" if space.arm in EXTENDED_TAG_ARMS else "curated"
+    )
 
 
 def run_group(task: dict[str, Any]) -> dict[str, Any]:
