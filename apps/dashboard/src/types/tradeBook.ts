@@ -322,7 +322,13 @@ export interface TradeBookInputs {
 }
 
 /** BL-200: GET /api/momentum/lots/rebalances, one block per lot per due week. */
-export type RebalanceStatus = 'done' | 'partly done' | 'waiting for notes' | 'not done';
+export type RebalanceStatus =
+  | 'done'
+  | 'partly done'
+  | 'waiting for notes'
+  | 'not done'
+  /** A week no lot was due, listed because the account traded in it. */
+  | 'no lot due';
 
 export interface RebalanceLine {
   symbol: string;
@@ -332,15 +338,17 @@ export interface RebalanceLine {
   /** Traded value, or the planned value for a stock not traded yet. */
   value: number | null;
   planned_shares: number | null;
-  /** forward_fills' per-stock status: done / shares differ / extra / missed. */
+  /** forward_fills' per-stock status (done / shares differ / extra / missed), or `outside`: a
+   * fill on the account that no lot's orders claim. */
   status: string;
 }
 
 export interface RebalanceBlock {
   week: string;
   week_no: number;
-  lot: string;
-  sleeve_id: string;
+  /** Null for a week no lot was due. */
+  lot: string | null;
+  sleeve_id: string | null;
   new_lot: boolean;
   status: RebalanceStatus;
   notes_final: boolean;

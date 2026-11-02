@@ -31,6 +31,7 @@ const BLOCK: RebalanceBlock = {
 describe('momentumRebalanceLog', () => {
   it('titles a block by week number, Friday and lot', () => {
     expect(rebalanceTitle(BLOCK)).toBe('Week 3 · Fri 30 Oct · Lot 3');
+    expect(rebalanceTitle({ ...BLOCK, lot: null })).toBe('Week 3 · Fri 30 Oct · no lot');
     expect(rebalanceStatusLabel('done')).toBe('Rebalance done');
   });
 
@@ -50,6 +51,7 @@ describe('momentumRebalanceLog', () => {
     expect(lineNote({ ...line, shares: 20, status: 'shares differ' })).toBe('21 planned');
     expect(lineNote({ ...line, shares: 1, status: 'extra' })).toBe('not in the orders');
     expect(lineNote({ ...line, shares: 21, status: 'done' })).toBeNull();
+    expect(lineNote({ ...line, shares: 50, status: 'outside' })).toBe('not in any lot');
   });
 
   it('lists the holding after, or says nothing is held', () => {
@@ -58,11 +60,11 @@ describe('momentumRebalanceLog', () => {
       holdingLine({
         ...BLOCK,
         holding_after: [
-          { symbol: 'NAZARA', shares: 33 },
-          { symbol: 'CUPID', shares: 42 },
+          { symbol: 'ALPHA', shares: 33 },
+          { symbol: 'BRAVO', shares: 42 },
         ],
       }),
-    ).toBe('NAZARA 33 · CUPID 42');
+    ).toBe('ALPHA 33 · BRAVO 42');
   });
 
   it('says whether Kite holds what the lots hold', () => {
@@ -71,9 +73,9 @@ describe('momentumRebalanceLog', () => {
       synced_at: '2026-11-02T22:17:12+05:30',
       cash: 40000,
       matches: false,
-      differences: [{ symbol: 'GRWRHITECH', kite: 3, lots: 2 }],
+      differences: [{ symbol: 'DELTA', kite: 3, lots: 2 }],
     };
-    expect(kiteCheckLine(check)).toMatch(/differs from the lots: GRWRHITECH Kite 3, lots 2/);
+    expect(kiteCheckLine(check)).toMatch(/differs from the lots: DELTA Kite 3, lots 2/);
     expect(kiteCheckLine({ ...check, matches: true, differences: [] })).toMatch(
       /holds exactly what the lots hold · free cash ₹40,000\.$/,
     );

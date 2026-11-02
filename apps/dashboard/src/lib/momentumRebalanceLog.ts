@@ -17,6 +17,7 @@ export const REBALANCE_TONE: Record<RebalanceStatus, Tone> = {
   'partly done': 'warning',
   'waiting for notes': 'info',
   'not done': 'negative',
+  'no lot due': 'neutral',
 };
 
 const STATUS_LABEL: Record<RebalanceStatus, string> = {
@@ -24,15 +25,17 @@ const STATUS_LABEL: Record<RebalanceStatus, string> = {
   'partly done': 'Partly done',
   'waiting for notes': 'Waiting for notes',
   'not done': 'Rebalance not done',
+  'no lot due': 'No lot due',
 };
 
 export function rebalanceStatusLabel(status: RebalanceStatus): string {
   return STATUS_LABEL[status] ?? status;
 }
 
-/** "Week 2 · Fri 23 Oct · Lot 2" */
+/** "Week 2 · Fri 23 Oct · Lot 2" ("… · no lot" for a week no lot was due). */
 export function rebalanceTitle(block: RebalanceBlock): string {
-  return `Week ${block.week_no} · ${formatDayShort(block.week, { weekday: true })} · ${block.lot}`;
+  const friday = formatDayShort(block.week, { weekday: true });
+  return `Week ${block.week_no} · ${friday} · ${block.lot ?? 'no lot'}`;
 }
 
 /** What a missed week became: the lot's next due week, where it is rebalanced in full. */
@@ -56,6 +59,7 @@ export function lineNote(line: RebalanceLine): string | null {
     return `${formatInt(line.planned_shares)} planned`;
   }
   if (line.status === 'extra') return 'not in the orders';
+  if (line.status === 'outside') return 'not in any lot';
   return null;
 }
 
