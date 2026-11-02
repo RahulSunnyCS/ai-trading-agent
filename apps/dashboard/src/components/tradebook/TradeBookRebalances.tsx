@@ -17,7 +17,7 @@ import {
   rebalanceStatusLabel,
   rebalanceTitle,
 } from '../../lib/momentumRebalanceLog';
-import type { RebalanceBlock } from '../../types/tradeBook';
+import type { RebalanceBlock, RebalanceLogResponse } from '../../types/tradeBook';
 import { Badge } from '../ui/Badge';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { Loaded, TradeBookWidget } from './parts';
@@ -51,15 +51,7 @@ export function TradeBookRebalances({ range }: { range: TradeBookRange }) {
               </p>
             ) : (
               <div className="space-y-3">
-                {kiteCheckLine(data.kite_check) ? (
-                  <p
-                    className={
-                      data.kite_check?.matches ? 'text-xs text-muted' : 'text-xs text-warning'
-                    }
-                  >
-                    {kiteCheckLine(data.kite_check)}
-                  </p>
-                ) : null}
+                <KiteCheck check={data.kite_check} />
                 {blocks.map((block) => (
                   <RebalanceCard key={`${block.week}-${block.sleeve_id}`} block={block} />
                 ))}
@@ -70,6 +62,12 @@ export function TradeBookRebalances({ range }: { range: TradeBookRange }) {
       )}
     </TradeBookWidget>
   );
+}
+
+function KiteCheck({ check }: { check: RebalanceLogResponse['kite_check'] }) {
+  const line = kiteCheckLine(check);
+  if (!line) return null;
+  return <p className={check?.matches ? 'text-xs text-muted' : 'text-xs text-warning'}>{line}</p>;
 }
 
 function RebalanceCard({ block }: { block: RebalanceBlock }) {

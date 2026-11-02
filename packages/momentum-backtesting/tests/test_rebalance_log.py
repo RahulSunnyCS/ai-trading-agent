@@ -200,3 +200,52 @@ def test_kite_check_compares_the_snapshot_with_what_the_lots_hold_now():
     assert check["differences"] == [{"symbol": "GRWRHITECH", "kite": 1, "lots": 0.0}]
     assert check["matches"] is False and check["cash"] == 40000.0
     assert rl.kite_check(None, {}) is None
+
+
+def test_shares_that_differ_from_the_orders_leave_the_week_partly_done():
+    block = _build(
+        [
+            _rebalance(
+                "2026-10-23",
+                "Lot 2",
+                "b",
+                [_row("ACME", "shares differ", shares=30, plan=35, avg=1)],
+            )
+        ]
+    )["2026-10-23"]
+    assert block["status"] == rl.PARTLY
+
+
+def test_an_owners_correction_after_the_block_counts_in_the_kite_check():
+    events = [
+        # booked after the Friday: a seed books the week's own fills (already counted)...
+        {
+            "sleeve_id": "a",
+            "symbol": "NAZARA",
+            "delta": 33,
+            "at": "2026-10-21T08:55",
+            "kind": "seed",
+        },
+        # ...an assignment is the owner's correction, and clears the difference
+        {
+            "sleeve_id": "a",
+            "symbol": "GRWRHITECH",
+            "delta": 1,
+            "at": "2026-11-03T09:00",
+            "kind": "assigned",
+        },
+    ]
+    rebalances = [
+        _rebalance("2026-10-16", "Lot 1", "a", [_row("NAZARA", "done", shares=33, avg=1)])
+    ]
+    groups = [{"group_id": "g", "name": "F", "rebalances": rebalances, "outside_lots": []}]
+    kite = {"synced_at": "x", "cash": 1.0, "holdings": {"NAZARA": 33, "GRWRHITECH": 1}}
+    out = rl.build(
+        groups,
+        {"g": events},
+        paper_start=START,
+        notes_through="2026-11-10",
+        lots_per_group={"g": 4},
+        kite=kite,
+    )
+    assert out["kite_check"]["matches"] is True

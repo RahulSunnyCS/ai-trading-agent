@@ -111,7 +111,7 @@ The Zerodha contract notes. That account trades nothing but Momentum, so every f
 
 **Rebalances** is the log of the lots, one block per lot on the Friday it was due, newest first. Weeks are counted from the paper start (Fri 16 Oct 2026 is week 1). Each block shows:
 
-- **The status.** **Rebalance done**: every stock the signal or the 14:15 orders asked for was traded. **Partly done**: some were. **Waiting for notes**: nothing is on the notes yet and the notes for the first session after that Friday are not in (a lot is often bought on the Monday). **Rebalance not done**: the notes are in and nothing was traded.
+- **The status.** **Rebalance done**: every stock the signal or the 14:15 orders asked for was traded, in the shares the orders said. **Partly done**: some were, or in other shares. **Waiting for notes**: nothing is on the notes yet and the notes for the first session after that Friday are not in (a lot is often bought on the Monday). **Rebalance not done**: the notes are in and nothing was traded.
 - **One line per stock**, the day's fills netted: shares, value and side. A stock asked for and not traded shows its planned shares and value; **not in the orders** is a trade nobody asked for.
 - **Folded into**: a week not done says where its trades went. The orders are not changed: the lot rebalances in full the next time it is due, with what it holds and the free cash.
 - **Holding after**: what the lot holds after that Friday, its booked shares plus the week's fills.

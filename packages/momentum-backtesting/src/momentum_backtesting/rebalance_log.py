@@ -31,6 +31,9 @@ from .forward_score import IST
 DONE, PARTLY, WAITING, NOT_DONE = "done", "partly done", "waiting for notes", "not done"
 #: Stock statuses (`forward_fills._status`) that mean the stock was traded this week.
 TRADED = {"done", "shares differ", "extra"}
+#: Ledger events that are not a booking of fills (`seed` and `attributed` book what Kite showed
+#: after trades, which the week's fills already count): an owner's own correction.
+CORRECTIONS = {"assigned", "manual"}
 #: A day's contract note is in the mailbox by this hour (IST); a read before it does not cover
 #: that day's trades.
 NOTE_HOUR = 21
@@ -105,9 +108,11 @@ def _lines(rebalance: dict) -> list[dict]:
 
 
 def _status(lines: list[dict], final: bool) -> str:
+    """Done only when the fills cover every order: a stock traded in other shares than the
+    orders said leaves the week partly done (owner, 2026-11-02)."""
     traded = sum(1 for line in lines if line["status"] in TRADED)
-    missed = sum(1 for line in lines if line["status"] == "missed")
-    if traded and not missed:
+    short = sum(1 for line in lines if line["status"] in ("missed", "shares differ"))
+    if traded and not short:
         return DONE
     if traded:
         return PARTLY
@@ -127,8 +132,8 @@ def _holding(events: list[dict], sleeve_id: str, week: str, lines: list[dict]) -
 
 
 def _lots_now(blocks: list[dict], events: list[dict]) -> dict[str, float]:
-    """What a group's lots hold now: each lot's newest holding after; a lot with no block, its
-    ledger shares."""
+    """What a group's lots hold now: each lot's newest holding after, plus the owner's own
+    corrections booked since (`mbt lots assign`); a lot with no block, its ledger shares."""
     newest: dict[str, dict] = {}
     for block in sorted(blocks, key=lambda b: b["week"]):
         newest[block["sleeve_id"]] = block
@@ -137,7 +142,10 @@ def _lots_now(blocks: list[dict], events: list[dict]) -> dict[str, float]:
         for h in block["holding_after"]:
             held[h["symbol"]] += h["shares"]
     for event in events:
-        if event["sleeve_id"] not in newest:
+        block = newest.get(event["sleeve_id"])
+        if block is None or (
+            event.get("kind") in CORRECTIONS and str(event["at"]) >= f"{block['week']}T14:00"
+        ):
             held[event["symbol"]] += float(event["delta"])
     return held
 
