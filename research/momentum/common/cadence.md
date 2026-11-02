@@ -1,6 +1,6 @@
 # Momentum: rebalance cadence, phase and tranches
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-11-02
 
 ## What it is
 
@@ -32,6 +32,7 @@ How often the strategy trades, and on which Fridays.
 | TODO 3.9.23 follow-up | `sell_every_week` on | Broad every 2 and 4 weeks (blends); ETF every 2 | Off, not recommended: it reverses the cadence's own edge | Broad every 2: 36.3% / 1.25 / -19.8% to 27.9% / 1.01 / -18.0% (median +5.0 to -3.4, CAGR win share 100% to 7%). Broad every 4: 37.2% / 1.29 / -20.0% to 21.9% / 0.87 / -16.6% (+5.2 to -10.3). ETF every 2: -2.8 to -2.2 median |
 | [BL-085](../../../backlog/BL-085-momentum-improvement-levers.md) L1 | every 4, 6, 8, 13 weeks, against each strategy's own 2 or 4 | 11 Broad strategies, after tax at Rs 5 lakh; FY2018-22, FY2023-26 | Killed | Every 6: +0.9 then -2.4. Every 8: +0.2 then -6.2. Every 13: -0.7 then -8.2. In the 2023-26 run-up, waiting longer cost far more than the tax it saved |
 | BL-085 L2 / [BL-087](../../../backlog/BL-087-momentum-all-fridays-split.md) | own Friday vs money split across all Fridays | 10 Broad configs, 2017-2026, after tax at Rs 5 lakh | Report only (no pass rule): removes calendar luck, does not raise the average | Split: worst fall -27.6% against -31.1% for the typical single Friday and -35.7% for the unluckiest; Ulcer 9.9% vs 10.8%; CAGR 31.5% against 27.5% to 33.9% for single Fridays. Shallower in 10 of 10 configs in both windows |
+| [BL-176](../../../backlog/BL-176-momentum-search-on-f6-ranking.md) Stage 1 + Stage 3 | `rebalance_every` 1, 2, 4; non-weekly configs scored as the all-Fridays blend (one ₹2 lakh sleeve a Friday, equal capital each April) | Broad, 2017-01 to 2026-10, F6 ranking, Stage 1 (one sampled Friday, ₹50k sleeve; 20,000 runs per arm A tag set, 10,000 B, 4,000 C1); Stage 3 at ₹2 lakh | Descriptive: every 4 weeks best in every arm; 7 of the 8 ensemble members are 4-weekly | Median lower-bound excess, curated A: weekly −12.0, fortnightly −9.9, 4-weekly −7.6 (B: −28.8 / −20.9 / −15.3). Stage 3 entry widened to the top 20% for non-weekly configs (owner override 2026-10-31) `search_spaces/bl176_stage1_axes.csv` |
 
 ## What we know
 

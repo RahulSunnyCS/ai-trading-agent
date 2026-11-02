@@ -1,6 +1,6 @@
 # Broad Momentum: the funnel (pool, categories, picks)
 
-**Status:** Tested · **Last updated:** 2026-10-17
+**Status:** Tested · **Last updated:** 2026-11-02
 
 ## What it is
 
@@ -52,6 +52,7 @@ rolling 3-year windows; baseline 31.7% / 1.06 / -20.4%.
 | TODO 3.9.23 | picks 1 and 3 | as above | 3 wins most (more names, same categories); 1 loses | 1: 25.9% / 0.99 / -18.0%, median -5.4. 3: 34.1% / 1.16 / -20.6%, rolling 93 / 96 / 46%, median +3.0 |
 | [BL-116](../../../../backlog/BL-116-broad-sector-position-and-score.md) | Do picks from the best-placed sector held (position 1) beat Nifty 500 more often than picks from the other fresh positions? Decided on the 9 saved groups other than Trio and Four Sectors | 2017-2022, 5,244 stock picks, pre-tax | **Passed**: +13.4 pts (90% interval +7.3 to +19.6), above zero in 9 of 9 | Position 1: 58% beat, +7.3% mean excess; positions 2-6: 42-46%, +0.4% to +2.7%. Trio does not show it (+2.7). Fresh positions only: under a stock tilt lingering sectors also buy, and those picks were left out. [`bl116_result.json`](../../../../packages/momentum-backtesting/search_spaces/bl116_result.json) |
 | [BL-010](../../../../backlog/BL-010-momentum-evaluation-review.md) F5 / Phase 5 | number of holdings across the round 7 search | Broad, 2017-2026, pre-tax | Prefer 8-12 names | Median CAGR is flat at about 32% from 2 up to 24 holdings; the maximum rises from 51% (12-24 holdings) to 73% (2 or fewer): concentration plus picking the best is a winner's curse. Phase 5: 8-12 holdings match 2-6 on return with far shallower falls |
+| [BL-176](../../../../backlog/BL-176-momentum-search-on-f6-ranking.md) Stage 1 | coverage floor 0–0.5, categories 1–10, picks 1–4, stock tilt 0–1 with a 30% screen, top-sector weight 1 / 1.5 / 2 | Broad, 2017-01 to 2026-10, F6 ranking, Stage 1 (one sampled Friday, ₹50k sleeve; 20,000 runs per arm A tag set, 10,000 B, 4,000 C1) | Descriptive. As expected: floor above 0.3 loses; 4 picks and 8–10 categories flatten return and falls. Not as expected: the tilt screen hurts (expected nothing); top-sector weight 2 does nothing (expected to help) | Curated A median lower-bound excess / CAGR: floor 0–0.1 −8.0 / 26.5%, 0.3–0.5 −11.3 / 19.2%; tilt screen 0.3 −11.6 vs 0 −8.5; top-sector weight 2 vs 1: −9.6 vs −9.8 (2023-26 FY excess +0.3, extended −0.2, C1 −0.3 points); tilt 0 best in A, and any tilt ruins B (CAGR 21.2% at 0 vs −7.3% at 1). `search_spaces/bl176_stage1_axes.csv` |
 
 ### Cold-start caveat
 

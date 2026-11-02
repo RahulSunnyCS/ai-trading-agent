@@ -1,0 +1,182 @@
+arm,axis,value,n,lb,cagr,mdd,medium
+round8_A_curated,voladj_lookbacks,False,7000,-0.09770,0.22113,-0.49244,0.08700
+round8_A_curated,voladj_lookbacks,True,13000,-0.09618,0.21933,-0.45891,0.15431
+round8_A_curated,voladj_skip,long,13400,-0.09524,0.21915,-0.47266,0.11970
+round8_A_curated,voladj_skip,none,6600,-0.09949,0.22131,-0.46984,0.15318
+round8_A_curated,fill,mon_close,6649,-0.10262,0.21668,-0.48652,0.09851
+round8_A_curated,fill,mon_open,6670,-0.10200,0.21662,-0.48183,0.10225
+round8_A_curated,fill,next_fri_close,6681,-0.08589,0.22629,-0.44496,0.19129
+round8_A_curated,max_category,0.3,5682,-0.09349,0.21914,-0.46685,0.13534
+round8_A_curated,max_category,0.5,7005,-0.09517,0.22013,-0.47131,0.13176
+round8_A_curated,stock_tilt_screen_pct,0.0,12777,-0.08506,0.22131,-0.46451,0.14769
+round8_A_curated,stock_tilt_screen_pct,0.3,7223,-0.11574,0.21793,-0.48529,0.10079
+round8_A_curated,top_sector_weight,1.0,6674,-0.09802,0.21646,-0.47167,0.12586
+round8_A_curated,top_sector_weight,1.5,6646,-0.09631,0.22164,-0.47007,0.13301
+round8_A_curated,top_sector_weight,2.0,6680,-0.09586,0.22178,-0.47288,0.13338
+round8_A_curated,picks_per_category,1,4363,-0.09153,0.22303,-0.48170,0.13179
+round8_A_curated,picks_per_category,2,5080,-0.09172,0.22143,-0.47030,0.12854
+round8_A_curated,picks_per_category,3,5273,-0.10009,0.21988,-0.47415,0.12422
+round8_A_curated,picks_per_category,4,5284,-0.09939,0.21585,-0.46177,0.13853
+round8_A_curated,category_top_n,1-3,2920,-0.11293,0.22693,-0.48578,0.14589
+round8_A_curated,category_top_n,4-7,9634,-0.09472,0.22459,-0.47552,0.11864
+round8_A_curated,category_top_n,8-10,7446,-0.09378,0.21088,-0.46222,0.14048
+round8_A_curated,coverage_floor,0-0.1,4020,-0.08017,0.26495,-0.47202,0.09726
+round8_A_curated,coverage_floor,0.1-0.3,7981,-0.08735,0.23880,-0.45292,0.11653
+round8_A_curated,coverage_floor,0.3-0.5,7999,-0.11261,0.19198,-0.48982,0.16177
+round8_A_curated,max_position,0.15,2787,-0.09131,0.21067,-0.44219,0.20811
+round8_A_curated,max_position,0.2,3174,-0.08793,0.21851,-0.45617,0.15942
+round8_A_curated,max_position,0.25,3344,-0.09808,0.22002,-0.47076,0.13337
+round8_A_curated,max_position,0.35,3450,-0.09735,0.22196,-0.47999,0.11217
+round8_A_curated,max_position,0.5,3580,-0.10154,0.22552,-0.48109,0.10279
+round8_A_curated,rebalance_every,1,6651,-0.12044,0.19776,-0.51225,0.09848
+round8_A_curated,rebalance_every,2,6676,-0.09950,0.22051,-0.47418,0.12463
+round8_A_curated,rebalance_every,4,6673,-0.07560,0.23595,-0.43646,0.16904
+round8_A_curated,lookbacks,"[1, 4, 13, 26, 52]",2400,-0.14225,0.18416,-0.52658,0.09875
+round8_A_curated,lookbacks,"[1, 4, 13]",2200,-0.18177,0.13731,-0.51443,0.13364
+round8_A_curated,lookbacks,"[13, 26, 52]",3400,-0.06846,0.25458,-0.45171,0.13206
+round8_A_curated,lookbacks,"[13, 26]",3000,-0.08525,0.23758,-0.43536,0.17600
+round8_A_curated,lookbacks,"[26, 52]",3400,-0.04523,0.24841,-0.44481,0.11647
+round8_A_curated,lookbacks,"[4, 13, 26, 52]",2600,-0.10564,0.22025,-0.49436,0.10500
+round8_A_curated,lookbacks,"[4, 13, 26]",3000,-0.13551,0.19350,-0.48608,0.14600
+round8_A_curated,score,blend,9600,-0.09913,0.22274,-0.48439,0.09917
+round8_A_curated,score,ranksum,2800,-0.13106,0.19639,-0.52221,0.05929
+round8_A_curated,score,voladj,7600,-0.07689,0.22355,-0.43686,0.19697
+round8_A_curated,stock_tilt,0.0,8487,-0.08335,0.21778,-0.46386,0.13856
+round8_A_curated,stock_tilt,0.25,2844,-0.10458,0.22479,-0.47626,0.12447
+round8_A_curated,stock_tilt,0.5,2928,-0.10043,0.22049,-0.47793,0.12466
+round8_A_curated,stock_tilt,0.75,2841,-0.10884,0.21736,-0.47737,0.11686
+round8_A_curated,stock_tilt,1.0,2900,-0.10361,0.22185,-0.47569,0.13379
+round8_A_curated,entry,make_room,10017,-0.09887,0.21565,-0.47679,0.12539
+round8_A_curated,entry,wait,9983,-0.09407,0.22446,-0.46652,0.13613
+round8_A_extended,voladj_lookbacks,False,7000,-0.08982,0.21077,-0.45449,0.15971
+round8_A_extended,voladj_lookbacks,True,13000,-0.09404,0.20731,-0.42689,0.21592
+round8_A_extended,voladj_skip,long,13400,-0.09069,0.20853,-0.43771,0.18216
+round8_A_extended,voladj_skip,none,6600,-0.09584,0.20908,-0.43310,0.22485
+round8_A_extended,fill,mon_close,6649,-0.09966,0.20725,-0.45696,0.15521
+round8_A_extended,fill,mon_open,6670,-0.09432,0.20594,-0.44748,0.14993
+round8_A_extended,fill,next_fri_close,6681,-0.08426,0.21248,-0.40607,0.28334
+round8_A_extended,max_category,0.3,5682,-0.08816,0.20898,-0.43419,0.22404
+round8_A_extended,max_category,0.5,7005,-0.09292,0.20866,-0.43617,0.18758
+round8_A_extended,stock_tilt_screen_pct,0.0,12777,-0.08215,0.20914,-0.42350,0.22407
+round8_A_extended,stock_tilt_screen_pct,0.3,7223,-0.11030,0.20751,-0.46129,0.14703
+round8_A_extended,top_sector_weight,1.0,6674,-0.09436,0.20686,-0.44021,0.18280
+round8_A_extended,top_sector_weight,1.5,6646,-0.09183,0.21008,-0.43561,0.20178
+round8_A_extended,top_sector_weight,2.0,6680,-0.09063,0.20897,-0.43396,0.20419
+round8_A_extended,picks_per_category,1,4363,-0.09881,0.21126,-0.44735,0.19895
+round8_A_extended,picks_per_category,2,5080,-0.08793,0.21348,-0.43307,0.21004
+round8_A_extended,picks_per_category,3,5273,-0.08996,0.20838,-0.43751,0.18642
+round8_A_extended,picks_per_category,4,5284,-0.09526,0.20355,-0.43199,0.19058
+round8_A_extended,category_top_n,1-3,2920,-0.11311,0.20960,-0.44108,0.15856
+round8_A_extended,category_top_n,4-7,9634,-0.08966,0.21300,-0.43573,0.18850
+round8_A_extended,category_top_n,8-10,7446,-0.08969,0.20302,-0.43538,0.22106
+round8_A_extended,coverage_floor,0-0.1,4020,-0.11349,0.22180,-0.49976,0.04876
+round8_A_extended,coverage_floor,0.1-0.3,7981,-0.07664,0.22887,-0.41228,0.18958
+round8_A_extended,coverage_floor,0.3-0.5,7999,-0.09923,0.18753,-0.42832,0.27703
+round8_A_extended,max_position,0.15,2787,-0.08880,0.20164,-0.41895,0.26695
+round8_A_extended,max_position,0.2,3174,-0.08919,0.20687,-0.42655,0.23566
+round8_A_extended,max_position,0.25,3344,-0.08718,0.20900,-0.43144,0.21142
+round8_A_extended,max_position,0.35,3450,-0.09352,0.21135,-0.44074,0.17565
+round8_A_extended,max_position,0.5,3580,-0.09440,0.21241,-0.44341,0.16816
+round8_A_extended,rebalance_every,1,6651,-0.11457,0.18978,-0.47733,0.15141
+round8_A_extended,rebalance_every,2,6676,-0.09376,0.20915,-0.43726,0.19068
+round8_A_extended,rebalance_every,4,6673,-0.07330,0.22254,-0.40538,0.24652
+round8_A_extended,lookbacks,"[1, 4, 13, 26, 52]",2400,-0.13382,0.17501,-0.48136,0.17167
+round8_A_extended,lookbacks,"[1, 4, 13]",2200,-0.16842,0.14003,-0.48065,0.20591
+round8_A_extended,lookbacks,"[13, 26, 52]",3400,-0.06488,0.24046,-0.41896,0.20941
+round8_A_extended,lookbacks,"[13, 26]",3000,-0.08503,0.22238,-0.41264,0.23867
+round8_A_extended,lookbacks,"[26, 52]",3400,-0.04488,0.22711,-0.41020,0.17265
+round8_A_extended,lookbacks,"[4, 13, 26, 52]",2600,-0.09917,0.20718,-0.45761,0.17808
+round8_A_extended,lookbacks,"[4, 13, 26]",3000,-0.12418,0.18524,-0.45500,0.19400
+round8_A_extended,score,blend,9600,-0.09167,0.21183,-0.44734,0.17656
+round8_A_extended,score,ranksum,2800,-0.11691,0.19376,-0.48652,0.11714
+round8_A_extended,score,voladj,7600,-0.08291,0.20893,-0.40514,0.25026
+round8_A_extended,stock_tilt,0.0,8487,-0.08181,0.20572,-0.42629,0.20797
+round8_A_extended,stock_tilt,0.25,2844,-0.09879,0.21166,-0.44212,0.19374
+round8_A_extended,stock_tilt,0.5,2928,-0.09848,0.21121,-0.44488,0.18374
+round8_A_extended,stock_tilt,0.75,2841,-0.10064,0.20900,-0.44637,0.18057
+round8_A_extended,stock_tilt,1.0,2900,-0.09747,0.21136,-0.44701,0.19241
+round8_A_extended,entry,make_room,10017,-0.09360,0.20535,-0.44024,0.19327
+round8_A_extended,entry,wait,9983,-0.09127,0.21249,-0.43301,0.19924
+round8_B,voladj_lookbacks,False,3500,-0.18787,0.09480,-0.63169,0.00086
+round8_B,voladj_lookbacks,True,6500,-0.21308,0.07017,-0.62872,0.01723
+round8_B,voladj_skip,long,6700,-0.19545,0.08674,-0.62710,0.01045
+round8_B,voladj_skip,none,3300,-0.22216,0.06384,-0.63645,0.01364
+round8_B,fill,mon_close,3359,-0.21598,0.06919,-0.64639,0.00268
+round8_B,fill,mon_open,3317,-0.21255,0.07303,-0.63717,0.00332
+round8_B,fill,next_fri_close,3324,-0.18400,0.09356,-0.59719,0.02858
+round8_B,stock_tilt_screen_pct,0.0,6397,-0.17272,0.11436,-0.59639,0.01329
+round8_B,stock_tilt_screen_pct,0.3,3603,-0.25305,0.02646,-0.67991,0.00833
+round8_B,max_position,0.15,1467,-0.18282,0.08940,-0.61025,0.00886
+round8_B,max_position,0.2,1590,-0.20099,0.08776,-0.62484,0.01195
+round8_B,max_position,0.25,1701,-0.20299,0.07925,-0.63129,0.01411
+round8_B,max_position,0.35,1759,-0.21051,0.07484,-0.63514,0.01251
+round8_B,max_position,0.5,1748,-0.21144,0.07552,-0.63708,0.00973
+round8_B,rebalance_every,1,3346,-0.28794,0.00112,-0.70256,0.00508
+round8_B,rebalance_every,2,3342,-0.20881,0.07564,-0.63284,0.01047
+round8_B,rebalance_every,4,3312,-0.15270,0.12598,-0.57508,0.01902
+round8_B,lookbacks,"[1, 4, 13, 26, 52]",1200,-0.41656,-0.14954,-0.84232,0.00333
+round8_B,lookbacks,"[1, 4, 13]",1100,-0.22797,0.06570,-0.63675,0.00636
+round8_B,lookbacks,"[13, 26, 52]",1700,-0.19663,0.07457,-0.64137,0.00294
+round8_B,lookbacks,"[13, 26]",1500,-0.19648,0.07905,-0.63553,0.02067
+round8_B,lookbacks,"[26, 52]",1700,-0.07571,0.23934,-0.49455,0.02529
+round8_B,lookbacks,"[4, 13, 26, 52]",1300,-0.31995,-0.02622,-0.71735,0.00538
+round8_B,lookbacks,"[4, 13, 26]",1500,-0.30620,-0.01176,-0.69168,0.01200
+round8_B,score,blend,4800,-0.20329,0.07564,-0.63729,0.00271
+round8_B,score,ranksum,1400,-0.22748,0.05686,-0.66214,0.00000
+round8_B,score,voladj,3800,-0.19232,0.09269,-0.59270,0.02684
+round8_B,stock_tilt,0.0,4231,-0.10033,0.21176,-0.52689,0.02387
+round8_B,stock_tilt,0.25,1403,-0.24650,0.02930,-0.70215,0.00071
+round8_B,stock_tilt,0.5,1469,-0.31558,-0.02988,-0.73474,0.00136
+round8_B,stock_tilt,0.75,1453,-0.34164,-0.07158,-0.75445,0.00275
+round8_B,stock_tilt,1.0,1444,-0.32853,-0.07301,-0.75360,0.00485
+round8_B,entry,make_room,5010,-0.20506,0.07643,-0.63102,0.01078
+round8_B,entry,wait,4990,-0.20309,0.08344,-0.62887,0.01222
+round8_C1,voladj_lookbacks,False,1500,-0.09967,0.20846,-0.45689,0.15333
+round8_C1,voladj_lookbacks,True,2500,-0.12546,0.18261,-0.44056,0.21760
+round8_C1,voladj_skip,long,2500,-0.11457,0.19242,-0.45810,0.16800
+round8_C1,voladj_skip,none,1500,-0.11166,0.19678,-0.42909,0.23600
+round8_C1,fill,mon_close,1360,-0.12172,0.19231,-0.46934,0.15221
+round8_C1,fill,mon_open,1304,-0.11664,0.19234,-0.46081,0.14034
+round8_C1,fill,next_fri_close,1336,-0.10559,0.19745,-0.41175,0.28743
+round8_C1,max_category,0.3,1128,-0.10893,0.19567,-0.44027,0.20922
+round8_C1,max_category,0.5,1414,-0.11454,0.19426,-0.45017,0.19165
+round8_C1,stock_tilt_screen_pct,0.0,2895,-0.10845,0.19227,-0.43842,0.21831
+round8_C1,stock_tilt_screen_pct,0.3,1105,-0.12465,0.19797,-0.47139,0.12851
+round8_C1,top_sector_weight,1.0,1347,-0.11315,0.19508,-0.44575,0.19599
+round8_C1,top_sector_weight,1.5,1342,-0.11461,0.19170,-0.44967,0.19970
+round8_C1,top_sector_weight,2.0,1311,-0.11331,0.19404,-0.44820,0.18459
+round8_C1,picks_per_category,1,902,-0.12765,0.18991,-0.45039,0.20177
+round8_C1,picks_per_category,2,1003,-0.10646,0.20053,-0.44518,0.19741
+round8_C1,picks_per_category,3,1042,-0.11813,0.19328,-0.45342,0.18618
+round8_C1,picks_per_category,4,1053,-0.10541,0.19086,-0.44184,0.18993
+round8_C1,category_top_n,1-3,594,-0.13433,0.19271,-0.44710,0.18013
+round8_C1,category_top_n,4-7,1921,-0.11315,0.19814,-0.44596,0.18688
+round8_C1,category_top_n,8-10,1485,-0.10819,0.18828,-0.45133,0.20741
+round8_C1,coverage_floor,0-0.1,802,-0.13243,0.19584,-0.52838,0.03616
+round8_C1,coverage_floor,0.1-0.3,1610,-0.09843,0.20939,-0.42431,0.17143
+round8_C1,coverage_floor,0.3-0.5,1588,-0.12071,0.18221,-0.42759,0.29534
+round8_C1,max_position,0.15,542,-0.10964,0.18733,-0.43171,0.23432
+round8_C1,max_position,0.2,630,-0.10075,0.19405,-0.43196,0.25079
+round8_C1,max_position,0.25,673,-0.11470,0.19216,-0.43950,0.19614
+round8_C1,max_position,0.35,701,-0.12177,0.19533,-0.44436,0.18688
+round8_C1,max_position,0.5,720,-0.11422,0.20150,-0.45315,0.16944
+round8_C1,rebalance_every,1,1349,-0.14148,0.17660,-0.49168,0.14307
+round8_C1,rebalance_every,2,1336,-0.11302,0.19400,-0.44903,0.20210
+round8_C1,rebalance_every,4,1315,-0.08941,0.20960,-0.40924,0.23650
+round8_C1,lookbacks,"[1, 4, 13, 26, 52]",400,-0.13045,0.17430,-0.45824,0.15750
+round8_C1,lookbacks,"[1, 4, 13]",1100,-0.17622,0.13841,-0.48838,0.19182
+round8_C1,lookbacks,"[13, 26, 52]",500,-0.08128,0.23345,-0.42888,0.19800
+round8_C1,lookbacks,"[13, 26]",600,-0.09978,0.21897,-0.41254,0.23833
+round8_C1,lookbacks,"[26, 52]",700,-0.04980,0.23831,-0.40221,0.22286
+round8_C1,lookbacks,"[4, 13, 26, 52]",300,-0.13071,0.18488,-0.48968,0.17333
+round8_C1,lookbacks,"[4, 13, 26]",400,-0.13367,0.17946,-0.49633,0.12500
+round8_C1,score,blend,1700,-0.11866,0.18845,-0.46651,0.17941
+round8_C1,score,ranksum,700,-0.12625,0.19332,-0.48718,0.12143
+round8_C1,score,voladj,1600,-0.10276,0.19876,-0.41236,0.24000
+round8_C1,stock_tilt,0.0,2213,-0.11548,0.18400,-0.44309,0.21148
+round8_C1,stock_tilt,0.25,443,-0.11256,0.19957,-0.45668,0.16704
+round8_C1,stock_tilt,0.5,453,-0.11988,0.20481,-0.45100,0.15011
+round8_C1,stock_tilt,0.75,445,-0.11515,0.19876,-0.44933,0.20000
+round8_C1,stock_tilt,1.0,446,-0.10537,0.20752,-0.45093,0.16816
+round8_C1,entry,make_room,2003,-0.11670,0.18960,-0.45332,0.18972
+round8_C1,entry,wait,1997,-0.11124,0.19787,-0.44199,0.19730
