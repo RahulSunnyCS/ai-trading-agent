@@ -216,7 +216,8 @@ clicks: it makes that call for the `_id` it recorded at upload, then lists again
 `GET /strategies` without the CSRF header answers 401 "Missing CSRF token".
 
 **Live (`/live`, "Algo Trade").** Header: "Broker Login n/m", "n/6 Strategy Deployed" (6 at once on the
-owner's plan), Auto Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
+owner's plan; **gone by 2026-11-02**, when the page showed only "Deployed Strategies" and no count), Auto
+Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
 ("Strategies can only be deployed during 08:00 IST to 15:40 IST"). Two sections:
 
 - **Activation:** one row per saved strategy: status ("Setup Pending" → "Ready to deploy"), "n Deployed", the
@@ -226,7 +227,9 @@ owner's plan), Auto Activation, Auto restart paused executions. Deploys are allo
   Open Pos: n · RUNNING · ₹ MTM · <broker - account>", with Switch to manual / Square Off / View Trades; the
   section has "Switch all to manual" and "Square off all". Filters: Running, Paused, Sq Off, Error, Manual.
 
-**Setup Execution** opens a sheet "Edit execution for <name>":
+**Setup Execution** opens a sheet "Edit execution for <name>" (a narrow window) or "Select execution for
+<name>" (1440 px, 2026-11-02). It can be set up and saved outside the deploy hours (BL-197 does it each
+evening; the row turns "Ready to deploy"):
 
 | Field | Seen (default) |
 |---|---|
@@ -234,9 +237,9 @@ owner's plan), Auto Activation, Auto restart paused executions. Deploys are allo
 | Notice | for MIS orders the exit time must be strictly before 15:24; the rotation exits at 15:28, so NRML |
 | Quantity Multiplier | 1 |
 | Auto Sq Off on Margin Error | on |
-| Trade monitoring | on LTP / **on Candle Close** |
+| Trade monitoring | on LTP / **on Candle Close**: Candle Close checks the overall SL / target / TSL and lock-and-trail at each minute's 59th second, as the backtest does, and leaves leg-wise SL / target / TSL on LTP (AlgoTest's docs, `execution-settings/trade-monitoring`); BL-197 sets it on every pick |
 | Strategy execution time | the strategy's entry time (11:37:00 for the owner's Widesl file) |
-| Per leg (Leg 1, Leg 2, "Copy To Legs") | NRML/MIS **NRML**; Tgt/SL ref price Traded/**Trigger**; delay entry 0 s; entry and exit order type **Limit**/MPP; buffer type **Points**/%; trigger buffer 0; limit buffer 3; monitoring **Continuous**/Delayed, frequency 5 s |
+| Per leg (Leg 1, Leg 2, "Copy To Legs") | NRML/MIS **NRML**; Tgt/SL ref price Traded/**Trigger**; delay entry 0 s; entry and exit order type **Limit**/MPP; buffer type **Points**/%; trigger buffer 0; limit buffer 3; "Convert to Market After" 40 s (entry) / 1 s (exit) (seen 2026-11-02); monitoring **Continuous**/Delayed, frequency 5 s |
 | Execution days | Weekdays / DTE; M T W Th F Sa Su, **none ticked** |
 | Buttons | Cancel · "Setup Execution Settings" |
 

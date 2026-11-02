@@ -265,7 +265,9 @@ export const strategyPage = {
  * day boxes, "Setup Execution Settings"). What "Activate" opens is NOT yet seen.
  */
 export const livePage = {
-  header: (page: Page): Locator => page.getByText('Strategy Deployed').first(),
+  // "n/6 Strategy Deployed" until late October 2026; "Deployed Strategies" on 2026-11-02
+  header: (page: Page): Locator =>
+    page.getByText(/^(\d+\/\d+ Strategy Deployed|Deployed Strategies)$/).first(),
   anyRowCount: (page: Page): Locator => page.getByText(/^\d+ Deployed$/).first(),
   row: (page: Page, name: string): Locator => page.getByText(name, { exact: true }).first(),
   setupExecution: (page: Page): Locator =>
@@ -276,11 +278,23 @@ export const livePage = {
   sheet: (page: Page, name: string): Locator =>
     page
       .locator('div')
-      .filter({ has: page.getByText(`Edit execution for ${name}`) })
+      // "Edit execution for" in a narrow window, "Select execution for" at 1440 px (2026-11-02)
+      .filter({
+        has: page.getByText(
+          new RegExp(`(Edit|Select) execution for ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+        ),
+      })
       .filter({ has: page.getByRole('button', { name: 'Setup Execution Settings' }) })
       .last(),
   sheetSave: (sheet: Locator): Locator =>
     sheet.getByRole('button', { name: 'Setup Execution Settings' }),
+  /** The sheet's Trade monitoring choice: a radio inside each label (BL-197). */
+  monitoring: (sheet: Locator, choice: 'on LTP' | 'on Candle Close'): Locator =>
+    sheet
+      .locator('label')
+      .filter({ hasText: new RegExp(`^${choice}$`) })
+      .first(),
+  executionTime: (sheet: Locator): Locator => sheet.locator('input[type=time]').first(),
   /** Anything that may open after "Activate": a dialog or a bottom sheet. */
   popup: (page: Page): Locator =>
     page

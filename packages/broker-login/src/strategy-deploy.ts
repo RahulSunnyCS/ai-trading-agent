@@ -17,10 +17,12 @@ import {
   ACTIVATE_LEAD_SECONDS,
   type LiveState,
   type Pick,
+  SETUP_PENDING,
   istMinutes,
   nothingOnAlgotest,
   parseLive,
   planDeploy,
+  planSetup,
   repeating,
   secondsUntil,
 } from './deploy-plan.js';
@@ -39,6 +41,9 @@ import { visibleWithin } from './wait.js';
  *
  *   tsx src/strategy-deploy.ts --latest t1 [--apply]       deploy (after the 09:16 pick)
  *   tsx src/strategy-deploy.ts --latest t1 --check          15:35: anything left repeating or running
+ *   tsx src/strategy-deploy.ts --latest t1 --setup [--apply]  BL-197: each evening, after the upload,
+ *       Setup Execution for the next session's picks (Trade monitoring on Candle Close); deploys
+ *       nothing, so it needs ALGOTEST_UPLOAD=on rather than ALGOTEST_DEPLOY
  *
  * Only a recorded export for today (`obt rotation algotest-export`, source "recorded") is accepted.
  * Each pick is set up with AlgoTest's defaults as seen on 2026-10-19 (docs/algotest-execution.md §7:
@@ -83,7 +88,17 @@ async function readLive(page: Page): Promise<LiveState> {
 /** Too close to a pick's entry minute to activate it: that pick only; later picks still deploy. */
 class TooLate extends Error {}
 
-async function deployOne(page: Page, pick: Pick): Promise<string> {
+/** "HH:MM" of minutes after midnight. */
+function hhmm(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Open the pick's Setup Execution sheet, check AlgoTest's defaults, put Trade monitoring on Candle
+ * Close (BL-197: the overall MTM stop then checks at each minute's close, as the backtest does; leg
+ * stops stay on LTP) and save it.
+ */
+async function setupSheet(page: Page, pick: Pick): Promise<void> {
   const { name } = pick;
   await livePage.row(page, name).click();
   await livePage.setupExecution(page).click();
@@ -105,9 +120,22 @@ async function deployOne(page: Page, pick: Pick): Promise<string> {
     .locator('input[type=checkbox]')
     .evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).length);
   if (ticked > 0) throw new Error(`${ticked} box(es) ticked in the sheet; expected none`);
+  const time = (await livePage.executionTime(sheet).inputValue()).slice(0, 5);
+  if (time !== hhmm(pick.entry))
+    throw new Error(`strategy execution time ${time}, expected ${hhmm(pick.entry)}`);
+  const candle = livePage.monitoring(sheet, 'on Candle Close');
+  const radio = candle.locator('input[type=radio]');
+  if (!(await radio.isChecked())) await candle.click();
+  if (!(await radio.isChecked()))
+    throw new Error('Trade monitoring did not switch to on Candle Close');
 
   await livePage.sheetSave(sheet).click();
   await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
+}
+
+async function deployOne(page: Page, pick: Pick): Promise<string> {
+  const { name } = pick;
+  await setupSheet(page, pick);
 
   const before = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
   // The plan checked the time at login; setting up may have taken a while, so check again.
@@ -147,15 +175,21 @@ async function main(): Promise<number> {
       latest: { type: 'string' },
       apply: { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
+      setup: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
   });
   if (existsSync('.env')) process.loadEnvFile('.env');
-  if (
-    (values.apply || values.check) &&
-    process.env.ALGOTEST_DEPLOY?.trim().toLowerCase() !== 'on'
-  ) {
-    console.log('ALGOTEST_DEPLOY is not "on": nothing deployed (dry run without --apply)');
+  if (values.setup && values.check) {
+    console.error('--setup and --check do not go together');
+    return 64;
+  }
+  // BL-197: Setup Execution deploys nothing; it belongs to the upload and its switch
+  const gate = values.setup ? 'ALGOTEST_UPLOAD' : 'ALGOTEST_DEPLOY';
+  if ((values.apply || values.check) && process.env[gate]?.trim().toLowerCase() !== 'on') {
+    console.log(
+      `${gate} is not "on": nothing ${values.setup ? 'set up' : 'deployed'} (dry run without --apply)`,
+    );
     return 0;
   }
   // BL-143 Phase 4: a confirmed stop holds every deploy until the owner resumes.
@@ -175,7 +209,7 @@ async function main(): Promise<number> {
     console.error(`automation settings unreadable (${String(error)}): the check runs anyway`);
   }
   if (values.apply && automation) {
-    if (!automation.masters.deploy) {
+    if (!values.setup && !automation.masters.deploy) {
       console.log(`Automated deployment is off (${describeSource(automation)}): nothing deployed`);
       return 0;
     }
@@ -197,21 +231,36 @@ async function main(): Promise<number> {
     dir = (JSON.parse(await readFile(pointer, 'utf8')) as { dir: string }).dir;
   }
   if (!dir) {
-    console.error('usage: --dir <export folder> | --latest <book> [--apply | --check]');
+    console.error('usage: --dir <export folder> | --latest <book> [--apply | --check | --setup]');
     return 64;
   }
   const manifest = JSON.parse(
     await readFile(join(resolve(dir), 'manifest.json'), 'utf8'),
   ) as Manifest;
   const today = istToday();
-  if (!values.check && (manifest.source !== 'recorded' || manifest.day !== today)) {
+  if (values.setup) {
+    if (manifest.day < today) {
+      console.error(`the export is for ${manifest.day}, a past session: nothing to set up`);
+      return 1;
+    }
+  } else if (!values.check && (manifest.source !== 'recorded' || manifest.day !== today)) {
     console.error(
       `the export is ${manifest.source} for ${manifest.day}, not today's recorded picks`,
     );
     return 1;
   }
   // BL-140: no login at all when the settings give AlgoTest nothing of the tool's to deploy or check.
-  if ((values.apply || values.check) && automation) {
+  if (
+    values.setup &&
+    automation &&
+    !(uploadBooks(automation, 'algotest') as string[]).includes(manifest.book)
+  ) {
+    console.log(
+      `no AlgoTest row in Settings › Automation uploads the ${manifest.book.toUpperCase()} list: nothing to set up (${describeSource(automation)}); AlgoTest not logged in`,
+    );
+    return 0;
+  }
+  if ((values.apply || values.check) && automation && !values.setup) {
     const uploads = uploadBooks(automation, 'algotest');
     const ledger = join(resolve(dir), '..', '..', 'deploy-ledger.jsonl');
     const nothing = nothingOnAlgotest(
@@ -248,7 +297,8 @@ async function main(): Promise<number> {
     return 1;
   }
   registerSecret(password);
-  const label = `AlgoTest ${manifest.book.toUpperCase()} ${values.check ? '15:35 check' : 'deploy'} ${today}`;
+  const what = values.setup ? `setup for ${manifest.day}` : values.check ? '15:35 check' : 'deploy';
+  const label = `AlgoTest ${manifest.book.toUpperCase()} ${what}${values.setup ? '' : ` ${today}`}`;
   const browser = await chromium.launch({ headless: !values.headed });
   const page = await (
     await browser.newContext({ viewport: VIEWPORT, locale: 'en-IN', timezoneId: 'Asia/Kolkata' })
@@ -260,7 +310,32 @@ async function main(): Promise<number> {
   try {
     await algotestLoginLocked(page, { phone: normalizePhone(phone), password }, 'strategy-deploy');
     const live = await readLive(page);
-    if (values.check) {
+    if (values.setup) {
+      const p = planSetup(picks, live);
+      if (p.deployed.length) lines.push(`already deployed, left alone: ${p.deployed.join(', ')}`);
+      if (p.missing.length) lines.push(`NOT IN ALGOTEST, not set up: ${p.missing.join(', ')}`);
+      if (p.setup.length) lines.push(`set up: ${p.setup.map((d) => d.name).join(', ')}`);
+      failed = p.missing.length > 0;
+      console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
+      if (values.apply) {
+        for (const pick of p.setup) {
+          try {
+            await setupSheet(page, pick);
+            const row = (await readLive(page)).rows.find((r) => r.name === pick.name);
+            if (!row || row.status === SETUP_PENDING)
+              throw new Error(`still "${row?.status ?? 'not listed'}" after saving the sheet`);
+            lines.push(`✅ ${pick.name}: ${row.status} (Candle Close, ${hhmm(pick.entry)})`);
+          } catch (error) {
+            failed = true;
+            await safeScreenshot(page, 'setup-failed');
+            await dumpHtml(page, 'setup-failed');
+            lines.push(`❌ ${pick.name}: ${describe(error)}`);
+            // a sheet that did not behave stops the run: nothing else is set up blind
+            break;
+          }
+        }
+      }
+    } else if (values.check) {
       const again = repeating(live);
       if (again.length) {
         failed = true;
@@ -311,7 +386,9 @@ async function main(): Promise<number> {
   }
 
   if (values.apply || (values.check && failed)) {
-    const head = failed ? `⚠️ ${label}: check AlgoTest now` : `✅ ${label}`;
+    const head = failed
+      ? `⚠️ ${label}: check AlgoTest ${values.setup ? 'before the morning' : 'now'}`
+      : `✅ ${label}`;
     await sendText(
       readTelegramConfig(),
       redact([head, ...lines].join('\n')),
