@@ -109,5 +109,14 @@ Filters for source, index and days to expiry sit above the cards and stay in the
 
 The Zerodha contract notes. That account trades nothing but Momentum, so every fill on it is a Momentum buy or sell: what was bought and sold, the charges and their share of the turnover, and every fill. **Open Momentum › This week** goes to the weekly plan the fills carried out.
 
+**Rebalances** is the log of the lots, one block per lot on the Friday it was due, newest first. Weeks are counted from the paper start (Fri 16 Oct 2026 is week 1). Each block shows:
+
+- **The status.** **Rebalance done**: every stock the signal or the 14:15 orders asked for was traded. **Partly done**: some were. **Waiting for notes**: nothing is on the notes yet and the notes for the first session after that Friday are not in (a lot is often bought on the Monday). **Rebalance not done**: the notes are in and nothing was traded.
+- **One line per stock**, the day's fills netted: shares, value and side. A stock asked for and not traded shows its planned shares and value; **not in the orders** is a trade nobody asked for.
+- **Folded into**: a week not done says where its trades went. The orders are not changed: the lot rebalances in full the next time it is due, with what it holds and the free cash.
+- **Holding after**: what the lot holds after that Friday, its booked shares plus the week's fills.
+
+The line under the title compares the latest Kite snapshot (read when you log in to Kite) with what the lots hold now. Kite already shows trades whose contract note has not arrived, so a difference is such a trade or a share no lot owns. **All fills**, collapsed below, lists every transaction on the notes, to check a figure against a note.
+
 > [!NOTE]
 > The page reads the notes as they were stored. If a figure differs from your sheet for the same day, the day drawer shows the note's own figures and inputs, which is where to look first.
