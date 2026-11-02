@@ -423,6 +423,8 @@ class _Data:
         pool_top_n: int,
         pool_exit_rank: int,
         liquidity: liquidity_mod.LiquidityConfig | None = None,
+        voladj_lookbacks: bool = False,
+        voladj_skip: Literal["long", "all", "none"] = "long",
         universe_kind: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
         series_breaks: Literal["legacy", "verified"] = "verified",
     ) -> broad.UniverseRanking:
@@ -449,6 +451,8 @@ class _Data:
             liquidity,
             universe_kind,
             series_breaks,
+            voladj_lookbacks,
+            voladj_skip,
         )
         with self._lock:
             if mtimes != self._broad_mtimes:
@@ -466,6 +470,8 @@ class _Data:
             weights=weights,
             score=score,  # type: ignore[arg-type]
             voladj_skip_recent_month=voladj_skip_recent_month,
+            voladj_lookbacks=voladj_lookbacks,
+            voladj_skip=voladj_skip,
             pool_top_n=pool_top_n,
             pool_exit_rank=pool_exit_rank,
             liquidity=liquidity,
@@ -654,6 +660,11 @@ class BacktestRequest(BaseModel):
     # Stock-momentum additions (engine.py Config fields; harmless defaults for ETF requests).
     score: Literal["ranksum", "voladj", "blend"] = "ranksum"
     voladj_skip_recent_month: bool = True
+    # dataset="broad" only (BL-086, searched in BL-176): `voladj` follows `lookbacks` and
+    # `weights` (one volatility-adjusted component per lookback) instead of NSE's fixed 26/52
+    # weeks; `voladj_skip` names which of them skip the latest 4 weeks. Off = unchanged.
+    voladj_lookbacks: bool = False
+    voladj_skip: Literal["long", "all", "none"] = "long"
     rebalance: Literal["weekly", "monthly"] = "weekly"
     # rebalance="weekly" only: trade every K weeks, on calendar phase `rebalance_offset`
     # (engine.Config.rebalance_every). 1 = every week.
@@ -724,6 +735,9 @@ class BacktestRequest(BaseModel):
     # "extended" also tags stocks outside the 755-name Total Market (BSE-derived sectors), so the
     # all-liquid universe's category layer can hold them; "curated" is the original 755-name file.
     broad_category_tags: Literal["curated", "extended"] = "curated"
+    # Category mode only (BL-116 Phase 2, searched in BL-176): a buy week's money is shared 2 : 1
+    # (or this weight : 1) between picks from the first-placed held category and the rest.
+    broad_top_sector_weight: float = Field(1.0, ge=1.0, le=3.0)
     # How big one-day falls are treated when building price series. "verified" (the default
     # everywhere since 2026-10-05, BL-010) keeps one continuous series unless a corporate action
     # that cannot be back-adjusted (demerger, rights, scheme, dividend) explains the fall.
@@ -1963,11 +1977,13 @@ def _run_broad(
     ranking: broad.UniverseRanking,
     outer_prices: pd.DataFrame,
     *,
-    top_sector_weight: float = 1.0,
+    top_sector_weight: float | None = None,
     tax: TaxRules | None = None,
 ) -> broad.BroadBacktestResult:
-    """`top_sector_weight` and `tax` are for research scripts (BL-116, after-tax runs); the API's
-    own Broad requests leave both at their defaults."""
+    """`top_sector_weight` (None = the request's `broad_top_sector_weight`) and `tax` are for
+    research scripts (BL-116, after-tax runs); the API's own Broad requests leave both unset."""
+    if top_sector_weight is None:
+        top_sector_weight = req.broad_top_sector_weight
     weights = tuple(req.weights) if req.weights else None
     stock_tilt_ranks = None
     if req.broad_reversal_tilt > 0:
@@ -1995,6 +2011,8 @@ def _run_broad(
         weights=weights,
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
+        voladj_lookbacks=req.voladj_lookbacks,
+        voladj_skip=req.voladj_skip,
         pool_top_n=req.broad_pool_top_n,
         pool_exit_rank=req.broad_pool_exit_rank,
         coverage_floor=req.broad_coverage_floor,
@@ -2243,6 +2261,8 @@ def _broad_ranking(req: BacktestRequest) -> broad.UniverseRanking:
         weights=tuple(req.weights) if req.weights else None,
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
+        voladj_lookbacks=req.voladj_lookbacks,
+        voladj_skip=req.voladj_skip,
         pool_top_n=req.broad_pool_top_n,
         pool_exit_rank=req.broad_pool_exit_rank,
         liquidity=_liquidity_config(req),
@@ -2266,6 +2286,8 @@ def _broad_parts(
         raise HTTPException(422, "Top N can't be greater than the exit rank.")
     if req.broad_pool_top_n > req.broad_pool_exit_rank:
         raise HTTPException(422, "Pool top N can't be greater than the pool exit rank.")
+    if req.broad_top_sector_weight != 1.0 and not on:
+        raise HTTPException(422, "A top-sector weight needs the category layer on.")
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
         raise HTTPException(422, "Give one weight per lookback.")
     if not (
@@ -2616,6 +2638,8 @@ def _broad_live_ranking(
         weights=tuple(req.weights) if req.weights else None,
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
+        voladj_lookbacks=req.voladj_lookbacks,
+        voladj_skip=req.voladj_skip,
     )
     live, ltp, symbols = rebalance.live_broad_ranking(
         ranking,

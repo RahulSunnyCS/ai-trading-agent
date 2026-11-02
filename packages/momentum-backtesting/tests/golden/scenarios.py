@@ -95,6 +95,28 @@ SCENARIOS: dict[str, dict] = {
         "$meta": "broad",
         "with": {"broad_universe": "total_market", "execution": "mon_close"},
     },
+    # BL-176: voladj following the run's own lookbacks (BL-086), with no 4-week skip, and the
+    # top-placed category's pick bought at 1.5x (BL-116 Phase 2); then the skip on every lookback.
+    "broad_voladj_lookbacks_top_sector": {
+        "$meta": "broad",
+        "with": {
+            "broad_universe": "total_market",
+            "score": "voladj",
+            "lookbacks": [13, 26, 52],
+            "voladj_lookbacks": True,
+            "voladj_skip": "none",
+            "broad_top_sector_weight": 1.5,
+        },
+    },
+    "broad_voladj_lookbacks_skip_all": {
+        "$meta": "broad",
+        "with": {
+            "broad_universe": "total_market",
+            "score": "voladj",
+            "voladj_lookbacks": True,
+            "voladj_skip": "all",
+        },
+    },
     "broad_category_mode_off": {
         "$meta": "broad",
         "with": {

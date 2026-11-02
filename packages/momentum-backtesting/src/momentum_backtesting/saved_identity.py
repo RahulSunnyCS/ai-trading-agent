@@ -70,11 +70,17 @@ _BROAD_ONLY = frozenset(
         "broad_reversal_screen_pct",
         "broad_reversal_tilt",
         "broad_series_breaks",
+        "broad_top_sector_weight",
         "broad_universe",
         "max_category",
         "max_stock_price",
+        "voladj_lookbacks",
+        "voladj_skip",
     }
 )
+#: Broad settings added after strategies were saved (BL-176), with the value every earlier config
+#: ran at: dropped from the identity at that value, so no existing fingerprint moves.
+_LATER_DEFAULTS = {"voladj_lookbacks": False, "voladj_skip": "long", "broad_top_sector_weight": 1.0}
 _INNER = frozenset({"commodity_copies", "debt_copies", "inner_exit_rank", "inner_top_n"})
 _ETF_LEVERS = frozenset({"exclude_high_vol", "execution", "reversal_screen_pct", "reversal_tilt"})
 #: The ETF levers a stock-based dataset still never reads. `execution` is read by all four now
@@ -140,6 +146,12 @@ def normalise(dataset: str, config: dict[str, Any]) -> dict[str, Any] | None:
     # config saved before the option existed fills at Friday's close and keeps its fingerprint.
     if dataset != "etf" and settings.get("execution") == "fri_close":
         settings.pop("execution")
+    for key, default in _LATER_DEFAULTS.items():
+        if key in settings and settings[key] == default:
+            settings.pop(key)
+    # `voladj_skip` is read only with `voladj_lookbacks` on (engine.compute_ranks).
+    if not settings.get("voladj_lookbacks"):
+        settings.pop("voladj_skip", None)
     if "broad_liquidity_filter" in settings:
         # A gated universe runs with the filter on whatever was sent (`api._liquidity_config`), so
         # the stored flag is not a setting there: both spellings are the same strategy.

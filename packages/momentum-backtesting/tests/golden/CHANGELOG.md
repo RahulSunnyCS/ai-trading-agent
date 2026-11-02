@@ -242,3 +242,12 @@ BL-176: Broad Monday-close fill, new scenario broad_monday_close; no other scena
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
 | broad_monday_close | n/a -> 15.38% | n/a -> -29.88% |
+
+## 2026-11-02 (on top of `da9ff4d6`)
+
+BL-176: two new Broad scenarios for the request fields voladj_lookbacks, voladj_skip and broad_top_sector_weight (the round 8 ensemble needs them in the API); no existing scenario moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_voladj_lookbacks_top_sector | n/a -> 22.14% | n/a -> -25.64% |
+| broad_voladj_lookbacks_skip_all | n/a -> 15.88% | n/a -> -31.52% |

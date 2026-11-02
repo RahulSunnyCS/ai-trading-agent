@@ -279,6 +279,10 @@ REQUEST_FIELDS = {
     "entry": "entry",
     "stock_tilt": "broad_reversal_tilt",
     "stock_tilt_screen_pct": "broad_reversal_screen_pct",
+    # BL-176 (round 8) keys
+    "voladj_lookbacks": "voladj_lookbacks",
+    "voladj_skip": "voladj_skip",
+    "top_sector_weight": "broad_top_sector_weight",
 }
 
 #: What the search runs with when a space says nothing (the defaults of `bias.Runner` and
@@ -333,10 +337,23 @@ def effective_parameters(fixed: dict, config: dict) -> dict:
     return {**rest, **heavy, **light, "rebalance_offset": config["rebalance_offset"]}
 
 
-def favourite_request(fixed: dict, config: dict) -> dict:
-    """One frozen config as a complete `BacktestRequest` dict for the Broad dataset."""
+def favourite_request(
+    fixed: dict,
+    config: dict,
+    *,
+    universe: str = "turnover_rank",
+    tags: str = "curated",
+) -> dict:
+    """One frozen config as a complete `BacktestRequest` dict for the Broad dataset. `universe`
+    and `tags` are the arm's (BL-010's frozen ensemble: `turnover_rank`, curated); a space that
+    fixes `universe_kind` or `category_tags` (BL-176) wins over them."""
     params = effective_parameters(fixed, config)
-    unmapped = sorted(set(params) - set(REQUEST_FIELDS))
+    universe = params.pop("universe_kind", None) or universe
+    tags = params.pop("category_tags", None) or tags
+    fill = params.pop("fill", None)
+    if fill is not None:
+        params["signal_delay"], params["execution"] = search.FILLS[fill]
+    unmapped = sorted(set(params) - set(REQUEST_FIELDS) - {"execution"})
     if unmapped:
         raise ValueError(
             f"config {config['id']}: no request field for {unmapped}; the live path cannot "
@@ -350,10 +367,12 @@ def favourite_request(fixed: dict, config: dict) -> dict:
         "portfolio": "buffer",
         "rebalance": "weekly",
         "broad_category_mode": "on",
-        "broad_category_tags": "curated",
-        "broad_universe": "turnover_rank",
+        "broad_category_tags": tags,
+        "broad_universe": universe,
         "broad_liquidity_filter": True,
     }
+    if "execution" in params:
+        request["execution"] = params["execution"]
     for key, field in REQUEST_FIELDS.items():
         if key not in values:
             continue
