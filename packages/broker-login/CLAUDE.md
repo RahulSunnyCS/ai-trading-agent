@@ -223,6 +223,9 @@ week, until disabled.
   name, so it was run once, supervised.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) deploys the day's recorded picks on /live. `--apply`
   and `--check` need `ALGOTEST_DEPLOY=on`. It stops at anything "Activate" opens that it has not seen.
+  `--setup` (BL-197, the last step of `algotest-evening`) sets up the next session's picks instead: each
+  sheet checked (multiplier 1, NRML, no day ticked, execution time = entry) and saved with Trade monitoring
+  on Candle Close; it deploys nothing, so it needs `ALGOTEST_UPLOAD=on`, not `ALGOTEST_DEPLOY`.
 - Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read
   `latest-<book>.json`, written by `obt rotation algotest-export`. The page contract is in
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save

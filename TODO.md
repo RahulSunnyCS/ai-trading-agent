@@ -744,6 +744,7 @@ them. Every evening after the result message, delete what the tool uploaded and 
 | 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | **Closed 2026-10-28: built, unused** (Automation settings v6, 23 Oct, turned AlgoTest off; trading is on Quantiply; still gated by `ALGOTEST_UPLOAD`). **Built 2026-10-19** (`src/strategy-upload.ts`, `src/strategy-plan.ts`); first supervised `--apply` and the delete dialog still to be seen |
 | 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler | claude | **Closed 2026-10-28: built, unused** (Automation settings v6, 23 Oct, turned AlgoTest off; trading is on Quantiply; still gated by `ALGOTEST_UPLOAD`). **Registered 2026-10-19** (`algotest-evening` 16:40, `algotest-topup` 09:18), off until `ALGOTEST_UPLOAD=on`; restart the scheduler after merge. The top-up sends its own Telegram line, not one inside the 09:16 message |
 | 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | **Closed 2026-10-28, not run** (AlgoTest not used for trading) |
+| 3.30.6 | AlgoTest: Setup Execution each evening (Candle Close), Activate right after the morning broker login — [BL-197](backlog/BL-197-algotest-evening-setup-morning-activate.md) | claude | In progress: Phase 1 (evening setup) built and run 2026-11-02; Phase 2 after seeing the first Activate |
 
 ### 3.31 Deploy the rotation picks in AlgoTest — [BL-138](backlog/BL-138-algotest-auto-deploy.md)
 
