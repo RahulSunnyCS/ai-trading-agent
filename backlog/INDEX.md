@@ -45,6 +45,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-174](BL-174-rotation-day-60-readout.md) | Options rotation: the registered read-out at 60 trading days of the forward journal (due ~early Jan 2027) | P1 | Planned | research | options |
 | [BL-176](BL-176-momentum-search-on-f6-ranking.md) | Momentum: re-run the strategy search on the F6-fixed (point-in-time) ranking | P1 | Planned | research | momentum |
 | [BL-197](BL-197-algotest-evening-setup-morning-activate.md) | AlgoTest: Setup Execution every evening (Trade monitoring on Candle Close), Activate right after the morning broker login; the evening list trades | P1 | In progress | feature | broker-login |
+| [BL-200](BL-200-momentum-rebalance-log.md) | Momentum: a rebalance log in the Trade book, one block per lot per due week (done / waiting / not done, net shares per stock, the lot's holding after), the raw fills collapsed below | P1 | In progress | feature | momentum |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |

@@ -20,7 +20,7 @@ from typing import Any, Literal
 
 import duckdb
 import pandas as pd
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
@@ -6008,6 +6008,22 @@ def create_app() -> FastAPI:
         """This week's Lots panel (BL-142 Phase 4): the lot ledger with values and calendars.
         Read-only: no Kite read, no quote, no booking (`lots_view`)."""
         return lots_view()
+
+    @app.get("/api/lots/rebalances")
+    def lots_rebalances(
+        from_: str | None = Query(None, alias="from"), to: str | None = None
+    ) -> dict:
+        """Trade book › Momentum's rebalance log (BL-200): one block per lot per due week.
+        Read-only, from the Kite fills reconciliation (`forward_run.rebalance_log`)."""
+        from . import forward_run
+
+        for day in (from_, to):
+            if day is not None:
+                try:
+                    date.fromisoformat(day)
+                except ValueError:
+                    raise HTTPException(422, f"Not a date: {day!r}") from None
+        return forward_run.rebalance_log(from_, to)
 
     @app.post("/api/orders/run", status_code=202)
     def orders_run() -> dict:
