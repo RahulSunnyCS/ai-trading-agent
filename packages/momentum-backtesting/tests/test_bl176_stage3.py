@@ -55,3 +55,32 @@ def test_nudges_never_tilt_a_lookback_set_the_tilt_cannot_use():
     for n in robust.nudges(tilted, space):
         if not search.tilt_possible(n["heavy"]["lookbacks"]):
             assert n["light"]["stock_tilt"] == 0.0
+
+
+def test_config_facts_reads_a_direct_rank_config():
+    """Arm B (no category layer) is pooled with the category arms in one ranking: its holdings
+    are its direct top N, and it counts as no categories in the simplicity tie-break."""
+    from momentum_backtesting import choose
+
+    heavy = {"lookbacks": [13, 26]}
+    records = {
+        "a": {
+            "heavy": heavy,
+            "light": {
+                "category_top_n": 5,
+                "picks_per_category": 2,
+                "pool_top_n": 300,
+                "rebalance_every": 4,
+            },
+        },
+        "b": {"heavy": heavy, "light": {"off_top_n": 12, "pool_top_n": 40, "rebalance_every": 1}},
+        "b_small_pool": {
+            "heavy": heavy,
+            "light": {"off_top_n": 25, "pool_top_n": 20, "rebalance_every": 2},
+        },
+    }
+    facts = choose.config_facts(records)
+    assert facts.at["a", "holdings"] == 10
+    assert facts.at["b", "holdings"] == 12
+    assert facts.at["b_small_pool", "holdings"] == 20
+    assert facts.at["b", "simplicity"][1] == 0
