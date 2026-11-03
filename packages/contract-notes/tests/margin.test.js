@@ -133,6 +133,11 @@ describe("Angel One's statement", () => {
     ).toMatch(/collateral/);
   });
 
+  test('securities in the table with no readable collateral section are refused', () => {
+    const noSection = ANGEL.slice(0, ANGEL.indexOf('Collateral Details'));
+    expect(parseAngelone(noSection).error).toMatch(/no scrip could be read/);
+  });
+
   test('a row with a wrong number of figures, or no table, is refused', () => {
     expect(parseAngelone(ANGEL.replace('-100.000.00-100.00\n', '-100.00\n')).error).toMatch(
       /figures, not 13/,

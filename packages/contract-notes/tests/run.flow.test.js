@@ -395,6 +395,21 @@ describe('margin statements', () => {
     expect(readCursors(root())).toEqual({});
   });
 
+  test('a broken margin file is reported and stops neither the notes nor the bookmarks', async () => {
+    fs.mkdirSync(path.join(root(), 'margin'), { recursive: true });
+    fs.writeFileSync(path.join(root(), 'margin', '2026-10-23.jsonl'), '{not json\n');
+    mail = [
+      angel(201, '2026-10-23', parsedFor('2026-10-23', 500)),
+      finvasia(101, '2026-10-26', 700),
+    ];
+    const d = withReader(deps(MON_NIGHT, [...accounts, account('finvasia', 'FA1')]));
+    expect(await main([], d)).toBe(1);
+    expect(marginProblems().join('\n')).toMatch(/margin 2026-10-23: .*JSON/);
+    expect(line('2026-10-26').status).toBe('note');
+    expect(readCursors(root())['m@x.com|finvasia/FA1'].last_uid).toBe(101);
+    expect(readCursors(root())['m@x.com|margin/angelone'].last_uid).toBe(201);
+  });
+
   test('--dry-run writes no statement', async () => {
     mail = [angel(201, '2026-10-23', parsedFor('2026-10-23', 500))];
     await main(['--dry-run'], withReader(deps(MON_NIGHT, accounts)));

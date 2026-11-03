@@ -102,9 +102,15 @@ function parseAngelone(text) {
   }
   const holdings = angelHoldings(text);
   if (holdings.error) return holdings;
+  // Collateral in the table must be read scrip by scrip: the cash half of the 50:50 rule
+  // depends on which scrips they are, so an unread section is refused, never stored empty.
   const held = holdings.list.reduce((s, h) => s.plus(h.value), new Decimal(0));
-  if (holdings.list.length && !close(held, total.securities.plus(total.pledged))) {
-    return { error: 'collateral: the scrips do not add up to the securities in the table' };
+  if (!close(held, total.securities.plus(total.pledged))) {
+    return {
+      error: holdings.list.length
+        ? 'collateral: the scrips do not add up to the securities in the table'
+        : 'collateral: the table shows securities but no scrip could be read',
+    };
   }
   return {
     day: `${day[3]}-${day[2]}-${day[1]}`,

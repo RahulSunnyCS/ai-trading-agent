@@ -131,6 +131,20 @@ async function readNote(file, acc) {
   }
 }
 
+/** A cursor's bookmark on this connection: its last UID, or null when Gmail renumbered the folder. */
+function bookmarkOf(cursor, uidvalidity) {
+  return cursor.uidvalidity === uidvalidity && Number.isInteger(cursor.last_uid)
+    ? cursor.last_uid
+    : null;
+}
+
+/** The cursor after a read: the newest UID seen, never moving back. */
+function advanced(cursor, bookmark, messages, uidvalidity, at) {
+  const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
+  const last = Math.max(bookmark ?? 0, newest);
+  return { ...cursor, uidvalidity, ...(last ? { last_uid: last } : {}), checked_at: at };
+}
+
 /**
  * Decrypt and read one margin statement (BL-205) in `scratch`; returns { parsed } or { error }.
  * Never throws; leaves no decrypted copy behind.
@@ -331,10 +345,7 @@ async function main(argv, deps = {}) {
         for (const acc of opts.marginOnly ? [] : mine) {
           const cursorKey = `${mailbox.email}|${acc.broker}/${acc.accountId}`;
           const cursor = cursors[cursorKey] ?? {};
-          const bookmark =
-            cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
-              ? cursor.last_uid
-              : null;
+          const bookmark = bookmarkOf(cursor, conn.uidvalidity);
           let messages;
           try {
             messages = await d.searchNotes(
@@ -443,14 +454,7 @@ async function main(argv, deps = {}) {
           }
 
           if (!byDate) {
-            const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
-            const last = Math.max(bookmark ?? 0, newest);
-            cursors[cursorKey] = {
-              ...cursor,
-              uidvalidity: conn.uidvalidity,
-              ...(last ? { last_uid: last } : {}),
-              checked_at: at,
-            };
+            cursors[cursorKey] = advanced(cursor, bookmark, messages, conn.uidvalidity, at);
           }
           d.log(
             `read  ${label(acc)}: ${messages.filter((m) => isNew(m.uid)).length} new message(s)${!byDate && bookmark != null ? ` after #${bookmark}` : ` since ${addDays(window[0], -1)}`}`,
@@ -469,10 +473,7 @@ async function main(argv, deps = {}) {
           // Bookmarks written before the key named the broker carry over.
           const oldKey = `${mailbox.email}|ledger/${reader.kind}`;
           const cursor = cursors[cursorKey] ?? cursors[oldKey] ?? {};
-          const bookmark =
-            cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
-              ? cursor.last_uid
-              : null;
+          const bookmark = bookmarkOf(cursor, conn.uidvalidity);
           let messages;
           try {
             messages = await d.searchNotes(conn.imap, reader.subject, {
@@ -531,14 +532,7 @@ async function main(argv, deps = {}) {
           }
           if (stored) d.log(`ledger ${who}: ${stored} ${reader.kind} event(s)`);
           if (!byDate) {
-            const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
-            const last = Math.max(bookmark ?? 0, newest);
-            cursors[cursorKey] = {
-              ...cursor,
-              uidvalidity: conn.uidvalidity,
-              ...(last ? { last_uid: last } : {}),
-              checked_at: at,
-            };
+            cursors[cursorKey] = advanced(cursor, bookmark, messages, conn.uidvalidity, at);
             delete cursors[oldKey];
           }
         }
@@ -551,10 +545,7 @@ async function main(argv, deps = {}) {
           const who = `${statement.broker} margin`;
           const cursorKey = `${mailbox.email}|margin/${statement.broker}`;
           const cursor = cursors[cursorKey] ?? {};
-          const bookmark =
-            cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
-              ? cursor.last_uid
-              : null;
+          const bookmark = bookmarkOf(cursor, conn.uidvalidity);
           let messages;
           try {
             messages = await d.searchNotes(conn.imap, statement.subject, {
@@ -568,6 +559,60 @@ async function main(argv, deps = {}) {
             continue;
           }
           const isNew = (uid) => byDate || bookmark == null || uid > bookmark;
+
+          /** Read and store one statement PDF: true when stored. */
+          const storeStatement = async (acc, info, att, msg) => {
+            if (opts.day && info.day !== opts.day) return false;
+            if (history && (info.day < window[0] || info.day > window[window.length - 1])) {
+              return false;
+            }
+            if (acc.from && info.day < acc.from) return false;
+            const sha256 = crypto.createHash('sha256').update(att.content).digest('hex');
+            const existing = readMarginDay(root, info.day).find(
+              (l) => l.broker === acc.broker && l.account === acc.accountId,
+            );
+            if (existing?.sha256 === sha256) return false;
+            // A copy mailed earlier than the stored one is not a revision.
+            if (existing && msg.received && existing.received > msg.received) return false;
+            const read = await d.readStatement(att.content, acc, statement, scratch);
+            const parsed = read.parsed;
+            const bad =
+              read.error ??
+              (parsed.day !== info.day
+                ? `the statement is for ${parsed.day}, its file name says ${info.day}`
+                : parsed.account && parsed.account !== acc.accountId
+                  ? 'the statement names another account than its file name'
+                  : null);
+            if (bad) {
+              if (isNew(msg.uid)) {
+                problems.push(`${label(acc)} margin ${info.day}: ${hideId(bad, acc)}`);
+              }
+              return false;
+            }
+            const line = {
+              day: info.day,
+              broker: acc.broker,
+              account: acc.accountId,
+              kind: 'margin_statement',
+              total: parsed.total,
+              segments: parsed.segments,
+              holdings: parsed.holdings,
+              file: att.filename,
+              sha256,
+              message_id: msg.messageId ?? `${msg.uid}|${msg.received}|${msg.subject}`,
+              received: msg.received,
+              read_at: at,
+            };
+            if (!opts.dryRun) {
+              saveRawStatement(root, acc.broker, acc.accountId, info.day, att.content);
+              writeStatement(root, line);
+            }
+            d.log(
+              `margin ${info.day} ${label(acc)}: available ${line.total.available}, upfront ${line.total.upfront}, funds ${line.total.funds}${existing ? ' (revised)' : ''}`,
+            );
+            return true;
+          };
+
           let stored = 0;
           for (const msg of messages) {
             if (!fromOk(statement, msg.from)) {
@@ -589,67 +634,17 @@ async function main(argv, deps = {}) {
             for (const { att, info } of pdfs) {
               const acc = accs.find((a) => a.accountId === info.account);
               if (!acc) continue; // another account of the owner's, not configured here
-              if (opts.day && info.day !== opts.day) continue;
-              if (history && (info.day < window[0] || info.day > window[window.length - 1])) {
-                continue;
+              try {
+                if (await storeStatement(acc, info, att, msg)) stored += 1;
+              } catch (err) {
+                // One bad statement or file must not stop the notes, the bookmarks or the alerts.
+                problems.push(`${label(acc)} margin ${info.day}: ${hideId(err.message, acc)}`);
               }
-              if (acc.from && info.day < acc.from) continue;
-              const sha256 = crypto.createHash('sha256').update(att.content).digest('hex');
-              const existing = readMarginDay(root, info.day).find(
-                (l) => l.broker === acc.broker && l.account === acc.accountId,
-              );
-              if (existing?.sha256 === sha256) continue;
-              // A copy mailed earlier than the stored one is not a revision.
-              if (existing && msg.received && existing.received > msg.received) continue;
-              const read = await d.readStatement(att.content, acc, statement, scratch);
-              const parsed = read.parsed;
-              const bad =
-                read.error ??
-                (parsed.day !== info.day
-                  ? `the statement is for ${parsed.day}, its file name says ${info.day}`
-                  : parsed.account && parsed.account !== acc.accountId
-                    ? 'the statement names another account than its file name'
-                    : null);
-              if (bad) {
-                if (isNew(msg.uid)) {
-                  problems.push(`${label(acc)} margin ${info.day}: ${hideId(bad, acc)}`);
-                }
-                continue;
-              }
-              const line = {
-                day: info.day,
-                broker: acc.broker,
-                account: acc.accountId,
-                kind: 'margin_statement',
-                total: parsed.total,
-                segments: parsed.segments,
-                holdings: parsed.holdings,
-                file: att.filename,
-                sha256,
-                message_id: msg.messageId ?? `${msg.uid}|${msg.received}|${msg.subject}`,
-                received: msg.received,
-                read_at: at,
-              };
-              if (!opts.dryRun) {
-                saveRawStatement(root, acc.broker, acc.accountId, info.day, att.content);
-                writeStatement(root, line);
-              }
-              stored += 1;
-              d.log(
-                `margin ${info.day} ${label(acc)}: available ${line.total.available}, upfront ${line.total.upfront}, funds ${line.total.funds}${existing ? ' (revised)' : ''}`,
-              );
             }
           }
           if (stored) d.log(`margin ${who}: ${stored} statement(s)`);
           if (!byDate) {
-            const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
-            const last = Math.max(bookmark ?? 0, newest);
-            cursors[cursorKey] = {
-              ...cursor,
-              uidvalidity: conn.uidvalidity,
-              ...(last ? { last_uid: last } : {}),
-              checked_at: at,
-            };
+            cursors[cursorKey] = advanced(cursor, bookmark, messages, conn.uidvalidity, at);
           }
         }
       } finally {

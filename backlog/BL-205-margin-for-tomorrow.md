@@ -24,15 +24,15 @@ And the 50:50 rule (owner, later the same day): the exchange wants at least half
 in cash (or cash equivalents), the rest may be pledged shares. "In Finvasia we should assume
 strict 50:50 cash and non-cash collateral. In Angel One we should try to achieve it, else we get
 the amount to be paid as interest." Angel One's "Interest on collateral used against your
-derivative trade" e-mails are already in the ledger (`collateral_interest`, 119 days): on
-2 Nov ₹92.27 on a cash shortfall of ₹3,19,415 — about 0.029% a day (≈ 10.5% a year), ₹58–94 a
-day through late October, so roughly ₹2,000 a month at today's shortfall.
+derivative trade" e-mails are already in the ledger (`collateral_interest`, 119 days): the
+interest is about 0.029% a day (≈ 10.5% a year) of the cash shortfall, which ran at about ₹3 L in
+late October: roughly ₹2,000 a month.
 
 What the mailboxes hold (read 2026-11-04 with the contract-notes IMAP reader, nothing stored):
 
 | Broker | E-mail | When | What the PDF gives |
 |---|---|---|---|
-| Angel One | "Margin Statement for the day" from contract.notes@angeltrade.in, `CM_<client>_DDMMYYYY.pdf`, PAN password (the configured `pdfPassword`) | 00:00–05:00 IST the next day, every trading day (Oct: 21 of 21) | per segment (NSE-F&O, EQUITY, MCX, NCE) and a Total: funds (A), securities and pledged securities after haircut (B, C), **total margin available (F)**, **total upfront margin (G)**, crystallised obligation / MTM (H), total requirement (J), excess or shortfall (K). G is the day's **peak** requirement, not the end-of-day one: 2 Nov G = ₹8,62,692 against the warning e-mail's peak ₹8,65,364; 29 Oct ₹8,06,853 vs ₹8,04,646; 30 Oct ₹7,47,740 vs ₹8,08,061 (the exchange's random snapshot vs the broker's RMS peak) |
+| Angel One | "Margin Statement for the day" from contract.notes@angeltrade.in, `CM_<client>_DDMMYYYY.pdf`, PAN password (the configured `pdfPassword`) | 00:00–05:00 IST the next day, every trading day (Oct: 21 of 21) | per segment (NSE-F&O, EQUITY, MCX, NCE) and a Total: funds (A), securities and pledged securities after haircut (B, C), **total margin available (F)**, **total upfront margin (G)**, crystallised obligation / MTM (H), total requirement (J), excess or shortfall (K). G is the day's **peak** requirement, not the end-of-day one: on 2 and 29 Oct it was within 0.3% of the warning e-mail's peak, on 30 Oct 8% under it (the exchange's random snapshot vs the broker's RMS peak) |
 | Finvasia | "Client Margin Report#TID-…#" from Backoffice@shoonya.com, `MARGIN_<client>_DDMMYYYY.pdf`, PAN password | 17:45–20:00 IST the same day (a few the next morning) | funds, collateral after haircut, total margin available; the NSEFNO row's upfront margin is **0.00** on days the account traded intraday (29, 30 Oct) and its MTM column holds the day's crystallised obligation. No peak figure |
 | Zerodha (Kite) | "Daily Equity Margin Statement for <client> - <date>" from reportsmailer.zerodha.net | ~20:30 IST | not needed (Momentum, no F&O) — skipped |
 
@@ -111,8 +111,8 @@ the reading predates today's close.
   the cash component = funds + cash-equivalent collateral is a stored figure, not a guess at
   message time. A pledged scrip the list does not name is non-cash.
 - **Done when:** the backfill stores one line per statement e-mail since Sep for both accounts,
-  each row's arithmetic checks, and 2 Nov's Angel One line reads F ₹7,40,577.82 / G ₹8,62,691.62
-  / K −₹1,28,259.05 for NSE-F&O with four pledged scrips totalling ₹8,44,921.63 after haircut.
+  each row's arithmetic checks, and 2 Nov's Angel One NSE-F&O line matches the PDF (a shortfall of
+  about ₹1.3 L against the exchange) with its pledged scrips adding up to the table.
 
 ### Phase 2 — The requirement by day type, per lot
 - **Tasks:** `obt margin days [--from D --to D]` (Python, `realised/margin.py`): per trading
