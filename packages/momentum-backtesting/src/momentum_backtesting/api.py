@@ -5505,6 +5505,20 @@ def create_app() -> FastAPI:
         """The Kite login page to send the browser to (the dashboard card's button)."""
         return {"url": _kite_start()}
 
+    @app.post("/api/kite/sync")
+    def kite_sync() -> dict:
+        """Read the Kite holdings and free cash now (read-only) and keep them as a snapshot,
+        whatever the holdings source (the Trade book's Refresh from Kite, BL-200)."""
+        from . import holdings_sync
+
+        load_repo_env()
+        try:
+            return holdings_sync.sync("kite")
+        except holdings_sync.LOGIN_ERRORS as error:
+            raise HTTPException(409, f"No valid Kite login: {error}") from error
+        except RuntimeError as error:
+            raise HTTPException(502, str(error)) from error
+
     @app.get("/api/kite/start")
     def kite_start() -> RedirectResponse:
         """The same, as a redirect (`mbt kite login` opens this)."""

@@ -366,8 +366,11 @@ export interface RebalanceBlock {
 export interface RebalanceKiteCheck {
   synced_at: string | null;
   cash: number | null;
+  /** Kite against the lots plus the shares held outside any lot. */
   matches: boolean;
-  differences: { symbol: string; kite: number; lots: number }[];
+  differences: { symbol: string; kite: number; lots: number; outside: number }[];
+  /** Shares the notes show bought (net of sales) for no lot since the paper start. */
+  not_in_lots: { symbol: string; shares: number }[];
 }
 
 export interface RebalanceLogResponse {

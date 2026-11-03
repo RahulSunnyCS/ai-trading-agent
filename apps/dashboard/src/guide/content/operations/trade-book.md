@@ -117,7 +117,7 @@ The Zerodha contract notes. That account trades nothing but Momentum, so every f
 - **Folded into**: a week not done says where its trades went. The orders are not changed: the lot rebalances in full the next time it is due, with what it holds and the free cash.
 - **Holding after**: what the lot holds after that Friday, its booked shares plus the week's fills.
 
-The line under the title compares the latest Kite snapshot (read when you log in to Kite) with what the lots hold now. Kite already shows trades whose contract note has not arrived, so a difference is such a trade or a share no lot owns. **All fills**, collapsed below, lists every transaction on the notes, to check a figure against a note.
+The line under the title compares the latest Kite snapshot with what the notes say the account holds: the lots plus any shares bought for no lot (named as **in no lot**). Kite already shows trades whose contract note has not arrived, so a difference is such a trade. **Refresh from Kite** reads the Kite holdings and free cash now (read-only; it needs today's Kite login) and checks them again. Past weeks' trades still come from the contract notes: Kite's API gives only today's. **All fills**, collapsed below, lists every transaction on the notes, to check a figure against a note.
 
 > [!NOTE]
 > The page reads the notes as they were stored. If a figure differs from your sheet for the same day, the day drawer shows the note's own figures and inputs, which is where to look first.

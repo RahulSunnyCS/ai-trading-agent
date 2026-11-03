@@ -19,10 +19,10 @@ lot's due week to the Kite contract-note fills and gives every stock a status; t
   lists the fills no lot's orders claim (owner, 2026-11-02: the log shows whatever was bought or
   sold that week, in the strategy or not), as `outside` lines. They count in the week's bought and
   sold, never in the lot's status or holding.
-- **Kite check:** the latest stored Kite snapshot (read-only, BL-142) against what the lots hold
-  now (each lot's newest holding after, or its ledger when it has no block). Kite's holdings
-  include trades the contract notes have not brought in yet, so a difference is either such a
-  trade or a share no lot owns.
+- **Kite check:** the latest stored Kite snapshot (read-only, BL-142) against what the notes say
+  the account holds: the lots now (each lot's newest holding after, or its ledger when it has no
+  block) plus the shares bought outside any lot since the paper start. Kite's holdings include
+  trades the contract notes have not brought in yet, so a difference is such a trade.
 
 Every figure comes from the reconciliation; nothing here prices or plans.
 """
@@ -213,21 +213,44 @@ def _lots_now(blocks: list[dict], events: list[dict]) -> dict[str, float]:
     return held
 
 
-def kite_check(kite: dict | None, held: dict[str, float]) -> dict | None:
-    """The Kite snapshot (`{synced_at, holdings: {symbol: shares}, cash}`) against the lots."""
+def _outside_net(fills: list[dict], paper_start: str) -> dict[str, float]:
+    """Shares bought minus sold outside any lot since the paper start, per stock."""
+    net: dict[str, float] = defaultdict(float)
+    for f in fills:
+        if _friday_of(f["day"], f.get("time")) >= paper_start:
+            qty = float(f["qty"])
+            net[f["symbol"]] += qty if f["side"] == "buy" else -qty
+    return net
+
+
+def kite_check(
+    kite: dict | None, held: dict[str, float], outside: dict[str, float] | None = None
+) -> dict | None:
+    """The Kite snapshot (`{synced_at, holdings: {symbol: shares}, cash}`) against the lots plus
+    the shares held outside any lot (`outside`, from the notes)."""
     if not kite:
         return None
+    outside = outside or {}
     holdings = kite.get("holdings") or {}
+    names = set(holdings) | {s for s, n in held.items() if n > EPS}
+    names |= {s for s, n in outside.items() if n > EPS}
     differences = [
-        {"symbol": s, "kite": holdings.get(s, 0.0), "lots": held.get(s, 0.0)}
-        for s in sorted(set(holdings) | {s for s, n in held.items() if n > EPS})
-        if abs(holdings.get(s, 0.0) - held.get(s, 0.0)) > 1e-6
+        {
+            "symbol": s,
+            "kite": holdings.get(s, 0.0),
+            "lots": held.get(s, 0.0),
+            "outside": outside.get(s, 0.0),
+        }
+        for s in sorted(names)
+        if abs(holdings.get(s, 0.0) - held.get(s, 0.0) - outside.get(s, 0.0)) > 1e-6
     ]
+    not_in_lots = [{"symbol": s, "shares": n} for s, n in sorted(outside.items()) if n > EPS]
     return {
         "synced_at": kite.get("synced_at"),
         "cash": kite.get("cash"),
         "matches": not differences,
         "differences": differences,
+        "not_in_lots": not_in_lots,
     }
 
 
@@ -254,6 +277,7 @@ def build(
     if not paper_start:
         return out
     held_now: dict[str, float] = defaultdict(float)
+    outside_now: dict[str, float] = defaultdict(float)
     for group in groups:
         every = max(1, lots_per_group.get(group["group_id"], 1))
         rebalances = group.get("rebalances", [])
@@ -304,6 +328,8 @@ def build(
             )
         for symbol, shares in _lots_now(blocks, events.get(group["group_id"], [])).items():
             held_now[symbol] += shares
+        for symbol, shares in _outside_net(group.get("outside_lots") or [], paper_start).items():
+            outside_now[symbol] += shares
         _add_outside(blocks, group.get("outside_lots") or [], paper_start)
         blocks = [
             b for b in blocks if (not start or b["week"] >= start) and (not end or b["week"] <= end)
@@ -318,5 +344,5 @@ def build(
                 "outside_lots": len(group.get("outside_lots") or []),
             }
         )
-    out["kite_check"] = kite_check(kite, held_now)
+    out["kite_check"] = kite_check(kite, held_now, outside_now)
     return out

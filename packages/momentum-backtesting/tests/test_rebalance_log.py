@@ -199,7 +199,7 @@ def test_kite_check_compares_the_snapshot_with_what_the_lots_hold_now():
         start="2026-10-20",  # the date filter does not hide what a lot holds now
     )
     check = out["kite_check"]
-    assert check["differences"] == [{"symbol": "DELTA", "kite": 1, "lots": 0.0}]
+    assert check["differences"] == [{"symbol": "DELTA", "kite": 1, "lots": 0.0, "outside": 0.0}]
     assert check["matches"] is False and check["cash"] == 40000.0
     assert rl.kite_check(None, {}) is None
 
@@ -331,3 +331,71 @@ def test_every_fill_of_the_week_shows_even_when_no_lot_claims_it():
     ]
     alone = blocks["2026-11-06"]
     assert alone["lot"] is None and alone["status"] == rl.NO_LOT and alone["week_no"] == 4
+
+
+def test_shares_bought_outside_any_lot_count_in_the_kite_check():
+    rebalances = [
+        _rebalance("2026-10-23", "Lot 2", "b", [_row("ECHO", "done", shares=1, avg=7000)]),
+    ]
+    outside = [
+        # the same stock bought once more that week, for no lot
+        {
+            "day": "2026-10-23",
+            "time": "14:33:42",
+            "symbol": "ECHO",
+            "side": "buy",
+            "qty": 1,
+            "price": 7100,
+        },
+        {
+            "day": "2026-10-27",
+            "time": "10:00:00",
+            "symbol": "FOX",
+            "side": "buy",
+            "qty": 5,
+            "price": 10,
+        },
+        {
+            "day": "2026-10-28",
+            "time": "10:00:00",
+            "symbol": "FOX",
+            "side": "sell",
+            "qty": 5,
+            "price": 11,
+        },
+    ]
+    groups = [{"group_id": "g", "name": "F", "rebalances": rebalances, "outside_lots": outside}]
+
+    def check(holdings):
+        return rl.build(
+            groups,
+            {"g": []},
+            paper_start=START,
+            notes_through="2026-11-10",
+            lots_per_group={"g": 4},
+            kite={"synced_at": "x", "cash": 1.0, "holdings": holdings},
+        )["kite_check"]
+
+    both = check({"ECHO": 2})
+    assert both["matches"] is True
+    assert both["not_in_lots"] == [{"symbol": "ECHO", "shares": 1.0}]  # FOX was sold again
+    short = check({"ECHO": 3})
+    assert short["differences"] == [{"symbol": "ECHO", "kite": 3, "lots": 1, "outside": 1.0}]
+
+
+def test_the_kite_sync_route_reads_kite_whatever_the_holdings_source(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from momentum_backtesting import api, holdings_sync, kite
+
+    seen = []
+    monkeypatch.setattr(holdings_sync, "sync", lambda source: seen.append(source) or {"rows": []})
+    client = TestClient(api.create_app())
+    assert client.post("/api/kite/sync").json() == {"rows": []}
+    assert seen == ["kite"]
+
+    def refused(source):
+        raise kite.KiteCredentialsError("expired")
+
+    monkeypatch.setattr(holdings_sync, "sync", refused)
+    assert client.post("/api/kite/sync").status_code == 409
