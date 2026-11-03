@@ -328,6 +328,23 @@ def _t1_state(day: date, root: Path | None, err: Echo):
         return "error", f"{type(error).__name__}: {error}"
 
 
+def message_capital() -> dict[str, float]:
+    """The capital the evening message measures the month against (Settings › Automation, owner
+    2026-10-29): {'adaptive', 't1'}: the accounts that upload each list; 'total': every account
+    added up. Settings that cannot be read give the defaults: the message must always go."""
+    from . import automation_settings as auto
+
+    try:
+        settings, _ = auto.read()
+    except Exception:  # noqa: BLE001
+        settings = auto.DEFAULT
+    return {
+        "adaptive": auto.book_capital(settings, "core"),
+        "t1": auto.book_capital(settings, "t1"),
+        "total": sum(auto.capital(settings).values()),
+    }
+
+
 def _month_so_far(day: date, adaptive, t1, boost: dict[str, bool], root: Path | None, echo: Echo):
     """((Adaptive's paper month, T1's), the account's real month) for the evening message; T1's
     only when its day is in (`t1`), the real one for the owner's copy only. A failure here leaves
@@ -496,6 +513,7 @@ def _send_result_locked(
         boost = message_boost()
         t1_day = t1 if kind == "ready" else None
         paper, real = _month_so_far(day, adaptive, t1_day, boost, root, echo)
+        capital = message_capital()
         private = result.render(
             adaptive,
             t1_part,
@@ -503,7 +521,7 @@ def _send_result_locked(
             next_t1,
             live,
             boost=boost,
-            month=messages.month_lines(day, *paper, real),
+            month=messages.month_lines(day, *paper, real, capital),
         )
         group = result.render(
             adaptive,
@@ -511,7 +529,7 @@ def _send_result_locked(
             next_adaptive,
             next_t1,
             boost=boost,
-            month=messages.month_lines(day, *paper),
+            month=messages.month_lines(day, *paper, capital=capital),
         )
         echo(private)
         if not telegram:

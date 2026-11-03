@@ -101,10 +101,28 @@ def test_month_lines():
     assert messages.month_lines("2026-11-20", real=r)[0] == "📅 November so far"
 
 
+def test_month_lines_with_capital():
+    # owner 2026-10-29: each net as a share of its capital (a list's, or every account's)
+    a = month.Month(23400, 13, 9)
+    t = month.Month(-9000, 13, 6)
+    r = month.Month(25000, 2, 1, through=date(2026, 11, 2))
+    capital = {"adaptive": 850_000, "t1": 1_000_000, "total": 1_700_000}
+    assert messages.month_lines(date(2026, 11, 20), a, t, r, capital)[1:] == [
+        "🎯 Adaptive   +₹23,400 (+2.8% of ₹8.5 L) · won 9 of 13 days (69%)",
+        "🧪 Tuned Adaptive   −₹9,000 (−0.9% of ₹10 L) · won 6 of 13 days (46%)",
+        "💰 Your account to Mon 2 Nov   +₹25,000 (+1.5% of ₹17 L) · won 1 of 2 days (50%)",
+    ]
+    assert messages.month_lines(date(2026, 11, 20), month.Month(0, 1, 0), capital=capital)[1] == (
+        "🎯 Adaptive   ₹0 (0.0% of ₹8.5 L) · won 0 of 1 day (0%)"
+    )
+
+
 def _evening(root, monkeypatch, day):
     nxt = tomorrow.NextPicks(date(2026, 11, 4), "Wed", CORE, [], None, None)
     monkeypatch.setattr(tomorrow, "next_session_picks", lambda today, root=None, track=None: nxt)
     monkeypatch.setattr(deliver, "message_boost", lambda: {"adaptive": False, "t1": True})
+    capital = {"adaptive": 850_000, "t1": 1_000_000, "total": 1_700_000}
+    monkeypatch.setattr(deliver, "message_capital", lambda: capital)
     sent = []
 
     def send(text, severity="info", chat_id=None):
@@ -130,11 +148,11 @@ def test_the_owner_gets_paper_and_real_the_group_paper_only(tmp_path, monkeypatc
     owner, group = sent[None], sent["-456"]
     for text in (owner, group):
         assert "📅 November so far · paper, 1 lot per strategy" in text
-        assert "🎯 Adaptive   +₹600 · won 1 of 2 days (50%)" in text
-        assert "🧪 Tuned Adaptive   +₹600 · won 1 of 2 days (50%)" in text
+        assert "🎯 Adaptive   +₹600 (+0.1% of ₹8.5 L) · won 1 of 2 days (50%)" in text
+        assert "🧪 Tuned Adaptive   +₹600 (+0.1% of ₹10 L) · won 1 of 2 days (50%)" in text
         assert "   As traded (Dir ×2): +₹800" in text  # T1 trades the Dir ×2 rule
         assert text.index("📅 November") < text.index("➡️ Wed 4 Nov")
-    assert "💰 Your account to Mon 2 Nov   +₹5,000" in owner
+    assert "💰 Your account to Mon 2 Nov   +₹5,000 (+0.3% of ₹17 L)" in owner
     assert "Your account" not in group
 
 

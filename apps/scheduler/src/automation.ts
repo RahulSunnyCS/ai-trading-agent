@@ -18,6 +18,8 @@ import { jobPath } from './env.js';
  *   it includes the Buy add-on (default yes), and (BL-183) whether the picked Dir trades 2 lots on a
  *   non-expiry day (default no).
  * - A pause (BL-140 Phase 4): no uploads or deploys for any session up to and including a day.
+ * - The capital in each broker account (owner, 2026-10-29), for the evening result message: a
+ *   list's line uses the capital of the accounts that upload it, and the total is their sum.
  *
  * Every Save is a new version in the scheduler's SQLite (`automation_settings`); nothing is
  * ever updated in place, so the page can show the history. The current version is also
@@ -38,6 +40,12 @@ export type RowKey = `${Platform}.${Broker}`;
 /** The platform multiplier a row may run at: an integer in this range, 1 unless the owner sets it. */
 export const MULTIPLIER_MIN = 1;
 export const MULTIPLIER_MAX = 10;
+
+/** The capital a broker account may be given: whole rupees in this range. */
+export const CAPITAL_MIN = 10_000;
+export const CAPITAL_MAX = 100_000_000;
+/** The capital each account reads as when its settings predate the field (owner, 2026-10-29). */
+export const DEFAULT_CAPITAL = 850_000;
 
 /** The Quantiply clientwise MTM SL a row may ask for (BL-172): whole rupees in this range. */
 export const MTM_SL_MIN = 500;
@@ -84,6 +92,8 @@ export interface AutomationSettings {
   masters: Masters;
   rows: Record<RowKey, Row>;
   pause: Pause;
+  /** rupees in each broker account (the evening result message's capital lines) */
+  capital: Record<Broker, number>;
 }
 
 export interface Version {
@@ -144,6 +154,7 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
     },
   },
   pause: { until: null },
+  capital: { finvasia: DEFAULT_CAPITAL, angelone: DEFAULT_CAPITAL },
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -157,12 +168,15 @@ function isRealDay(value: string): boolean {
 
 /**
  * Settings saved before Phase 4 have no multiplier, add-on or pause: they mean 1, yes and none,
- * exactly what the jobs did; settings before BL-183 have no `dirBoost`: off. Anything present is kept as it is (and validated on a Save).
+ * exactly what the jobs did; settings before BL-183 have no `dirBoost`: off; settings before
+ * 2026-10-29 have no `capital`: ₹8.5 lakh an account. Anything present is kept as it is (and
+ * validated on a Save).
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
   const partial = settings as unknown as {
     rows: Record<string, Partial<Row>>;
     pause?: Partial<Pause>;
+    capital?: Partial<Record<Broker, number>>;
   };
   return {
     ...settings,
@@ -179,6 +193,9 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
       ]),
     ) as Record<RowKey, Row>,
     pause: { until: partial.pause?.until ?? null },
+    capital: Object.fromEntries(
+      BROKERS.map((b) => [b, partial.capital?.[b] ?? DEFAULT_CAPITAL]),
+    ) as Record<Broker, number>,
   };
 }
 
@@ -188,7 +205,9 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
   const obj = (v: unknown): v is Record<string, unknown> =>
     !!v && typeof v === 'object' && !Array.isArray(v);
   if (!obj(value)) return { errors: ['settings must be an object'] };
-  const extra = Object.keys(value).filter((k) => !['masters', 'rows', 'pause'].includes(k));
+  const extra = Object.keys(value).filter(
+    (k) => !['masters', 'rows', 'pause', 'capital'].includes(k),
+  );
   if (extra.length) errors.push(`unknown keys: ${extra.join(', ')}`);
 
   const masters = value.masters;
@@ -261,6 +280,17 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
     if (until !== null && !(typeof until === 'string' && isRealDay(until)))
       errors.push('pause.until must be a day as YYYY-MM-DD, or null');
   }
+  const capital = value.capital;
+  if (!obj(capital)) errors.push('capital must be an object');
+  else {
+    for (const k of Object.keys(capital))
+      if (!BROKERS.includes(k as Broker)) errors.push(`unknown capital account: ${k}`);
+    for (const b of BROKERS) {
+      const c = capital[b];
+      if (!(typeof c === 'number' && Number.isInteger(c) && c >= CAPITAL_MIN && c <= CAPITAL_MAX))
+        errors.push(`capital.${b} must be whole rupees from ${CAPITAL_MIN} to ${CAPITAL_MAX}`);
+    }
+  }
   if (errors.length) return { errors };
   const v = value as unknown as AutomationSettings;
   // Rebuild in a fixed key order, so equal settings always serialise the same.
@@ -285,6 +315,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         }),
       ) as Record<RowKey, Row>,
       pause: { until: v.pause.until },
+      capital: Object.fromEntries(BROKERS.map((b) => [b, v.capital[b]])) as Record<Broker, number>,
     },
   };
 }

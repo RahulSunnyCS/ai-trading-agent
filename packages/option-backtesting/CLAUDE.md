@@ -301,7 +301,12 @@ Otherwise:
   missing pick first; a pick that cannot be copied sends the day unslipped, without the label, and drops the month.
   Unit tests run with the message's slippage off (`tests/conftest.py`).
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs) for the live list or
-  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming). Sent markers are per
+  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming).
+  The month-so-far lines (`rotation/month.py`, `messages.month_lines`) give each net as a share of its capital
+  (owner 2026-10-29; `deliver.message_capital`): a list's is `automation_settings.book_capital` (the Settings ›
+  Automation `capital` of the broker accounts whose rows upload that list, each once; ₹8.5 lakh an account by
+  default, and `capital()` never raises, so `read` stays strict for the jobs), the account's real month every
+  account's capital added up. A failure in any of these is echoed and leaves only its lines out. Sent markers are per
   destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`, `.group-t1-owed.sent`, `.group-t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
   covers owner + group), so a retry never double-sends and a late T1 result still follows as its own message; `obt rotation result --force` resends.
   Days to expiry in the rotation are **weekdays** (Monday to Friday dates after the session up to the expiry;
