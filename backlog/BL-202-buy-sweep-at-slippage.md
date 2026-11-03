@@ -304,3 +304,45 @@ All six answered by the owner on 2026-11-03 (Log). Kept here as asked:
   14:17 were not in that grid) re-run at 0 % slippage over BL-104's 488 days give its net, worst
   day and trade count to the rupee (`results/regression0/`). Smoke at 1 %, fit half: the NIFTY
   09:17 template +₹40 a lot-day with a lower bound of −₹90 (whole window −₹85).
+- 2026-11-03 — **Stage 1 run and its fit-half read** (Phase 1). `run_grid.py --tag stage1
+  --workers 2`, 16:22–19:27 IST (3 h 05 min; the two morning slots ~58 min a cohort, 12:17 ~43 min,
+  14:17 ~22 min), 81,928 cells × 504 sessions an index (2024-10-09 → 2026-10-31), no cohort
+  skipped a day, log `results/stage1.log`. Scored at once with `score.py --tag stage1` (fit half:
+  247 sessions to 2025-10-08; `results/stage1/{B_ranked_fit.csv, B_cohorts_fit.csv,
+  band_tables_fit.md}`, git-ignored). The owner has the NIFTY tables (sent 18:10) and the full set.
+
+  | cohort | pass gates | candidates | template ₹/lot-day (LB) | best robust | best cell ₹/lot-day (LB) |
+  |---|---|---|---|---|---|
+  | NIFTY 09:17 | 180 | 11 | +40 (−90), passes | −77 | 49 (−65) |
+  | NIFTY 10:17 | 52 | 1 | −146 (−274) | −198 | 54 (−198) |
+  | NIFTY 12:17 | 0 | 0 | −274 (−391) | — | −27 (−254) |
+  | NIFTY 14:17 | 64 | 16 | −205 (−296) | −60 | 44 (−51) |
+  | SENSEX 09:17 | 830 | 518 | −3 (−55) | −27 | 84 (+2); rank 5: 154 (+16), PF 1.32 |
+  | SENSEX 10:17 | 503 | 178 | −55 (−99) | −58 | 177 (−27) |
+  | SENSEX 12:17 | 21 | 0 | −110 (−146) | — | 149 (−88) |
+  | SENSEX 14:17 | 285 | 148 | −112 (−141) | −43 | 46 (−25) |
+
+  **Read.** (a) **No cell in the grid has a positive robust score**: the best is −27 (SENSEX
+  09:17). 18 of 81,928 cells have a positive own lower bound, all SENSEX 09:17 (14 of them
+  candidates; the best +₹16 a lot-day at PMID · 15-min range · instrument · SL 30 % · target 200 %
+  · 1/1-pt trail · MTM 1000, mean ₹154, PF 1.32, Martin 12), and each sits in a neighbourhood whose
+  median lower bound is −₹27 to −₹29: peaks, not a plateau. (b) **The template passes its gates
+  only at NIFTY 09:17** (+₹40, LB −₹90); at every other slot it loses ₹55–274 a lot-day and 92–100 %
+  of its cohort loses with it (per-axis medians −₹110 to −₹570 a lot-day everywhere). (c) The
+  axes lean as registered: the cheaper premium (PLOW/PMID) beats PHIGH/PTOP in 7 of 8 cohorts
+  (10:17 SENSEX the exception, PTOP with 58–60 % day-stops); the instrument-range source beats
+  the underlying in all 8 (best underlying cell −₹90 LB or worse); the 1/1-pt trail is the best
+  trail value at both 09:17 and 10:17 on both indices; a tighter stop raises nothing. (d) The 14:17
+  candidates enter on only 63–68 % of days (median day ₹0, day win rate 19–25 %): the 40 % entry
+  gate is met, the mean rides on a few days. (e) "Beats the template" (rule 2's paired lower
+  bound > 0) is cheap where the template loses badly — 1,993 NIFTY 14:17 cells and 1,386 SENSEX
+  14:17 cells beat it with negative lower bounds of their own — so it is read only with rule (1).
+
+  **Consequence under the registered kill rule** ("a cohort whose best Stage-1 plateau cell
+  fails the gates on the fit half has no Stage 2 and no finalist"): **NIFTY 12:17 and SENSEX
+  12:17 are killed** (no candidate; SENSEX 12:17's 21 gate-passing cells each have fewer than
+  half their neighbours passing). The other six cohorts go to Stage 2 with their top five
+  plateau cells (NIFTY 10:17 has one). Nothing here is a verdict: rule (1) is judged on the test
+  half, which stays unscored until the finalists are committed. The owner's working read
+  (2026-11-03, before SENSEX landed and unchanged after): on this evidence a Buy is not worth
+  adding to the live lists; the item runs to its registered end.
