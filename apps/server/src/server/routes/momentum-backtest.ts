@@ -594,6 +594,11 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   fastify.get('/api/momentum/lots', async (_request, reply) => {
     await forward(reply, '/api/lots');
   });
+  // BL-200: the Trade book's Momentum rebalance log, read-only; keeps the from/to query.
+  fastify.get('/api/momentum/lots/rebalances', async (request, reply) => {
+    const query = new URLSearchParams(request.query as Record<string, string>).toString();
+    await forward(reply, `/api/lots/rebalances${query ? `?${query}` : ''}`);
+  });
 
   // BL-142: the Kite connection (read-only). Login returns Kite's login URL as JSON; the login
   // itself comes back to the Momentum API on the laptop, never through this proxy.
@@ -602,6 +607,10 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   });
   fastify.post('/api/momentum/kite/login', async (_request, reply) => {
     await forward(reply, '/api/kite/login', { method: 'POST' });
+  });
+  // BL-200: read the Kite holdings and free cash now (read-only), for the Trade book's refresh.
+  fastify.post('/api/momentum/kite/sync', async (_request, reply) => {
+    await forward(reply, '/api/kite/sync', { method: 'POST' });
   });
 
   // BL-051: the latest live-money rules check, and a manual re-check (never sends).

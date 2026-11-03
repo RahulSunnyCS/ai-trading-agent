@@ -517,3 +517,22 @@ describe('fillLine', () => {
     expect(line?.title).toBe('see the server log');
   });
 });
+
+describe('describeConfig: BL-176 settings with no panel control', () => {
+  it('shows a chip for each one a Broad run carries, and none at the defaults', () => {
+    const base = { broad_category_mode: 'on', broad_universe: 'turnover_rank' };
+    const ids = (config: Record<string, unknown>) =>
+      describeConfig(config, 'broad').chips.map((chip) => chip.id);
+    expect(ids(base)).not.toContain('voladj_lookbacks');
+    expect(ids({ ...base, broad_top_sector_weight: 1 })).not.toContain('top_sector_weight');
+    const chips = describeConfig(
+      { ...base, voladj_lookbacks: true, broad_top_sector_weight: 1.5 },
+      'broad',
+    ).chips;
+    expect(chips.find((chip) => chip.id === 'voladj_lookbacks')?.section).toBe('ranking');
+    expect(chips.find((chip) => chip.id === 'top_sector_weight')?.label).toBe(
+      'Top category 1.5× money',
+    );
+    expect(settingsSectionOf('voladj_lookbacks', 'etf')).toBeNull();
+  });
+});

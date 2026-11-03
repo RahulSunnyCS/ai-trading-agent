@@ -20,7 +20,7 @@ from typing import Any, Literal
 
 import duckdb
 import pandas as pd
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
@@ -423,6 +423,8 @@ class _Data:
         pool_top_n: int,
         pool_exit_rank: int,
         liquidity: liquidity_mod.LiquidityConfig | None = None,
+        voladj_lookbacks: bool = False,
+        voladj_skip: Literal["long", "all", "none"] = "long",
         universe_kind: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
         series_breaks: Literal["legacy", "verified"] = "verified",
     ) -> broad.UniverseRanking:
@@ -449,6 +451,8 @@ class _Data:
             liquidity,
             universe_kind,
             series_breaks,
+            voladj_lookbacks,
+            voladj_skip,
         )
         with self._lock:
             if mtimes != self._broad_mtimes:
@@ -466,6 +470,8 @@ class _Data:
             weights=weights,
             score=score,  # type: ignore[arg-type]
             voladj_skip_recent_month=voladj_skip_recent_month,
+            voladj_lookbacks=voladj_lookbacks,
+            voladj_skip=voladj_skip,
             pool_top_n=pool_top_n,
             pool_exit_rank=pool_exit_rank,
             liquidity=liquidity,
@@ -650,10 +656,15 @@ class BacktestRequest(BaseModel):
     momentum_sizing_window: int = Field(10, ge=1, le=52)
     momentum_sizing_floor: float = Field(0.0, ge=0, le=1)
     track: Literal["index", "etf"] = "index"
-    execution: Literal["fri_close", "mon_open", "mon_10am"] = "fri_close"
+    execution: Literal["fri_close", "mon_open", "mon_close", "mon_10am"] = "fri_close"
     # Stock-momentum additions (engine.py Config fields; harmless defaults for ETF requests).
     score: Literal["ranksum", "voladj", "blend"] = "ranksum"
     voladj_skip_recent_month: bool = True
+    # dataset="broad" only (BL-086, searched in BL-176): `voladj` follows `lookbacks` and
+    # `weights` (one volatility-adjusted component per lookback) instead of NSE's fixed 26/52
+    # weeks; `voladj_skip` names which of them skip the latest 4 weeks. Off = unchanged.
+    voladj_lookbacks: bool = False
+    voladj_skip: Literal["long", "all", "none"] = "long"
     rebalance: Literal["weekly", "monthly"] = "weekly"
     # rebalance="weekly" only: trade every K weeks, on calendar phase `rebalance_offset`
     # (engine.Config.rebalance_every). 1 = every week.
@@ -724,6 +735,9 @@ class BacktestRequest(BaseModel):
     # "extended" also tags stocks outside the 755-name Total Market (BSE-derived sectors), so the
     # all-liquid universe's category layer can hold them; "curated" is the original 755-name file.
     broad_category_tags: Literal["curated", "extended"] = "curated"
+    # Category mode only (BL-116 Phase 2, searched in BL-176): a buy week's money is shared 2 : 1
+    # (or this weight : 1) between picks from the first-placed held category and the rest.
+    broad_top_sector_weight: float = Field(1.0, ge=1.0, le=3.0)
     # How big one-day falls are treated when building price series. "verified" (the default
     # everywhere since 2026-10-05, BL-010) keeps one continuous series unless a corporate action
     # that cannot be back-adjusted (demerger, rights, scheme, dividend) explains the fall.
@@ -1260,12 +1274,12 @@ def _stock_backtest(req: BacktestRequest) -> dict:
 
 
 def _refuse_monday_fill(req: BacktestRequest, dataset: str) -> None:
-    """Stock and Custom Index have no Monday-open fill yet (BL-036 Phase 2b); Broad and the ETF
+    """Stock and Custom Index have no Monday fill yet (BL-036 Phase 2b); Broad and the ETF
     dataset do. Refuse the option rather than run a Friday-close backtest under its name."""
     if req.execution != "fri_close":
         raise HTTPException(
             422,
-            f"Monday-open fills are not available for {dataset} yet; choose Friday close.",
+            f"Monday fills are not available for {dataset} yet; choose Friday close.",
         )
 
 
@@ -1963,11 +1977,16 @@ def _run_broad(
     ranking: broad.UniverseRanking,
     outer_prices: pd.DataFrame,
     *,
-    top_sector_weight: float = 1.0,
+    top_sector_weight: float | None = None,
     tax: TaxRules | None = None,
 ) -> broad.BroadBacktestResult:
-    """`top_sector_weight` and `tax` are for research scripts (BL-116, after-tax runs); the API's
-    own Broad requests leave both at their defaults."""
+    """`top_sector_weight` (None = the request's `broad_top_sector_weight`) and `tax` are for
+    research scripts (BL-116, after-tax runs); the API's own Broad requests leave both unset."""
+    if top_sector_weight is None:
+        top_sector_weight = req.broad_top_sector_weight
+    if top_sector_weight != 1.0 and req.broad_category_mode != "on":
+        # Here, not in `_broad_parts`: the weekly signal, orders and previews call this directly.
+        raise HTTPException(422, "A top-sector weight needs the category layer on.")
     weights = tuple(req.weights) if req.weights else None
     stock_tilt_ranks = None
     if req.broad_reversal_tilt > 0:
@@ -1980,7 +1999,7 @@ def _run_broad(
         uc_locked, lc_locked = circuit_exposure_mod.lock_masks(
             ranking.column_to_base_symbol,
             ranking.prices.index,
-            session="first" if req.execution == "mon_open" else "last",
+            session="first" if req.execution in ("mon_open", "mon_close") else "last",
         )
     return broad.run_broad_backtest(
         outer_prices=outer_prices,
@@ -1995,6 +2014,8 @@ def _run_broad(
         weights=weights,
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
+        voladj_lookbacks=req.voladj_lookbacks,
+        voladj_skip=req.voladj_skip,
         pool_top_n=req.broad_pool_top_n,
         pool_exit_rank=req.broad_pool_exit_rank,
         coverage_floor=req.broad_coverage_floor,
@@ -2150,7 +2171,10 @@ def _fill_companion(
     The ranking does not depend on the fill, so the run's own `ranking` is reused: one extra
     engine pass per sleeve. Never raises; a failure is reported in the payload instead."""
     if req.execution not in ("fri_close", "mon_open"):
-        return {"status": "not_applicable", "reason": "this fill is not a Friday or Monday fill"}
+        return {
+            "status": "not_applicable",
+            "reason": "the Friday-close and Monday-open comparison is shown for those two fills",
+        }
     if req.signal_delay != 0:
         return {
             "status": "not_applicable",
@@ -2240,6 +2264,8 @@ def _broad_ranking(req: BacktestRequest) -> broad.UniverseRanking:
         weights=tuple(req.weights) if req.weights else None,
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
+        voladj_lookbacks=req.voladj_lookbacks,
+        voladj_skip=req.voladj_skip,
         pool_top_n=req.broad_pool_top_n,
         pool_exit_rank=req.broad_pool_exit_rank,
         liquidity=_liquidity_config(req),
@@ -2613,6 +2639,8 @@ def _broad_live_ranking(
         weights=tuple(req.weights) if req.weights else None,
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
+        voladj_lookbacks=req.voladj_lookbacks,
+        voladj_skip=req.voladj_skip,
     )
     live, ltp, symbols = rebalance.live_broad_ranking(
         ranking,
@@ -5477,6 +5505,20 @@ def create_app() -> FastAPI:
         """The Kite login page to send the browser to (the dashboard card's button)."""
         return {"url": _kite_start()}
 
+    @app.post("/api/kite/sync")
+    def kite_sync() -> dict:
+        """Read the Kite holdings and free cash now (read-only) and keep them as a snapshot,
+        whatever the holdings source (the Trade book's Refresh from Kite, BL-200)."""
+        from . import holdings_sync
+
+        load_repo_env()
+        try:
+            return holdings_sync.sync("kite")
+        except holdings_sync.LOGIN_ERRORS as error:
+            raise HTTPException(409, f"No valid Kite login: {error}") from error
+        except RuntimeError as error:
+            raise HTTPException(502, str(error)) from error
+
     @app.get("/api/kite/start")
     def kite_start() -> RedirectResponse:
         """The same, as a redirect (`mbt kite login` opens this)."""
@@ -6008,6 +6050,22 @@ def create_app() -> FastAPI:
         """This week's Lots panel (BL-142 Phase 4): the lot ledger with values and calendars.
         Read-only: no Kite read, no quote, no booking (`lots_view`)."""
         return lots_view()
+
+    @app.get("/api/lots/rebalances")
+    def lots_rebalances(
+        from_: str | None = Query(None, alias="from"), to: str | None = None
+    ) -> dict:
+        """Trade book › Momentum's rebalance log (BL-200): one block per lot per due week.
+        Read-only, from the Kite fills reconciliation (`forward_run.rebalance_log`)."""
+        from . import forward_run
+
+        for day in (from_, to):
+            if day is not None:
+                try:
+                    date.fromisoformat(day)
+                except ValueError:
+                    raise HTTPException(422, f"Not a date: {day!r}") from None
+        return forward_run.rebalance_log(from_, to)
 
     @app.post("/api/orders/run", status_code=202)
     def orders_run() -> dict:

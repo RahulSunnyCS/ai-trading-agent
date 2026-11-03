@@ -1,6 +1,6 @@
 # Momentum: position caps, cap band, category cap, price ceiling, minimum trade
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-11-02
 
 ## What it is
 
@@ -33,6 +33,7 @@ Limits on how much money one holding (or one category) can take, and small-trade
 | TODO 3.9.23 dry run | Broad `max_position` 0.10, 0.25 | Broad, every week simulated | A dial | 0.10: 7 / 79 / 100% (median -2.8, MaxDD -16.1%). 0.25: 43 / 29 / 14% |
 | TODO 3.9.23 dry run | Broad `max_group` removed | same | The cap costs a little and buys nothing measurable | 32.0% / 1.07 / -20.2%, rolling 71 / 75 / 68%, median +0.4 |
 | TODO 3.9.23 dry run | Broad `max_stock_price` removed | same | An affordability rule, not alpha | 32.3% / 1.08 / -20.3%, rolling 54 / 57 / 50%, median +0.3 |
+| [BL-176](../../../backlog/BL-176-momentum-search-on-f6-ranking.md) Stage 1 | `max_category` 0.3, 0.5 (none dropped from this read); `max_position` 0.15 to 0.5 | Broad, 2017-01 to 2026-10, F6 ranking, Stage 1 (one sampled Friday, ₹50k sleeve; 20,000 runs per arm A tag set, 10,000 B, 4,000 C1) | Descriptive, as expected: the category cap does nothing; 0.15 smoother and poorer | Curated A: category cap 0.3 −9.3 vs 0.5 −9.5. Position cap 0.15 vs 0.5: CAGR 21.1 vs 22.6%, worst fall −44.2 vs −48.1%, medium basket 21% vs 10%. `search_spaces/bl176_stage1_axes.csv` |
 
 ## What we know
 

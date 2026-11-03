@@ -284,6 +284,16 @@ to the data (lazy `api` import; the catalog open only for the reads): `mbt journ
 live, and `api._forward_score_line` adds `forward_run.headline_line()` to the headline's final
 message (a failure is a line saying so).
 
+**Rebalance log (BL-200).** `rebalance_log.py` is pure: over `forward_run.cached_fills()` (the same
+cached reconciliation the Journal page reads) it builds one block per lot per due week for the
+Trade book's Momentum tab: week number from the paper start, status (done / partly done / waiting
+for notes / not done: "waiting" until the Kite mailbox's last check, `contract-notes/cursor.json`,
+covers the first session after the Friday), the lines netted per stock, the lot's holding after
+(ledger before the Friday + the week's fills), where a missed week was folded in (the lot's next
+due week; orders never change), and the latest stored Kite snapshot against what the lots hold
+now. `GET /api/lots/rebalances?from=&to=` (`forward_run.rebalance_log`; proxied at
+`/api/momentum/lots/rebalances`), read-only.
+
 **Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
 parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into
 real values (e.g. `"2011-01-01"`) when its own CLI runner invokes the function. Calling them
@@ -407,8 +417,12 @@ contract, not a shared service).
 - **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
   4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-086, a heavy key in the
-  rank-cache key) makes it follow them; tested and killed (short lookbacks without the skip-month
-  chase reversing spikes), so it stays off.
+  rank-cache key) makes it follow them; tested and killed as a default (short lookbacks without
+  the skip-month chase reversing spikes), so it stays off by default. Since BL-176 it is a Broad
+  request field (`voladj_lookbacks`, with `voladj_skip` and `broad_top_sector_weight`): three of
+  the four sleeves of the frozen round 8 ensemble (`search_spaces/bl176_frozen_extended.json`,
+  saved by `scripts/bl176_save_ensemble.py`) set it, so never drop it. At their defaults the
+  three fields leave every saved fingerprint unchanged (`saved_identity._LATER_DEFAULTS`).
 - **Broad ranks over the week's point-in-time members (BL-001 F6, 2026-10-25):** `engine.compute_ranks(prices, config, cross_section=)` takes a week x column boolean table; `broad.cross_section_mask(stock_membership, frame)` builds it (members behind the gate, plus the atomic instruments) and `UniverseRanking.cross_section()` hands it to anything that ranks the same frame again (the stock tilt in `levers.grouped_momentum_ranks`). A new Broad ranking path must pass it, or a stock that joins the universe years later moves earlier weeks' ranks. `build_stock_weekly_prices(fill_internal_gaps=False)` (Broad only) forward-fills only after a stale column's last real price. `mbt audit lookahead-requests` is the check. `score="residual"` and Custom Index do not take it yet.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,
@@ -659,7 +673,10 @@ contract, not a shared service).
   feeds Custom Index only). A new dated row moves the live signal from its launch week on. Anything that *describes* the past
   with category membership must respect the date too: `exit_reasons.explain_exits(launches=...)` drops a
   dated category from a stock's tags for weeks before it launched, and `api._broad_parts` passes it.
-- `monday_fills.py` (BL-036 Phase 2, BL-010 E13) - Monday-open fills for a stock-based run.
+- `monday_fills.py` (BL-036 Phase 2, BL-010 E13) - Monday-open fills for a stock-based run;
+  BL-176 adds `execution="mon_close"` (`build(execution=)`: the session's close `move` instead of its
+  `open_gap`, the daily file's close for other columns; same delay-0 rule, same Monday lock session;
+  no `fill_companion`, which compares Friday close and Monday open only).
   `BacktestRequest.execution="mon_open"` on a **Broad** request builds a fill table (`run_backtest(
   trade_prices=...)`, the same hook the ETF dataset uses) from the weekly adjusted close times one
   plus the first following session's `open_gap` (`categories/daily_moves.py`); other columns use their

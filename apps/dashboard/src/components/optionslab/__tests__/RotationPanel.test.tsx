@@ -22,8 +22,11 @@ vi.mock('../../../hooks/useRotation', () => ({
   }),
   useRotationSummary: (opts: unknown) => {
     mocks.summaryArgs.push(opts);
+    const o = (opts ?? {}) as { track?: string; from?: string };
+    // Tuned starts later than Classic; a read with `from` starts there
+    const firstDay = o.from ?? (o.track === 't1' ? '2026-10-19' : undefined);
     return {
-      data: mocks.summary,
+      data: mocks.summary && firstDay ? { ...mocks.summary, first_day: firstDay } : mocks.summary,
       loading: false,
       error: null,
       refetch: () => undefined,
@@ -184,6 +187,21 @@ describe('RotationPanel as one page', () => {
     const cells = classic?.querySelectorAll('td') ?? [];
     expect(cells[5]?.textContent).toBe('+₹5');
     expect(books.textContent).toMatch(/vs base \/ lot-day/);
+  });
+
+  it("reads Classic and the base again from Tuned's first scored day, the verdict on its own", () => {
+    render(<RotationPanel />);
+    // the registered read-out (verdict, Day N of 60) and a read over the same days as Tuned
+    expect(mocks.summaryArgs).toContainEqual({ lots: 1 });
+    expect(mocks.summaryArgs).toContainEqual({ lots: 1, from: '2026-10-19' });
+    expect(
+      screen.getByText(
+        /registered read-out, from 12 Oct 2026 \(the pre-registered test\); the rows above all run from 19 Oct 2026/,
+      ),
+    ).toBeTruthy();
+    // the rows are the aligned read's: Classic's "since" is the Tuned start, not its own 12 Oct
+    const books = screen.getByRole('table');
+    expect(books.textContent).not.toMatch(/from 12 Oct/);
   });
 
   it('reads both books at 1 lot, Tuned from the T1 track, each with its own stop', () => {

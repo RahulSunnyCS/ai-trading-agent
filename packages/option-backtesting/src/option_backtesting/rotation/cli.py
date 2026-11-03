@@ -1,7 +1,7 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
 triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
 track-readout (the T1 parallel track); lot-plans (BL-135); algotest-export (BL-137);
-quantiply-export (BL-139); live-compare (BL-141)."""
+quantiply-export (BL-139); live-compare (BL-141); live-board (BL-203)."""
 
 from __future__ import annotations
 
@@ -564,6 +564,107 @@ def live_compare_cmd(
         typer.echo(live_compare.render(c, messages.rupees))
     if not c.captured:
         raise typer.Exit(2)
+
+
+live_board_app = typer.Typer(
+    no_args_is_help=True,
+    help="BL-203: today's Adaptive picks run live on Angel One's bars so far (refreshed every 5 "
+    "minutes by the scheduler, or now).",
+)
+rotation_app.add_typer(live_board_app, name="live-board")
+
+
+def _render_board(snap: dict, lots: bool = False) -> str:
+    from .messages import rupees
+
+    key = "yours" if lots else "per_lot"
+    out = [
+        f"{snap['day']} as at {snap['as_of']} ({snap['source']}, {snap.get('requests', '?')} "
+        f"requests, {snap.get('took_s', '?')} s)"
+    ]
+    for name, s in snap.get("spot", {}).items():
+        out.append(f"  {name} {s['last']:,.2f}")
+    for b in snap["books"]:
+        total = b[key]
+        lots_text = f", {total['lots']} lots" if lots else ", a lot each"
+        out.append(
+            f"\n{b['name']}: {rupees(total['net'])} ({rupees(total['net_slipped'])} after "
+            f"{snap['slippage_pct']}% slippage{lots_text})"
+        )
+        for p in b["picks"]:
+            k = p.get("lots", 0) if lots else 1
+            out.append(
+                f"  {p['variant']:<22} {p['state']:<8} {rupees(k * p['net']):>10}  {p['label']}"
+            )
+            for leg in p["legs"]:
+                end = leg["exit"] or "open"
+                out.append(
+                    f"      {leg['side']} {leg['contract']:<14} {leg['entry']} @ "
+                    f"{leg['entry_price']:>8.2f} -> {end} @ {leg['price'] or 0:>8.2f} "
+                    f"{leg['reason']:<10} {rupees(leg['pnl'])}"
+                )
+    for note in snap.get("notes", []):
+        out.append(f"note: {note}")
+    return "\n".join(out)
+
+
+@live_board_app.command("refresh")
+def live_board_refresh(
+    lots: bool = typer.Option(False, "--lots", help="Show your lots instead of a lot each."),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """ONE refresh now: one guarded Angel One login, the picks' bars read, the snapshot written
+    (TRADING_DATA_ROOT/rotation/live-board/<day>.json). When the 5-minute loop is running, asks
+    it instead, so no second login is made. Exit 1 when no picks are recorded or it failed."""
+    import json
+
+    from ..angelone import check
+    from ..angelone.auth import AngelCredentialsError, AngelNetworkError
+    from . import live_board
+
+    if live_board.loop_status()["running"]:
+        live_board.request_refresh()
+        typer.echo("the live-board loop is running: asked it to refresh now")
+        return
+    try:
+        snap = live_board.Board(log=typer.echo).refresh(by="cli")
+    except (AngelCredentialsError, AngelNetworkError, check.CheckRefused) as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    if snap is None:
+        typer.echo("no picks recorded for today yet")
+        raise typer.Exit(1)
+    typer.echo(json.dumps(snap, indent=1) if as_json else _render_board(snap, lots))
+
+
+@live_board_app.command("show")
+def live_board_show(
+    day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+    lots: bool = typer.Option(False, "--lots", help="Show your lots instead of a lot each."),
+) -> None:
+    """The last snapshot written (no login, nothing read from Angel One)."""
+    from . import live_board
+
+    board = live_board.read_board(day=_day(day))
+    if board["snapshot"] is None:
+        typer.echo("no live-board snapshot yet")
+        raise typer.Exit(1)
+    typer.echo(_render_board(board["snapshot"], lots))
+
+
+@live_board_app.command("run")
+def live_board_run(
+    every: int = typer.Option(300, "--every", help="Seconds between refreshes."),
+    until: str = typer.Option("15:31", "--until", help="Stop after this IST time (HH:MM)."),
+) -> None:
+    """The scheduler's loop (trading days from 09:18): refresh every `--every` seconds and when
+    the dashboard's Refresh button asks, until `--until`. One Angel One login for the day; a
+    rejected session is logged in again once. Exit 3 = a refused login (never retried)."""
+    from . import live_board
+
+    code = live_board.run_loop(every_s=every, until=until, log=typer.echo)
+    if code:
+        raise typer.Exit(code)
 
 
 @rotation_app.command()

@@ -1,6 +1,6 @@
 # Broad Momentum: category tags (curated, extended, dated)
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-11-02
 
 ## What it is
 
@@ -29,6 +29,7 @@ Phase 1). New themes go into `pending_themes.csv` (read by no code) until they g
 | BL-010 Phase 3 step 3 | label-shuffle placebo (100 permutations keeping sizes and multi-membership) | six configs | Category layer kill undecided | Four of six beat the shuffle's 95th percentile; the launch-dated taxonomy was not built ([`bl010_criteria.json`](../../../../packages/momentum-backtesting/search_spaces/bl010_criteria.json)) |
 | BL-010 Log, 2026-10-10 | the five highest-CAGR favourites, curated vs extended tags vs today's list | 2017-01-06 to 2026-10-09, pre-tax, point-in-time universe | All clear the owner's 30% line on every variant; tags are the remaining hindsight | CAGR as saved / extended / today's list, worst fall saved to extended: Five Sectors Monthly 45.8 / 35.0 / 39.4 (-27 to -41); Five Sectors, Stock Tilt 45.9 / 37.9 / 35.1 (-37 to -43); Six Sectors Monthly, No Tilt 44.5 / 33.4 / 36.4 (-27 to -34); Four Sectors, Half Tilt 43.4 / 39.4 / 33.5 (-32 to -44); Trio Fortnightly 42.2 / 35.9 / 45.5 (-27 to -36). Tags cost 4-11 points and 7-14 points of drawdown |
 | BL-036 Phase 1 | default Broad run, curated vs extended | 2017-01-06 to 2026-10-09, point in time | Descriptive | 33.3% curated; 24.2% extended (-9.1 points), worst fall -24.3% |
+| [BL-176](../../../../backlog/BL-176-momentum-search-on-f6-ranking.md) | curated vs extended tags as two complete selections | Broad, 2017-01 to 2026-10, F6 ranking, Stage 3 at ₹2 lakh | Hindsight confirmed again: what ranks top on curated tags drops on extended | Curated ensemble 33.4% as ranked, 30.1% on extended tags, 23.7% after tax; member `086b1949a637` 36.3% → 29.0%. Five Sectors, Rank Sum: top 1% curated, 13% extended (26.7%, −43.7%). Only Four Sectors, Quick Exit is top-decile in both |
 
 ## What we know
 

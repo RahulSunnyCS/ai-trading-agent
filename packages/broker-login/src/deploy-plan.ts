@@ -24,7 +24,8 @@ export interface LiveState {
   brokersLoggedIn: number;
   brokersTotal: number;
   slotsUsed: number;
-  slotsMax: number;
+  /** null when /live does not show "n/6 Strategy Deployed" (gone by 2026-11-02): no limit read */
+  slotsMax: number | null;
   rows: ActivationRow[];
 }
 
@@ -92,9 +93,70 @@ export function planDeploy(picks: Pick[], live: LiveState, now: number): DeployP
     else candidates.push(pick);
   }
   if (out.refused) return out;
-  const free = Math.max(0, live.slotsMax - live.slotsUsed);
+  const free =
+    live.slotsMax === null ? candidates.length : Math.max(0, live.slotsMax - live.slotsUsed);
   out.deploy = candidates.slice(0, free);
   out.noSlot = candidates.slice(free).map((p) => p.name);
+  return out;
+}
+
+/** How a broker is named on AlgoTest's broker sheet: "<label> - <account holder>". */
+export const BROKER_LABELS: Record<string, string> = {
+  finvasia: 'Finvasia',
+  angelone: 'Angel One',
+};
+
+export interface BrokerSheetCheck {
+  /** wanted brokers the sheet does not list */
+  missing: string[];
+  /** wanted brokers listed but not LOGGED IN */
+  notLoggedIn: string[];
+}
+
+/**
+ * BL-197: the broker sheet "Activate" opens, read from its text (each broker's line, then its
+ * badge on the next line): is every wanted broker listed and logged in?
+ */
+export function checkBrokerSheet(text: string, wanted: readonly string[]): BrokerSheetCheck {
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const out: BrokerSheetCheck = { missing: [], notLoggedIn: [] };
+  for (const broker of wanted) {
+    const label = BROKER_LABELS[broker] ?? broker;
+    const at = lines.findIndex((l) => l.startsWith(`${label} - `));
+    if (at < 0) out.missing.push(label);
+    else if (lines[at + 1] !== 'LOGGED IN') out.notLoggedIn.push(label);
+  }
+  return out;
+}
+
+/** Status of an Activation row whose execution has not been set up yet. */
+export const SETUP_PENDING = 'Setup Pending';
+
+export interface SetupPlan {
+  /** picks to set up, in entry-time order (also those already set up: setting up again is safe) */
+  setup: Pick[];
+  /** already deployed today: their sheet is left alone */
+  deployed: string[];
+  /** not on /live (the upload has not run, or failed) */
+  missing: string[];
+}
+
+/**
+ * BL-197: the evening Setup Execution, decided without a browser. Every uploaded pick is set up
+ * (re-saving a sheet that is already set up changes nothing), except one already deployed.
+ */
+export function planSetup(picks: Pick[], live: LiveState): SetupPlan {
+  const out: SetupPlan = { setup: [], deployed: [], missing: [] };
+  const rows = new Map(live.rows.map((r) => [r.name, r]));
+  for (const pick of [...picks].sort((a, b) => a.entry - b.entry)) {
+    const row = rows.get(pick.name);
+    if (!row || !NAME_PREFIXES.some((p) => pick.name.startsWith(p))) out.missing.push(pick.name);
+    else if (row.deployed > 0) out.deployed.push(pick.name);
+    else out.setup.push(pick);
+  }
   return out;
 }
 
@@ -171,7 +233,7 @@ export function parseLive(text: string): LiveState {
     brokersLoggedIn: broker ? Number(broker[1]) : 0,
     brokersTotal: broker ? Number(broker[2]) : 0,
     slotsUsed: slots ? Number(slots[1]) : 0,
-    slotsMax: slots ? Number(slots[2]) : 0,
+    slotsMax: slots ? Number(slots[2]) : null,
     rows,
   };
 }
