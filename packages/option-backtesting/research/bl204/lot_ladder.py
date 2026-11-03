@@ -43,6 +43,8 @@ STAMP = "2026-11-03"
 
 # an arm = the extra lots on top of the three 1-lot base picks, by role
 NORMAL_ARMS: dict[str, tuple[str, ...]] = {
+    # N4 = Dir Boost (BL-135): on a three-Widesl day the best unpicked Dir is ADDED at 1 lot,
+    # where live trades 3 lots (33 of 251 normal days)
     "N4": ("D",),
     "N5-D3": ("D", "D"),
     "N5-W1": ("D", "W1"),
@@ -128,7 +130,7 @@ def roles(
     w_plus = unpicked_wides[0] if unpicked_wides else None
     r_plus = None
     if d_plus and w_plus:
-        r_plus = max((d_plus, w_plus), key=lambda n: (score[n], n))
+        r_plus = min((d_plus, w_plus), key=lambda n: (-score[n], n))
     else:
         r_plus = d_plus or w_plus
     o_plus = None

@@ -125,7 +125,11 @@ None before the run; the owner's choice of lots per capital level comes after re
 - 2026-11-03 — **Run as registered** (`research/bl204/lot_ladder.py`; `lot_ladder_2026-11-03.json`). 437 T1 days
   replayed (2025-01-10 → 2026-10-30), none skipped: 251 normal days (218 with a Dir pick, 33 three-Widesl days with
   the best unpicked Dir as D), 185 one-index expiry days, 1 other (2026-09-30, SENSEX label unknown). Every arm could be
-  built on every day. The book stop on Dir ×3 days was ₹15,000 (88 days) or ₹17,000 (163); the D was a Dir ITM1 on
+  built on every day. **N4 is BL-135's Dir Boost, not quite live:** on the 33 three-Widesl normal days it adds the best
+  unpicked Dir at 1 lot where live trades 3 lots (`live_lots.lots_for_day`); on the other 218 normal days and every
+  expiry day it is what live trades, and the N4 / E3 figures reproduce BL-194's rule series day by day (436 of 437
+  days; 2026-09-30 differs only because BL-194's kept rows file is from its first run, which doubled the Dir that
+  day). The true live book is the first whole-book row below. The book stop on Dir ×3 days was ₹15,000 (88 days) or ₹17,000 (163); the D was a Dir ITM1 on
   211 of 251 normal days. Net per day after brokerage, under the book stop; "vs base" = the arm minus the live lots
   (N4 on normal days, E3 on expiry days), "vs even" = minus the 3-lot book scaled to the same lots; 90 % intervals.
 
@@ -133,7 +137,7 @@ None before the run; the owner's choice of lots per capital level comes after re
 
   | Arm | Net / day | Per lot-day | vs N4 (90 %) | vs even (90 %) | Max DD | DD per lot | Worst day | Worst week | R/DD |
   |---|---|---|---|---|---|---|---|---|---|
-  | N4 Dir ×2 (live) | +1,458 [+1,999] | +365 [+500] | | +185 [−20, +398] / [+294 [+77, +520]] | −49,379 [−34,977] | −12,345 [−8,744] | −13,941 [−12,456] | −40,105 | 7.4 [14.3] |
+  | N4 Dir ×2 (Dir Boost; live on Dir-pick days) | +1,458 [+1,999] | +365 [+500] | | +185 [−20, +398] / [+294 [+77, +520]] | −49,379 [−34,977] | −12,345 [−8,744] | −13,941 [−12,456] | −40,105 | 7.4 [14.3] |
   | **N5-D3 Dir ×3** | **+2,075 [+2,821]** | **+415 [+564]** | **+617 [+374, +879]** / [**+822 [+520, +1,143]**] | **+405 [+3, +818]** / [**+608 [+175, +1,056]**] | −55,017 [−48,538] | −11,003 [−9,708] | −17,994 [−14,874] | −51,465 | 9.4 [14.5] |
   | N5-W1 Dir ×2, W1 ×2 | +1,773 [+2,403] | +355 [+481] | +315 [+113, +513] / [+404 [+131, +664]] | +103 [−73, +281] / [+189 [+5, +379]] | −65,328 [−38,645] | −13,066 [−7,729] | −18,056 | −49,026 | 6.8 [15.5] |
   | N5-W2 Dir ×2, W2 ×2 | +1,731 [+2,403] | +346 [+481] | +272 [+108, +428] / [+404 [+203, +608]] | +61 [−113, +230] / [+189 [+18, +369]] | −61,733 [−38,047] | −12,347 [−7,609] | −17,846 | −46,453 | 7.0 [15.8] |
@@ -182,7 +186,8 @@ None before the run; the owner's choice of lots per capital level comes after re
 
   | Lots normal / expiry | Arms | Net / day | Per lot-day | Max DD | DD per lot | Worst day | Worst week | R/DD | Stop days |
   |---|---|---|---|---|---|---|---|---|---|
-  | 4 / 3 (live) | N4 + E3 | +2,009 [+2,207] | +562 [+618] | −36,145 [−27,347] | −10,112 [−7,657] | −13,941 [−12,456] | −26,618 | 13.9 [20.2] | 12 |
+  | 4 / 3 (live, BL-194's rule) | live | +2,016 [+2,215] | +576 [+633] | −32,648 [−27,026] | −9,331 [−7,722] | −13,941 [−12,136] | | 15.4 [20.5] | |
+  | 4 / 3 | N4 + E3 | +2,009 [+2,207] | +562 [+618] | −36,145 [−27,347] | −10,112 [−7,657] | −13,941 [−12,456] | −26,618 | 13.9 [20.2] | 12 |
   | 4 / 4 | N4 + E4-D2 | +2,336 [+2,520] | +584 [+631] | −35,480 [−35,480] | −8,875 [−8,879] | −13,941 | −27,282 | 16.5 [17.8] | 9 |
   | **5 / 4** | **N5-D3 + E4-D2** | **+2,690 [+2,989]** | **+588 [+655]** | −41,801 [−38,773] | −9,143 [−8,489] | −17,994 [−14,874] | −31,959 | 16.1 [19.3] | 8 |
   | 5 / 4 | N5+D + E4-D2 | +2,564 [+2,749] | +561 [+602] | −39,275 [−35,265] | −8,590 [−7,721] | −16,568 | −34,220 | 16.3 [19.5] | 6 |
@@ -192,6 +197,9 @@ None before the run; the owner's choice of lots per capital level comes after re
   | **6 / 5** | **N6-D4 + E5-D2W1** | **+3,375 [+3,736]** | **+606 [+672]** | −53,915 [−45,093] | −9,680 [−8,106] | −22,047 [−19,083] | −40,554 | 15.7 [20.7] | 10 |
   | 6 / 5 | N6-D4 + E5-D3 | +3,416 [+3,798] | +613 [+683] | −51,191 [−51,191] | −9,191 [−9,202] | −22,047 | −41,543 | 16.7 [18.5] | 8 |
   | 6 / 5 | N6-D3+D + E5-D2W1 | +3,250 [+3,498] | +583 [+629] | −48,757 [−43,949] | −8,754 [−7,900] | −20,485 | −42,815 | 16.7 [19.9] | 7 |
+
+  Whole-book pairs for every normal × expiry arm are in the JSON (`whole_book.pairs`); the table keeps the ones the
+  capital levels allow.
 
   **Read under the rule (descriptive, in-sample).** On normal days the Dir is the home of every extra lot, as the
   hypothesis said: Dir ×3 earns its fifth lot against the even spread in both windows (+₹405 [+3, +818] / +₹608
