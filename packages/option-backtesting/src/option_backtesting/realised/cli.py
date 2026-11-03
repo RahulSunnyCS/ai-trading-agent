@@ -1,6 +1,6 @@
 """`obt realised …` (BL-168 Phase 4): the contract-notes store read as the owner's sheet.
 
-summary | days | months | trips | day D: read-only, `--json` for the page's exact answer;
+summary | days | months | trips | day D | margin: read-only, `--json` for the page's exact answer;
 capital: the 15:50 reading (scheduler `contract-notes-capital`), the one command that writes."""
 
 from __future__ import annotations
@@ -156,3 +156,40 @@ def capital(
         typer.echo(f"Angel One capital not recorded: {str(error)[:200]}")
         raise typer.Exit(1) from None
     typer.echo(f"{d}: Angel One closing funds recorded, and {nxt}'s capital")
+
+
+@realised_app.command("margin")
+def margin_(
+    start: str = FROM,
+    end: str = TO,
+    n: int = typer.Option(6, "--days", min=1, help="Days per day type in the per-lot table."),
+    as_json: bool = JSON,
+) -> None:
+    """BL-205: each account's margin per day (available, cash and non-cash, the day's peak, the
+    lots open together, per lot) and the per-lot table by day type."""
+    from . import margin as m
+
+    out = m.report(_root(), _d(start), _d(end), n)
+    if as_json:
+        typer.echo(json.dumps(out, default=str))
+        return
+    for r in out["days"]:
+        per_lot = (
+            f"{_inr(r['per_lot'])}/lot ({r['lots']} lots, {r['lots_from']})" if r["per_lot"] else ""
+        )
+        typer.echo(
+            f"{r['day']} {r['account']:22} {r['type']:13} available {_inr(r['available']):>11}"
+            f"  cash {_inr(r['cash']):>10}  50:50 usable {_inr(r['usable']):>11}"
+            f"  peak {_inr(r['peak']):>10}  {per_lot}"
+        )
+    typer.echo("")
+    for kind, t in out["table"].items():
+        figures = ", ".join(f"{d['day'][5:]} {_inr(d['per_lot'])}" for d in t["days"]) or "none yet"
+        typer.echo(f"{m.DAY_TYPE_NAMES[kind]:24} max {_inr(t['max']):>9}  ({figures})")
+    rate = out["interest"]
+    if rate:
+        typer.echo(
+            f"collateral interest {rate['rate'] * 100:.4f}% a day on {rate['day']} "
+            f"({_inr(rate['amount'])} on {_inr(rate['shortfall'])}); "
+            f"this month {_inr(rate['month_total'])}"
+        )

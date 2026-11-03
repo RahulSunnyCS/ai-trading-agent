@@ -226,3 +226,15 @@ the reading predates today's close.
   the PDF kept encrypted); `node run.js --margin-only --from D --to D` backfills. Angel One's
   collateral is all ordinary shares (no Liquid BeES or SGBs), so its cash half is its funds alone;
   Finvasia FA··24 pledges Liquid BeES and SGBs.
+- 2026-11-04 — Phase 1 reviewed (six findings, five fixed: a broken margin file no longer stops
+  the run, Angel One's collateral is required whenever the table shows securities, one bookmark
+  helper, tests, figures rounded here) and backfilled: 167 statements since June. Phase 2 built:
+  `realised/margin.py`, `obt realised margin`, `GET /legwise/contract-notes/margin`. Quantiply's
+  capture rows carry no fill times, so their lots are counted from the entry time in the
+  strategy's name to the close (`lots_from` 'schedule'). Per lot (Angel One, peak ÷ every lot
+  open, the owner's own strategies included) over 21 Oct – 2 Nov: normal days ₹1.2–1.9 L, SENSEX
+  expiry ₹1.0–1.6 L, NIFTY expiry ₹1.0 L (one day). Below BL-133 A3's ₹2.0–2.6 L because the
+  owner's own strategies on the account (some hedged) count as lots; the max of a type is what
+  Phase 3 uses. Angel One's cash half is ₹0.7–1.1 L against ₹3–4.3 L the rule asks, which is
+  the interest the e-mails charge; Finvasia's main account's cash (funds, Liquid BeES, SGBs) is
+  about ₹4.6–5.2 L, so the strict rule caps it at about ₹9.3–10.4 L of its ₹12 L.
