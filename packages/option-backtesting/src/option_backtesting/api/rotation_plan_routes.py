@@ -18,7 +18,7 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from ..rotation import journal, plan
+from ..rotation import journal, plan, store
 
 router = APIRouter(prefix="/legwise/rotation/plan")
 
@@ -39,7 +39,7 @@ def get_plan() -> Any:
         root = data_dir()
     except (RuntimeError, OSError, ValueError) as error:
         return _error(503, f"the data root is not available: {error}")
-    key = str(root)
+    key = (str(root), store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)

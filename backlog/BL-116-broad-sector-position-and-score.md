@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — BL-115 found the stock's own numbers say little; the sector choice decides most of a Broad portfolio |
-| **Status** | Phase 2 development passed (top-sector weight 2x, after tax); the one check on 2023-2026 is not run yet and waits on BL-176 (owner, 2026-10-28) |
+| **Status** | Phase 2 development passed (top-sector weight 2x, after tax); the one check on 2023-2026 is not run yet; BL-176 (done 2026-11-02) found the weight flat across its search |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-17 |
@@ -192,3 +192,4 @@ score against beating Nifty 500, on 2017-2022.
 - 2026-10-28 — Owner (asked in chat, 2026-10-28): hold the 2023–2026 confirmation window until BL-176 (the
   momentum search re-run on the F6-fixed ranking) is done. Not run; the window stays unread. Status
   unchanged (in progress).
+- 2026-11-02 — BL-176's search (F6 ranking, 2017-01 to 2026-10) searched `top_sector_weight` 1 / 1.5 / 2 as a light axis over 44,000 Stage 1 runs. **Descriptive, not this item's confirmation:** weight 2 against 1 moved the median lower-bound FY excess by +0.2 points (curated arm A), +0.3 (extended) and 0.0 (C1); over FY2024-26 only, the median mean FY excess moved +0.3, −0.2 and −0.3 points. The search found no effect at all. This reads the 2023-2026 window the 2026-10-28 hold kept unread, as BL-176's registration planned (Phase 0, expected directions: "the 2023–26 half of the data is its confirmation"), so that window is no longer unseen for this item. Phase 2's own confirmation (addendum 1: the 11 favourites, 2023-2026, after tax) is still unrun; BL-176 is done, so it no longer waits on it, but these figures make a pass unlikely. Evidence: `search_spaces/bl176_stage1_axes.csv`, BL-176 Log 2026-11-02.

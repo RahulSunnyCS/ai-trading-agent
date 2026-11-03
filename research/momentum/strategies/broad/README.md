@@ -1,8 +1,8 @@
 # Broad Momentum (stock funnel)
 
-> **Caveat, 2026-10-25 (BL-001 F6):** every Broad figure on these pages was measured with a ranking whose cross-section included stocks that were not members that week, so a past week's ranks depended on later data. Fixed and merged on 2026-10-28 (PRs #318, #319, #322, merge commit `778ba02e`): on live data the followed strategy's headline CAGR fell from 42.9% to 35.0% and most favourites lost 3.5 to 10 points; see `packages/momentum-backtesting/docs/lookahead-requests-2026-10-24.md`. The pages have not been re-measured; the search is re-run on the fixed ranking under [BL-176](../../../../backlog/BL-176-momentum-search-on-f6-ranking.md).
+> **Caveat, 2026-10-25 (BL-001 F6):** every Broad figure on these pages was measured with a ranking whose cross-section included stocks that were not members that week, so a past week's ranks depended on later data. Fixed and merged on 2026-10-28 (PRs #318, #319, #322, merge commit `778ba02e`): on live data the followed strategy's headline CAGR fell from 42.9% to 35.0% and most favourites lost 3.5 to 10 points; see `packages/momentum-backtesting/docs/lookahead-requests-2026-10-24.md`. The search was re-run on the fixed ranking under [BL-176](../../../../backlog/BL-176-momentum-search-on-f6-ranking.md) (result below, 2026-11-02); older figures on these pages are still pre-fix unless a BL-176 row says otherwise.
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-11-02
 
 ## What it is
 
@@ -56,6 +56,8 @@ Shared pages: [universe](../../common/universe.md) · [benchmarks](../../common/
   the engine has been fixed since, so this is not comparable with the 3.9.23 baseline.
 - BL-085 baseline, after tax at Rs 5 lakh, median of 11 strategies: 29.9% (FY2018-22) and 32.4%
   (FY2023-26); before tax 38.3% and 41.2%.
+
+**The BL-176 search on the fixed ranking (2026-11-02)** ([BL-176](../../../../backlog/BL-176-momentum-search-on-f6-ranking.md)): a fresh three-stage search (about 72,000 runs) on the F6-fixed, point-in-time ranking, curated and extended tags ranked apart, scored as all-Fridays blends at ₹2 lakh a sleeve. Picking the single best config was killed again (PBO 0.43 curated, 0.55 extended). Addendum 4's ensemble of four typical configs (medium basket, 8-12 names, every 2 or 4 weeks) passed its walk-forward in both rankings and is frozen (`search_spaces/bl176_frozen_{curated,extended}.json`). Both are MIXED on G1-G6 (`bl176_finalists_*.json`): after tax on fuller tags the curated ensemble makes 23.7% a year (worst fall −27.9%), the extended one 24.8% (−30.0%), against 16.2% for Nifty200 Momentum 30 TRI; each has one financial year more than 10 points behind it, and the alpha t-stat is 1.92 / 2.02. The followed Four Sectors Monthly, No Tilt sits in the bottom half of both rankings; Five Sectors, Rank Sum is top 1% on curated tags and 13% on extended. These supersede the BL-010 figures below for Broad.
 
 **The BL-010 evaluation review** ([BL-010](../../../../backlog/BL-010-momentum-evaluation-review.md)):
 

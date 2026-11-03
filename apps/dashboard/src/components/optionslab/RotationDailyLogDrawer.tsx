@@ -11,7 +11,11 @@
 
 import { useState } from 'react';
 
-import { useRotationDay, useSavePlacement } from '../../hooks/useRotationDailyLog';
+import {
+  type RotationLogTrack,
+  useRotationDay,
+  useSavePlacement,
+} from '../../hooks/useRotationDailyLog';
 import { cn } from '../../lib/cn';
 import {
   EMPTY,
@@ -31,6 +35,8 @@ import {
   rowFlags,
 } from '../../lib/rotationDailyLogView';
 import { isVisibleList, listLabel, listName } from '../../lib/rotationListNames';
+import { grossLabel } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type {
   PlacementStatus,
   RotationDay,
@@ -326,12 +332,15 @@ function latest(
 
 function DayBody({
   d,
+  tracked = false,
   onChanged,
   onReplay,
   onReplayList,
   refreshError,
 }: {
   d: RotationDay;
+  /** Read from a parallel track's journal: it has no placement record. */
+  tracked?: boolean;
   onChanged: () => void;
   onReplay: (variant: string, day: string) => void;
   onReplayList: (list: RotationListKey, day: string) => void;
@@ -340,6 +349,7 @@ function DayBody({
 }) {
   const flags = rowFlags(d);
   const keys = LIST_KEYS.filter((k) => d.lists[k] !== undefined);
+  const slippage = useRotationSlippage();
   // Only a shown list is named as "the same strategies as": a hidden list never surfaces here.
   const sameAs = (k: RotationListKey): RotationListKey | null => {
     const group = d.groups.find((g) => g.includes(k));
@@ -385,7 +395,7 @@ function DayBody({
       </div>
 
       {keys.length > 0 ? (
-        <Section title="Scheduled and simulated (gross, one lot per strategy)">
+        <Section title={`Scheduled and simulated (${grossLabel(slippage)}, one lot per strategy)`}>
           <div className="space-y-3">
             {keys.map((k) => {
               const block = d.lists[k];
@@ -493,7 +503,11 @@ function DayBody({
         </Section>
       ) : null}
 
-      {d.source === 'recorded' ? (
+      {tracked ? (
+        <p className="text-xs text-faint">
+          The placement record covers Adaptive Classic only; this track's days are not marked here.
+        </p>
+      ) : d.source === 'recorded' ? (
         <Section title="Executed: what you placed on AlgoTest">
           <p className="text-xs text-muted">
             Mark what you placed by hand. This is your own record; it never changes a pick or a
@@ -541,12 +555,15 @@ function DayBody({
  */
 export function RotationDailyLogDrawer({
   day,
+  track,
   onClose,
   onChanged,
   onReplay,
   onReplayList,
 }: {
   day: string | null;
+  /** A parallel track's journal (`t1`: Adaptive Tuned); absent = the live journal. */
+  track?: RotationLogTrack | undefined;
   onClose: () => void;
   onChanged: () => void;
   /** Open one pick's day in Day forensics (the caller closes the drawer and shows it). */
@@ -567,6 +584,7 @@ export function RotationDailyLogDrawer({
         <DayLoader
           key={day}
           day={day}
+          track={track}
           onChanged={onChanged}
           onReplay={onReplay}
           onReplayList={onReplayList}
@@ -578,16 +596,18 @@ export function RotationDailyLogDrawer({
 
 function DayLoader({
   day,
+  track,
   onChanged,
   onReplay,
   onReplayList,
 }: {
   day: string;
+  track?: RotationLogTrack | undefined;
   onChanged: () => void;
   onReplay: (variant: string, day: string) => void;
   onReplayList: (list: RotationListKey, day: string) => void;
 }) {
-  const res = useRotationDay(day);
+  const res = useRotationDay(day, track);
   if (res.error && !res.data) {
     return (
       <div className="space-y-3">
@@ -610,6 +630,7 @@ function DayLoader({
   return (
     <DayBody
       d={res.data}
+      tracked={track !== undefined}
       refreshError={res.error}
       onReplay={onReplay}
       onReplayList={onReplayList}

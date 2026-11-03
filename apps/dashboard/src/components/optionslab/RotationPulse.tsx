@@ -43,6 +43,8 @@ import {
   unavailableView,
   unplacedNote,
 } from '../../lib/rotationPulseView';
+import { SLIPPAGE_TEXT, grossLabel } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type {
   PulseAvailable,
   PulseCell,
@@ -261,6 +263,7 @@ function Row({ cell, r, focus }: { cell: PulseCell; r: PulseAvailable; focus: Pu
 export function RotationPulse({ focus }: { focus: PulseListKey }) {
   const [index, setIndex] = useState<PulseIndex>('both');
   const result = useRotationPulse(focus, index);
+  const slippage = useRotationSlippage();
   // The polled hook keeps the previous response while a new one loads and after a failure, so a
   // response is only shown when it is the one these controls asked for (the response echoes the
   // list and index it was built for).
@@ -277,7 +280,7 @@ export function RotationPulse({ focus }: { focus: PulseListKey }) {
     <Card>
       <CardHeader
         title="Family pulse"
-        description="Is morning short-premium working right now? Recent gross per lot-day in the 12 cells the ranking pools: strategy kind by start band, both indices, every strike."
+        description={`Is morning short-premium working right now? Recent ${grossLabel(slippage)} per lot-day in the 12 cells the ranking pools: strategy kind by start band, both indices, every strike.`}
         className="mb-3"
       />
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -325,8 +328,8 @@ export function RotationPulse({ focus }: { focus: PulseListKey }) {
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-            <Badge tone="info">Gross</Badge>
-            <span>{asOfLine(data)}</span>
+            <Badge tone="info">{slippage ? `Gross · ${SLIPPAGE_TEXT} slippage` : 'Gross'}</Badge>
+            <span>{asOfLine(data, slippage)}</span>
             {data.journal.chain.intact ? null : (
               <Badge tone="negative">Journal chain broken: entries not trusted</Badge>
             )}

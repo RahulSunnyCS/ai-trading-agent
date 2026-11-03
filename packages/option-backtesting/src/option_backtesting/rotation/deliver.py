@@ -27,7 +27,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import journal, live_compare, messages, result, store, tomorrow
+from . import journal, live_compare, messages, month, result, slippage, store, tomorrow
 from . import pick as pick_mod
 from .journal import AlreadyRecorded
 from .pick import PickError, PickResult
@@ -274,32 +274,6 @@ def message_boost() -> dict[str, bool]:
     return automation_settings.dir_boost_lists(settings, automation_settings.env_uploads_on())
 
 
-def message_capital() -> dict[str, float]:
-    """The capital the evening message shows (Settings › Automation, owner 2026-10-29):
-    {'adaptive', 't1'}: the accounts that upload each list; 'total': every account added up.
-    Settings that cannot be read give the defaults: the message must always go."""
-    from . import automation_settings as auto
-
-    try:
-        settings, _ = auto.read()
-    except Exception:  # noqa: BLE001
-        settings = auto.DEFAULT
-    return {
-        "adaptive": auto.book_capital(settings, "core"),
-        "t1": auto.book_capital(settings, "t1"),
-        "total": sum(auto.capital(settings).values()),
-    }
-
-
-def _real_month(day, capital, root, echo):
-    """The owner's real month from the contract notes; None (the lines left out) on any error."""
-    try:
-        return result.real_month(day, capital, root)
-    except Exception as error:  # noqa: BLE001
-        echo(f"the real month from the contract notes could not be read: {error}")
-        return None
-
-
 def _severity(entry: dict) -> str:
     return "info" if entry.get("before_first_entry") else "warn"
 
@@ -327,6 +301,16 @@ def _failed(error: Exception, day: date, alert_if, err: Echo, tag: str = "") -> 
 # -- evening ------------------------------------------------------------------------------------
 
 
+def _slipped(r: result.DailyResult, root: Path | None, err: Echo) -> result.DailyResult:
+    """`r` after the message's slippage (`slippage.apply`); unslipped, and the message then says
+    none, when the day's bars cannot be simulated again. Never stops the result going out."""
+    try:
+        return slippage.apply(r, root)
+    except Exception as error:  # noqa: BLE001
+        err(f"slippage not applied to {r.day}: {type(error).__name__}: {error}")
+        return r
+
+
 def _t1_state(day: date, root: Path | None, err: Echo):
     """('ready', DailyResult) | ('pending', reason) | ('none', reason) | ('error', reason).
 
@@ -334,7 +318,7 @@ def _t1_state(day: date, root: Path | None, err: Echo):
     appended) is 'error': logged, never allowed to stop Adaptive's result, and left unsettled so a
     later run delivers T1."""
     try:
-        return "ready", result.calculate(day, root, track="t1")
+        return "ready", _slipped(result.calculate(day, root, track="t1"), root, err)
     except result.NoEntry as error:
         return "none", str(error)
     except result.ResultUnavailable as error:
@@ -342,6 +326,42 @@ def _t1_state(day: date, root: Path | None, err: Echo):
     except Exception as error:  # noqa: BLE001 - T1 must never hold Adaptive's result back
         err(f"T1 result could not be read ({type(error).__name__}: {error}); sending without it")
         return "error", f"{type(error).__name__}: {error}"
+
+
+def message_capital() -> dict[str, float]:
+    """The capital the evening message measures the month against (Settings › Automation, owner
+    2026-10-29): {'adaptive', 't1'}: the accounts that upload each list; 'total': every account
+    added up. Settings that cannot be read give the defaults: the message must always go."""
+    from . import automation_settings as auto
+
+    try:
+        settings, _ = auto.read()
+    except Exception:  # noqa: BLE001
+        settings = auto.DEFAULT
+    return {
+        "adaptive": auto.book_capital(settings, "core"),
+        "t1": auto.book_capital(settings, "t1"),
+        "total": sum(auto.capital(settings).values()),
+    }
+
+
+def _month_so_far(day: date, adaptive, t1, boost: dict[str, bool], root: Path | None, echo: Echo):
+    """((Adaptive's paper month, T1's), the account's real month) for the evening message; T1's
+    only when its day is in (`t1`), the real one for the owner's copy only. A failure here leaves
+    that part out, never the result."""
+    paper = [None, None]
+    real = None
+    try:
+        paper[0] = month.paper(day, root, boost=boost.get("adaptive", False), today=adaptive)
+        if t1 is not None:
+            paper[1] = month.paper(day, root, "t1", boost.get("t1", False), today=t1)
+    except Exception as error:  # noqa: BLE001
+        echo(f"month so far (paper) skipped: {type(error).__name__}: {error}")
+    try:
+        real = month.real(day, root)
+    except Exception as error:  # noqa: BLE001
+        echo(f"month so far (account) skipped: {type(error).__name__}: {error}")
+    return tuple(paper), real
 
 
 def _tomorrow_adaptive(today: date, root: Path | None, echo: Echo):
@@ -418,6 +438,7 @@ def send_result(
     except result.ResultUnavailable as error:
         echo(f"result not ready: {error}")
         return 2
+    adaptive = _slipped(adaptive, root, err)
     if not telegram:  # print only: no lock, no marker, nothing written
         return _send_result_locked(
             day,
@@ -490,15 +511,26 @@ def _send_result_locked(
         # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
         live = live_compare.owner_lines(day, root, echo)
         boost = message_boost()
+        t1_day = t1 if kind == "ready" else None
+        paper, real = _month_so_far(day, adaptive, t1_day, boost, root, echo)
         capital = message_capital()
-        # each list's capital and month to date, in both chats; the real month, the owner's only
-        # (owner, 2026-10-29)
-        months = result.months_to_date(adaptive, t1_part, root, boost, capital, echo)
-        real = _real_month(day, capital["total"], root, echo)
         private = result.render(
-            adaptive, t1_part, next_adaptive, next_t1, live, boost=boost, months=months, real=real
+            adaptive,
+            t1_part,
+            next_adaptive,
+            next_t1,
+            live,
+            boost=boost,
+            month=messages.month_lines(day, *paper, real, capital),
         )
-        group = result.render(adaptive, t1_part, next_adaptive, next_t1, boost=boost, months=months)
+        group = result.render(
+            adaptive,
+            t1_part,
+            next_adaptive,
+            next_t1,
+            boost=boost,
+            month=messages.month_lines(day, *paper, capital=capital),
+        )
         echo(private)
         if not telegram:
             return 0
@@ -544,9 +576,7 @@ def _send_result_locked(
         echo(f"T1 result still not ready: {t1}")
     elif owed:
         next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None
-        boost = message_boost()
-        month = result.months_to_date(None, t1, root, boost, message_capital(), echo)["t1"]
-        text = result.render_t1_followup(t1, next_t1, boost=boost, month=month)
+        text = result.render_t1_followup(t1, next_t1, boost=message_boost())
         echo(text)
         for chat, marker in owed:
             if send(text, chat_id=chat):

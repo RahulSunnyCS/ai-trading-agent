@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import journal, lot_plans
+from ..rotation import journal, lot_plans, store
 
 router = APIRouter(prefix="/legwise/rotation/lot-plans")
 
@@ -39,7 +39,7 @@ def get_lot_plans(book: str = Query(default="core")) -> Any:
         root = data_dir()  # an unmounted data volume raises here: answer it as an error too
     except (RuntimeError, OSError, ValueError) as error:
         return _error(503, f"the data root is not available: {error}")
-    key = (root, book)
+    key = (root, book, store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)

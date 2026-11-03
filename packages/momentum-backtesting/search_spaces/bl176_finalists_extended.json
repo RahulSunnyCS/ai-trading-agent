@@ -1,0 +1,754 @@
+{
+  "written": "2026-11-02",
+  "criteria": "bl176_criteria_addendum_1.json",
+  "ranking": "extended",
+  "members": [
+    {
+      "id": "d5ad8da622e7",
+      "folder": "round8_A_extended",
+      "phase_slot": 0
+    },
+    {
+      "id": "d7b06967be4e",
+      "folder": "round8_C1",
+      "phase_slot": 1
+    },
+    {
+      "id": "00d4034e807e",
+      "folder": "round8_A_extended_focus",
+      "phase_slot": 2
+    },
+    {
+      "id": "02ff9a531230",
+      "folder": "round8_A_extended",
+      "phase_slot": 1
+    }
+  ],
+  "window": ["2017-01-06", "2026-10-30"],
+  "weeks": 513,
+  "commit": "fe9e1e9d84ca249a33ed821aa5575d8c46f810cc",
+  "working_tree_dirty": false,
+  "data_version": [
+    ["category_membership", 10754, 98591892116388555971903],
+    ["companies", 95, 885749809421713232574],
+    ["company_symbols", 110, 1040183031097597678258],
+    ["corporate_actions", 1886, 17149478071477760320785],
+    ["data_quality", 135724, 1248423667944450702075490],
+    ["index_membership", 105, 982157288905224367747],
+    ["instrument_aliases", 428401, 3943833889665190140233931],
+    ["instruments", 432702, 3987942828381500112017632],
+    ["momentum_cash", 7, 92030702782582861238],
+    ["momentum_lot_events", 7, 50161854352034050237],
+    ["momentum_lot_state", 1, 13379848884122911959],
+    ["momentum_prices", 119109, 1102892750631689855932172],
+    ["quality_issues", 1, 13782259730769377983],
+    ["ref_expiries", 330, 3130700320867506949173],
+    ["ref_expiry_rules", 3, 19583917854507542062],
+    ["ref_holidays", 48, 481014780835979530979],
+    ["ref_lot_sizes", 22, 196332079829254546933],
+    ["ref_margins", 1, 16531738359777705753],
+    ["ref_rates", 30, 282595287820685227638],
+    ["ref_strike_steps", 7, 50369804970544193076],
+    ["stock_action_candidates", 3199, 29052119667556356534187],
+    ["stock_action_reviews", 70, 634799196353799586737],
+    ["stock_action_scan_state", 1, 8026586735988637686],
+    ["stock_membership_weekly", 76603, 706697600196085744378247],
+    ["stock_weekly_prices", 142658, 1316975219658841920303503],
+    ["stock_weekly_series", 8232, 75513485932100151864724],
+    ["year=2011", 7912116, 1790828248.7093253],
+    ["year=2012", 8301006, 1790828249.134564],
+    ["year=2013", 7812972, 1790828249.4829848],
+    ["year=2014", 8316062, 1790828249.8715155],
+    ["year=2015", 8578160, 1790828250.5826967],
+    ["year=2016", 8942100, 1790828250.8860538],
+    ["year=2017", 9408852, 1790828251.1844535],
+    ["year=2018", 9678238, 1790828251.4826257],
+    ["year=2019", 9578655, 1790828251.8310094],
+    ["year=2020", 10107571, 1790828252.8631976],
+    ["year=2021", 11018301, 1790828253.2355673],
+    ["year=2022", 11723085, 1790828253.6929915],
+    ["year=2023", 12146355, 1790828254.0331426],
+    ["year=2024", 13962893, 1790828254.4246702],
+    ["year=2025", 15041385, 1790828254.8645353],
+    ["year=2026", 12815119, 1793375287.9933329]
+  ],
+  "verdict": "MIXED",
+  "verdict_flips_if_monday_change_zero": false,
+  "gates": {
+    "G1_minimum_bar": {
+      "pass": true,
+      "e_cagr": 0.244481641034066,
+      "mom30_cagr": 0.16231125169887162,
+      "excess_pts": 8.217038933519438,
+      "excess_pts_if_monday_change_were_zero": 8.553872669158991
+    },
+    "G2_drawdown_basket": {
+      "pass": false,
+      "t_real_passes_medium": false,
+      "t_real_passes_aggressive_reported": true,
+      "t_real_mdd": -0.3004137051704562,
+      "e_mdd": -0.29739048033085635,
+      "hard_ceiling": -0.4
+    },
+    "G3_no_bad_year": {
+      "pass": false,
+      "worst_fy": 2019,
+      "worst_fy_excess_pts": -12.426321851769961,
+      "fy_table": {
+        "2018": {
+          "T_real": 0.22178170471155068,
+          "Nifty200 Momentum 30 TRI": 0.21575462443946192,
+          "Nifty 50 TRI": 0.11758817218774698,
+          "Nifty Smallcap 250 TRI": 0.12865077237416278,
+          "Nifty Midcap 150 TRI": 0.16663957344430713,
+          "Nifty 500 TRI": 0.1286641117716285
+        },
+        "2019": {
+          "T_real": -0.008539228467821736,
+          "Nifty200 Momentum 30 TRI": 0.11572399004987788,
+          "Nifty 50 TRI": 0.16447502699131733,
+          "Nifty Smallcap 250 TRI": -0.12442010421685068,
+          "Nifty Midcap 150 TRI": -0.0064831012481045835,
+          "Nifty 500 TRI": 0.09728912579501325
+        },
+        "2020": {
+          "T_real": -0.07559295654124942,
+          "Nifty200 Momentum 30 TRI": -0.17796746645842598,
+          "Nifty 50 TRI": -0.24479518596120053,
+          "Nifty Smallcap 250 TRI": -0.4071869319592558,
+          "Nifty Midcap 150 TRI": -0.3015724469252945,
+          "Nifty 500 TRI": -0.2655411675515974
+        },
+        "2021": {
+          "T_real": 1.061581207334286,
+          "Nifty200 Momentum 30 TRI": 0.6149157460414267,
+          "Nifty 50 TRI": 0.6915231079859794,
+          "Nifty Smallcap 250 TRI": 1.1659306907142932,
+          "Nifty Midcap 150 TRI": 0.975738878037204,
+          "Nifty 500 TRI": 0.7502843547989608
+        },
+        "2022": {
+          "T_real": 0.40288112247603114,
+          "Nifty200 Momentum 30 TRI": 0.39168835865511786,
+          "Nifty 50 TRI": 0.1960487331636751,
+          "Nifty Smallcap 250 TRI": 0.37575738043057894,
+          "Nifty Midcap 150 TRI": 0.2555036080902533,
+          "Nifty 500 TRI": 0.21921655380066452
+        },
+        "2023": {
+          "T_real": -0.026413444953012455,
+          "Nifty200 Momentum 30 TRI": -0.08117012742606411,
+          "Nifty 50 TRI": 0.024184163003228676,
+          "Nifty Smallcap 250 TRI": -0.047112964394572465,
+          "Nifty Midcap 150 TRI": 0.0453047830505755,
+          "Nifty 500 TRI": 0.00424938049300283
+        },
+        "2024": {
+          "T_real": 0.7864583344295624,
+          "Nifty200 Momentum 30 TRI": 0.6996789227915592,
+          "Nifty 50 TRI": 0.30084508625404993,
+          "Nifty Smallcap 250 TRI": 0.6414829423928454,
+          "Nifty Midcap 150 TRI": 0.5753854602289528,
+          "Nifty 500 TRI": 0.404860514632319
+        },
+        "2025": {
+          "T_real": 0.11941346846507761,
+          "Nifty200 Momentum 30 TRI": -0.0762771861399032,
+          "Nifty 50 TRI": 0.06653587783333137,
+          "Nifty Smallcap 250 TRI": 0.06017671821548887,
+          "Nifty Midcap 150 TRI": 0.08167377681724441,
+          "Nifty 500 TRI": 0.0637311987910556
+        },
+        "2026": {
+          "T_real": 0.14257038641514352,
+          "Nifty200 Momentum 30 TRI": -0.0029077986692872537,
+          "Nifty 50 TRI": -0.018912206510625973,
+          "Nifty Smallcap 250 TRI": -0.02418062400293841,
+          "Nifty Midcap 150 TRI": 0.05015611036674472,
+          "Nifty 500 TRI": -0.005574240933645225
+        }
+      }
+    },
+    "G4_plateau": {
+      "pass": true,
+      "neighbours": 128,
+      "median_gap_pts": -0.4227154943050121,
+      "share_5_pts_above_mom30": 0.953125,
+      "per_member": {
+        "00d4034e807e": {
+          "neighbours": 30,
+          "median_gap_pts": -0.2780701703892524,
+          "share_5_pts_above_mom30": 1.0,
+          "worst": {
+            "label": "lookbacks (13, 26)",
+            "cagr": 0.22750637988773803
+          }
+        },
+        "02ff9a531230": {
+          "neighbours": 32,
+          "median_gap_pts": -1.809440115956662,
+          "share_5_pts_above_mom30": 0.84375,
+          "worst": {
+            "label": "lookbacks (1, 4, 13, 26, 52)",
+            "cagr": 0.13100516587715302
+          }
+        },
+        "d5ad8da622e7": {
+          "neighbours": 34,
+          "median_gap_pts": -0.0819988031924429,
+          "share_5_pts_above_mom30": 1.0,
+          "worst": {
+            "label": "coverage_floor 0.1888",
+            "cagr": 0.239884622311681
+          }
+        },
+        "d7b06967be4e": {
+          "neighbours": 32,
+          "median_gap_pts": -0.4177536000783494,
+          "share_5_pts_above_mom30": 0.96875,
+          "worst": {
+            "label": "lookbacks (1, 4, 13)",
+            "cagr": 0.17461511820810402
+          }
+        }
+      },
+      "errored_neighbours": 0,
+      "swapped_ensemble_reported": {
+        "median_cagr": 0.3043447736204239,
+        "p0_cagr": 0.30596384502944196,
+        "median_gap_pts": -0.1619071409018069
+      }
+    },
+    "G5_alpha": {
+      "pass": true,
+      "alpha_pa": 0.08331285982757702,
+      "alpha_t": 2.0231044373720395,
+      "beta_market": 0.922036872039269,
+      "beta_size": 0.5806690214097021,
+      "beta_momentum": 0.5230644088036531,
+      "r2": 0.659002354100803,
+      "weeks": 508
+    },
+    "G6_fair_placebo": {
+      "pass": true,
+      "seeds": 100,
+      "p0_cagr": 0.30596384502944196,
+      "placebo_median": 0.1405506879055125,
+      "placebo_p95": 0.18016425054135787,
+      "margin_over_p95_pts": 12.57995944880841,
+      "per_member_reported": {
+        "d5ad8da622e7": {
+          "p0_cagr": 0.30687180079073295,
+          "placebo_p95": 0.19628642930347984,
+          "margin_pts": 11.05853714872531
+        },
+        "d7b06967be4e": {
+          "p0_cagr": 0.30659246031258003,
+          "placebo_p95": 0.23596235305722546,
+          "margin_pts": 7.063010725535457
+        },
+        "00d4034e807e": {
+          "p0_cagr": 0.28386001090335156,
+          "placebo_p95": 0.18599393995720992,
+          "margin_pts": 9.786607094614164
+        },
+        "02ff9a531230": {
+          "p0_cagr": 0.31408885664868813,
+          "placebo_p95": 0.19499104608797135,
+          "margin_pts": 11.909781056071678
+        }
+      }
+    }
+  },
+  "ensemble": {
+    "P0_as_ranked": {
+      "cagr": 0.30596384502944196,
+      "mdd": -0.2845412889322013,
+      "ulcer": 0.10796925826849009
+    },
+    "P1_extended_tags": {
+      "cagr": 0.30596384502944196,
+      "mdd": -0.2845412889322013,
+      "ulcer": 0.10796925826849009
+    },
+    "T0_after_tax": {
+      "cagr": 0.24784997839046152,
+      "mdd": -0.3004137051704562,
+      "ulcer": 0.1178595740566205
+    },
+    "T_real": {
+      "cagr": 0.24784997839046152,
+      "mdd": -0.3004137051704562,
+      "ulcer": 0.1178595740566205
+    },
+    "T_real_50k": {
+      "cagr": 0.24297629620470462,
+      "mdd": -0.29572858846331485,
+      "ulcer": 0.11958646155367428
+    }
+  },
+  "tax_drag_pts": 5.811386663898044,
+  "monday_open_change": {
+    "cagr": -0.0033683373563955232,
+    "mdd": 0.003023224839599825
+  },
+  "monday_open_sleeves": {
+    "d5ad8da622e7": {
+      "sleeves": [
+        {
+          "offset": 0,
+          "sleeve_cagr_at_close": 0.3035494630711433,
+          "sleeve_cagr_at_open_whole_shares": 0.306860717688237,
+          "average_gap_on_buys": -0.0005617553784677869,
+          "average_gap_on_sells": 0.0010437581317858488,
+          "orders_with_no_open_that_week": 4,
+          "replay_problems": []
+        },
+        {
+          "offset": 1,
+          "sleeve_cagr_at_close": 0.2860077051636871,
+          "sleeve_cagr_at_open_whole_shares": 0.2781526469890012,
+          "average_gap_on_buys": 0.001779488577571715,
+          "average_gap_on_sells": 0.0017652033387554774,
+          "orders_with_no_open_that_week": 3,
+          "replay_problems": []
+        },
+        {
+          "offset": 2,
+          "sleeve_cagr_at_close": 0.27843607575458074,
+          "sleeve_cagr_at_open_whole_shares": 0.2616501479899196,
+          "average_gap_on_buys": 0.0034766777186031137,
+          "average_gap_on_sells": 0.002108593540267273,
+          "orders_with_no_open_that_week": 3,
+          "replay_problems": []
+        },
+        {
+          "offset": 3,
+          "sleeve_cagr_at_close": 0.35246701448473927,
+          "sleeve_cagr_at_open_whole_shares": 0.34459872962970617,
+          "average_gap_on_buys": 2.542980990466927e-5,
+          "average_gap_on_sells": 0.0003581639749682741,
+          "orders_with_no_open_that_week": 2,
+          "replay_problems": []
+        }
+      ]
+    },
+    "d7b06967be4e": {
+      "sleeves": [
+        {
+          "offset": 0,
+          "sleeve_cagr_at_close": 0.3479217638700274,
+          "sleeve_cagr_at_open_whole_shares": 0.34950516629653605,
+          "average_gap_on_buys": 0.0013961000229883293,
+          "average_gap_on_sells": 0.0020015959126973245,
+          "orders_with_no_open_that_week": 1,
+          "replay_problems": []
+        },
+        {
+          "offset": 1,
+          "sleeve_cagr_at_close": 0.29835222485846935,
+          "sleeve_cagr_at_open_whole_shares": 0.300285355330975,
+          "average_gap_on_buys": 0.00161076789048839,
+          "average_gap_on_sells": 0.0027795571472311706,
+          "orders_with_no_open_that_week": 2,
+          "replay_problems": []
+        },
+        {
+          "offset": 2,
+          "sleeve_cagr_at_close": 0.2709751297037517,
+          "sleeve_cagr_at_open_whole_shares": 0.2645166128354639,
+          "average_gap_on_buys": 0.0019113933284421944,
+          "average_gap_on_sells": 0.00221407693066259,
+          "orders_with_no_open_that_week": 2,
+          "replay_problems": []
+        },
+        {
+          "offset": 3,
+          "sleeve_cagr_at_close": 0.30234464268854566,
+          "sleeve_cagr_at_open_whole_shares": 0.29331836631171804,
+          "average_gap_on_buys": 0.0021325353743120467,
+          "average_gap_on_sells": 0.0014948575178259248,
+          "orders_with_no_open_that_week": 0,
+          "replay_problems": []
+        }
+      ]
+    },
+    "00d4034e807e": {
+      "sleeves": [
+        {
+          "offset": 0,
+          "sleeve_cagr_at_close": 0.3109872112370413,
+          "sleeve_cagr_at_open_whole_shares": 0.3063217231735371,
+          "average_gap_on_buys": 0.0009940971081616086,
+          "average_gap_on_sells": 0.0010381178196625983,
+          "orders_with_no_open_that_week": 2,
+          "replay_problems": []
+        },
+        {
+          "offset": 1,
+          "sleeve_cagr_at_close": 0.2657627738357984,
+          "sleeve_cagr_at_open_whole_shares": 0.2570309980304515,
+          "average_gap_on_buys": 0.0013772018034319251,
+          "average_gap_on_sells": 0.0006359743930323322,
+          "orders_with_no_open_that_week": 2,
+          "replay_problems": []
+        },
+        {
+          "offset": 2,
+          "sleeve_cagr_at_close": 0.26752747436603275,
+          "sleeve_cagr_at_open_whole_shares": 0.26236680613906826,
+          "average_gap_on_buys": 0.002795287371221094,
+          "average_gap_on_sells": 0.003276066030918476,
+          "orders_with_no_open_that_week": 4,
+          "replay_problems": []
+        },
+        {
+          "offset": 3,
+          "sleeve_cagr_at_close": 0.28893222369218474,
+          "sleeve_cagr_at_open_whole_shares": 0.2807341813724453,
+          "average_gap_on_buys": 0.0008694660831052443,
+          "average_gap_on_sells": -2.0732665525394655e-5,
+          "orders_with_no_open_that_week": 3,
+          "replay_problems": []
+        }
+      ]
+    },
+    "02ff9a531230": {
+      "sleeves": [
+        {
+          "offset": 0,
+          "sleeve_cagr_at_close": 0.31352242594603585,
+          "sleeve_cagr_at_open_whole_shares": 0.31459270372024406,
+          "average_gap_on_buys": 0.0007630410516165193,
+          "average_gap_on_sells": 0.0008421442556727904,
+          "orders_with_no_open_that_week": 5,
+          "replay_problems": []
+        },
+        {
+          "offset": 1,
+          "sleeve_cagr_at_close": 0.3130284772114238,
+          "sleeve_cagr_at_open_whole_shares": 0.31712070603231957,
+          "average_gap_on_buys": -2.9816542456173632e-5,
+          "average_gap_on_sells": 0.0018959777691273348,
+          "orders_with_no_open_that_week": 5,
+          "replay_problems": []
+        }
+      ]
+    }
+  },
+  "e_expected_case": {
+    "cagr": 0.244481641034066,
+    "mdd": -0.29739048033085635
+  },
+  "members_by_variant": {
+    "d5ad8da622e7": {
+      "P0_as_ranked": {
+        "cagr": 0.30687180079073295,
+        "mdd": -0.29815587502927676,
+        "ulcer": 0.1172643118504942
+      },
+      "P1_extended_tags": {
+        "cagr": 0.30687180079073295,
+        "mdd": -0.29815587502927676,
+        "ulcer": 0.1172643118504942
+      },
+      "T0_after_tax": {
+        "cagr": 0.24574661453888202,
+        "mdd": -0.3207612443547043,
+        "ulcer": 0.12530543642544792
+      },
+      "T_real": {
+        "cagr": 0.24574661453888202,
+        "mdd": -0.3207612443547043,
+        "ulcer": 0.12530543642544792
+      },
+      "T_real_50k": {
+        "cagr": 0.24782823085092565,
+        "mdd": -0.30926421928899184,
+        "ulcer": 0.12016815258266099
+      }
+    },
+    "d7b06967be4e": {
+      "P0_as_ranked": {
+        "cagr": 0.30659246031258003,
+        "mdd": -0.29141131588278923,
+        "ulcer": 0.1036289059093373
+      },
+      "P1_extended_tags": {
+        "cagr": 0.30659246031258003,
+        "mdd": -0.29141131588278923,
+        "ulcer": 0.1036289059093373
+      },
+      "T0_after_tax": {
+        "cagr": 0.24546805198800237,
+        "mdd": -0.30531852120642655,
+        "ulcer": 0.11364629556762729
+      },
+      "T_real": {
+        "cagr": 0.24546805198800237,
+        "mdd": -0.30531852120642655,
+        "ulcer": 0.11364629556762729
+      },
+      "T_real_50k": {
+        "cagr": 0.2407851802238381,
+        "mdd": -0.31067348367825376,
+        "ulcer": 0.11742363065512326
+      }
+    },
+    "00d4034e807e": {
+      "P0_as_ranked": {
+        "cagr": 0.28386001090335156,
+        "mdd": -0.332689603282567,
+        "ulcer": 0.108616239358111
+      },
+      "P1_extended_tags": {
+        "cagr": 0.28386001090335156,
+        "mdd": -0.332689603282567,
+        "ulcer": 0.108616239358111
+      },
+      "T0_after_tax": {
+        "cagr": 0.2331962126888476,
+        "mdd": -0.3326966488037898,
+        "ulcer": 0.11434032826762576
+      },
+      "T_real": {
+        "cagr": 0.2331962126888476,
+        "mdd": -0.3326966488037898,
+        "ulcer": 0.11434032826762576
+      },
+      "T_real_50k": {
+        "cagr": 0.2268184986176236,
+        "mdd": -0.33333183188284987,
+        "ulcer": 0.1175315553409868
+      }
+    },
+    "02ff9a531230": {
+      "P0_as_ranked": {
+        "cagr": 0.31408885664868813,
+        "mdd": -0.33001089352211177,
+        "ulcer": 0.14349795550980393
+      },
+      "P1_extended_tags": {
+        "cagr": 0.31408885664868813,
+        "mdd": -0.33001089352211177,
+        "ulcer": 0.14349795550980393
+      },
+      "T0_after_tax": {
+        "cagr": 0.2547970877090955,
+        "mdd": -0.3457260149181096,
+        "ulcer": 0.15388705472264305
+      },
+      "T_real": {
+        "cagr": 0.2547970877090955,
+        "mdd": -0.3457260149181096,
+        "ulcer": 0.15388705472264305
+      },
+      "T_real_50k": {
+        "cagr": 0.24366005247076172,
+        "mdd": -0.3586233506203699,
+        "ulcer": 0.15757349790567235
+      }
+    }
+  },
+  "turnover_real": {
+    "d5ad8da622e7": 4.31235501977499,
+    "d7b06967be4e": 3.9323160539095823,
+    "00d4034e807e": 3.7363864402876303,
+    "02ff9a531230": 4.563393333479168
+  },
+  "friday_spread_P0": {
+    "d5ad8da622e7": [
+      {
+        "cagr": 0.3035494630711435,
+        "mdd": -0.3351944060221965,
+        "ulcer": 0.1377812643592505,
+        "offset": 0
+      },
+      {
+        "cagr": 0.2860077051636871,
+        "mdd": -0.32824033155364907,
+        "ulcer": 0.14059270266560253,
+        "offset": 1
+      },
+      {
+        "cagr": 0.27843607575458096,
+        "mdd": -0.29527442699853546,
+        "ulcer": 0.11053510797156883,
+        "offset": 2
+      },
+      {
+        "cagr": 0.3524670144847395,
+        "mdd": -0.3106864150659763,
+        "ulcer": 0.11401444296553925,
+        "offset": 3
+      }
+    ],
+    "d7b06967be4e": [
+      {
+        "cagr": 0.3479217638700274,
+        "mdd": -0.298729313483194,
+        "ulcer": 0.11021815611770767,
+        "offset": 0
+      },
+      {
+        "cagr": 0.2983522248584696,
+        "mdd": -0.29186712222192734,
+        "ulcer": 0.1158114825872054,
+        "offset": 1
+      },
+      {
+        "cagr": 0.2709751297037517,
+        "mdd": -0.2938288447859977,
+        "ulcer": 0.11442528179114106,
+        "offset": 2
+      },
+      {
+        "cagr": 0.3023446426885459,
+        "mdd": -0.2903645838284613,
+        "ulcer": 0.10227522216715136,
+        "offset": 3
+      }
+    ],
+    "00d4034e807e": [
+      {
+        "cagr": 0.3109872112370413,
+        "mdd": -0.341602297387107,
+        "ulcer": 0.10483532940303619,
+        "offset": 0
+      },
+      {
+        "cagr": 0.2657627738357984,
+        "mdd": -0.3345929207164985,
+        "ulcer": 0.11718154974657848,
+        "offset": 1
+      },
+      {
+        "cagr": 0.26752747436603297,
+        "mdd": -0.32791141172203264,
+        "ulcer": 0.12040525340818507,
+        "offset": 2
+      },
+      {
+        "cagr": 0.28893222369218474,
+        "mdd": -0.3262781785013913,
+        "ulcer": 0.10408489236661107,
+        "offset": 3
+      }
+    ],
+    "02ff9a531230": [
+      {
+        "cagr": 0.3135224259460361,
+        "mdd": -0.30794459660230233,
+        "ulcer": 0.13261192535062416,
+        "offset": 0
+      },
+      {
+        "cagr": 0.313028477211424,
+        "mdd": -0.36546087485157475,
+        "ulcer": 0.1568779812688896,
+        "offset": 1
+      }
+    ]
+  },
+  "one_friday_ensemble_reported": {
+    "P0_as_ranked": {
+      "cagr": 0.3005691785218021,
+      "mdd": -0.29030684487320446,
+      "ulcer": 0.12215705528913147
+    },
+    "T_real": {
+      "cagr": 0.24483767634462317,
+      "mdd": -0.303033109895513,
+      "ulcer": 0.13022365509403613
+    }
+  },
+  "concentration_real": {
+    "realised_profit_total_in_sleeve_units": 7.37561441820309,
+    "top5_share": 0.4334769858165489,
+    "top5": {
+      "APARINDS": 0.09347311110077955,
+      "Gold": 0.09206663675292749,
+      "Silver": 0.08921451170203354,
+      "ANANTRAJ": 0.08334353518274495,
+      "RECLTD": 0.07537919107806342
+    },
+    "flag_top5_above_50pct": false
+  },
+  "rolling_windows_T_real": {
+    "2y": {
+      "worst": -0.04265297800776935,
+      "median": 0.27852749255430376,
+      "best": 0.7006332227204708,
+      "worst_vs_mom30_pts": -8.583530819274854,
+      "share_above_mom30": 0.8387096774193549
+    },
+    "3y": {
+      "worst": 0.03843057388172211,
+      "median": 0.33648737974494636,
+      "best": 0.438285283541894,
+      "worst_vs_mom30_pts": 0.14660411769873427,
+      "share_above_mom30": 1.0
+    }
+  },
+  "bootstrap_T_real": {
+    "13w": {
+      "cagr_p5": 0.10050206582690106,
+      "cagr_p50": 0.24907934950792643,
+      "cagr_p95": 0.4129088047990716,
+      "mdd_p5": -0.488011942281534,
+      "mdd_p50": -0.32057234296813725,
+      "mean_block_weeks": 13
+    },
+    "26w": {
+      "cagr_p5": 0.10527248697616706,
+      "cagr_p50": 0.248533352499827,
+      "cagr_p95": 0.4144194790265606,
+      "mdd_p5": -0.460212393909464,
+      "mdd_p50": -0.3073609744407424,
+      "mean_block_weeks": 26
+    }
+  },
+  "deflated_sharpe_P0": {
+    "sharpe_week": 0.11784673580906169,
+    "sr0_week": 0.09955449118886427,
+    "dsr": 0.658600884293949,
+    "weeks": 512,
+    "skew": -0.0835747321965018,
+    "kurtosis": 5.046493741189493,
+    "n_trials": 48048,
+    "trial_sharpes_from": "2825 Stage 3 blends",
+    "prior_trials_named": "round 7: 8,003 (arm A), 4,754 (C1 / C2)"
+  },
+  "p0_reproduction": {
+    "d5ad8da622e7": {
+      "stored_cagr": 0.30687177181243896,
+      "p0_cagr": 0.30687180079073295,
+      "gap_pts": 2.897829398662566e-6
+    },
+    "d7b06967be4e": {
+      "stored_cagr": 0.3065924644470215,
+      "p0_cagr": 0.30659246031258003,
+      "gap_pts": -4.134441455860838e-7
+    },
+    "00d4034e807e": {
+      "stored_cagr": 0.2838599681854248,
+      "p0_cagr": 0.28386001090335156,
+      "gap_pts": 4.2717926751478785e-6
+    },
+    "02ff9a531230": {
+      "stored_cagr": 0.3140888214111328,
+      "p0_cagr": 0.31408885664868813,
+      "gap_pts": 3.5237555318090585e-6
+    }
+  },
+  "correlation_with_other_ensemble_P0": 0.8825016260636369,
+  "comparators_cagr": {
+    "Nifty200 Momentum 30 TRI": 0.16231125169887162,
+    "Nifty 50 TRI": 0.12189413845185548,
+    "Nifty Smallcap 250 TRI": 0.1528713989865722,
+    "Nifty Midcap 150 TRI": 0.17513298808608102,
+    "Nifty 500 TRI": 0.1350914210806402
+  },
+  "benchmark_cutoff": "2026-10-02",
+  "backtests_run": 1899
+}

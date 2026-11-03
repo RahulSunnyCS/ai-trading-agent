@@ -135,6 +135,19 @@ describe('job registry', () => {
   });
 });
 
+describe('live board (BL-203)', () => {
+  it('runs one process from after the pick to the close, never retrying a refused login', () => {
+    const board = JOBS.find((job) => job.id === 'rotation-live-board');
+    expect(board?.schedule.at).toBe('09:18');
+    expect(board?.steps).toEqual([
+      ['/usr/bin/caffeinate', '-i', 'uv', 'run', 'obt', 'rotation', 'live-board', 'run'],
+    ]);
+    expect(board?.noRetryExitCodes).toEqual([3]);
+    expect(board?.group).toBeUndefined();
+    expect(board?.restartIfInterruptedUntil).toBe('15:25');
+  });
+});
+
 describe('T1 parallel track', () => {
   it('records the live and the track pick in one step, so one message can carry both', () => {
     const pick = JOBS.find((job) => job.id === 'options-rotation-pick');
@@ -174,13 +187,14 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 49 jobs', () => {
+  it('has 50 jobs', () => {
     // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
     // BL-012: + check-expiry-calendar (Y4), check-blocked-dates (Y3), universe-refresh-reminder (S3)
     // BL-024: + momentum-journal-score
     // BL-001 Phase 4: + momentum-history
     // phone login: + fyers-login-reminder, fyers-login-recheck, kite-login-reminder-monday
-    expect(JOBS).toHaveLength(49);
+    // BL-203: + rotation-live-board
+    expect(JOBS).toHaveLength(50);
   });
 });
 

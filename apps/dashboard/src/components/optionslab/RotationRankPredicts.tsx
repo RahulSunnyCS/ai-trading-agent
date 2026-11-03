@@ -27,6 +27,8 @@ import {
   nearestBar,
 } from '../../lib/rotationExplainView';
 import { listName } from '../../lib/rotationListNames';
+import { RANKING_NO_SLIPPAGE, noSlippageNote } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type {
   RotationIc,
   RotationIcDay,
@@ -446,6 +448,7 @@ export function RotationRankPredicts({
   const [span, setSpan] = useState<Window>('63');
   const forward = useRotationIc(list, 'forward');
   const research = useRotationIc(list, 'research', RANGE[span]);
+  const slippage = useRotationSlippage();
 
   const forwardHas = (forward.data?.n_days ?? 0) > 0;
   const mode: View = view ?? (forwardHas ? 'forward' : 'research');
@@ -590,6 +593,7 @@ export function RotationRankPredicts({
             days, and is not read on fewer than {formatInt(ic.min_band_days)} days; consecutive days
             share look-back windows, so it is a little narrower than it should be. A research day is
             scored on what the ranking would have said then, not on a recorded entry.
+            {noSlippageNote(slippage, RANKING_NO_SLIPPAGE)}
           </p>
         </div>
       )}

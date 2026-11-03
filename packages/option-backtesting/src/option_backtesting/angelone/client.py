@@ -174,6 +174,27 @@ class AngelClient:
             flags["thin_contracts"] += 1
         return out
 
+    def bars(
+        self, exchange: str, token: str, day: date, until: str = "15:30"
+    ) -> dict[int, tuple[float, float, float, float]]:
+        """{bar start epoch: (open, high, low, close)} for one instrument and day, as Angel One
+        answers it: no open-interest call and no filled gaps (the live board, BL-203, reads the
+        session while it is still running and wants only the bars that exist)."""
+        body = {
+            "exchange": exchange,
+            "symboltoken": token,
+            "interval": "ONE_MINUTE",
+            "fromdate": f"{day.isoformat()} 09:15",
+            "todate": f"{day.isoformat()} {until}",
+        }
+        payload = self._call(CANDLE_PATH, body)
+        self._check(payload, f"{exchange}:{token} {day}")
+        out: dict[int, tuple[float, float, float, float]] = {}
+        for r in payload.get("data") or []:
+            epoch = int(datetime.fromisoformat(str(r[0])).timestamp())
+            out[epoch] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]))
+        return out
+
     def _oi(self, symbol: str, target: Target, body: dict, flags: dict) -> dict[int, float]:
         if target.kind == "index":
             return {}

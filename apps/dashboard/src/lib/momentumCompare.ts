@@ -211,10 +211,13 @@ export const SETTING_LABELS: Record<string, string> = {
   weights: 'Lookback weights',
   score: 'Ranking rule',
   voladj_skip_recent_month: 'Skip the most recent month',
+  voladj_lookbacks: 'Vol-adjusted score uses these lookbacks',
+  voladj_skip: 'Lookbacks that skip the latest 4 weeks',
   reversal_tilt: 'Reversal tilt',
   reversal_screen_pct: 'Reversal screen: top % by short-term momentum',
   broad_reversal_tilt: 'Reversal tilt (stocks in category)',
   broad_reversal_screen_pct: 'Reversal screen (stocks in category): top % by short-term momentum',
+  broad_top_sector_weight: "Top category's pick gets × the money",
   // Portfolio rule
   portfolio: 'Portfolio rule',
   entry: 'When full',

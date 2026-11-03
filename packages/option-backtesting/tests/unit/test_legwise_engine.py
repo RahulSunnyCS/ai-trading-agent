@@ -616,3 +616,98 @@ def test_reverse_on_sl_validates_and_stays_out_of_the_dump_when_unset():
         strategy([sar_leg(lots_ratio=0.7)])
     with pytest.raises(ValidationError, match="square_off: complete"):
         strategy([sell_leg(stop_loss={"percent": 21}, reverse_on_sl={})], square_off="complete")
+
+
+# --- BL-186 Amendment 1: a cheaper long, and the re-sale toggle ---------------------------------
+
+
+def cheap_chain(**extra) -> dict:
+    """The stopped 22000 CE (entry 100, SL 121 touched at 10:00) and three other CE strikes: 22100
+    at 48 (the closest to 50), 22050 at 60 (in the band, farther) and 22200 at 30 (below it). The
+    22100 spikes inside the stop bar to a 66 close, then runs to 90."""
+    stop_bar = {"10:00": (100, 125, 100, 124)}
+    return {
+        (22000.0, "CE"): rising(100, stop_bar, "10:00", 124),
+        (22100.0, "CE"): rising(48, {"10:00": (48, 70, 48, 66)}, "10:00", 90),
+        (22050.0, "CE"): bars(60),
+        (22200.0, "CE"): bars(30),
+        **extra,
+    }
+
+
+def test_strike_premium_buys_the_closest_strike_at_the_close_of_the_stop_bar():
+    result = simulate_day(strategy([sar_leg(strike_premium=50)]), day(cheap_chain()))
+    short, long = result.trades
+    assert (short.exit_price, short.exit_reason) == (121, "SL")
+    assert (long.leg_id, long.contract) == ("ce_rev", (EXP, 22100.0, "CE"))
+    # picked on its 48 before the stop bar; filled at the stop bar's close, 66; judged from 10:01
+    assert (long.entry_min, long.entry_price, long.qty) == (minute_index("10:00"), 66, LOT)
+    assert (long.exit_price, long.exit_reason) == (90, "EXIT_TIME")
+    assert result.gross == pytest.approx((100 - 121) * LOT + (90 - 66) * LOT)
+
+
+def test_strike_premium_long_has_its_own_stop_and_time_stop_counted_from_the_fill():
+    chain = cheap_chain()
+    chain[(22100.0, "CE")] = rising(
+        48, {"10:00": (48, 70, 48, 66), "10:20": (66, 66, 40, 44)}, "10:20", 44
+    )
+    [_, long] = simulate_day(strategy([sar_leg(strike_premium=50)]), day(chain)).trades
+    assert (long.exit_price, long.exit_reason, long.exit_min) == (
+        to_tick(66 * 0.7),
+        "SL",
+        minute_index("10:20"),
+    )
+    timed = simulate_day(
+        strategy([sar_leg(strike_premium=50, time_stop_minutes=30)]), day(cheap_chain())
+    ).trades[1]
+    # 30 minutes after the fill at the end of the 10:00 bar (10:01)
+    assert (timed.exit_min, timed.exit_price, timed.exit_reason) == (
+        minute_index("10:31"),
+        90,
+        "TIME",
+    )
+
+
+def test_strike_premium_with_no_strike_in_the_band_or_only_the_stopped_one_does_not_reverse():
+    only_far = {
+        (22000.0, "CE"): rising(100, {"10:00": (100, 125, 100, 124)}, "10:00", 124),
+        (22200.0, "CE"): bars(30),  # below 35
+        (22300.0, "CE"): bars(90),  # above 70
+    }
+    data = day(only_far)
+    data.chain[(EXP, 22000.0, "CE")].close[minute_index("09:19")] = 100
+    result = simulate_day(strategy([sar_leg(strike_premium=50)]), data)
+    assert [t.leg_id for t in result.trades] == ["ce"]  # RE COST armed, price never returns
+    assert any("reverse skipped, no strike priced 35-70" in n for n in result.notes)
+    # a target that makes the stopped contract itself the closest: no reversal either
+    same = simulate_day(strategy([sar_leg(strike_premium=100)]), day(cheap_chain()))
+    assert [t.leg_id for t in same.trades] == ["ce"]
+    assert any("closest strike is the stopped one" in n for n in same.notes)
+
+
+def test_resell_after_reverse_waits_for_the_long_to_close_then_re_sells_at_cost():
+    back = {
+        "10:00": (100, 125, 100, 124),
+        "10:03": (110, 110, 95, 97),  # back through the 100 entry while the long is still open
+    }
+    ce = rising(110, back, "10:03", 97)
+    ce.close[minute_index("09:19")] = 100  # entry at 100
+    data = day({(22000.0, "CE"): ce})
+    plain = simulate_day(strategy([sar_leg(time_stop_minutes=5)]), data)
+    assert [t.leg_id for t in plain.trades] == ["ce", "ce_rev"]  # a reversed leg is not re-sold
+    result = simulate_day(strategy([sar_leg(time_stop_minutes=5, resell_after_reverse=True)]), data)
+    short, long, resold = result.trades
+    assert (long.exit_reason, long.exit_min) == ("TIME", minute_index("10:05"))
+    assert (resold.leg_id, resold.position, resold.entry_price) == ("ce", "sell", 97)
+    assert resold.entry_min > long.exit_min  # not before the long closed
+    assert short.exit_reason == "SL"
+
+
+def test_amendment_fields_validate_and_stay_out_of_the_dump_at_their_defaults():
+    base = strategy([sar_leg(time_stop_minutes=30)]).model_dump()["legs"][0]["reverse_on_sl"]
+    assert "strike_premium" not in base and "resell_after_reverse" not in base
+    on = strategy([sar_leg(strike_premium=50, resell_after_reverse=True)]).model_dump()
+    rev = on["legs"][0]["reverse_on_sl"]
+    assert (rev["strike_premium"], rev["resell_after_reverse"]) == (50, True)
+    with pytest.raises(ValidationError):
+        strategy([sar_leg(strike_premium=0)])

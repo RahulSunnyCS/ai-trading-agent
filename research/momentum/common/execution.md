@@ -1,6 +1,6 @@
 # Momentum: signal delay, fill time, tracking and premium warning
 
-**Status:** Tested · **Last updated:** 2026-10-24
+**Status:** Tested · **Last updated:** 2026-11-02
 
 ## What it is
 
@@ -9,7 +9,7 @@ When a signal is traded, at what price, and what the P&L is measured on.
 | Parameter | Default (where) | Mechanism | Grade |
 |---|---|---|---|
 | `signal_delay` | 0 weeks (API range 0 to 4) | Trade N weeks after the signal | M, TODO 3.9.23 |
-| `execution` | `fri_close` (`mon_open`, `mon_10am`) | Fill time. `mon_10am` falls back to the open where no 10:00 prices exist | M, TODO 3.9.23, 3.9.18 |
+| `execution` | `fri_close` (`mon_open`, `mon_close`, `mon_10am`) | Fill time. `mon_close` (BL-176) is the close of the first session after the signal Friday, Broad and ETF; `mon_10am` falls back to the open where no 10:00 prices exist | M, TODO 3.9.23, 3.9.18 |
 | `track` | `index` in Config / API; `etf` in Live | P&L on the index or on the traded ETF | M, package README, TODO 3.9.23 |
 | `premium_warn_pct` | 1.0 (2.0 international) | The live job flags a buy whose ETF trades above NAV. Premium drag is a steady cost for momentum buying | R |
 
@@ -35,6 +35,7 @@ When a signal is traded, at what price, and what the P&L is measured on.
 | [BL-161](../../../backlog/BL-161-favourites-score-and-friday-fill.md) (written as BL-056) | each favourite at `signal_delay` 0 against its saved 1, nothing else changed | the 14 individual favourite configs (Broad), 2017-01-06 to 2026-10-02, pre-tax; registered rule: delay "matters" if the median absolute change in CAGR is above 1 pt (BL-010 E13's threshold) | Delay matters, no fixed direction | Median absolute change 3.4 pts (signed -1.1); single configs move from -7.1 (Five Sectors Monthly) to +6.9 pts (Four Sectors, Four Lookbacks); 8 of 14 are worse at delay 0 on each of CAGR, max drawdown, Martin and Sharpe. Delay 0 here fills at the same Friday close the ranking used, so it is the optimistic, untradable fill timing (it did worse on median here, so not an upper bound on results). [`bl161_summary.json`](../../../packages/momentum-backtesting/search_spaces/bl161_summary.json) |
 | BL-010 Log, 2026-10-05 | one-week delay on the default Broad run (pre-point-in-time) | 2017-01 to 2026-10 | Descriptive | 53.2% as shipped; 44.3% with a one-week delay; 40.3% with circuit locks, the tradability filter and the delay together |
 | [BL-158](../../../backlog/BL-158-momentum-monday-open-fill.md) | the followed Four Sectors group (all Fridays): delay 0 at Monday's open (C) against delay 1 at Friday's close (A); delay 0 at Friday's close (B) for reference | 28 rolling 3-year windows, 2017-01 to 2026-09 | **Killed**: fails 3 of 5 pre-registered rules ([`bl158_criteria.json`](../../../packages/momentum-backtesting/search_spaces/bl158_criteria.json)) | C beats A on CAGR and Sharpe in 5 of 28 windows (CAGR 61%, Sharpe 18%); median CAGR +1.12 pts; median drawdown 3.34 pts deeper, worst 11.26 deeper; after tax +1.28. B: median +3.0 pts, drawdown level with A |
+| [BL-176](../../../backlog/BL-176-momentum-search-on-f6-ranking.md) Stage 1 | `fill`: next Friday close (delay 1), Monday open, Monday close (new) | Broad, 2017-01 to 2026-10, F6 ranking, Stage 1 (one sampled Friday, ₹50k sleeve; 20,000 runs per arm A tag set, 10,000 B, 4,000 C1) | Descriptive, **surprise**: Monday fills lose on return as well as fall (expected: more return, deeper fall) | Median lower-bound excess, curated A: Friday −8.6, Monday open −10.2, Monday close −10.3; worst fall −44.5 / −48.2 / −48.7%; medium basket 19% / 10% / 10%; the same order in every arm. Finalist ensembles: Monday open −0.85 (curated) and −0.34 (extended) CAGR points, verdict unchanged. `search_spaces/bl176_stage1_axes.csv` |
 
 ## What we know
 

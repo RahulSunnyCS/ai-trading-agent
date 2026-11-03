@@ -300,3 +300,235 @@ def test_an_end_dated_snapshot_ignores_data_after_the_end(tmp_path, monkeypatch)
         part.to_parquet(path, index=False)
     capped = sr.data_snapshot(tmp_path, through="2022-12-31")
     assert capped["last_bar"] == "2022-12-29" and capped["last_week"] == "2022-12-30"
+
+
+# --- BL-176: round 8's settings ----------------------------------------------------------------
+
+SPACES = __import__("pathlib").Path(__file__).resolve().parents[1] / "search_spaces"
+
+
+def test_round8_spaces_load_with_the_registered_counts():
+    for name, arm, universe, light in (
+        ("round8_A_curated", "A", "turnover_rank", 15),
+        ("round8_A_extended", "A", "turnover_rank", 15),
+        ("round8_B", "B", "turnover_rank", 11),
+        ("round8_C1", "C1", "all_liquid", 15),
+    ):
+        space = sr.load_space(SPACES / f"{name}.toml")
+        assert (space.arm, sr.universe_of(space), len(space.light)) == (arm, universe, light)
+        # Seven lookback sets x three weights x three scores x the two voladj keys collapse to
+        # 133 distinct rankings: ranksum 21; voladj 7 without lookbacks (it reads no weights) and
+        # 42 with them; blend 63. As registered.
+        assert len(sr.heavy_combinations(space, 10_000, 8)) == 133
+
+
+def test_earlier_spaces_keep_their_heavy_combinations():
+    space = sr.load_space(SPACES / "round7_A.toml")
+    assert len(sr.heavy_combinations(space, 10_000, 1)) == 45
+
+
+def test_canonical_heavy_collapses_only_inert_voladj_keys():
+    assert sr.canonical_heavy(
+        {"score": "ranksum", "voladj_lookbacks": True, "voladj_skip": "none"}
+    ) == {"score": "ranksum", "voladj_lookbacks": False, "voladj_skip": "long"}
+    fixed_window = {"score": "voladj", "voladj_lookbacks": False, "voladj_skip": "none"}
+    assert sr.canonical_heavy(fixed_window)["voladj_skip"] == "long"
+    no_weights = {"score": "voladj", "voladj_lookbacks": False, "weight_scheme": "long"}
+    assert sr.canonical_heavy(no_weights)["weight_scheme"] == "equal"
+    with_weights = {"score": "voladj", "voladj_lookbacks": True, "weight_scheme": "long"}
+    assert sr.canonical_heavy(with_weights)["weight_scheme"] == "long"
+    # An earlier space that does not search voladj_lookbacks keeps every combination.
+    assert sr.canonical_heavy({"score": "voladj", "weight_scheme": "long"})["weight_scheme"] == (
+        "long"
+    )
+    live = {"score": "blend", "voladj_lookbacks": True, "voladj_skip": "none"}
+    assert sr.canonical_heavy(live) == live
+    assert sr.canonical_heavy({"score": "ranksum"}) == {"score": "ranksum"}  # absent stays absent
+
+
+def test_the_paired_arm_a_spaces_draw_the_same_points_with_different_ids():
+    curated = sr.load_space(SPACES / "round8_A_curated.toml")
+    extended = sr.load_space(SPACES / "round8_A_extended.toml")
+    one = sr.plan(curated, heavy_count=3, light_count=5, seed=8)
+    two = sr.plan(extended, heavy_count=3, light_count=5, seed=8)
+    assert [g["heavy"] for g in one] == [g["heavy"] for g in two]
+    assert [[r["light"] for r in g["runs"]] for g in one] == [
+        [r["light"] for r in g["runs"]] for g in two
+    ]
+    assert not {r["id"] for g in one for r in g["runs"]} & {r["id"] for g in two for r in g["runs"]}
+
+
+@pytest.mark.parametrize(
+    ("fill", "delay", "execution", "session"),
+    [
+        ("next_fri_close", 1, "fri_close", "last"),
+        ("mon_open", 0, "mon_open", "first"),
+        ("mon_close", 0, "mon_close", "first"),
+    ],
+)
+def test_fill_resolves_to_a_signal_delay_an_execution_and_a_circuit_session(
+    fill, delay, execution, session
+):
+    space = sr.Space("t", "A", {}, (), ())
+    kwargs = sr._split_light(space, {"fill": fill, "category_top_n": 4})
+    assert (kwargs["signal_delay"], kwargs["execution"]) == (delay, execution)
+    assert "fill" not in kwargs and sr.fill_session(kwargs) == session
+
+
+def test_split_light_keeps_a_fixed_tag_file_and_drops_space_only_keys():
+    fixed_tags = sr.Space("t", "A", {}, (), ())
+    kwargs = sr._split_light(
+        fixed_tags, {"category_tags": "extended", "universe_kind": "turnover_rank"}
+    )
+    assert kwargs["category_tags"] == "extended" and "universe_kind" not in kwargs
+    assert sr._split_light(fixed_tags, {})["category_tags"] == "curated"  # the arm's default
+    assert sr._split_light(sr.Space("t", "C1", {}, (), ()), {})["category_tags"] == "extended"
+    off = sr._split_light(sr.Space("t", "B", {}, (), ()), {"top_sector_weight": 2.0})
+    assert "top_sector_weight" not in off and off["category_mode"] == "off"
+
+
+def test_load_space_refuses_a_bad_fill_or_universe(tmp_path):
+    head = 'name = "t"\narm = "A"\n'
+    for bad in (
+        '[light]\nfill = { choice = ["mon_open", "tue_open"] }',
+        '[fixed]\nsignal_delay = 1\n[light]\nfill = { choice = ["mon_open"] }',
+        '[fixed]\nuniverse_kind = "nifty50"',
+    ):
+        with pytest.raises(ValueError):
+            _space(tmp_path, head + bad)
+    ok = _space(tmp_path, head + '[fixed]\nuniverse_kind = "turnover_rank"\nfill = "mon_close"')
+    assert sr.universe_of(ok) == "turnover_rank"
+
+
+def _wiring(monkeypatch):
+    """Stub the data and the engine; record which session each circuit mask is built for."""
+    from types import SimpleNamespace
+
+    from momentum_backtesting import api, reference_benchmarks
+    from momentum_backtesting.categories import broad
+    from momentum_backtesting.categories import circuit_exposure as cx
+
+    ranking = SimpleNamespace(
+        column_to_base_symbol={}, prices=pd.DataFrame(index=pd.to_datetime(["2020-01-03"]))
+    )
+    sessions: list[str] = []
+    calls: list[dict] = []
+    monkeypatch.setattr(api.DATA, "get", lambda: None)
+    monkeypatch.setattr(broad, "compute_universe_base", lambda **kw: object())
+    monkeypatch.setattr(broad, "finish_universe_ranking", lambda base, **kw: ranking)
+
+    def engine_stub(**kw):
+        calls.append(kw)
+        return SimpleNamespace(result=SimpleNamespace(equity=None))
+
+    # load_space validates light keys against the real function's signature.
+    engine_stub.__signature__ = __import__("inspect").signature(broad.run_broad_backtest)
+    monkeypatch.setattr(broad, "run_broad_backtest", engine_stub)
+    monkeypatch.setattr(
+        cx,
+        "lock_masks",
+        lambda *a, session="last", **k: sessions.append(session) or (f"UC-{session}", "LC"),
+    )
+    refs = pd.DataFrame(columns=[sr.RANK_BENCHMARK, *sr.BASKET_INDICES])
+    monkeypatch.setattr(reference_benchmarks, "load_references", lambda *a, **k: refs)
+    monkeypatch.setattr(sr, "run_metrics", lambda result, idle: {"cagr": 0.1})
+    monkeypatch.setattr(sr, "rank_measures", lambda equity, refs: None)
+    return sessions, calls, reference_benchmarks
+
+
+def test_the_search_worker_builds_circuit_masks_for_each_fills_session(tmp_path, monkeypatch):
+    sessions, calls, _ = _wiring(monkeypatch)
+    heavy = {"lookbacks": [26, 52], "weight_scheme": "equal", "score": "voladj"}
+    runs = [
+        {"id": f"r{i}", "light": {"fill": fill}}
+        for i, fill in enumerate(["mon_open", "next_fri_close", "mon_close", "next_fri_close"])
+    ]
+    task = {
+        "space_path": str(SPACES / "round8_A_curated.toml"),
+        "out_dir": str(tmp_path),
+        "heavy": heavy,
+        "runs": runs,
+        "snapshot": None,
+    }
+    assert sr.run_group(task)["done"] == 4
+    assert sessions == ["first", "last"]  # one mask build per session, then reused
+    assert [c["uc_locked"] for c in calls] == ["UC-first", "UC-last", "UC-first", "UC-last"]
+    assert [(c["signal_delay"], c["execution"]) for c in calls] == [
+        (0, "mon_open"),
+        (1, "fri_close"),
+        (0, "mon_close"),
+        (1, "fri_close"),
+    ]
+
+
+def test_the_search_worker_refuses_to_run_without_the_rank_references(tmp_path, monkeypatch):
+    _, _, refs_module = _wiring(monkeypatch)
+    monkeypatch.setattr(refs_module, "load_references", lambda *a, **k: pd.DataFrame())
+    task = {
+        "space_path": str(SPACES / "round8_A_curated.toml"),
+        "out_dir": str(tmp_path),
+        "heavy": {"lookbacks": [26, 52], "weight_scheme": "equal", "score": "voladj"},
+        "runs": [{"id": "r0", "light": {"fill": "mon_open"}}],
+        "snapshot": None,
+    }
+    with pytest.raises(RuntimeError, match="fetch-benchmarks"):
+        sr.run_group(task)
+
+
+def test_the_shared_runner_gives_a_monday_fill_monday_masks_not_the_callers_friday_ones(
+    monkeypatch,
+):
+    from momentum_backtesting import api, bias
+
+    sessions, calls, _ = _wiring(monkeypatch)
+    runner = bias.Runner.__new__(bias.Runner)
+    runner.api, runner.space, runner.refs, runner._tilt_cache = (
+        api,
+        sr.load_space(SPACES / "round8_A_curated.toml"),
+        {},
+        {},
+    )
+    runner.universe_kind, runner.category_tags = "turnover_rank", None
+    runner.common = {"outer_prices": None}
+    heavy = {"lookbacks": [26, 52], "weight_scheme": "equal", "score": "voladj"}
+    base = object()
+    friday_masks = ("UC-last", "LC")
+    runner.run(base, heavy, {"fill": "mon_close"}, locks=friday_masks)
+    runner.run(base, heavy, {"fill": "next_fri_close"}, locks=friday_masks)
+    assert sessions == ["first"]
+    assert [c["uc_locked"] for c in calls] == ["UC-first", "UC-last"]
+
+
+def test_a_lookback_set_the_tilt_cannot_use_runs_untilted():
+    assert sr.tilt_possible([4, 13, 26]) and sr.tilt_possible([13, 26])
+    assert not sr.tilt_possible([26, 52]) and not sr.tilt_possible([1, 4, 13])
+    light = {"stock_tilt": 0.75, "stock_tilt_screen_pct": 0.3, "category_top_n": 4}
+    out = sr.without_impossible_tilt({"lookbacks": [26, 52]}, light, {})
+    assert out == {"stock_tilt": 0.0, "stock_tilt_screen_pct": 0.0, "category_top_n": 4}
+    assert sr.without_impossible_tilt({"lookbacks": [4, 13, 26]}, light, {}) == light
+    assert sr.without_impossible_tilt({"lookbacks": [26, 52]}, {"category_top_n": 4}, {}) == {
+        "category_top_n": 4
+    }
+
+
+def test_no_planned_round8_run_asks_for_a_tilt_its_lookbacks_cannot_make():
+    space = sr.load_space(SPACES / "round8_A_curated.toml")
+    groups = sr.plan(space, heavy_count=133, light_count=20, seed=8)
+    impossible = [g for g in groups if not sr.tilt_possible(g["heavy"]["lookbacks"])]
+    assert impossible  # [26, 52] and [1, 4, 13] are both drawn
+    for group in impossible:
+        assert all(r["light"]["stock_tilt"] == 0.0 for r in group["runs"])
+        assert len(group["runs"]) == 20  # still a full group
+    tilted = [r for g in groups for r in g["runs"] if r["light"]["stock_tilt"] > 0]
+    assert tilted and all(
+        sr.tilt_possible(g["heavy"]["lookbacks"]) for g in groups for r in g["runs"] if r in tilted
+    )
+
+
+def test_voladj_skip_none_stays_the_engines_word_not_null():
+    space = sr.load_space(SPACES / "round8_A_curated.toml")
+    skip = next(d for d in space.heavy if d.name == "voladj_skip")
+    assert skip.values == ("long", "none")
+    from momentum_backtesting.engine import Config
+
+    Config(score="voladj", voladj_lookbacks=True, voladj_skip=skip.values[1])  # accepted

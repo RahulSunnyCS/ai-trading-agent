@@ -4,6 +4,7 @@
  * morning, so nothing polls fast; a person refreshes with the page's Reload.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { RotationOverview, RotationSummary } from '../types/rotation';
 import { usePolledResource } from './usePolledResource';
 
@@ -11,7 +12,9 @@ const BASE = '/api/backtest/legwise/rotation';
 const HALF_MINUTE = 30_000;
 
 export function useRotationOverview() {
-  return usePolledResource<RotationOverview>(`${BASE}/overview`, { intervalMs: HALF_MINUTE });
+  return usePolledResource<RotationOverview>(useSlippageUrl(`${BASE}/overview`), {
+    intervalMs: HALF_MINUTE,
+  });
 }
 
 /** The owner trades one lot a pick (2026-10-19): the Rotation page shows every rupee figure at
@@ -25,19 +28,22 @@ export const ROTATION_PAGE_LOTS = 1;
 export interface RotationReadOptions {
   lots?: number;
   track?: 't1';
+  /** Read the forward sessions from this day ('YYYY-MM-DD') instead of the journal's first. */
+  from?: string;
 }
 
-/** "?lots=1&track=t1", or "" for the defaults. */
+/** "?lots=1&track=t1&from=2026-10-19", or "" for the defaults. */
 export function readQuery(opts: RotationReadOptions = {}): string {
   const q = new URLSearchParams();
   if (opts.lots !== undefined) q.set('lots', String(opts.lots));
   if (opts.track) q.set('track', opts.track);
+  if (opts.from) q.set('from', opts.from);
   const text = q.toString();
   return text ? `?${text}` : '';
 }
 
 export function useRotationSummary(opts: RotationReadOptions = {}) {
-  return usePolledResource<RotationSummary>(`${BASE}/summary${readQuery(opts)}`, {
+  return usePolledResource<RotationSummary>(useSlippageUrl(`${BASE}/summary${readQuery(opts)}`), {
     intervalMs: HALF_MINUTE * 4,
   });
 }

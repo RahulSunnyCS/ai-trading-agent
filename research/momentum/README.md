@@ -26,7 +26,7 @@ All four run on the same engine (`packages/momentum-backtesting/src/momentum_bac
 before BL-001's F6 fix (members z-scored against stocks outside that week's universe), merged on
 2026-10-28 (PRs #318, #319, #322, merge commit `778ba02e`). BL-010 closed
 on 2026-10-28 without paper tracking; the search is re-run on the fixed ranking under
-[BL-176](../../backlog/BL-176-momentum-search-on-f6-ranking.md), which updates the pages it re-tests.
+[BL-176](../../backlog/BL-176-momentum-search-on-f6-ranking.md), run 2026-11-02, which added a row to each page it re-tested (universe, score, execution, cadence, caps, Broad's funnel and category tags); the other Broad figures are still pre-fix.
 
 ## Every variable page
 

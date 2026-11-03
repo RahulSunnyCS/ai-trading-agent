@@ -46,6 +46,18 @@ INERT: dict[tuple[str, str], str] = {
         "broad_respect_circuits",
     ): LOCKS_IDLE,
     (
+        "broad_monday_close",
+        "broad_respect_circuits",
+    ): LOCKS_IDLE,
+    (
+        "broad_voladj_lookbacks_top_sector",
+        "broad_respect_circuits",
+    ): LOCKS_IDLE,
+    (
+        "broad_voladj_lookbacks_skip_all",
+        "broad_respect_circuits",
+    ): LOCKS_IDLE,
+    (
         "broad_one_category_three_picks_four_weekly",
         "broad_respect_circuits",
     ): LOCKS_IDLE,
