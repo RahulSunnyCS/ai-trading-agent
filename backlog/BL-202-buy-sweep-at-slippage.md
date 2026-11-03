@@ -367,3 +367,37 @@ All six answered by the owner on 2026-11-03 (Log). Kept here as asked:
   IST, `run_grid.py --cells results/stage2/cells.json --tag stage2 --workers 2`, log
   `results/stage2.log`; `evaluate` then writes `results/stage2/stage2_table_fit.md` (fit half only:
   the regression line per base and each axis's change in the lower bound when it alone moves).
+- 2026-11-03 — **Stage 2 run and its fit-half read; finalists proposed, not yet committed**
+  (Phase 2). Run 20:21–20:43 IST on 2 workers (6,336 cells × 504 sessions, no cohort skipped a
+  day, log `results/stage2.log`). `stage2.py evaluate` (`results/stage2/stage2_table_fit.md`,
+  `stage2_axes_fit.csv`): **every one of the 31 bases under Stage 2's defaults reproduces its
+  Stage-1 ₹/lot-day and lower bound** (the regression line per base). Each axis moved alone off its
+  default, median change in the fit-half lower bound over the cohort's bases (flat = within ₹10):
+
+  | axis | N 09:17 | N 10:17 | N 14:17 | S 09:17 | S 10:17 | S 14:17 | read |
+  |---|---|---|---|---|---|---|---|
+  | re-entry once at cost | −213 | −139 | 0 | −64 | −76 | −27 | down everywhere it trades: as registered (adds trades and slippage) |
+  | stop on close | −49 | −14 | +3 | −32 | −45 | −28 | down in 5 of 6 |
+  | peak trail 150/70 | 0 | −4 | −12 | 0 | 0 | −2 | flat: it almost never triggers on these legs |
+  | gap 1 % / 2 % | −15 / −60 | +20 / +34 | +5 / +34 | +24 / −3 | −25 / −32 | +2 / +3 | mixed, cohort by cohort |
+  | valid-until 60 / 120 | −32 / −3 | +33 / −2 | — | +4 / +14 | −15 / 0 | — | mixed; at 14:17 only 60 with the 15:28 exit exists |
+  | exit 13:00 / 14:30 / 15:28 | −11 / +8 / +4 | +37 / +14 / −6 | — / — / −56 | +5 / +3 / +2 | −4 / −22 / +2 | — / — / +2 | mostly flat; 13:00 helps only NIFTY 10:17 |
+
+  Nothing on these axes turns a NIFTY cohort's lower bound positive; SENSEX 09:17's best cell goes
+  from +₹7 to +₹42 (gap 1 %, exit 13:00: ₹121 a lot-day, PF 1.40) and SENSEX 10:17's from −₹18 to
+  +₹21 (valid-until 120, exit 14:30: ₹255 a lot-day, but day-stops on 57 % of days, near the 60 %
+  gate). These are the best of 1,728 cells each; Stage 3's test half and rule (4) are what count.
+
+  **Proposed finalists** (`stage2.py finalists` → `results/stage2/finalists_proposed.json`): per
+  cohort the Stage-2 cell with the highest fit-half lower bound among those passing the registered
+  gates, tie-break Martin, then the fewest axes off their defaults (the ranking rule of Phase 0
+  applied to Stage 2; Phase 0 named no other choice rule). NIFTY 09:17: PMID · range 5 · SL 20 ·
+  target 50 · no trail · MTM 3000 · exit 15:28 · valid 120 (LB −55, ₹73). NIFTY 10:17: PLOW · range
+  5 · SL 15 · no target · no trail · MTM 1000 · exit 14:30 · gap 2 % · valid 60 (LB −122, ₹119).
+  NIFTY 14:17: PMID · range 30 · SL 50 · target 200 · trail 1/1 pt · no MTM · gap 2 % · stop on
+  close · re-entry once (LB −11, ₹112, entry 57 %). SENSEX 09:17: PMID · range 10 · SL 15 · target
+  50 · trail 1/1 pt · MTM 1000 · exit 13:00 · gap 1 % (LB +42, ₹121). SENSEX 10:17: PTOP · range
+  10 · SL 40 · target 100 · trail 1/1 pt · MTM 1000 · exit 14:30 · valid 120 (LB +21, ₹255, stops
+  57 %). SENSEX 14:17: PLOW · range 30 · SL 20 · target 200 · trail 3/1 pt · MTM 2000 · exit 15:28 ·
+  valid 60 (LB −21, ₹49). **Not committed as `finalists_<date>.json` until the owner confirms the
+  choice rule**; the test half stays unscored meanwhile. `evaluate` fix: per-cell `n_days` read.

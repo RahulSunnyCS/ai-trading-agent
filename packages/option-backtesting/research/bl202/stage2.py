@@ -253,7 +253,7 @@ def evaluate(stage2: str, committed: Path, half: str) -> str:
         labels = data["labels"]
         by_label = {label: i for i, label in enumerate(labels)}
         bases = [b for b in spec["bases"] if b["cohort"] == name]
-        lines += [f"### {name} — {half} half, {int(stats['n_days'])} days", ""]
+        lines += [f"### {name} — {half} half, {int(stats['n_days'][0])} days", ""]
         reg: list[str] = []
         axis_rows: list[list[str]] = []
         for base in bases:
@@ -364,6 +364,80 @@ def evaluate(stage2: str, committed: Path, half: str) -> str:
     return text
 
 
+def finalists(stage2: str, committed: Path, half: str = "fit") -> list[dict[str, Any]]:
+    """One proposed finalist per cohort: the Stage-2 cell with the highest fit-half lower bound
+    among those passing the registered gates (score.failed_gates), tie-break Martin, then the
+    fewest Stage-2 axes off their defaults. A cohort with no gate-passing Stage-2 cell has none.
+    Written to `results/<stage2>/finalists_proposed.json`; the owner's committed copy is
+    `finalists_<date>.json` beside this script, and only that is what `score.py --half test
+    --only` may read."""
+    score = _load_scorer()
+    spec, cells = reexpand(committed)
+    out_dir = RESULTS / stage2
+    proposed: list[dict[str, Any]] = []
+    for cohort in sorted({c["index"] + c["slot"] for c in cells}):
+        index, slot = cohort[0], cohort[1:]
+        name = cohort_of(index, slot)
+        data = score.load_cohort(out_dir, name)
+        stats = score.half_stats(data, half)
+        params_of = {
+            label_of(index, slot, c["params"]): c["params"]
+            for c in cells
+            if c["index"] == index and c["slot"] == slot
+        }
+        best: dict[str, Any] | None = None
+        n_pass = 0
+        for i, label in enumerate(data["labels"]):
+            r = {k: (float(v[i]) if k != "_means" else None) for k, v in stats.items()}
+            if score.failed_gates(r):
+                continue
+            n_pass += 1
+            params = params_of[label]
+            off = sum(params.get(a) != v for a, v in DEFAULTS.items())
+            key = (r["lb_day_inr"], score.finite(r["martin"]), -off)
+            if best is None or key > best["_key"]:
+                best = {
+                    "cohort": name,
+                    "index": index,
+                    "slot": slot,
+                    "label": label,
+                    "params": json_ready(params),
+                    "fit": {k: round(v, 4) for k, v in r.items() if k != "_means"},
+                    "stage2_axes_off_default": off,
+                    "_key": key,
+                }
+        if best is None:
+            proposed.append(
+                {
+                    "cohort": name,
+                    "index": index,
+                    "slot": slot,
+                    "label": None,
+                    "params": None,
+                    "reason": "no Stage-2 cell passes the gates on the fit half",
+                }
+            )
+            continue
+        best.pop("_key")
+        best["gate_passing_cells"] = n_pass
+        proposed.append(best)
+    path = out_dir / "finalists_proposed.json"
+    path.write_text(
+        json.dumps(
+            {
+                "stage2_tag": stage2,
+                "cells": committed.name,
+                "half": half,
+                "rule": finalists.__doc__,
+                "finalists": proposed,
+            },
+            indent=1,
+        )
+        + "\n"
+    )
+    return proposed
+
+
 def _load_scorer():
     import importlib.util
 
@@ -389,7 +463,24 @@ def main() -> None:
         "--cells", type=Path, default=None, help="the committed stage2_cells_<date>.json"
     )
     e.add_argument("--half", default="fit", choices=("fit", "all"))
+    f = sub.add_parser("finalists")
+    f.add_argument("--stage2", default="stage2")
+    f.add_argument("--cells", type=Path, default=None)
     args = parser.parse_args()
+    if args.command == "finalists":
+        committed = args.cells or sorted(HERE.glob("stage2_cells_*.json"))[-1]
+        for p in finalists(args.stage2, committed):
+            if p["label"] is None:
+                print(f"{p['cohort']}: none ({p['reason']})")
+                continue
+            fit = p["fit"]
+            print(
+                f"{p['cohort']}: {p['label'].replace(p['cohort'] + '_', '')}  LB {fit['lb_day_inr']:.0f} "
+                f"₹/day {fit['avg_day_inr']:.0f} PF {fit['profit_factor']:.2f} entry {100 * fit['entry_hit_rate']:.0f}% "
+                f"stop {100 * fit['stop_frequency']:.0f}% worst5 {fit['worst5_inr']:,.0f} "
+                f"({p['stage2_axes_off_default']} axes off default; {p['gate_passing_cells']} cells pass)"
+            )
+        return
     if args.command == "generate":
         spec = generate(args.stage1, args.top, args.date)
         counts = spec["counts"]
