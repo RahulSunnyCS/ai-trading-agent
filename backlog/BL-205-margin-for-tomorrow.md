@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money runs at 90–97% margin utilisation most days (46 Angel One shortfall warnings since June; on 2 Nov the F&O segment was ₹1.28 L short of the exchange requirement, covered only by the equity segment's cash), and nothing in the repo says before the open whether tomorrow's lots fit |
-| **Status** | In progress |
+| **Status** | Done (2026-11-04): Phases 1–4 merged (#406–#409) |
 | **Type** | feature |
 | **Area** | contract-notes / options / scheduler |
 | **Created** | 2026-11-04 |
@@ -258,3 +258,8 @@ the reading predates today's close.
   (the buffer is the cushion), margin.csv stays its fallback, and it stores the free figures it
   reads, which the next evening's block shows for Shoonya beside last evening's figure (the
   first-fortnight comparison of the owner's answer 2). Nothing switched on.
+- 2026-11-04 — Phase 4 reviewed (Shoonya held to the strict 50:50 cap at 09:05 too). All four
+  phases merged (#406, #407, #408, #409); the scheduler restarted at 01:33 for the new settings
+  field. First real block: the 16:00 message of Wed 4 Nov. Open for the owner: switch on
+  `MARGIN_CHECK` if the 09:05 check is wanted; tag any other liquid ETF or cash-like collateral in
+  `realised/cash_collateral.csv` if one is pledged.
