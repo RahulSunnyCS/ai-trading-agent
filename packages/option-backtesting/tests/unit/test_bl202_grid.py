@@ -8,7 +8,9 @@ but for that slippage.
 
 from __future__ import annotations
 
+import csv
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -303,3 +305,132 @@ def test_test_half_needs_a_finalist_list(tmp_path: Path, monkeypatch: pytest.Mon
     monkeypatch.setattr(sys, "argv", ["score.py", "--tag", "nothing", "--half", "test"])
     with pytest.raises(SystemExit, match="finalists"):
         score.main()
+
+
+# --- Stage 2: the template base and the generator ---------------------------------------------
+
+
+def _load_stage2():
+    return _load_sibling("stage2.py", "bl202_stage2")
+
+
+STAGE2_FULL = {
+    "exit": "15:28",
+    "gap": 2.0,
+    "valid": 60,
+    "stop_on": "close",
+    "reentry": ("cost", 1),
+    "peak": (150, 70),
+}
+
+
+def test_template_base_applies_only_the_stage2_axes() -> None:
+    """The Stage-2 template base keeps the rotation file's own Stage-1 values (SL 25 %, premium
+    ₹50, the 1/1-point trail unscaled on SENSEX) and applies the Stage-2 keys alone."""
+    template = grid.build(grid.Cell("S", "09:17", None))
+    s = grid.build(grid.Cell("S", "09:17", {"base": "template", **STAGE2_FULL}))
+    leg = s.legs[0]
+    assert s.exit_time == "15:28"
+    assert leg.strike.closest_premium == template.legs[0].strike.closest_premium == 50
+    assert leg.stop_loss.percent == 25 and leg.trail_sl.points == (1.0, 1.0)
+    assert leg.range_breakout.until == template.legs[0].range_breakout.until == "09:27"
+    assert leg.range_breakout.gap_percent == 2.0 and leg.range_breakout.valid_until == "10:17"
+    assert leg.stop_on == "close" and leg.reentry_on_sl.count == 1
+    assert leg.trail_peak.activate_percent == 150
+    assert s.execution.slippage_pct == grid.SLIPPAGE_PCT
+    # Under Stage 2's defaults the template base IS the template cell.
+    defaults = {"base": "template", "exit": "15:14", "gap": 0.0, "valid": None, "stop_on": "tick"}
+    same = grid.build(grid.Cell("S", "09:17", defaults))
+    assert same.model_dump(exclude={"id"}) == template.model_dump(exclude={"id"})
+    params = {"base": "template", **STAGE2_FULL}
+    row = grid.params_to_row(params)
+    assert row["p_strike"] == "" and json.loads(row["p_extra"])["base"] == "template"
+    assert grid.params_from_row(row) == {**dict.fromkeys(grid.AXES), **params}
+    assert grid.grid_sha() == "5f6d9595a141c13c"  # the template path changed no registered value
+
+
+def test_stage2_expand_counts_and_duplicates() -> None:
+    stage2 = _load_stage2()
+    cell = grid.cells("N", "09:17", with_template=False)[0]
+    morning, dropped = stage2.expand({"index": "N", "params": cell.params}, "09:17")
+    assert len(morning) == 288 and dropped == {
+        "exit_before_min_hold": 0,
+        "valid_until_collapses": 0,
+    }
+    assert sum(stage2.is_default(c["params"]) for c in morning) == 1
+    late, dropped = stage2.expand({"index": "N", "params": None}, "14:17")
+    # 13:00 and 14:30 are out; valid-until 60 / 120 past the 15:14 exit, and 120 past 15:28,
+    # would be the same strategy as none, so they are not cells either.
+    assert len(late) == 72
+    assert dropped == {"exit_before_min_hold": 144, "valid_until_collapses": 72}
+    assert all(c["params"]["base"] == "template" for c in late)
+    for c in late:
+        grid.build(grid.Cell("N", "14:17", c["params"]))  # every cell validates
+
+
+def _ranked_rows(cohort: str, index: str, slot: str, labels_ranked: list[tuple[str, bool]]):
+    """Synthetic B_ranked_fit.csv rows: (label suffix | 'template', candidate) in rank order."""
+    rows = []
+    cells = grid.cells(index, slot, with_template=False)
+    for rank, (which, candidate) in enumerate(labels_ranked, start=1):
+        params = None if which == "template" else cells[int(which)].params
+        row = {
+            "cohort": cohort,
+            "index": index,
+            "slot": slot,
+            "label": grid.Cell(index, slot, params).label,
+            **grid.params_to_row(params),
+            "candidate": str(candidate),
+            "passes": str(candidate),
+            "cohort_rank": str(rank),
+        }
+        for field in (
+            "robust",
+            "lb_day_inr",
+            "avg_day_inr",
+            "profit_factor",
+            "martin",
+            "entry_hit_rate",
+            "stop_frequency",
+            "worst5_inr",
+            "max_drawdown_inr",
+            "neighbour_median_lb_inr",
+        ):
+            row[field] = "1.0"
+        rows.append(row)
+    return rows
+
+
+def test_stage2_generate_takes_top_five_once_and_kills(tmp_path: Path, monkeypatch) -> None:
+    stage2 = _load_stage2()
+    monkeypatch.setattr(stage2, "RESULTS", tmp_path)
+    monkeypatch.setattr(stage2, "HERE", tmp_path)
+    rows = _ranked_rows(
+        "B_N_0917",
+        "N",
+        "09:17",
+        [("0", True), ("1", True), ("template", True)] + [(str(i), True) for i in range(2, 8)],
+    )
+    rows += _ranked_rows("B_N_1417", "N", "14:17", [("0", False), ("template", False)])
+    rows += _ranked_rows("B_S_1417", "S", "14:17", [("0", True), ("template", False)])
+    (tmp_path / "stage1").mkdir()
+    with (tmp_path / "stage1" / "B_ranked_fit.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    spec = stage2.generate("stage1", 5, "2026-11-03")
+    bases = [(b["cohort"], b["label"]) for b in spec["bases"]]
+    assert [c for c, _ in bases] == ["B_N_0917"] * 5 + ["B_S_1417"] * 2
+    assert sum(label.endswith("_template") for _, label in bases) == 2  # once per cohort
+    assert list(spec["killed"]) == ["B_N_1417"]
+    assert spec["counts"]["cells"] == 5 * 288 + 2 * 72
+    assert spec["counts"]["per_cohort"] == {"B_N_0917": 1440, "B_S_1417": 144}
+    committed, out = stage2.write_generated(dict(spec), "2026-11-03")
+    assert len(json.loads(out.read_text())) == spec["counts"]["cells"]
+    _, cells = stage2.reexpand(committed)
+    assert len(cells) == spec["counts"]["cells"]
+    edited = json.loads(committed.read_text())
+    edited["bases"][0]["params"]["sl"] = 50 if edited["bases"][0]["params"]["sl"] != 50 else 40
+    committed.write_text(json.dumps(edited))
+    with pytest.raises(SystemExit, match="cells_sha"):
+        stage2.reexpand(committed)

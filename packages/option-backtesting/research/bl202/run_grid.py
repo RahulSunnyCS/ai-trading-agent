@@ -344,7 +344,7 @@ def run_cohort(
             "label": cell.label,
             **grid.params_to_row(cell.params),
             "premium_inr": ""
-            if cell.params is None
+            if cell.params is None or "strike" not in cell.params
             else grid.PREMIUM[underlying][cell.params["strike"]],
             "slippage_pct": slippage,
             "lot_sizing": grid.LOT_SIZING,

@@ -255,6 +255,8 @@ def build(
     p = cell.params
     if p is None:
         return LegwiseStrategy.model_validate(strategy.model_dump())
+    if p.get("base") == TEMPLATE:
+        return apply_stage2(strategy, p)
     underlying = cell.underlying
     scale = POINT_SCALE[underlying]
     if "exit" in p:
@@ -284,6 +286,42 @@ def build(
             None if peak is None else TrailPeak(activate_percent=peak[0], exit_percent=peak[1])
         )
     strategy.overall.stop_loss_inr = p["mtm"]
+    return LegwiseStrategy.model_validate(strategy.model_dump())
+
+
+def apply_stage2(strategy: LegwiseStrategy, p: dict[str, Any]) -> LegwiseStrategy:
+    """Stage 2's template base (backlog/BL-202 Phase 0: "its template, each crossed with" the
+    Stage-2 axes): the rotation file as-is plus slippage, with ONLY the Stage-2 keys applied —
+    `{"base": "template", "exit": .., "gap": .., "valid": .., "stop_on": .., "reentry": ..,
+    "peak": ..}`. The Stage-1 axes are left as the file has them (SL 25 %, premium ₹50, an
+    unscaled 1/1-point trail on SENSEX too), which no Stage-1 cell can express. Added 2026-11-03
+    after the Stage 1 run; `registered()` and the SHA are unchanged."""
+    if "exit" in p:
+        strategy.exit_time = p["exit"]
+    valid = p.get("valid")
+    valid_until = None if valid is None else hhmm_plus(strategy.entry_time, valid)
+    reentry = p.get("reentry")
+    peak = p.get("peak")
+    for leg in strategy.legs:
+        rb = leg.range_breakout
+        if rb is None:  # pragma: no cover - every Buy rotation file has one
+            raise ValueError("template has no range_breakout")
+        if valid_until is not None and (
+            valid_until <= rb.until or valid_until >= strategy.exit_time
+        ):
+            valid_until = None
+        leg.range_breakout = RangeBreakout(
+            until=rb.until,
+            side=rb.side,
+            source=rb.source,
+            gap_percent=p.get("gap", 0.0),
+            valid_until=valid_until,
+        )
+        leg.stop_on = p.get("stop_on", "tick")
+        leg.reentry_on_sl = None if reentry is None else ReEntry(mode=reentry[0], count=reentry[1])
+        leg.trail_peak = (
+            None if peak is None else TrailPeak(activate_percent=peak[0], exit_percent=peak[1])
+        )
     return LegwiseStrategy.model_validate(strategy.model_dump())
 
 
@@ -341,7 +379,7 @@ def params_from_row(row: dict[str, str]) -> dict[str, Any] | None:
 def params_to_row(params: dict[str, Any] | None) -> dict[str, str]:
     out = {"cell": TEMPLATE if params is None else "grid"}
     for axis in AXES:
-        value = None if params is None else params[axis]
+        value = None if params is None else params.get(axis)
         out[f"p_{axis}"] = "" if value is None else json.dumps(value)
     extra = {} if params is None else {k: v for k, v in params.items() if k not in AXES}
     out["p_extra"] = json.dumps(extra, sort_keys=True) if extra else ""
