@@ -32,7 +32,7 @@ most 10% lower than with no stop.
 | BL-095 | ₹10,000 on lists A / B / C / REF (a feature, not a test) | reconstructed list-days, gross, in-sample | First looks only (below) | [BL-095][bl095] |
 | BL-131 | ₹6k, 7k, 8k, 9k, 10k, 12k on each 3-lot book: Core-298 and T1 Adaptive (one lot per pick) | 2025-01-10 → 2026-10-16 (428 days) and the last year, gross, minute replay | **No level clearly changes the result** (24 cells, one interval above zero, chance-level; Core point estimates ≥ 0, T1 at ₹6k–7k < 0); ₹9k+ never binds on Core; trims the worst day (T1 −13.8k → ~−9k), maximum drawdown mostly unchanged | [BL-131][bl131] |
 | BL-132 | Stop = the 85 / 90 / 93 / 95th percentile of each 3-lot book's day low, set on 2025-01 → 2025-10, checked on the next year | Core-298 and T1 Adaptive, gross, minute replay | Levels ₹6.5k–9.5k; in the calmer test year hit 2–10 points less often than targeted (none "holds"); protective at P90–95, no clear money effect. Whole-period (in-sample) P95 ≈ ₹8,500, P90 ≈ ₹7,000 for both books | [BL-132][bl132] |
-| BL-194 | ₹9k–16k, ₹18k, ₹20k, none on T1's Dir ×2 (4-lot) days, against ₹9k + the Dir's stop (₹12–13k) | T1 Adaptive with the expiry rule and SL150% cap, 2025-01-10 → 2026-10-30 (437 days, 219 4-lot), net of brokerage, minute replay | **No level beats ₹9k + the Dir's stop**; ₹9k −₹66 a day [−152, +8] (−₹131 [−271, −9] on the last year), ₹11k −₹47 [−91, −7] on the last year; ₹14k+ change 1 day and deepen the worst day; the rule fires on 1 % of 4-lot days | [BL-194][bl194] |
+| BL-194 | ₹9k–16k, ₹18k, ₹20k, none on T1's Dir ×2 (4-lot) days, against ₹9k + the Dir's stop (₹12–13k) | T1 Adaptive with the expiry rule and SL150% cap, 2025-01-10 → 2026-10-30 (437 days, 218 4-lot), net of brokerage, minute replay | **No level beats ₹9k + the Dir's stop**; ₹9k −₹51 a day [−129, +15] (−₹104 [−232, −1] on the last year), ₹11k −₹47 [−91, −7] on the last year; ₹14k+ change 2 days, gain only from one the rule stopped, and deepen the worst day; the rule fires on 1 % of 4-lot days | [BL-194][bl194] |
 
 ## What we know
 
@@ -46,8 +46,8 @@ most 10% lower than with no stop.
   level does nothing for five identical lots ([BL-055][bl055]).
 - On the forward lists' reconstructed history, ₹10,000 cut A and B and added to C and REF (116 days,
   gross, in-sample; [BL-095][bl095] Log). The sign depends on the mix, as BL-055 found.
-- On a 4-lot (Dir ×2) T1 day the picks' own stops cap most days near −₹13k to −₹17.6k (lowest MTM: median
-  −₹2.5k, 1 % of days below −₹13.3k), so ₹9k + the Dir's stop acts as a disaster stop; a level at the 3-lot ₹9,000
+- On a 4-lot (Dir ×2) T1 day the picks' own stops keep most days shallow (lowest MTM: median −₹2.5k, 1 % of
+  days below −₹13.3k, the worst −₹17.6k), so ₹9k + the Dir's stop acts as a disaster stop; a level at the 3-lot ₹9,000
   closes days that recover ([BL-194][bl194]).
 - All exploratory: same years already seen, owner override, no hold-out.
 

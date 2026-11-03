@@ -18,9 +18,9 @@ import numpy as np
 
 from option_backtesting.fyers.daily import data_dir
 from option_backtesting.legwise.schema import load_legwise
-from option_backtesting.rotation import daylog, expiry, pick, portfolio, sl150_cap, store
+from option_backtesting.rotation import daylog, expiry, live_lots, pick, portfolio, sl150_cap, store
 from option_backtesting.rotation.readout import block_bootstrap_mean, max_drawdown
-from option_backtesting.rotation.variants import is_dir, track_names, variant_names
+from option_backtesting.rotation.variants import track_names, variant_names
 
 HERE = Path(__file__).parent
 BLOCK, RESAMPLES, SEED, LEVEL = 5, 2000, 20261102, 0.90
@@ -30,6 +30,7 @@ NO_MTMSL_ADD = 4000.0
 LEVELS = (9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000, 18000, 20000)
 ARMS = ("rule", *(f"{v // 1000}k" for v in LEVELS), "none")
 FIRST = date(2025, 1, 10)
+LAST = date(2026, 10, 30)  # the first run's newest day; a re-run keeps the same days
 LAST_YEAR_FROM = date(2025, 11, 3)
 
 
@@ -73,16 +74,18 @@ def run(root: Path) -> tuple[dict[str, dict], list[str]]:
     rows: dict[str, dict] = {}
     skipped: list[str] = []
     for d in rec.days_available():
-        if d < FIRST:
+        if d < FIRST or d > LAST:
             continue
         a = rec.attrs[d]
         labels = (str(a["dte_n"]), str(a["dte_s"]))
-        is_expiry = "0" in labels
+        dte = {"NIFTY": labels[0], "SENSEX": labels[1]}
         i = bisect_left(rec.days, d)
         hist = pick.History(rec.days[:i], rec.cols, rec.values[:i], rec.weekday[:i], rec.band[:i],
                             rec.dte_n[:i], rec.dte_s[:i], "")  # fmt: skip
         vix = daylog._number(a.get("vix_open"))
-        for key, cols, comp, picks in pick._rank(hist, d, vix, {"dte_n": a["dte_n"], "dte_s": a["dte_s"]}):
+        for key, cols, comp, picks in pick._rank(
+            hist, d, vix, {"dte_n": a["dte_n"], "dte_s": a["dte_s"]}
+        ):
             if key != "C":
                 continue
             idx = expiry.expiring_index(a["dte_n"], a["dte_s"])
@@ -94,10 +97,13 @@ def run(root: Path) -> tuple[dict[str, dict], list[str]]:
                 capped = new is not picks
                 picks = new
             core = list(picks.core)
-            dirs = sorted((n for n in core if is_dir(n)), key=lambda n: (-float(comp[cols.index(n)]), n))
-            four = (not is_expiry) and bool(dirs)
-            doubled = dirs[0] if four else None
-            members_spec = [(m, 2 if m == doubled else 1) for m in core]
+            # live's own rule (rotation/live_lots.py): an unknown label counts as an expiry day,
+            # so nothing is doubled on a day that cannot be shown to be a normal one
+            lots = live_lots.lots_for_day(core, dte)
+            is_expiry = live_lots.summary(core, dte) == "expiry day"
+            four = live_lots.boosted(lots)
+            doubled = next((m for m, n in lots.items() if n > 1), None)
+            members_spec = list(lots.items())
             try:
                 loaded: dict = {}
                 paths = {m: portfolio.one_lot_path(root, d, m, loaded) for m in core}
@@ -118,7 +124,8 @@ def run(root: Path) -> tuple[dict[str, dict], list[str]]:
                     bd = portfolio.apply_book(members, stop_for(arm, doubled))
                     row["arms"][arm] = {"gross": bd.gross_with, "fired": bd.stop_minute is not None,
                                         "stop": stop_for(arm, doubled)}  # fmt: skip
-                row["low_nostop"] = float(min(min(bd.combined), 0.0))  # bd is the "none" arm
+                    if arm == "none":
+                        row["low_nostop"] = float(min(min(bd.combined), 0.0))
             else:
                 bd = portfolio.apply_book(members, BASE_STOP)
                 for arm in ARMS:
@@ -152,7 +159,11 @@ def summarise(rows: dict[str, dict]) -> dict:
             if a != "rule":
                 e["vs_rule"] = interval(net[a] - net["rule"])
             if a != "none":
-                diff = [(r["arms"][a]["gross"] - r["arms"]["none"]["gross"]) for r in four if r["arms"][a]["fired"]]
+                diff = [
+                    (r["arms"][a]["gross"] - r["arms"]["none"]["gross"])
+                    for r in four
+                    if r["arms"][a]["fired"]
+                ]
                 e["cost_days"] = sum(x < 0 for x in diff)
                 e["cost_sum"] = float(sum(x for x in diff if x < 0))
                 e["saved_days"] = sum(x > 0 for x in diff)
