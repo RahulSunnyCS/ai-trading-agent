@@ -10,6 +10,14 @@ const { getBroker, isSupported, loadBrokerAccounts } = require('./brokers');
 const { addDays, istNow, lastSession, sessionsBack, sessionsBetween } = require('./calendar');
 const { connect, decryptWithQpdf, hasQpdf, searchNotes } = require('./fetchMail');
 const { READERS, readLedger, readLedgerDay, writeEvent } = require('./ledger');
+const {
+  STATEMENTS,
+  fileInfo,
+  fromOk,
+  readMarginDay,
+  saveRawStatement,
+  writeStatement,
+} = require('./margin');
 const { closeWithoutNotes, failedLine, key, noteLine, openPairs } = require('./record');
 const {
   acquireLock,
@@ -41,6 +49,8 @@ const { withRetry } = require('./utils/retry');
 //   node run.js --reparse --from D --to D   read the stored notes' kept PDFs again (no mail):
 //                               after an extractor improves; a line whose figures would change is
 //                               kept and reported unless --accept-figures
+//   node run.js --margin-only [--from D --to D]   only the daily margin statements (BL-205),
+//                               e.g. a backfill: no notes, ledger e-mails or closed sessions
 
 const SESSIONS = 10;
 // Accounts read only from a day on, unless BROKER_ACCOUNTS_JSON gives the account its own
@@ -64,6 +74,7 @@ function parseArgs(argv) {
     to: null,
     reparse: false,
     acceptFigures: false,
+    marginOnly: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -74,6 +85,7 @@ function parseArgs(argv) {
     else if (a === '--to') opts.to = argv[++i];
     else if (a === '--reparse') opts.reparse = true;
     else if (a === '--accept-figures') opts.acceptFigures = true;
+    else if (a === '--margin-only') opts.marginOnly = true;
     else throw new Error(`unknown argument ${a}`);
   }
   const isDay = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -83,6 +95,7 @@ function parseArgs(argv) {
   }
   if (opts.day && opts.from) throw new Error('--day or --from/--to, not both');
   if (opts.reparse && !opts.from) throw new Error('--reparse takes --from and --to');
+  if (opts.reparse && opts.marginOnly) throw new Error('--reparse or --margin-only, not both');
   if (!Number.isInteger(opts.sessions) || opts.sessions < 1) {
     throw new Error('--sessions takes a whole number of at least 1');
   }
@@ -115,6 +128,42 @@ async function readNote(file, acc) {
     return extracted.error ? { error: extracted.error } : { extracted };
   } catch (err) {
     return { error: `read: ${err.message}` };
+  }
+}
+
+/** A cursor's bookmark on this connection: its last UID, or null when Gmail renumbered the folder. */
+function bookmarkOf(cursor, uidvalidity) {
+  return cursor.uidvalidity === uidvalidity && Number.isInteger(cursor.last_uid)
+    ? cursor.last_uid
+    : null;
+}
+
+/** The cursor after a read: the newest UID seen, never moving back. */
+function advanced(cursor, bookmark, messages, uidvalidity, at) {
+  const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
+  const last = Math.max(bookmark ?? 0, newest);
+  return { ...cursor, uidvalidity, ...(last ? { last_uid: last } : {}), checked_at: at };
+}
+
+/**
+ * Decrypt and read one margin statement (BL-205) in `scratch`; returns { parsed } or { error }.
+ * Never throws; leaves no decrypted copy behind.
+ */
+async function readStatement(content, acc, statement, scratch) {
+  const file = path.join(scratch, `statement-${crypto.randomUUID()}.pdf`);
+  const out = file.replace(/\.pdf$/, '.decrypted.pdf');
+  try {
+    fs.writeFileSync(file, content);
+    const decrypted = decryptWithQpdf(file, acc.pdfPassword, out);
+    if (decrypted.error) return { error: `decrypt: ${decrypted.error}` };
+    const { text } = await pdfParse(fs.readFileSync(decrypted.path));
+    const parsed = statement.parse(text);
+    return parsed.error ? { error: parsed.error } : { parsed };
+  } catch (err) {
+    return { error: `read: ${err.message}` };
+  } finally {
+    fs.rmSync(file, { force: true });
+    fs.rmSync(out, { force: true });
   }
 }
 
@@ -210,6 +259,7 @@ async function main(argv, deps = {}) {
     searchNotes,
     hasQpdf,
     readNote,
+    readStatement,
     lock: acquireLock,
     env: process.env,
     now: () => new Date(),
@@ -292,13 +342,10 @@ async function main(argv, deps = {}) {
       }
 
       try {
-        for (const acc of mine) {
+        for (const acc of opts.marginOnly ? [] : mine) {
           const cursorKey = `${mailbox.email}|${acc.broker}/${acc.accountId}`;
           const cursor = cursors[cursorKey] ?? {};
-          const bookmark =
-            cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
-              ? cursor.last_uid
-              : null;
+          const bookmark = bookmarkOf(cursor, conn.uidvalidity);
           let messages;
           try {
             messages = await d.searchNotes(
@@ -407,14 +454,7 @@ async function main(argv, deps = {}) {
           }
 
           if (!byDate) {
-            const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
-            const last = Math.max(bookmark ?? 0, newest);
-            cursors[cursorKey] = {
-              ...cursor,
-              uidvalidity: conn.uidvalidity,
-              ...(last ? { last_uid: last } : {}),
-              checked_at: at,
-            };
+            cursors[cursorKey] = advanced(cursor, bookmark, messages, conn.uidvalidity, at);
           }
           d.log(
             `read  ${label(acc)}: ${messages.filter((m) => isNew(m.uid)).length} new message(s)${!byDate && bookmark != null ? ` after #${bookmark}` : ` since ${addDays(window[0], -1)}`}`,
@@ -423,7 +463,7 @@ async function main(argv, deps = {}) {
 
         // The ledger e-mails (money in and out, collateral interest, margin warnings) of this
         // mailbox's brokers: one bookmark per kind of e-mail, the same reading rules as notes.
-        for (const reader of READERS) {
+        for (const reader of opts.marginOnly ? [] : READERS) {
           const accs = mine.filter((a) => a.broker === reader.broker);
           if (!accs.length) continue;
           // These e-mails do not name the account: with two of one broker in a mailbox, unknown.
@@ -433,10 +473,7 @@ async function main(argv, deps = {}) {
           // Bookmarks written before the key named the broker carry over.
           const oldKey = `${mailbox.email}|ledger/${reader.kind}`;
           const cursor = cursors[cursorKey] ?? cursors[oldKey] ?? {};
-          const bookmark =
-            cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
-              ? cursor.last_uid
-              : null;
+          const bookmark = bookmarkOf(cursor, conn.uidvalidity);
           let messages;
           try {
             messages = await d.searchNotes(conn.imap, reader.subject, {
@@ -495,15 +532,119 @@ async function main(argv, deps = {}) {
           }
           if (stored) d.log(`ledger ${who}: ${stored} ${reader.kind} event(s)`);
           if (!byDate) {
-            const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
-            const last = Math.max(bookmark ?? 0, newest);
-            cursors[cursorKey] = {
-              ...cursor,
-              uidvalidity: conn.uidvalidity,
-              ...(last ? { last_uid: last } : {}),
-              checked_at: at,
-            };
+            cursors[cursorKey] = advanced(cursor, bookmark, messages, conn.uidvalidity, at);
             delete cursors[oldKey];
+          }
+        }
+
+        // The daily margin statements (BL-205): one bookmark per broker and mailbox; the PDF's
+        // name says whose statement it is and for which day.
+        for (const statement of STATEMENTS) {
+          const accs = mine.filter((a) => a.broker === statement.broker);
+          if (!accs.length) continue;
+          const who = `${statement.broker} margin`;
+          const cursorKey = `${mailbox.email}|margin/${statement.broker}`;
+          const cursor = cursors[cursorKey] ?? {};
+          const bookmark = bookmarkOf(cursor, conn.uidvalidity);
+          let messages;
+          try {
+            messages = await d.searchNotes(conn.imap, statement.subject, {
+              sinceDay: addDays(window[0], -1),
+              beforeDay: history ? lateNotes(window[window.length - 1]) : undefined,
+              afterUid: byDate ? null : bookmark,
+              overlapSince: byDate ? undefined : addDays(window[window.length - 1], -OVERLAP_DAYS),
+            });
+          } catch (err) {
+            problems.push(`${who}: mailbox search failed: ${err.message}`);
+            continue;
+          }
+          const isNew = (uid) => byDate || bookmark == null || uid > bookmark;
+
+          /** Read and store one statement PDF: true when stored. */
+          const storeStatement = async (acc, info, att, msg) => {
+            if (opts.day && info.day !== opts.day) return false;
+            if (history && (info.day < window[0] || info.day > window[window.length - 1])) {
+              return false;
+            }
+            if (acc.from && info.day < acc.from) return false;
+            const sha256 = crypto.createHash('sha256').update(att.content).digest('hex');
+            const existing = readMarginDay(root, info.day).find(
+              (l) => l.broker === acc.broker && l.account === acc.accountId,
+            );
+            if (existing?.sha256 === sha256) return false;
+            // A copy mailed earlier than the stored one is not a revision.
+            if (existing && msg.received && existing.received > msg.received) return false;
+            const read = await d.readStatement(att.content, acc, statement, scratch);
+            const parsed = read.parsed;
+            const bad =
+              read.error ??
+              (parsed.day !== info.day
+                ? `the statement is for ${parsed.day}, its file name says ${info.day}`
+                : parsed.account && parsed.account !== acc.accountId
+                  ? 'the statement names another account than its file name'
+                  : null);
+            if (bad) {
+              if (isNew(msg.uid)) {
+                problems.push(`${label(acc)} margin ${info.day}: ${hideId(bad, acc)}`);
+              }
+              return false;
+            }
+            const line = {
+              day: info.day,
+              broker: acc.broker,
+              account: acc.accountId,
+              kind: 'margin_statement',
+              total: parsed.total,
+              segments: parsed.segments,
+              holdings: parsed.holdings,
+              file: att.filename,
+              sha256,
+              message_id: msg.messageId ?? `${msg.uid}|${msg.received}|${msg.subject}`,
+              received: msg.received,
+              read_at: at,
+            };
+            if (!opts.dryRun) {
+              saveRawStatement(root, acc.broker, acc.accountId, info.day, att.content);
+              writeStatement(root, line);
+            }
+            d.log(
+              `margin ${info.day} ${label(acc)}: available ${line.total.available}, upfront ${line.total.upfront}, funds ${line.total.funds}${existing ? ' (revised)' : ''}`,
+            );
+            return true;
+          };
+
+          let stored = 0;
+          for (const msg of messages) {
+            if (!fromOk(statement, msg.from)) {
+              if (isNew(msg.uid)) {
+                problems.push(
+                  `${who}: a "${statement.subject}" e-mail came from another sender (${/@([^>\s]+)/.exec(String(msg.from ?? ''))?.[1] ?? 'no sender'}); has the broker's sending domain changed?`,
+                );
+              }
+              continue;
+            }
+            const pdfs = msg.attachments
+              .map((att) => ({ att, info: fileInfo(statement, att.filename) }))
+              .filter((x) => x.info);
+            if (!pdfs.length && isNew(msg.uid)) {
+              problems.push(
+                `${who}: a "${statement.subject}" e-mail carries no statement PDF (${msg.received?.slice(0, 10) ?? 'no date'}); has its file name changed?`,
+              );
+            }
+            for (const { att, info } of pdfs) {
+              const acc = accs.find((a) => a.accountId === info.account);
+              if (!acc) continue; // another account of the owner's, not configured here
+              try {
+                if (await storeStatement(acc, info, att, msg)) stored += 1;
+              } catch (err) {
+                // One bad statement or file must not stop the notes, the bookmarks or the alerts.
+                problems.push(`${label(acc)} margin ${info.day}: ${hideId(err.message, acc)}`);
+              }
+            }
+          }
+          if (stored) d.log(`margin ${who}: ${stored} statement(s)`);
+          if (!byDate) {
+            cursors[cursorKey] = advanced(cursor, bookmark, messages, conn.uidvalidity, at);
           }
         }
       } finally {
@@ -511,7 +652,7 @@ async function main(argv, deps = {}) {
       }
     }
 
-    if (!opts.day) {
+    if (!opts.day && !opts.marginOnly) {
       // Sessions of accounts whose mailbox could not be read are not judged this run.
       const judged = accounts.filter((acc) => !unreachable.has(acc));
       const { lines, quiet } = closeWithoutNotes(window, judged, status, at);

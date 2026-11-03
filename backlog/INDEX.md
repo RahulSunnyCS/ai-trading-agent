@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ## Open
 
@@ -47,6 +47,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-197](BL-197-algotest-evening-setup-morning-activate.md) | AlgoTest: Setup Execution every evening (Trade monitoring on Candle Close), Activate right after the morning broker login; the evening list trades | P1 | In progress | feature | broker-login |
 | [BL-200](BL-200-momentum-rebalance-log.md) | Momentum: a rebalance log in the Trade book, one block per lot per due week (done / waiting / not done, net shares per stock, the lot's holding after), the raw fills collapsed below | P1 | In progress | feature | momentum |
 | [BL-203](BL-203-rotation-live-board.md) | Rotation live board: today's Adaptive picks (Classic and Tuned) run through the backtest on Angel One's 1-minute prices so far, every 5 minutes and on a Refresh button, a lot each or at your lots | P1 | In progress | feature | options |
+| [BL-205](BL-205-margin-for-tomorrow.md) | Margin for tomorrow: read the brokers' daily margin statements (Angel One's carries the day's peak requirement, Finvasia's the margin available), the requirement per lot by day type, and a line in the 16:00 message saying whether each account's lots for tomorrow fit, with a buffer and the 50:50 cash rule (strict on Finvasia; Angel One's miss costed as interest) | P1 | In progress | feature | contract-notes / options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |

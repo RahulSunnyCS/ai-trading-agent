@@ -6,7 +6,8 @@ Guidance for coding agents working in `packages/contract-notes`.
 
 Reads the brokers' daily contract notes from Gmail and stores each session's realised F&O
 figures (Finvasia, Angel One) and the Momentum account's equity notes (Zerodha, `kite`) under
-`TRADING_DATA_ROOT/contract-notes/` (BL-168). It runs on the laptop from the
+`TRADING_DATA_ROOT/contract-notes/` (BL-168), and the F&O accounts' daily margin statements
+(BL-205). It runs on the laptop from the
 scheduler (`apps/scheduler`: `contract-notes` every day 00:00, `contract-notes-retry` 07:30, `contract-notes-retry-1030` and `contract-notes-retry-1530`).
 It never writes the Google Sheet: the standalone `trade-analytics` repo keeps filling the
 owner's "Trade Book" sheet on its own cron until the owner archives it (TODO §2.7). The two
@@ -24,6 +25,7 @@ node run.js --day D         # read session D again by date for every account, re
 node run.js --sessions N    # a wider window, e.g. after a long trip
 node run.js --from D --to D # history by date (bookmark untouched; a stored note is never written over)
 node run.js --reparse --from D --to D [--accept-figures]   # rebuild stored lines from the kept PDFs (no mail), after an extractor improves; a line whose figures would change is kept and reported unless --accept-figures
+node run.js --margin-only [--from D --to D] [--dry-run]   # only the daily margin statements (BL-205), e.g. a backfill: no notes, ledger e-mails or closed sessions
 node reconcile.js <sheet.csv> [--import-manual] [--out DIR]   # the owner's Google Sheet (CSV export) against the notes
 bun run test                # Jest
 ```
@@ -56,6 +58,10 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 - `fetchMail.js` — `connect`, `searchNotes` (by UID after a bookmark, or by date; it gives up
   only when the mailbox sends nothing for 2 minutes, so a year of history is never cut off),
   and `decryptWithQpdf` (qpdf exit 3 = repaired with warnings, kept).
+- `margin.js` — the daily margin statements (BL-205): `STATEMENTS` (subject, sender, the PDF's
+  name, which carries the account and the trade date), `parseAngelone` / `parseFinvasia`,
+  `readMarginDay`, `writeStatement`, `saveRawStatement`. The run reads them after the ledger
+  e-mails, one bookmark per broker and mailbox (`<mailbox>|margin/<broker>`).
 - `reconcile.js` — the owner's sheet (a CSV export of its first tab) against the notes: per day
   and broker, the sheet's net (obligation − brokerage − other, columns found by header; every
   Finvasia account counts towards its one Finvasia block) within ₹1 of the notes' final net, or
@@ -74,6 +80,8 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 | `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (an F&O broker's with `fno`, the sheet's five figures; a `kite` line with `eq` — obligation, each charge, total charges, final net — and `trades`, every fill; `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
 | `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
 | `ledger/<day>.jsonl` | The brokers' ledger e-mails, one event per message (`ledger.js`): `deposit`, `withdrawal`, `collateral_interest` (amount, shortfall; on the session it is for), `margin_warning` (utilisation %, time, margin available and used), `settlement` (Finvasia's quarterly; its e-mail has no amount). `account` is null when a mailbox has two accounts of the broker (the e-mails do not name one) |
+| `margin/<day>.jsonl` | One line per account per trade date (`margin.js`): `total` (the thirteen SEBI columns: `funds`, `securities`, `pledged`, `bank_guarantee`, `other`, `available`, `upfront`, `crystallised`, `delivery`, `requirement`, `excess`, `rms_additional`, `status`), `segments` (Angel One's per segment; null for Finvasia), `holdings` (the collateral: ISIN, name, quantity, closing price, haircut %, value after haircut), the PDF's name, sha256, message id and received time. A later copy with other content replaces the line |
+| `raw/<broker>/<account>/margin/<day>.pdf` | The statement as mailed (encrypted); the decrypted copy is never kept |
 | `manual/<day>.json` | The inputs the sheet had typed by hand: `algos`, `capital_total`, `source` (`sheet`, later the page or the 15:50 reading) |
 | `reconcile/` | `sheet-vs-notes-<day>.md`, each reconciliation report |
 | `cursor.json` | Per `<mailbox>\|<broker>/<account>`: `uidvalidity`, `last_uid`, `checked_at` — how far that account's mail has been read — and `quiet_since`, the day a quiet spell began |
@@ -148,6 +156,24 @@ subject from another sender is reported once too (a broker that changed its send
 Angel One's margin warning has two wordings (Sep 2026: "as on YYYY-MM-DD HH:MM:SS"; Oct 2026 on:
 "as on DD-Mon-YYYY, HH:MM:SS AM"); both are read and the time stored as 24-hour. Finvasia's
 settlement e-mail carries no amount (`amount: null`).
+
+## Margin statements (BL-205)
+
+| Broker | E-mail | Arrives | What it gives |
+|---|---|---|---|
+| Angel One | "Margin Statement for the day", contract.notes@angeltrade.in, `CM_<client>_DDMMYYYY.pdf` | 00:00–05:00 the next day, every trading day | per segment (NSE-F&O, EQUITY, MCX-F&O, NCE-F&O, EPN-EPN early pay-in) and a Total; `upfront` is the day's peak requirement (an exchange snapshot), the figure BL-205's margin block needs |
+| Finvasia | "Client Margin Report#TID-…#", Backoffice@shoonya.com, `MARGIN_<client>_DDMMYYYY.pdf` | 17:45–20:00 the same day | the Total row only (`segments` null); `upfront` is 0 on a day traded intraday, so it gives what is available, not what was needed |
+
+Both are PAN-protected (the account's `pdfPassword`). pdf-parse runs Angel One's cells together
+(`0.000.000.00740577.82`) and wraps a number over two lines (`104343.` / `81`): every figure has
+two decimals, which splits them; its collateral rows glue the quantity to the rate, split where
+quantity × rate = value. Finvasia's Total row comes out of order over two lines around the word
+"Total" (the header's column titles say "Total" too). Every statement is checked before it is
+stored: F = A+B+C+D+E, J = G+H+I, K = F−J, M = K−L, Angel One's segments add up to its Total,
+the collateral adds up to the securities in the table, Finvasia's funds equal its "Net Funds";
+one that does not is reported (once, like a ledger e-mail) and not stored. A statement for an
+account not configured in the mailbox is skipped. A margin statement for a day in a run's
+`--from`/`--to` is read from the mail received up to five days after it.
 
 ## Zerodha (`kite`): equity, for Momentum
 
