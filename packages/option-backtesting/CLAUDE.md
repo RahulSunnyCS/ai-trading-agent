@@ -543,7 +543,12 @@ Otherwise:
   losing trade sums and charges in `series/<cohort>.aux.npz`), `score.py` (the registered gates, the
   5-day block-bootstrap lower bound with paired resamples, the plateau rule and the per-cohort tables,
   every figure from ONE half of the window split at `grid.FIT_TO`; `--half test` scores only a
-  committed `--only` finalist list). Results git-ignored under `results/<tag>/`.
+  committed `--only` finalist list), `stage2.py` (`generate`: each surviving cohort's top five plateau
+  cells plus its template, crossed with the Stage-2 axes, into the committed `stage2_cells_<date>.json`
+  and the runner's `results/stage2/cells.json`; a cohort with no candidate is killed; `evaluate`: the
+  per-base regression against Stage 1 and the per-axis fit-half table). A params dict with
+  `base: template` makes `grid.build` apply only the Stage-2 keys to the rotation file. Results
+  git-ignored under `results/<tag>/`.
 
 ## Commands
 

@@ -346,3 +346,24 @@ All six answered by the owner on 2026-11-03 (Log). Kept here as asked:
   half, which stays unscored until the finalists are committed. The owner's working read
   (2026-11-03, before SENSEX landed and unchanged after): on this evidence a Buy is not worth
   adding to the live lists; the item runs to its registered end.
+- 2026-11-03 — **Stage 2 generated and started** (Phase 2, same evening; owner: "let's add the
+  queue"). `stage2.py generate` (commit 09d0bb7a) from Stage 1's fit-half ranking: six cohorts,
+  each its top five plateau cells (candidates in `cohort_rank` order; NIFTY 10:17 has one) plus its
+  template, crossed with the registered Stage-2 axes — **31 bases, 6,336 cells**, committed as
+  `research/bl202/stage2_cells_2026-11-03.json` (bases with their Stage-1 figures, the killed
+  cohorts, counts, and the SHA `a109476ff41fe1fb` of the expanded list, which `evaluate` re-checks).
+  Per cohort: NIFTY 09:17 1,440 (its template is itself the rank-4 candidate and counts once),
+  NIFTY 10:17 576, NIFTY 14:17 432, SENSEX 09:17 / 10:17 1,728 each, SENSEX 14:17 432. Left out:
+  1,728 combinations with an exit earlier than start + 60 min (the registered exclusion) and 864
+  whose valid-until `grid.build` would collapse to none (at or past the exit: at 14:17 only
+  valid 60 with the 15:28 exit survives), which would otherwise run one strategy under two labels.
+  NIFTY and SENSEX 12:17 have no Stage 2 (killed above). **Code added, no registered value
+  changed** (grid SHA still `5f6d9595a141c13c`, held by the test): the template base — a params
+  dict `base: template` makes `grid.build` apply only the Stage-2 keys to the rotation file as-is
+  (its SL 25 %, ₹50 premium and unscaled 1/1-point trail, which no Stage-1 cell expresses) — and
+  `run_grid.py` tolerates a cell without a strike. Smoke: a base under Stage 2's defaults (exit
+  15:14, gap 0, no valid-until, tick, no re-entry, no peak trail) reproduces its Stage-1 day series
+  exactly (NIFTY 14:17 rank 1, 13 days, max day difference 0.0000). 28 tests. Run started 20:21
+  IST, `run_grid.py --cells results/stage2/cells.json --tag stage2 --workers 2`, log
+  `results/stage2.log`; `evaluate` then writes `results/stage2/stage2_table_fit.md` (fit half only:
+  the regression line per base and each axis's change in the lower bound when it alone moves).
