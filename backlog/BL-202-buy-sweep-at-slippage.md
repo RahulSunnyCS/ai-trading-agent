@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — Buy is the one Adaptive family the owner has no evidence for after slippage; the pick rule still takes it on the ranking's word |
-| **Status** | Ready (Phase 0 written and its open questions answered by the owner 2026-11-03; nothing run) |
+| **Status** | In progress (Phase 0 answered and Phase 1 built 2026-11-03; Stage 1 queued for that night; nothing scored) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-03 |
 | **Depends on** | BL-104 (the Buy grid and its archive), BL-164 (peak trail, `stop_on: close`), the `slip_store` copies (owner, 2026-10-30); CPU free of BL-176 |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.57 |
 
 ## Context
 
@@ -111,8 +111,10 @@ no pick rule: a change to the live Buy rule is a separate item that cites this o
   on the test half alone, with the fit half reported beside it. The forward journal from the day
   this item's verdict is written is the only period unseen by everyone; a finalist that goes live
   (another item) is scored there by `rotation readout`.
-- **Grid, Stage 1** (`research/bl202/grid.py`, SHA recorded here before the run, counts held by a
-  unit test). One slot per band, the band's first rotation slot: **09:17 (A), 10:17 (B), 12:17 (C),
+- **Grid, Stage 1** (`research/bl202/grid.py`, version `bl202-stage1-2026-11-03`, **SHA
+  `5f6d9595a141c13c`**, recorded 2026-11-03 before any run beyond the 5-cell smoke; the SHA
+  covers the axes, chains, slots, slippage, the split, the Stage-2 values, the exit exclusion
+  and the day-rule list; counts held by `tests/unit/test_bl202_grid.py`). One slot per band, the band's first rotation slot: **09:17 (A), 10:17 (B), 12:17 (C),
   14:17 (D)** × NIFTY, SENSEX = 8 cohorts. Axes, a full Cartesian product:
 
   | Axis | Values | BL-104 had |
@@ -233,9 +235,9 @@ no pick rule: a change to the live Buy rule is a separate item that cites this o
 - **Buy is a few big days.** A 244-session fit half holds perhaps 20 days that carry a cell; a
   lower-bound ranking and the plateau rule limit the damage, but a finalist may still be three
   days. The worst-five-days gate and the "≤ 60 % from one bucket" flag are there for that.
-- **82k cells at 1 % slippage is about 7 hours on three workers** (BL-104 ran at 1.86 ms per
-  cell-day with two). The runner is resumable; the Mac's cores are shared with the morning jobs
-  (08:00–09:30 is kept free) and any Momentum re-run.
+- **82k cells at 1 % slippage is about 3 hours on three workers** (0.5–0.8 ms per cell-day in
+  the Phase 1 probes; BL-104 ran at 1.86 ms with two). The runner is resumable; the Mac's cores
+  are shared with the morning jobs (08:00–09:30 is kept free) and any Momentum re-run.
 - **Slippage at 1 % may be harsher than real fills** on a ₹50 option (a tick is ₹0.05, the spread
   often ₹0.10–0.30 either side: about 0.2–0.6 %). That is why 0.5 % is reported beside it; but
   the pass rules are at 1 %, the owner's choice, so the verdict errs on the cautious side.
@@ -279,3 +281,14 @@ All six answered by the owner on 2026-11-03 (Log). Kept here as asked:
   (dropped from this grid) more often than any premium value; NIFTY held 75 of those 1,452
   cells, SENSEX 1,377. Adding ATM and OTM1 back as strike values would be a one-line change to
   `grid.py` before the SHA is recorded, and is the owner's call. Status Ready.
+- 2026-11-03 — **Phase 1 built** (`research/bl202/grid.py`, `run_grid.py`,
+  `tests/unit/test_bl202_grid.py`; 18 tests pass). Grid SHA **`5f6d9595a141c13c`**, 10,240 cells a
+  cohort, 81,920 in all, every cell at `slippage_pct` 1.0 inside the strategy. One rule fixed
+  before the SHA was recorded: a Stage-2 exit earlier than start + 60 min is excluded, but the
+  rotation's own 15:14 and 15:28 are always cells (else the 14:17 cohort would lose its template
+  exit). Smoke: 5 cells of B_N_0917 over 503 days at 1 % (the template −₹85 a lot-day after
+  charges, against +₹38 at 0 % in BL-104's archive: the slippage drag the item expects). Timing
+  probes: 0.5–0.8 ms per cell-day at 300–2,500 cells a cohort, 212 MB a worker at 2,500 cells,
+  so Stage 1 is about **3 hours on three workers**, not 7. Window: 2024-10-09 → 2026-11-02 (503
+  sessions each index; fit half 247). Stage 1 queued for the night of 2026-11-03 on three
+  workers; nothing scored yet.
