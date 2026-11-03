@@ -16,9 +16,10 @@ the owner built by hand on 2026-10-19 to settle the rest:
 - a buy leg is `PositionType.Buy`, a trail in points `TrailStopLossType.Points`.
 
 Anything else that is set (a target, a points stop, re-entry asap or on target, roll, a peak
-trail, a stop judged on the close, a range breakout on the index or side low or with a gap or
-valid-until, next-weekly or monthly expiry, complete square-off, `no_reentry_after`, an overall
-target, historical lot sizing) raises `Unmappable` naming the field: never dropped, never guessed.
+trail, a stop-and-reverse, a stop judged on the close, a range breakout on the index or side low
+or with a gap or valid-until, next-weekly or monthly expiry, complete square-off,
+`no_reentry_after`, an overall target, historical lot sizing) raises `Unmappable` naming the
+field: never dropped, never guessed.
 `execution.slippage_pct` and `cost_per_order_inr` are the engine's own assumptions and are not
 exported.
 
@@ -104,6 +105,8 @@ def _leg(spec: LegwiseStrategy, leg: Leg) -> dict:
         raise _refuse(where, "roll")
     if leg.trail_peak is not None:
         raise _refuse(where, "trail_peak")
+    if leg.reverse_on_sl is not None:
+        raise _refuse(where, "reverse_on_sl")
     if leg.stop_on != "tick":
         raise _refuse(where, f"stop_on: {leg.stop_on}")
 

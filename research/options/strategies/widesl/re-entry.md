@@ -1,6 +1,6 @@
 # Widesl: re-entry
 
-**Status:** Descriptive · **Last updated:** 2026-10-24
+**Status:** Descriptive · **Last updated:** 2026-10-29
 
 ## What it is
 
@@ -30,6 +30,8 @@ no re-entry) at ₹5,697 and drawdown −₹32,996.
 - COST ×1 and ×2 being identical suggests a second re-entry never triggered on those files in the holdout.
 - No NIFTY re-entry row reached a top-four list. ASAP and cut-off rows are in the raw file, not summarised
   in the item.
+
+- A different strategy in place of a pick that stopped out by 12:15 (BL-190, book level, not this strategy's own re-entry): the strongest later Widesl or Dir adds nothing on T1 (−₹9 / −₹10 a margin lot-day, 95 % intervals ±₹45) and deepens the drawdown; slightly positive on NIFTY 2022-24 ([BL-190](../../../../backlog/BL-190-replace-early-stopped-pick.md)).
 
 ## Not yet tested
 

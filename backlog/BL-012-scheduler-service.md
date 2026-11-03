@@ -3,30 +3,40 @@
 | | |
 |---|---|
 | **Priority** | P0 — missed evening runs lose expiring-option data for good (30 Sep 2026 is already gone from the lake), and several silent data-quality deadlines are approaching |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | feature |
 | **Area** | infra (cross-cutting: options, momentum, trading-data, broker-login, contract-notes, server) |
 | **Created** | 2026-10-05 |
 | **Depends on** | BL-011 Phase 1 (done). Supersedes BL-011 Phases 2–4. Related: BL-002 (hosting) |
 | **TODO.md row** | 1.10 |
 
-## Status — 2026-10-07
+## Status — 2026-10-28: Done
 
 **Built and merged:** the scheduler (registry, IST schedules, runner, SQLite history, catch-up,
-alerts, 09:00 morning summary), the launchd cut-over code, `obt daily` 16:15, the monthly backup,
+alerts, 09:00 morning summary), the launchd cut-over, `obt daily`, the monthly backup,
 per-type Telegram switches, the loopback API, the alert-only checks (lot sizes, Nifty 50
 membership, holidays/RBI/margin upkeep, stock-data baseline age and review queue, `gh` auth and
-the yearly credential reminder), the Saturday health digest, the dashboard Jobs page and the
-Telegram-alerts card in Settings, and `docs/mac-mini.md`. 19 jobs (`options-derived` added by BL-034 Phase 4); 96 scheduler tests.
+the yearly credential reminder, and from 2026-10-28 the expiry calendar and strike steps (Y4),
+`BLOCKED_DATES` (Y3) and the Total Market universe refresh (S3)), the Saturday health digest, the
+dashboard Jobs page and the Telegram-alerts card in Settings, and `docs/mac-mini.md`. Later items
+added their own jobs (BL-137–143, BL-168, BL-172): 44 jobs in the registry; 235 scheduler tests.
 
-**Owner steps still open:** `deploy/launchd/install.sh` (nothing runs through the scheduler until
-then), `sudo pmset repeat wakeorpoweron MTWRF 07:55:00`, and whether Postgres :5433 should run.
+**Installed:** `com.ai-trading-agent.scheduler` runs under launchd (`KeepAlive`), from the main
+checkout. Postgres :5433 (Homebrew) runs and holds only `broker_tokens`; no scheduler job needs it.
 
-**Remaining (not built):**
-- Regime-tag CLI + 16:30 job (D5) — needs Postgres.
-- A check that EOD retrospection ran (D6), reminders for S3 (Total Market universe refresh), Y3
-  (`BLOCKED_DATES`) and Y4 (expiry calendar), and the D4 contract-notes cutover.
-- Phase 5 beyond the guide: Docker image and home-runner mode, only if a cloud host is chosen.
+**Owner step still open:** the repeating wake. `pmset -g sched` on 2026-10-28 shows
+`wakepoweron at 8:50AM weekdays only`, the BL-143 option in `deploy/launchd/README.md`. Since
+BL-172 the Mac runs the logins at 08:00–08:10, so a sleeping Mac misses them (GitHub's backstop
+covers AlgoTest); `sudo pmset repeat wakeorpoweron MTWRF 07:55:00` wakes for them.
+
+**Not built, by decision (owner, 2026-10-28: "Reminders, drop rest"):**
+- D5 (regime-tag CLI + 16:30 job) and D6 (a check that EOD retrospection ran): **dropped.** Both
+  serve the frozen personality engine and need Postgres + TimescaleDB, which this laptop does not
+  run.
+- D4 (contract-notes cutover): **done by BL-168**: `packages/contract-notes` runs as the
+  scheduler's `contract-notes` jobs, and the `trade-analytics` sheet workflows are gone from here.
+- Phase 5's Dockerfile and home-runner mode: **not needed**: no cloud host is chosen and the
+  plan is a home Mac mini (`docs/mac-mini.md`), where the scheduler runs as it does today.
 
 ## Context
 
@@ -305,3 +315,15 @@ PR 5 the single launchd cut-over · then one PR per later job, check group and d
 - 2026-10-07 — Phase 3b: `weekly-digest` (Saturday 09:00 IST): CI on main, each job's runs over the last 7 days, last options day in the lake, last backup; green items collapse to one line. Journal-vs-backtest (BL-024) and live-money rules (BL-025) join when those ship.
 - 2026-10-07 — `docs/mac-mini.md`: the checklist for moving the scheduler to an always-on Mac mini (stay-awake and auto-login settings, tools, secrets, copying `~/TradingData`, dry runs, hard cut-over so two machines never both schedule).
 - 2026-10-07 — Built through Phase 4b and the Phase 5 guide; remaining items listed under Status. Item stays In progress until the owner installs it and the remaining checks are decided.
+- 2026-10-28 — Closed. Owner: "Reminders, drop rest". Built the last three checks, alert only:
+  `check-expiry-calendar` (Y4, trading days 17:05: every listed option expiry in the Fyers NSE/BSE
+  symbol masters must follow `expiry_calendar.csv`'s rule, holiday shifts included, the rule's next
+  three weeklies or next monthly must be listed, and the nearest expiry's strike gap must equal
+  `strike_step.csv`; years without holiday rows are not judged), `check-blocked-dates` (Y3,
+  trading days 08:35: `.env`'s list must parse as real days, must not be all past, and from 1 Dec
+  must hold next year's days; listed closed days are noted, not failed, since a weekend Budget
+  session is legitimate; unset passes) and `universe-refresh-reminder` (S3, trading days 08:40:
+  `total_market_membership.csv` and `category_membership.csv` rewritten since the last 1 Apr / 1 Oct
+  and holding this year's rows). On today's data S3 is due (files from 28–29 Sep, before the Sep
+  review) and Y3/Y4 pass. D5 and D6 dropped, D4 done by BL-168, Phase 5's container not needed (see
+  Status). Installed and running under launchd; the morning wake is 08:50, not 07:55.

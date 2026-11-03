@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the Options Lab is where the rotation is followed daily; today it is nine flat tabs that are hard to read |
-| **Status** | In progress |
+| **Status** | Done (2026-10-28): Phases 1, 1b, 1c, 2 and 3 built (#213 to #227); the leftover polish is [BL-178](BL-178-options-lab-polish-leftovers.md) |
 | **Type** | improvement |
 | **Area** | dashboard |
 | **Created** | 2026-10-14 |
@@ -174,3 +174,10 @@ None open; the owner answered them on 2026-10-14 (Log).
   Run panel instead), lot size (`execution.lot_sizing`) and the all-five-strategies byte-identical
   round-trip test. The Δ-vs-saved comparison is shown for 1-minute runs only (stored results are
   1-minute). Backtest and Save are held while a grid cell still shows a refused value.
+- 2026-10-28 — **Closed** (owner, asked in chat, 2026-10-28). Delivered: the three workspaces with Today
+  as the landing page, Strategies and baskets with favourites, the Correlation multiselect, the New strategy
+  dialog, the leg-grid Builder, Today as one page, Heatmap chips and drawer, Daily results retired, Regimes
+  and the YAML engine under Advanced (PRs #213 to #227). The polish left over moves to
+  [BL-178](BL-178-options-lab-polish-leftovers.md) (P3): Correlation and Regimes run bar plus drawer;
+  Builder arrow keys, a read-only "View as YAML", lot size (`execution.lot_sizing`) and the five-strategy
+  round-trip test; removing the unused anatomy chips and Daily-results code. Status `Done`.

@@ -42,6 +42,7 @@ from ..fyers.daily import data_dir
 from . import journal, pick, store
 from .dte import entry_basis, entry_labels, recorded_labels
 from .lists import WARMUP
+from .live_lots import dir_pick, is_expiry
 from .readout import block_bootstrap_mean, max_drawdown
 from .score import vix_band
 from .variants import is_dir, is_wide, track_names, variant_names
@@ -84,22 +85,12 @@ class LotPlanError(ValueError):
 # --- the plans (pure) ---------------------------------------------------------------------------
 
 
-def is_expiry(labels: dict[str, str]) -> bool:
-    """True when NIFTY or SENSEX expires today ({'NIFTY': '0', ...} on the weekday basis)."""
-    return str(labels.get("NIFTY")) == "0" or str(labels.get("SENSEX")) == "0"
-
-
 def w1(core: list[str], composite: dict[str, float]) -> str | None:
     """The core Widesl pick with the higher recorded composite (ties by name)."""
     wide = [n for n in core if is_wide(n)]
     if not wide:
         return None
     return min(wide, key=lambda n: (-float(composite.get(n, -math.inf)), n))
-
-
-def dir_pick(core: list[str]) -> str | None:
-    """The core Dir pick (Dir ATM or Dir ITM1), or None on a three-Widesl day."""
-    return next((n for n in core if is_dir(n)), None)
 
 
 def needs_runner_up(core: list[str], expiry: bool) -> dict[str, bool]:
@@ -171,7 +162,7 @@ def _number(text: str | None) -> float | None:
 def read_results(name: str, root: Path) -> dict[date, dict]:
     """{day: {gross, n_trades}} of one variant (Core or a track's, `store.result_path`). A row
     without a parseable gross or trade count is left out: missing, never zero."""
-    path = store.result_path(name, root)
+    path = store.read_path(store.result_path(name, root))
     if not path.exists():
         return {}
     out: dict[date, dict] = {}
@@ -221,7 +212,8 @@ class HistorySource:
         if not self.names:
             raise pick.PickError("no variant strategy files found")
         if self._matrix is None:
-            self._matrix = store.load_matrix(self.names, self.root)
+            with store.slipped(0.0):  # the entry ranked on the stored figures, never the copy
+                self._matrix = store.load_matrix(self.names, self.root)
         if basis not in self._attrs:
             self._attrs[basis] = store.read_days(self.root, basis)
         m, attrs = self._matrix, self._attrs[basis]
@@ -311,7 +303,7 @@ def _stamp(root: Path, names: list[str]) -> tuple:
     newest, count = 0, 0
     for n in names:
         try:
-            st = store.result_path(n, root).stat()
+            st = store.read_path(store.result_path(n, root)).stat()
         except OSError:
             continue
         newest = max(newest, st.st_mtime_ns)

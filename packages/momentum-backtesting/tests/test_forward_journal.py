@@ -453,3 +453,40 @@ def test_research_signals_carry_holdings_as_portfolio_weights(monkeypatch):
     result, blocked = api._research_weekly_result(favourite, pd.Timestamp("2026-10-09"))
     assert blocked is None
     assert result.signal["weights"] == {"INFY": 0.5, "TCS": 0.3, api.IDLE: 0.2}
+
+
+def test_the_headlines_final_message_carries_one_forward_score_line(weekly_env, monkeypatch):
+    """BL-024 Phase 2: one line in the existing Friday message, never a message of its own."""
+    from momentum_backtesting import forward_run
+
+    monkeypatch.setattr(
+        weekly,
+        "run_favorite_strategies",
+        lambda *a, **k: [_outcome("etf-1", "ETF Weekly Core", "etf", True, _signal())],
+    )
+    line = "Forward score, week of 02 Oct: +1.0%"
+    monkeypatch.setattr(forward_run, "headline_line", lambda: line)
+    api._execute_weekly_run(api.WeeklyRunBody(run="final", send=True))
+    assert len(weekly_env) == 1
+    assert weekly_env[0].body.endswith(line)
+
+    def broken():
+        raise RuntimeError("no prices")
+
+    weekly_env.clear()
+    monkeypatch.setattr(forward_run, "headline_line", broken)
+    api._execute_weekly_run(api.WeeklyRunBody(run="final", send=True))
+    assert "Forward score could not be computed: RuntimeError: no prices" in weekly_env[0].body
+    # A preview carries no score: a week is scored only once the week after it is recorded.
+    weekly_env.clear()
+    monkeypatch.setattr(forward_run, "headline_line", lambda: "should not appear")
+    api._execute_weekly_run(api.WeeklyRunBody(run="preview", send=True))
+    assert all("should not appear" not in n.body for n in weekly_env)
+
+
+def test_the_forward_route_answers_before_anything_is_scored():
+    client = TestClient(api.create_app())
+    body = client.get("/api/journal/forward").json()
+    assert body["score"] is None
+    assert body["fills_error"] is None, body["fills_error"]
+    assert body["fills"]["groups"] == []

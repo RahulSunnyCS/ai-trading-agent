@@ -435,6 +435,8 @@ def persisted_broad_ranking(
         pool_membership=extended(ranking.pool_membership),
         stock_pool_ranks=extended(ranking.stock_pool_ranks),
         combined_pool_ranks=extended(ranking.combined_pool_ranks),
+        # The tilt ranking reads who is a member each week, sentinel week included (BL-001 F6).
+        stock_membership=extended(ranking.stock_membership),
     )
 
 
@@ -509,7 +511,6 @@ def live_broad_ranking(
     raw_prices.loc[week] = raw_live
     raw_prices.loc[settlement_week] = raw_live
     raw_prices = raw_prices.sort_index()
-    ranks, _ = engine.compute_ranks(prices, config)
     stock_columns = list(ranking.column_to_base_symbol)
     if ranking.stock_membership is not None:
         # The ranking was built from this very universe (same membership, gate and series
@@ -529,6 +530,10 @@ def live_broad_ranking(
         membership.loc[week] = membership.iloc[-1]
     membership.loc[settlement_week] = membership.loc[week]
     membership = membership.reindex(prices.index, fill_value=False)
+    # The same cross-section as the stored ranking (BL-001 F6): this week's point-in-time members.
+    ranks, _ = engine.compute_ranks(
+        prices, config, broad.cross_section_mask(membership[stock_columns], prices)
+    )
     pool = broad._compute_pool_membership(
         ranks[stock_columns],
         membership[stock_columns],
@@ -563,5 +568,6 @@ def live_broad_ranking(
         pool_membership=pool,
         stock_pool_ranks=stock_pool,
         combined_pool_ranks=combined_pool,
+        stock_membership=membership[stock_columns],
     )
     return updated, ltp, symbols

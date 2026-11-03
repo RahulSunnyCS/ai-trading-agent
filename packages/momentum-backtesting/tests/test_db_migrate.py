@@ -431,3 +431,48 @@ def test_daily_prices_from_db_matches_the_row_by_row_read(tmp_path, monkeypatch)
     none_found = db_read.daily_prices_from_db_or_none(["NOPE"])
     assert none_found is not None and none_found.empty
     assert list(none_found.columns) == ["date", "symbol", "close", "turnover"]
+
+
+def test_latest_symbol_closes_reads_each_symbols_newest_close_up_to_the_day(tmp_path, monkeypatch):
+    """BL-142 Phase 4: the Lots panel values a lot at each holding's last stored close, by the
+    exchange symbol a broker's holdings carry; a symbol with no bars is simply absent."""
+    from momentum_backtesting import db_read
+
+    root = tmp_path / "td"
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    from trading_data import lake
+
+    with connect(root) as con:
+        con.execute(
+            "INSERT INTO instruments (instrument_key, asset_class, exchange, symbol) VALUES "
+            "('NSE:stock:CUPID', 'stock', 'NSE', 'CUPID'), "
+            "('NSE:stock:NAZARA', 'stock', 'NSE', 'NAZARA')"
+        )
+        ids = dict(con.execute("SELECT symbol, instrument_id FROM instruments").fetchall())
+    rows = [
+        ("CUPID", date(2026, 10, 22), 300.0),
+        ("CUPID", date(2026, 10, 23), 306.45),
+        ("CUPID", date(2026, 10, 26), 999.0),  # after the day asked: not read
+        ("NAZARA", date(2026, 10, 23), 402.15),
+    ]
+    path = lake.bars_1d_stock_path(root, 2026)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(
+        pa.table(
+            {
+                "instrument_id": pa.array([ids[s] for s, *_ in rows], pa.int64()),
+                "date": pa.array([d for _, d, _ in rows], pa.date32()),
+                "close": pa.array([c for *_, c in rows], pa.float64()),
+                "turnover": pa.array([1.0] * len(rows), pa.float64()),
+            }
+        ),
+        path,
+    )
+    got = db_read.latest_symbol_closes_from_db_or_none(
+        ["CUPID", "NAZARA", "NOPE"], date(2026, 10, 25)
+    )
+    assert got == {
+        "CUPID": (306.45, date(2026, 10, 23)),
+        "NAZARA": (402.15, date(2026, 10, 23)),
+    }
+    assert db_read.latest_symbol_closes_from_db_or_none([], date(2026, 10, 25)) == {}

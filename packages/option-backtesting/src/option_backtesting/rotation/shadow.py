@@ -204,7 +204,7 @@ BL081_REASON = (
 
 def _read_gross(name: str, root: Path) -> dict[str, float]:
     """{day: gross} of one variant's results file (the file also has net, costs: both read-only)."""
-    path = store.results_dir(root) / f"{name}.csv"
+    path = store.read_path(store.results_dir(root) / f"{name}.csv")
     if not path.exists():
         return {}
     out: dict[str, float] = {}

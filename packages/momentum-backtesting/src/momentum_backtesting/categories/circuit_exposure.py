@@ -144,7 +144,7 @@ def lock_masks(
 def holding_periods(result: Result, column_to_base: dict[str, str]) -> pd.DataFrame:
     """One row per unbroken holding of a stock: base symbol, first week held (buy day), the week it
     was sold (the Friday after the last held week), and the largest portfolio share it reached."""
-    weights = result.weights.drop(columns=[IDLE], errors="ignore")
+    weights = result.weights.drop(columns=[IDLE], errors="ignore").sort_index()
     weeks = list(weights.index)
     rows: list[dict] = []
     for column in weights.columns:
@@ -407,7 +407,7 @@ def circuit_exposure(
             "lc_trapped_sold_during": 0,
         }
 
-    last_day = pd.Timestamp(result.weights.index[-1]) + pd.Timedelta(days=7)
+    last_day = pd.Timestamp(result.weights.index.max()) + pd.Timedelta(days=7)
     first_day = pd.Timestamp(periods["buy"].min()) - pd.Timedelta(days=10)
     symbols = sorted(periods["symbol"].unique())
     with stock_bars(root) as con:

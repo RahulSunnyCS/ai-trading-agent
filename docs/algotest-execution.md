@@ -216,7 +216,8 @@ clicks: it makes that call for the `_id` it recorded at upload, then lists again
 `GET /strategies` without the CSRF header answers 401 "Missing CSRF token".
 
 **Live (`/live`, "Algo Trade").** Header: "Broker Login n/m", "n/6 Strategy Deployed" (6 at once on the
-owner's plan), Auto Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
+owner's plan; **gone by 2026-11-02**, when the page showed only "Deployed Strategies" and no count), Auto
+Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
 ("Strategies can only be deployed during 08:00 IST to 15:40 IST"). Two sections:
 
 - **Activation:** one row per saved strategy: status ("Setup Pending" → "Ready to deploy"), "n Deployed", the
@@ -226,7 +227,9 @@ owner's plan), Auto Activation, Auto restart paused executions. Deploys are allo
   Open Pos: n · RUNNING · ₹ MTM · <broker - account>", with Switch to manual / Square Off / View Trades; the
   section has "Switch all to manual" and "Square off all". Filters: Running, Paused, Sq Off, Error, Manual.
 
-**Setup Execution** opens a sheet "Edit execution for <name>":
+**Setup Execution** opens a sheet "Edit execution for <name>" (a narrow window) or "Select execution for
+<name>" (1440 px, 2026-11-02). It can be set up and saved outside the deploy hours (BL-197 does it each
+evening; the row turns "Ready to deploy"):
 
 | Field | Seen (default) |
 |---|---|
@@ -234,9 +237,9 @@ owner's plan), Auto Activation, Auto restart paused executions. Deploys are allo
 | Notice | for MIS orders the exit time must be strictly before 15:24; the rotation exits at 15:28, so NRML |
 | Quantity Multiplier | 1 |
 | Auto Sq Off on Margin Error | on |
-| Trade monitoring | on LTP / **on Candle Close** |
+| Trade monitoring | on LTP / **on Candle Close**: Candle Close checks the overall SL / target / TSL and lock-and-trail at each minute's 59th second, as the backtest does, and leaves leg-wise SL / target / TSL on LTP (AlgoTest's docs, `execution-settings/trade-monitoring`); BL-197 sets it on every pick |
 | Strategy execution time | the strategy's entry time (11:37:00 for the owner's Widesl file) |
-| Per leg (Leg 1, Leg 2, "Copy To Legs") | NRML/MIS **NRML**; Tgt/SL ref price Traded/**Trigger**; delay entry 0 s; entry and exit order type **Limit**/MPP; buffer type **Points**/%; trigger buffer 0; limit buffer 3; monitoring **Continuous**/Delayed, frequency 5 s |
+| Per leg (Leg 1, Leg 2, "Copy To Legs") | NRML/MIS **NRML**; Tgt/SL ref price Traded/**Trigger**; delay entry 0 s; entry and exit order type **Limit**/MPP; buffer type **Points**/%; trigger buffer 0; limit buffer 3; "Convert to Market After" 40 s (entry) / 1 s (exit) (seen 2026-11-02); monitoring **Continuous**/Delayed, frequency 5 s |
 | Execution days | Weekdays / DTE; M T W Th F Sa Su, **none ticked** |
 | Buttons | Cancel · "Setup Execution Settings" |
 
@@ -257,8 +260,17 @@ with the broker's alias), its figure a `p.tabular-nums` coloured `text-green-500
 when < 0 (a loading-dots element while it computes). Read live 2026-10-20 16:13 IST: `₹ 0`, green. The header also shows "Available Margin" and "Margin Blocked (approx)".
 
 The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia) left the days unticked, and the
-row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"
-asks (broker or account choice, a confirmation), and what stopping a deploy before its entry looks like.
+row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what stopping a
+deploy before its entry looks like.
+
+**What "Activate" opens (BL-197, the owner's session, 2026-11-03 08:2x, two brokers logged in).** A bottom sheet
+"Select Broker for <name>": "Edit Entry/Exit Timings" (left alone), a select-all checkbox with "n / m selected",
+then one row per broker connected to AlgoTest ("Angel One - Rahul", "Finvasia - Shiny"), each with a read-only
+checkbox (the row takes the click) and a LOGGED IN badge, and Cancel / Activate. The button reads "Activate" with
+nothing ticked and "Activate on n Brokers" once n are. Pressing it closed the sheet with nothing further to confirm:
+one RUNNING card per broker ("T1 · N_p80_0947 (1)", "entry in hh:mm:ss", "Cancel Deployment"), and the row's
+"n Deployed" up by the number of brokers. The deployer ticks exactly the brokers whose AlgoTest row in
+Settings › Automation uploads the list, checks the button names that many, and reads the count back.
 
 **Square off, stop, list (BL-143 Phase 4; read from the /live page's public JavaScript, 2026-10-20).** The page's
 chunks (`algotest.in/_next/static/chunks/*.js`, fetched with curl, no login) hold the `/execution` client the
@@ -320,7 +332,7 @@ Local setup needs **four** toolchains: `bun`, `node@20`, `qpdf`
 
 The sheet cutover this section used to describe is retired. `packages/contract-notes` now
 stores the notes under `TRADING_DATA_ROOT/contract-notes/`, run by the laptop scheduler
-(`contract-notes` 00:00, `contract-notes-retry` 07:30), and **never writes the Google Sheet**.
+(`contract-notes` 00:00, retries at 07:30, 10:30 and 15:30), and **never writes the Google Sheet**.
 `trade-analytics` keeps its own cron and keeps filling the sheet, unchanged. Both read the same
 mailboxes read-only, so there is nothing to coordinate and nothing to roll back. This repo's
 Actions workflows for the sheet (`contract-notes-daily.yml`, `contract-notes-row-tracker.yml`)

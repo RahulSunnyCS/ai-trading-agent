@@ -6,6 +6,8 @@ import {
   allLoggedIn,
   changedSecrets,
   fallback,
+  kiteDue,
+  kiteResult,
   loginEnv,
   secretsReminder,
 } from './local-login-plan.js';
@@ -122,5 +124,27 @@ describe('the GitHub secrets reminder (BL-172 Phase 3)', () => {
     const text = secretsReminder(['SHOONYA_PASSWORD']);
     assert.match(text, /gh secret set SHOONYA_PASSWORD/);
     assert.match(text, /grep '\^SHOONYA_PASSWORD=' \.env/);
+  });
+});
+
+describe("Kite's unattended login (owner, 2026-10-28)", () => {
+  it('runs on Fridays and Mondays, only with KITE_AUTO_LOGIN=on', () => {
+    const on = { KITE_AUTO_LOGIN: 'on' };
+    assert.equal(kiteDue('2026-10-30', on), true); // a Friday
+    assert.equal(kiteDue('2026-11-02', on), true); // a Monday
+    assert.equal(kiteDue('2026-10-28', on), false); // a Wednesday
+    assert.equal(kiteDue('2026-10-30', {}), false);
+    assert.equal(kiteDue('2026-10-30', { KITE_AUTO_LOGIN: 'off' }), false);
+  });
+
+  it("reads mbt's outcome, and nothing unreadable passes for one", () => {
+    assert.deepEqual(kiteResult('{"status":"OK","detail":"Kite connected.","name":"Kite"}'), {
+      name: 'Kite',
+      status: 'OK',
+      detail: 'Kite connected.',
+    });
+    assert.equal(kiteResult(null), null);
+    assert.equal(kiteResult('not json'), null);
+    assert.equal(kiteResult('{"status":"MAYBE"}'), null);
   });
 });

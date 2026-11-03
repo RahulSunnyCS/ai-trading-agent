@@ -6,6 +6,7 @@ import { type ReactNode, createContext, useContext, useMemo, useState } from 're
 import { type LiquidityPreviewParams, useLiquidityPreview } from '../../hooks/useLiquidityPreview';
 import { cn } from '../../lib/cn';
 import { formatInr, formatInt, formatNumber } from '../../lib/format';
+import { phaseRule } from '../../lib/momentumCadence';
 import type { MomentumSettingsSection } from '../../lib/momentumConfig';
 import {
   BROAD_UNIVERSES,
@@ -1456,7 +1457,7 @@ export function MomentumSettingsPanel({
             !bool('split_fridays') ? (
               <Field
                 label="Which Fridays"
-                help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
+                help={`Trading weeks are fixed on the calendar: weeks are counted from Friday 1 Jan 2016, and phase k trades the Fridays whose count, divided by ${num('rebalance_every', 1)}, leaves k − 1. ${phaseRule(num('rebalance_every', 1), num('rebalance_offset', 0))} Each phase is a different set of Fridays, so comparing them shows how much of a result is down to lucky timing.`}
               >
                 <Select
                   className="mt-1"

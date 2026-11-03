@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import basket
+from ..rotation import basket, store
 
 router = APIRouter(prefix="/legwise/rotation/basket")
 
@@ -64,7 +64,7 @@ def get_basket(
     from ..fyers.daily import data_dir
 
     root = data_dir()
-    key = (root, list_, d, window, start, end)
+    key = (root, list_, d, window, start, end, store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)

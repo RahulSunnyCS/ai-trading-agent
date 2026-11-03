@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the T1 picks with real money and asked for the deploy to be automatic (2026-10-19); a wrong or duplicate deploy costs money, so it is planned with its own gates |
-| **Status** | In progress: built ready but switched off; the owner decides later whether to use it |
+| **Status** | Done (2026-10-28): built, unused. The deployer and the 15:35 check merged (#264); Automation settings v6 (23 Oct) turned AlgoTest off, T1 and Core trade through Quantiply; still gated by `ALGOTEST_DEPLOY`; Phases 3–4 not run |
 | **Type** | feature |
 | **Area** | broker-login (AlgoTest automation), options (picks), infra (scheduler) |
 | **Created** | 2026-10-19 |
@@ -258,3 +258,9 @@ Claude.
   "Edit execution for" sheet, not the whole page (page toggles like "Auto restart paused executions" no longer
   count); `parseLive` accepts rows without the ticker line; the entry time is checked again, to the second, just
   before each Activate (at least 30 s left, else TOO LATE); locators in `src/selectors.ts` (`livePage`).
+- 2026-10-28 — **Closed as built, unused** (owner, asked in chat, 2026-10-28). Delivered: Phases 0–2 (terms
+  read, AlgoTest's verbal OK, the /live and Setup Execution discovery, `src/strategy-deploy.ts` +
+  `deploy-plan.ts`, jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35), merged in #264.
+  Automation settings v6 (23 Oct, BL-140) turned AlgoTest's upload and login off; T1 and Core trade through
+  Quantiply (BL-139). The code stays and is still gated by `ALGOTEST_DEPLOY`. **Not run:** Phase 3 (the
+  unattended dry run on /live) and Phase 4 (live). Status `Done`.

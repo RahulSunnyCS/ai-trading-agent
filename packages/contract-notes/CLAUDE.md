@@ -7,7 +7,7 @@ Guidance for coding agents working in `packages/contract-notes`.
 Reads the brokers' daily contract notes from Gmail and stores each session's realised F&O
 figures (Finvasia, Angel One) and the Momentum account's equity notes (Zerodha, `kite`) under
 `TRADING_DATA_ROOT/contract-notes/` (BL-168). It runs on the laptop from the
-scheduler (`apps/scheduler`: `contract-notes` every day 00:00, `contract-notes-retry` 07:30).
+scheduler (`apps/scheduler`: `contract-notes` every day 00:00, `contract-notes-retry` 07:30, `contract-notes-retry-1030` and `contract-notes-retry-1530`).
 It never writes the Google Sheet: the standalone `trade-analytics` repo keeps filling the
 owner's "Trade Book" sheet on its own cron until the owner archives it (TODO §2.7). The two
 read the same mailboxes and never touch each other's output.

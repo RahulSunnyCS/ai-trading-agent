@@ -15,7 +15,9 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | MTM (overall) SL | [T](strategies/widesl/mtm-sl.md) | [T](strategies/directional/mtm-sl.md) | [D](strategies/buy-breakout/mtm-sl.md) |
 | Trail | [D](strategies/widesl/trail.md) | [D](strategies/directional/trail.md) | [D](strategies/buy-breakout/trail.md) |
 | Re-entry | [D](strategies/widesl/re-entry.md) | [D](strategies/directional/re-entry.md) | [D](strategies/buy-breakout/re-entry.md) |
-| Exit time | [D](strategies/widesl/exit-time.md) | [T](strategies/directional/exit-time.md) | [D](strategies/buy-breakout/exit-time.md) |
+| Stop-and-reverse | — | [T](strategies/directional/stop-and-reverse.md) | — |
+| Exit time | [T](strategies/widesl/exit-time.md) | [T](strategies/directional/exit-time.md) | [D](strategies/buy-breakout/exit-time.md) |
+| Session split (two sets a day) | [T](strategies/widesl/session-split.md) | [T](strategies/directional/session-split.md) | — |
 | Days to expiry | [D](strategies/widesl/days-to-expiry.md) | [D](strategies/directional/days-to-expiry.md) | [D](strategies/buy-breakout/days-to-expiry.md) |
 | VIX | [T](strategies/widesl/vix.md) | [T](strategies/directional/vix.md) | [D](strategies/buy-breakout/vix.md) |
 | Weekday | [D](strategies/widesl/weekday.md) | [D](strategies/directional/weekday.md) | [D](strategies/buy-breakout/weekday.md) |
@@ -38,15 +40,16 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [Charges](common/charges.md) | Descriptive | BL-063, BL-096–099 |
 | [Rotation ranking (DRB, lists A/B/C/REF)](common/rotation-ranking.md) | Tested | BL-054, 057, 062, 064–075, 080, 100 |
 | [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083, BL-022 |
-| [Correlation and diverse baskets](common/correlation.md) | Descriptive | BL-090 |
+| [Correlation and diverse baskets](common/correlation.md) | Tested | BL-090 |
 | [Previous-session state (VRP, skew, put/call ratio)](common/previous-session-state.md) | Descriptive (screen, no lead) | BL-159 reads 1–3 |
+| [Two-session sweep (half-day sets)](common/two-session-sweep.md) | Tested (killed) | BL-185 |
 
 ## Other strategies
 
 | Strategy | Status | Item |
 |---|---|---|
 | [Long straddle hedge](strategies/long-straddle-hedge/README.md) | Tested (killed) | BL-101, BL-124 |
-| [Straddle premium exhaustion](strategies/straddle-exhaustion/README.md) | Tested on the learning periods; P1 unread | BL-091, BL-123 |
+| [Straddle premium exhaustion](strategies/straddle-exhaustion/README.md) | Tested on the learning periods (closed: a lead, not a result); P1 unread | BL-091, BL-123 |
 | [ATM Widesl, SENSEX](strategies/atm-widesl-sensex/README.md) | Descriptive (side look, no item) | — |
 | [Five-minute breakout, hold, 1-minute entry (index)](strategies/breakout/README.md) | Tested (killed) | BL-152, BL-153 |
 | [Gap-and-go band → Williams back-up (NIFTY, ITM buys)](strategies/gap-and-go/README.md) | Tested (killed) | BL-164, BL-165 |

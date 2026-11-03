@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — helps the friends read Momentum this month; not on the validation path |
-| **Status** | In progress (Phases 1–5 built 2026-10-07; owner review of the wording outstanding) |
+| **Status** | Done (2026-10-28): Phases 1–5 merged (#97); the upkeep rule in `apps/dashboard/CLAUDE.md` keeps the pages in step with their screens |
 | **Type** | feature |
 | **Area** | dashboard |
 | **Created** | 2026-10-07 |
@@ -87,6 +87,11 @@ the package READMEs, `apps/scheduler/CLAUDE.md`.
 Answered 2026-10-07 (below).
 
 ## Log
+
+- 2026-10-28 — **Closed** (owner, asked in chat, 2026-10-28). Delivered: the Guide (chapters, glossary,
+  search, hover terms, "How this works" in the top bar) in #97, grown since with every new screen. The upkeep
+  rule (Phase 5, `apps/dashboard/CLAUDE.md`: a screen change updates its page in the same commit) keeps it
+  current; no separate wording review was recorded. Status `Done`.
 
 - 2026-10-07 — Phases 1–5 built on branch `feat/bl-041-in-app-guide`: Guide tab (Help group, last,
   cannot be hidden), `/guide/<chapter>/<page>` with `/help` and `/docs` aliases, 5 chapters /

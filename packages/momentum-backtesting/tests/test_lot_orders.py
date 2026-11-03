@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 
 import pytest
+import trading_data.db as tdb
 from fastapi.testclient import TestClient
 
 from momentum_backtesting import api, holdings_store, lots, notify, runs_store, this_week
@@ -518,6 +519,157 @@ def test_a_preview_for_a_favourite_writes_nothing_and_leaves_the_friday_run_unch
     with open_catalog() as con:
         assert lots.pending(con, OWNER, gid) == ids[1]
         assert len(holdings_store.orders_for(con, OWNER, "2026-10-23")) == 1
+
+
+def test_the_lots_panel_shows_the_ledger_its_calendars_and_kite_beyond_it_without_writing(
+    client, monkeypatch
+):
+    """BL-142 Phase 4: GET /api/lots is the ledger exactly as `mbt lots show` gives it, valued at
+    the last close, with each lot's last and next rebalance, the last orders' word for each lot,
+    and Monday's buys (in Kite, not yet booked) beside what Friday's orders told the lot to buy.
+    It reads Kite, a quote or the ledger's writer never, and stores nothing."""
+    from datetime import date
+
+    from momentum_backtesting import holdings_sync
+
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+    _friday(monkeypatch, 2026, 10, 23)
+    _snapshot(LOT1, 4509.3)
+    api._compute_orders("scheduled")  # Friday: Lot 2 is new and told what to buy
+    # Wednesday: Kite holds Monday's buys: one GRWRHITECH more than the orders said, and no
+    # ACMESOLAR (the owner skipped it).
+    _friday(monkeypatch, 2026, 10, 28)
+    bought = {"CUPID": 36.0, "GRWRHITECH": 2.0, "NAZARA": 30.0}
+    held = {r["symbol"]: r["quantity"] for r in LOT1}
+    for symbol, shares in bought.items():
+        held[symbol] = held.get(symbol, 0.0) + shares
+    _snapshot([{"symbol": s, "quantity": q} for s, q in held.items()] + OUTSIDE, 500.0)
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the Lots panel must not read Kite or ask for a quote")
+
+    monkeypatch.setattr(holdings_sync, "sync", refuse)
+    monkeypatch.setattr(api, "_order_prices", refuse)
+    monkeypatch.setattr(
+        api.db_read,
+        "latest_symbol_closes_from_db_or_none",
+        lambda symbols, as_of: {s: (PRICES[s], date(2026, 10, 23)) for s in symbols if s in PRICES},
+    )
+    before = _everything_stored()
+    modes: list[bool] = []
+    real_connect = tdb.connect
+
+    def recording(*args, read_only=False, **kwargs):
+        modes.append(read_only)
+        return real_connect(*args, read_only=read_only, **kwargs)
+
+    monkeypatch.setattr(tdb, "connect", recording)
+    got = client.get("/api/lots")
+    monkeypatch.setattr(tdb, "connect", real_connect)
+    assert got.status_code == 200
+    view = got.json()
+    assert modes and all(modes), modes  # every catalog open was read-only
+    assert _everything_stored() == before
+
+    status = api.lots_status()  # what `mbt lots show` prints
+    assert view["available"] is True and view["week"] == "2026-10-30"
+    assert [lot["label"] for lot in view["lots"]] == list(status["lots"])
+    for lot in view["lots"]:
+        assert {r["symbol"]: r["shares"] for r in lot["holds"]} == status["lots"][lot["label"]][
+            "holds"
+        ]
+    lot1, lot2 = view["lots"]
+    assert lot1["id"] == ids[0] and lot1["value"] == round(
+        sum(PRICES[r["symbol"]] * r["quantity"] for r in LOT1), 2
+    )
+    assert (lot1["last"], lot1["next"], lot1["due"]) == ("2026-10-16", "2026-11-13", False)
+    assert lot1["last_orders"] == {"status": "not due", "budget": None, "next": "2026-11-13"}
+    assert lot2["holds"] == [] and lot2["pending"] is True and lot2["funded"] is False
+    assert (lot2["last"], lot2["next"], lot2["due"]) == ("2026-10-23", "2026-11-20", False)
+    assert lot2["last_orders"]["status"] == "new"
+    assert view["pending"] == "Lot 2" and view["snapshot"]["cash"] == 500.0
+    assert view["snapshot"]["today"] is True
+    assert view["last_orders"]["week"] == "2026-10-23"
+    assert view["close_days"] == ["2026-10-23", "2026-10-23"] and view["unpriced"] == 0
+    beyond = {row["symbol"]: row for row in view["not_in_a_lot"]}
+    # Everything Kite holds beyond the lots, as `mbt lots show` lists it: 20MICRONS (not a name
+    # of this strategy) too; LIQUIDBEES is options margin and never listed. ACMESOLAR, which the
+    # orders said to buy and Kite does not hold, is listed with no difference.
+    assert {s: row["delta"] for s, row in beyond.items() if row["delta"]} == status["not_in_a_lot"]
+    assert status["not_in_a_lot"] == {**bought, "20MICRONS": 50.0}
+    assert beyond["ACMESOLAR"]["delta"] == 0 and beyond["ACMESOLAR"]["value"] == 0
+    assert {s: row["planned"] for s, row in beyond.items()} == {
+        "20MICRONS": [],
+        "ACMESOLAR": [{"lot": "Lot 2", "shares": 30.0}],
+        "CUPID": [{"lot": "Lot 2", "shares": 36.0}],
+        "GRWRHITECH": [{"lot": "Lot 2", "shares": 1.0}],
+        "NAZARA": [{"lot": "Lot 2", "shares": 30.0}],
+    }
+    assert beyond["CUPID"]["value"] == 36 * PRICES["CUPID"]
+    assert beyond["20MICRONS"]["value"] is None  # no stored close: unpriced, never a zero
+    assert (
+        view["not_in_a_lot_value"] == round(sum(PRICES[s] * q for s, q in bought.items()), 2)
+        and view["not_in_a_lot_unpriced"] == 1
+    )
+
+
+def test_the_lots_panel_says_why_when_the_headline_is_not_followed_lot_by_lot(client, monkeypatch):
+    view = client.get("/api/lots").json()
+    assert view["available"] is False and view["reason"]  # no catalog, no headline
+    _setup(client, monkeypatch, 1, "2026-10-23")  # a group headline, but no lot recorded yet
+    view = client.get("/api/lots").json()
+    assert view["available"] is False and "mbt lots seed" in view["reason"]
+
+
+def test_the_lots_panel_keeps_the_friday_orders_when_orders_are_made_by_hand_midweek(
+    client, monkeypatch
+):
+    """A run by hand on a Wednesday plans the coming Friday but never moves the pending lot, so
+    the panel keeps the last orders made on their own Friday: the per-lot lines and the pending
+    lot then come from the same run."""
+    from datetime import date
+
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+    _friday(monkeypatch, 2026, 10, 23)
+    _snapshot(LOT1, 4509.3)
+    api._compute_orders("scheduled")
+    _friday(monkeypatch, 2026, 10, 28)
+    api._compute_orders("manual")  # Wednesday: saved for the 30 Oct week, made on the 28th
+    monkeypatch.setattr(
+        api.db_read,
+        "latest_symbol_closes_from_db_or_none",
+        lambda symbols, as_of: {s: (PRICES[s], date(2026, 10, 23)) for s in symbols if s in PRICES},
+    )
+    with open_catalog() as con:
+        assert holdings_store.latest_orders(con, OWNER, gid)["week"] == "2026-10-30"
+    view = client.get("/api/lots").json()
+    assert view["last_orders"]["week"] == "2026-10-23"
+    lot2 = view["lots"][1]
+    assert lot2["pending"] is True and lot2["last_orders"]["status"] == "new"
 
 
 def test_the_preview_route_refuses_a_malformed_favourite(client):

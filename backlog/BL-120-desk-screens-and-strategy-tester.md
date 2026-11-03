@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner asked for the screens on 2026-10-18, apart from strategy work |
-| **Status** | In progress (Phase 0 done; Phase 1 started 2026-10-18) |
+| **Status** | In progress (Phases 0-2 done; Phase 3 next) |
 | **Type** | feature |
 | **Area** | dashboard, options |
 | **Created** | 2026-10-18 |
@@ -259,4 +259,16 @@ The owner's answers to the open questions below; the screen order and placement 
   re-simulates when a history change moves it; exit rules with one template share the cache. A missing index price at
   entry is an error, not a ₹1-premium strike. The YAML `on:` fix moved into the loader. `wilder_rsi` now uses the
   shared Wilder mean (`rotation/triggers.wilder_rsi` keeps its own copy: it is parity-checked against the research).
-
+- 2026-10-28 — **Phase 2 built: say it in chat.** `obt-mcp` gained `validate_rule` (the spec checked and read back, with
+  its `spec_hash`; records nothing), `test_rule` and `list_rule_tests` (`mcp/server.py`), over Phase 1's own functions
+  (`spec.load_spec` / `read_back`, `study.run_test`, `store.ledger` / `counts`, the CLI's `render`); nothing reimplemented.
+  `test_rule(spec_text, spec_hash, period=learning|confirmation|both, tries=1, include_rows=false)` returns the read-back,
+  the result, the CLI's text, its ledger (S11) row and the running count. Guarantees kept: every call that runs is written to
+  the ledger by `run_test` before it returns (a sweep of K is `tries=K`); the read-back comes first, because `test_rule` runs
+  only with the hash `validate_rule` gave for that exact text (a mismatch returns the read-back and runs nothing); the
+  confirmation period stays locked: the tool always tests in `locked` mode, has no `open_all` and there is no reveal tool,
+  so a confirmation test from chat runs only for a rule the owner already revealed with `obt rule reveal <hash>`. Errors
+  come back as `{"error": ...}` (invalid spec, hash mismatch, bad period or tries, SENSEX confirmation, locked). The call
+  is synchronous like `obt rule test`: a new template's first test can take minutes. 10 unit tests in
+  `tests/unit/test_mcp_rules.py` (the real ledger, lock and counts, with the lake faked); the package suite passes (1,795).
+  Not yet tried by the owner in a live session (the "done when" is his).

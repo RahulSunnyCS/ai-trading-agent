@@ -57,6 +57,7 @@ def read_column(name_or_path: str | Path, column: str = "gross", root: Path | No
         if isinstance(name_or_path, Path)
         else store.results_dir(root) / f"{name_or_path}.csv"
     )
+    path = store.read_path(path)  # its slippage copy while `store.slipped` is in force
     if not path.exists():
         return {}
     with path.open() as f:
@@ -71,7 +72,7 @@ def append_dir_result(row: dict, root: Path | None = None) -> bool:
     """One day of the Dir ATM 09:24 leg; a stored day is never rewritten (as for the variants)."""
     path = _path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with store._write_lock(root):  # noqa: SLF001 - the one lock every rotation write shares
+    with store._write_lock(root), store.slipped(0.0):  # noqa: SLF001 - the one shared lock
         if date.fromisoformat(str(row["day"])) in dir_days(root):
             return False
         new = not path.exists()
@@ -146,6 +147,13 @@ def score_days(
         f"base Dir ATM 09:24: {out['written']} written, {out['already']} already there, "
         f"{len(out['skipped'])} skipped{first}"
     )
+    if out["written"]:  # the slippage copy, display only (`slip_store`); never stops the scoring
+        from . import slip_store
+
+        try:
+            slip_store.fill(root, days=days, names=[DIR_NAME], log=log)
+        except Exception as error:  # noqa: BLE001
+            log(f"base Dir ATM 09:24: slippage copy not written: {type(error).__name__}: {error}")
     return out
 
 

@@ -46,8 +46,19 @@ Three master switches, then one block per platform and broker.
   - The 09:25 deploy check expects the row's multiplier instead of 1, and the 09:05 margin check counts it. **Raising it above 1 has not been tried live yet: watch the first upload.**
 - **Keep the clientwise MTM SL (Quantiply blocks):** the account's whole-day stop-loss, the "Clientwise P&L" SL in Quantiply, over every algo on that account, your own included. Each trading day at 08:00, after the login, the tool reads it and sets it to this figure only when it differs, then reads it back; the morning message says which. The default is the list's portfolio stop: ₹9,000 for Adaptive Tuned, ₹8,000 for Adaptive Classic. Off leaves whatever you set in Quantiply. A target or trailing option set there by hand is kept.
 - **Include the Buy add-on:** whether the Buy add-on picks go with the list. Off leaves them out of the export, so they are not uploaded, deployed or checked, and an add-on already uploaded counts as no longer picked: the evening run deletes it unless it is deployed on /live (then it is kept and reported). On AlgoTest and Quantiply an export serves every account that uploads that list, so the add-on stays in while any of them has it on.
+- **Dir ×2 on non-expiry days** (off by default): on a day neither NIFTY nor SENSEX expires, the picked Dir is uploaded at **2 lots** with its MTM SL doubled (₹3,000 → ₹6,000 on Quantiply, which takes the rupee figure as written; AlgoTest doubles it itself), so the list trades 4 lots. On an expiry day, and on a day no Dir is picked, every pick stays at 1 lot. The research behind it: the Dir was the best home for a 4th lot, and on expiry days 3 lots of the expiring index did better than any 4-lot mix.
+  - **Quantiply:** on those days the 08:10 run raises the clientwise MTM SL above by the Dir's own stop (₹8,000 → ₹11,000 for Adaptive Classic, ₹9,000 → ₹12,000 for Adaptive Tuned), and sets it back on other days. The 09:21 top-up only ever raises it, for a Dir the 09:16 pick brought.
+  - **AlgoTest:** the saved strategy carries the 2 lots and keeps the 1-lot overall MTM SL (₹3,000), because AlgoTest scales the overall stop by the leg lots itself (so it applies ₹6,000). The uploader reads it back, and you deploy it as usual. The tool sets no AlgoTest book stop.
+  - One export serves every account that uploads a list on a platform, so the Dir is doubled only while **every** such account has this on; when they disagree it stays at 1 lot and the export says so.
+  - The 09:16 and evening messages say the day's lots (`🔢 4 lots · Dir ×2`) and the 16:00 result adds what those lots made. Margin: 4 lots is about ₹8.1–8.3 lakh on a normal day (Angel One, 28 Oct); the 09:05 margin check still uses its older ₹1.4 lakh figure.
 
 A warning badge on a block means its master switch holds it back.
+
+**Capital.** Below the blocks, the money in each broker account: **Angel One** and **Shoonya**, in whole rupees (₹8.5 lakh each until you change them). The page shows their total. They feed the month-so-far lines of the 16:00 result message on Telegram, from November 2026:
+
+- Each list's paper month (Adaptive and Tuned Adaptive) also reads as a share of that list's capital (`🎯 Adaptive   +₹23,400 (+2.8% of ₹8.5 L) · won 9 of 13 days`). A list's capital is the capital of the accounts whose rows upload it, each counted once.
+- In your own chat only, the account's real month from the contract notes reads as a share of the total of both accounts (`💰 Your account to Mon 2 Nov   +₹25,000 (+1.5% of ₹17 L)`).
+- The friends' group sees the per-list lines, never the real money.
 
 **Pause uploads and deploys.** Below the blocks, pick a day, or press **Skip next session**, to stop every upload, top-up and deploy for each session up to and including that day. **Clear pause** removes it.
 

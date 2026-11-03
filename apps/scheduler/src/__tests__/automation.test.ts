@@ -85,6 +85,7 @@ describe('effective and the GitHub variables', () => {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     });
     const { vars, withheld } = githubVariables(s);
@@ -236,6 +237,7 @@ describe('API /settings/automation', () => {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     });
     expect(body.github.QUANTIPLY_LOGIN).toBe('on');
@@ -408,5 +410,73 @@ describe('MTM SL per Quantiply row (BL-172)', () => {
     const ok = structuredClone(DEFAULT_SETTINGS);
     ok.rows['quantiply.angelone'].mtmSl = null;
     expect('settings' in validate(ok)).toBe(true);
+  });
+});
+
+describe('Dir ×2 on non-expiry days (BL-183)', () => {
+  it('settings saved before BL-183 read as off, and every default row is off', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+    };
+    for (const row of Object.values(old.rows)) row.dirBoost = undefined;
+    const filled = withDefaults(JSON.parse(JSON.stringify(old)));
+    expect(Object.values(filled.rows).every((r) => r.dirBoost === false)).toBe(true);
+    expect(Object.values(DEFAULT_SETTINGS.rows).every((r) => r.dirBoost === false)).toBe(true);
+  });
+
+  it('a save must say it, as true or false', () => {
+    for (const bad of [undefined, 'yes', 1, null]) {
+      const s = clone(DEFAULT_SETTINGS) as unknown as {
+        rows: Record<string, Record<string, unknown>>;
+      };
+      (s.rows['quantiply.angelone'] as Record<string, unknown>).dirBoost = bad;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain('quantiply.angelone.dirBoost');
+    }
+  });
+
+  it('reaches the jobs through effective', () => {
+    const s = clone(DEFAULT_SETTINGS);
+    s.rows['quantiply.angelone'].dirBoost = true;
+    const checked = validate(s);
+    if (!('settings' in checked)) throw new Error(checked.errors.join());
+    expect(effective(checked.settings, 'quantiply.angelone').dirBoost).toBe(true);
+    expect(effective(checked.settings, 'algotest.finvasia').dirBoost).toBe(false);
+  });
+});
+
+describe('capital per broker account (owner, 2026-10-29)', () => {
+  it('settings saved before the field read as ₹8.5 lakh an account', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { capital?: unknown };
+    old.capital = undefined;
+    const filled = withDefaults(JSON.parse(JSON.stringify(old)));
+    expect(filled.capital).toEqual({ finvasia: 850_000, angelone: 850_000 });
+    const partial = withDefaults({
+      ...clone(DEFAULT_SETTINGS),
+      capital: { angelone: 1_000_000 },
+    } as unknown as AutomationSettings);
+    expect(partial.capital).toEqual({ finvasia: 850_000, angelone: 1_000_000 });
+  });
+
+  it('a save must give each account whole rupees in range, and no other account', () => {
+    for (const bad of [undefined, 0, 9_999, 100_000_001, 850_000.5, '850000', null]) {
+      const s = clone(DEFAULT_SETTINGS) as unknown as { capital: Record<string, unknown> };
+      s.capital.finvasia = bad;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain('capital.finvasia');
+    }
+    const extra = clone(DEFAULT_SETTINGS) as unknown as { capital: Record<string, unknown> };
+    extra.capital.kite = 500_000;
+    const refused = validate(extra);
+    expect('errors' in refused && refused.errors.join()).toContain('unknown capital account: kite');
+    const missing = { ...clone(DEFAULT_SETTINGS), capital: undefined } as unknown;
+    expect('errors' in validate(missing)).toBe(true);
+    const ok = clone(DEFAULT_SETTINGS);
+    ok.capital = { finvasia: 900_000, angelone: 800_000 };
+    const checked = validate(ok);
+    expect('settings' in checked && checked.settings.capital).toEqual({
+      finvasia: 900_000,
+      angelone: 800_000,
+    });
   });
 });

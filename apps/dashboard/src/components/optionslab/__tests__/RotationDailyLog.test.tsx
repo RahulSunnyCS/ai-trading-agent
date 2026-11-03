@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearPolledResourceCache } from '../../../hooks/usePolledResource';
 import { COUNTERS, ROWS, log, placement } from '../../../lib/__tests__/rotationDailyLogFixture';
 import { listLabel } from '../../../lib/rotationListNames';
+import {
+  ROTATION_SLIPPAGE_STORAGE_KEY,
+  useRotationSlippageStore,
+} from '../../../store/rotationSlippage';
 import type { RotationDay, RotationLog, RotationPlacement } from '../../../types/rotationDailyLog';
 import { RotationDailyLog } from '../RotationDailyLog';
 import { RotationReplayStatus } from '../RotationReplayStatus';
@@ -50,7 +54,12 @@ function dayBody(day: string, saved: RotationPlacement[] = []): RotationDay {
   };
 }
 
-beforeEach(() => clearPolledResourceCache());
+beforeEach(() => {
+  clearPolledResourceCache();
+  // the slippage switch at its default (on), with nothing stored from an earlier test
+  window.localStorage.removeItem(ROTATION_SLIPPAGE_STORAGE_KEY);
+  useRotationSlippageStore.setState({ on: true, hydrated: true });
+});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -252,6 +261,65 @@ describe('RotationDailyLog', () => {
     expect(url).toContain('variant=N_wide_0917');
     expect(url).toContain('day=2026-10-13');
     expect(url).not.toContain('/legwise/day');
+    // a rotation variant's replay follows the slippage switch (on by default)
+    expect(url).toContain('slippage=0.5');
+  });
+
+  it('reads the log with 0.5% slippage while the switch is on, and without it when off', async () => {
+    const calls = stubFetch((url) =>
+      url.includes('/day/') ? { body: dayBody('2026-10-13') } : { body: log() },
+    );
+    render(<RotationDailyLog />);
+    await screen.findByRole('table');
+    expect(screen.getByText(/Gross after 0\.5% slippage, per lot-day/)).toBeTruthy();
+    const slipped = calls.filter((c) => c.url.includes('/rotation/log'));
+    expect(slipped.length).toBeGreaterThan(0);
+    for (const c of slipped) expect(c.url).toContain('slippage=0.5');
+    // the live read compares with paper without slippage and never takes the parameter
+    for (const c of calls.filter((x) => x.url.includes('/rotation/live'))) {
+      expect(c.url).not.toContain('slippage');
+    }
+
+    cleanup();
+    clearPolledResourceCache();
+    calls.length = 0;
+    useRotationSlippageStore.getState().setOn(false);
+    render(<RotationDailyLog />);
+    await screen.findByRole('table');
+    expect(screen.getByText(/then did\. Gross, per lot-day/)).toBeTruthy();
+    expect(calls.some((c) => c.url.includes('/rotation/log'))).toBe(true);
+    for (const c of calls) expect(c.url).not.toContain('slippage');
+  });
+
+  it('reads the T1 track with track=t1 on the log and the day, and the live journal without it', async () => {
+    const calls = stubFetch((url) => {
+      if (url.includes('/day/')) return { body: dayBody('2026-10-13') };
+      if (url.includes('/rotation/log')) {
+        return { body: url.includes('track=t1') ? log({ track: 't1' }) : log() };
+      }
+      return { body: log() };
+    });
+    render(<RotationDailyLog focus="C" track="t1" bookName="Adaptive Tuned" />);
+    await screen.findByRole('table');
+    expect(screen.getByText('Daily log · Adaptive Tuned')).toBeTruthy();
+    // a track has no reconstructed history, so the Recorded / Reconstructed switch is not offered
+    expect(screen.queryByRole('radiogroup', { name: /reconstructed history/ })).toBeNull();
+    const logs = calls.filter((c) => c.url.includes('/rotation/log'));
+    expect(logs.length).toBeGreaterThan(0);
+    for (const c of logs) expect(c.url).toContain('track=t1');
+    fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText(/placement record covers Adaptive Classic only/);
+    const day = calls.find((c) => c.url.includes('/day/'))?.url ?? '';
+    expect(day).toContain('track=t1');
+
+    cleanup();
+    clearPolledResourceCache();
+    calls.length = 0;
+    render(<RotationDailyLog focus="C" />);
+    await screen.findByRole('table');
+    expect(calls.some((c) => c.url.includes('/rotation/log'))).toBe(true);
+    for (const c of calls) expect(c.url).not.toContain('track=');
   });
 
   it('says a day with no entry cannot be marked', async () => {

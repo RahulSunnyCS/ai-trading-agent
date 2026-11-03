@@ -1,14 +1,91 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   type DeadlinesReport,
+  type UniverseFile,
   builtins,
   caAgeCheck,
+  checkUniverseRefresh,
+  diskUniverseReader,
   evaluateCaAge,
   evaluateReviews,
   jobs,
+  lastReviewDay,
+  momentumDataDir,
   reviewQueueCheck,
 } from '../checks/stock.js';
 import type { BuiltinContext } from '../runner.js';
+
+describe('universe refresh reminder (S3)', () => {
+  const both =
+    (info: UniverseFile | null, other: UniverseFile | null = info) =>
+    (file: string) =>
+      file === 'total_market_membership.csv' ? info : other;
+
+  test('the review day is the latest 1 Apr or 1 Oct', () => {
+    expect(lastReviewDay('2026-10-28')).toBe('2026-10-01');
+    expect(lastReviewDay('2026-09-30')).toBe('2026-04-01');
+    expect(lastReviewDay('2026-03-31')).toBe('2025-10-01');
+    expect(lastReviewDay('2026-04-01')).toBe('2026-04-01');
+  });
+  test('quiet when refreshed since the last review', () => {
+    const r = checkUniverseRefresh(
+      '2026-10-28',
+      both({ refreshedDay: '2026-10-02', newestYear: 2026 }),
+    );
+    expect(r.ok).toBe(true);
+  });
+  test('due when last refreshed before the review (the state on 2026-10-28)', () => {
+    const r = checkUniverseRefresh(
+      '2026-10-28',
+      both(
+        { refreshedDay: '2026-09-29', newestYear: 2026 },
+        { refreshedDay: '2026-09-28', newestYear: 2026 },
+      ),
+    );
+    expect(r.ok).toBe(false);
+    expect(r.detail).toContain(
+      'Total Market universe (total_market_membership.csv): last refreshed 2026-09-29',
+    );
+    expect(r.detail).toContain(
+      'category membership (category_membership.csv): last refreshed 2026-09-28',
+    );
+  });
+  test('due in a new year with no rows for it, and when a file is missing', () => {
+    const jan = checkUniverseRefresh(
+      '2027-01-04',
+      both({ refreshedDay: '2026-10-05', newestYear: 2026 }),
+    );
+    expect(jan.ok).toBe(false);
+    expect(jan.detail).toContain('no 2027 rows');
+    const missing = checkUniverseRefresh(
+      '2026-10-28',
+      both(null, { refreshedDay: '2026-10-05', newestYear: 2026 }),
+    );
+    expect(missing.ok).toBe(false);
+    expect(missing.detail).toContain('total_market_membership.csv does not exist');
+    expect(missing.detail).not.toContain('category membership');
+  });
+  test('reads the file day and newest year from disk, and honours MOMENTUM_DATA_DIR', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'universe-'));
+    mkdirSync(join(dir, 'categories'));
+    const path = join(dir, 'categories', 'total_market_membership.csv');
+    writeFileSync(path, 'category,year,symbol\nTotal Market,2025,A\nTotal Market,2026,B\n');
+    const at = new Date('2026-09-29T08:00:00Z');
+    utimesSync(path, at, at);
+    const read = diskUniverseReader(dir);
+    expect(read('total_market_membership.csv')).toEqual({
+      refreshedDay: '2026-09-29',
+      newestYear: 2026,
+    });
+    expect(read('category_membership.csv')).toBeNull();
+    const ctx = { repoRoot: '/r', env: { MOMENTUM_DATA_DIR: dir } } as unknown as BuiltinContext;
+    expect(momentumDataDir(ctx)).toBe(dir);
+    expect(momentumDataDir({ ...ctx, env: {} })).toBe('/r/packages/momentum-backtesting/data');
+  });
+});
 
 const ev = (age_days: number, company_id = 'C1') => ({
   company_id,

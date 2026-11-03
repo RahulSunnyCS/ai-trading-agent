@@ -1,0 +1,496 @@
+{
+ "summary": {
+  "all": {
+   "from": "2025-01-10",
+   "to": "2026-10-30",
+   "days": 437,
+   "four_lot_days": 218,
+   "expiry_days": 186,
+   "rule_stop_values": [
+    12000.0,
+    13000.0
+   ],
+   "four_lot_low_nostop": {
+    "p50": -2459.250000000001,
+    "p10": -8622.369999999999,
+    "p1": -13308.0125,
+    "min": -17598.399999999994
+   },
+   "rule": {
+    "per_day": 2016.262585812357,
+    "total": 881106.75,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -13941.099999999993,
+    "worst_5pct_mean": -10759.26590909091,
+    "fired_four_lot_days": 3,
+    "cost_days": 1,
+    "cost_sum": -4565.5999999999985,
+    "saved_days": 1,
+    "saved_sum": 4005.499999999998
+   },
+   "9k": {
+    "per_day": 1965.1530892448513,
+    "total": 858771.9,
+    "max_drawdown": -32126.150000000023,
+    "worst_day": -13228.999999999998,
+    "worst_5pct_mean": -10211.754545454545,
+    "fired_four_lot_days": 19,
+    "vs_rule": {
+     "mean": -51.109496567505744,
+     "ci90": [
+      -129.126847826087,
+      14.680120137299758
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 10,
+    "cost_sum": -43071.850000000006,
+    "saved_days": 9,
+    "saved_sum": 20176.9
+   },
+   "10k": {
+    "per_day": 2001.6709382151032,
+    "total": 874730.2000000001,
+    "max_drawdown": -33823.65000000002,
+    "worst_day": -13228.999999999998,
+    "worst_5pct_mean": -10701.354545454544,
+    "fired_four_lot_days": 15,
+    "vs_rule": {
+     "mean": -14.591647597253994,
+     "ci90": [
+      -48.08716247139588,
+      16.379250572082395
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 9,
+    "cost_sum": -20804.85,
+    "saved_days": 6,
+    "saved_sum": 13868.200000000003
+   },
+   "11k": {
+    "per_day": 1987.0975972540045,
+    "total": 868361.65,
+    "max_drawdown": -33854.15000000002,
+    "worst_day": -13228.999999999998,
+    "worst_5pct_mean": -11000.388636363636,
+    "fired_four_lot_days": 12,
+    "vs_rule": {
+     "mean": -29.164988558352412,
+     "ci90": [
+      -66.07304347826089,
+      2.18262585812358
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 7,
+    "cost_sum": -22106.100000000002,
+    "saved_days": 3,
+    "saved_sum": 8800.9
+   },
+   "12k": {
+    "per_day": 2006.75057208238,
+    "total": 876950.0,
+    "max_drawdown": -32121.900000000023,
+    "worst_day": -13228.999999999998,
+    "worst_5pct_mean": -10828.39090909091,
+    "fired_four_lot_days": 5,
+    "vs_rule": {
+     "mean": -9.512013729977115,
+     "ci90": [
+      -36.500943935926784,
+      9.029176201372989
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 3,
+    "cost_sum": -11264.099999999995,
+    "saved_days": 2,
+    "saved_sum": 6547.249999999996
+   },
+   "13k": {
+    "per_day": 2015.1083524027463,
+    "total": 880602.3500000001,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -13941.099999999993,
+    "worst_5pct_mean": -10782.193181818182,
+    "fired_four_lot_days": 3,
+    "vs_rule": {
+     "mean": -1.1542334096109874,
+     "ci90": [
+      -3.462700228832962,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 1,
+    "cost_sum": -5070.0,
+    "saved_days": 1,
+    "saved_sum": 4005.499999999998
+   },
+   "14k": {
+    "per_day": 2025.3165903890163,
+    "total": 885063.3500000001,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -14532.299999999994,
+    "worst_5pct_mean": -10608.7,
+    "fired_four_lot_days": 1,
+    "vs_rule": {
+     "mean": 9.05400457665904,
+     "ci90": [
+      -2.787185354691067,
+      29.949199084668187
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 1,
+    "saved_sum": 3396.5
+   },
+   "15k": {
+    "per_day": 2023.434439359268,
+    "total": 884240.8500000001,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -15354.799999999994,
+    "worst_5pct_mean": -10646.086363636365,
+    "fired_four_lot_days": 1,
+    "vs_rule": {
+     "mean": 7.171853546910756,
+     "ci90": [
+      -6.551487414187635,
+      28.0670480549199
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 1,
+    "saved_sum": 2574.0
+   },
+   "16k": {
+    "per_day": 2020.4064073226548,
+    "total": 882917.6000000001,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -16678.049999999996,
+    "worst_5pct_mean": -10706.234090909093,
+    "fired_four_lot_days": 1,
+    "vs_rule": {
+     "mean": 4.14382151029748,
+     "ci90": [
+      -12.607551487414188,
+      25.039016018306626
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 1,
+    "saved_sum": 1250.7499999999982
+   },
+   "18k": {
+    "per_day": 2017.5442791762016,
+    "total": 881666.8500000001,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -17928.799999999996,
+    "worst_5pct_mean": -10763.086363636367,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 1.2816933638443904,
+     "ci90": [
+      -18.331807780320368,
+      22.176887871853538
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "20k": {
+    "per_day": 2017.5442791762016,
+    "total": 881666.8500000001,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -17928.799999999996,
+    "worst_5pct_mean": -10763.086363636367,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 1.2816933638443904,
+     "ci90": [
+      -18.331807780320368,
+      22.176887871853538
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "none": {
+    "per_day": 2017.5442791762016,
+    "total": 881666.8500000001,
+    "max_drawdown": -32647.79999999998,
+    "worst_day": -17928.799999999996,
+    "worst_5pct_mean": -10763.086363636367,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 1.2816933638443904,
+     "ci90": [
+      -18.331807780320368,
+      22.176887871853538
+     ],
+     "reading": "includes zero"
+    }
+   }
+  },
+  "last_year": {
+   "from": "2025-11-03",
+   "to": "2026-10-30",
+   "days": 238,
+   "four_lot_days": 119,
+   "expiry_days": 102,
+   "rule_stop_values": [
+    12000.0,
+    13000.0
+   ],
+   "four_lot_low_nostop": {
+    "p50": -2099.0000000000005,
+    "p10": -8342.449999999997,
+    "p1": -11881.394999999997,
+    "min": -12115.999999999995
+   },
+   "rule": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "9k": {
+    "per_day": 2111.480462184874,
+    "total": 502532.35,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10102.154166666665,
+    "fired_four_lot_days": 8,
+    "vs_rule": {
+     "mean": -103.80987394957985,
+     "ci90": [
+      -232.09674369747898,
+      -0.7058298319327703
+     ],
+     "reading": "below zero"
+    },
+    "cost_days": 5,
+    "cost_sum": -29150.250000000004,
+    "saved_days": 3,
+    "saved_sum": 4443.5
+   },
+   "10k": {
+    "per_day": 2181.948949579832,
+    "total": 519303.85000000003,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10458.454166666665,
+    "fired_four_lot_days": 5,
+    "vs_rule": {
+     "mean": -33.34138655462185,
+     "ci90": [
+      -77.17069327731095,
+      5.205882352941184
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 3,
+    "cost_sum": -9363.250000000002,
+    "saved_days": 2,
+    "saved_sum": 1428.0000000000018
+   },
+   "11k": {
+    "per_day": 2168.2325630252103,
+    "total": 516039.35000000003,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10730.495833333332,
+    "fired_four_lot_days": 5,
+    "vs_rule": {
+     "mean": -47.05777310924371,
+     "ci90": [
+      -90.59138655462188,
+      -7.07563025210084
+     ],
+     "reading": "below zero"
+    },
+    "cost_days": 4,
+    "cost_sum": -11199.750000000004,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "12k": {
+    "per_day": 2191.092857142857,
+    "total": 521480.10000000003,
+    "max_drawdown": -27026.5,
+    "worst_day": -12446.399999999994,
+    "worst_5pct_mean": -10441.49583333333,
+    "fired_four_lot_days": 1,
+    "vs_rule": {
+     "mean": -24.197478991596643,
+     "ci90": [
+      -72.59243697478993,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 1,
+    "cost_sum": -5759.000000000001,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "13k": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 0.0,
+     "ci90": [
+      0.0,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "14k": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 0.0,
+     "ci90": [
+      0.0,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "15k": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 0.0,
+     "ci90": [
+      0.0,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "16k": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 0.0,
+     "ci90": [
+      0.0,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "18k": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 0.0,
+     "ci90": [
+      0.0,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "20k": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 0.0,
+     "ci90": [
+      0.0,
+      0.0
+     ],
+     "reading": "includes zero"
+    },
+    "cost_days": 0,
+    "cost_sum": 0.0,
+    "saved_days": 0,
+    "saved_sum": 0.0
+   },
+   "none": {
+    "per_day": 2215.2903361344543,
+    "total": 527239.1000000001,
+    "max_drawdown": -27026.5,
+    "worst_day": -12135.949999999999,
+    "worst_5pct_mean": -10142.504166666664,
+    "fired_four_lot_days": 0,
+    "vs_rule": {
+     "mean": 0.0,
+     "ci90": [
+      0.0,
+      0.0
+     ],
+     "reading": "includes zero"
+    }
+   }
+  }
+ },
+ "skipped": [],
+ "note": "T1 list C, expiry rule + SL150 cap as if live throughout; Dir x2 on non-expiry days with a Dir pick; 3-lot days at 9k in every arm; net = gross - brokerage"
+}

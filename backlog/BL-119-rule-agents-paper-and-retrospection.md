@@ -130,7 +130,8 @@ reported but not judged; they are judged forward.
     when the score is at least 0.60.
 - **Universe:** NIFTY, weekly expiry; sessions in the lake with option data and a `data_quality`
   verdict of usable. Days with a missing contract are logged, never zero-filled. Periods: **A**
-  2022-01-03 → 2024-10-08, **B** 2024-10-09 → 2026-10-08. Sessions after the data cut-off (the last
+  2022-01-03 → 2024-10-08, **B** 2024-10-09 → 2026-10-08 (*superseded 2026-10-28, before any run: B ends
+  2025-12-02; see the Log*). Sessions after the data cut-off (the last
   collected day when "Start BL-119" is said) are forward only and are never read here.
 - **Look-ahead check:** a rule at stamp j reads bars stamped ≤ j (asserted on the maximum timestamp);
   the 20-session median and the ATR use completed prior sessions; analog neighbours are all dated
@@ -215,7 +216,8 @@ paragraphs above are superseded by this block.
     hypothesis and a dated block, not this arm.
   - Legwise engine, `lot_sizing: current`, sizing date 2026-10-12, the early reference wrapper before
     2024-10-03. Rupees per strategy.
-- **Periods.** **A** 2022-01-03 → 2024-10-08 and **B** 2024-10-09 → 2026-10-08: the screening periods
+- **Periods.** **A** 2022-01-03 → 2024-10-08 and **B** 2024-10-09 → 2026-10-08 (*superseded 2026-10-28,
+  before any run: B ends 2025-12-02 for both arms; Log*): the screening periods
   (BL-083, BL-091 and BL-110 read these days for other rules, so neither is unseen; the rule has no tuned
   parameter, so nothing is fitted on them). **C** 2019-02-11 → 2021-12-31: weekly expiries begin in the
   lake on 2019-02-11 (nearest expiry 2019-02-14); about 740 usable weekday sessions; **read once**, only
@@ -261,8 +263,9 @@ paragraphs above are superseded by this block.
   or stops, a short arm on days the range holds, C before the screen, any parameter search.
 - **Done when:** this amendment is in a commit, named in the Log, before `research/bl119/` holds a run.
 - **Review notes, 2026-10-24 (nothing above is changed; see the Log):** the random-minute test favours short
-  trades, so for arm S test 3 is easier to pass than it reads; period B contains P1; and arm S sells at the
-  break, which may not be what the owner meant by "both". Two are open questions for the owner.
+  trades, so for arm S test 3 is easier to pass than it reads; period B contains P1 (**answered 2026-10-28:
+  B ends 2025-12-02 for both arms**, see the Log); and arm S sells at the break, which may not be what the
+  owner meant by "both" (still open).
 
 ### Phase 1 — Event study (research only, a few hours of compute)
 
@@ -409,7 +412,7 @@ Questions 5 (the evening post-mortem) and 6 (blocked dates) belong to later phas
     Arm S trades that same live Widesl across P1. Choose one before Phase 1: **(a)** end B at 2025-12-02 for
     arm S (and keep it so for L, or only for S), or **(b)** record in BL-091 and BL-123 that P1 is consumed
     for Widesl rules. Phase 0 on `main` already had this B; the Widesl arm is what makes it matter. Not
-    decided here.
+    decided here. **Answered by the owner 2026-10-28: (a) for both arms** (Log, 2026-10-28).
   - **Confirm with the owner: does arm S sell at the break?** Open question 2 asked "a long ATM option
     (default), or sell something when the range holds?" and the answer was "both". Arm S sells **at the
     break**, which is the assistant's reading (Phase 0b says so); "sell when the range holds" (no break) is a
@@ -418,3 +421,8 @@ Questions 5 (the evening post-mortem) and 6 (blocked dates) belong to later phas
   - **Pre-registration evidence for the lineage cited above:** BL-123 and BL-124 were registered in commits
     `8e5918e4`, `321680aa` (BL-123) and `dee24559` (BL-124), which exist on
     `origin/research/bl121-opening-straddle-break` (this PR squashes them).
+- 2026-10-28 — Owner answered the period B question (asked in chat, 2026-10-28): **end period B at
+  2025-12-02 for both arms**, L and S, so P1 (2025-12-03 → 2026-10-08) stays unread for BL-091 and BL-123.
+  This supersedes B's end date of 2026-10-08 in Phase 0 and Amendment 1 (B is now 2024-10-09 → 2025-12-02);
+  nothing has run, so no result is affected. Still open, not answered here: whether arm S sells at the break
+  or when the range holds, the test 3 caveat for arm S, and open questions 5 and 6. Status unchanged.

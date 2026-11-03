@@ -219,7 +219,7 @@ uv run mbt sources-check                  # can this machine reach every source?
 
 **Scheduling.** The repo's scheduler (`apps/scheduler`, installed by
 `deploy/launchd/install.sh`) runs the Friday jobs: 14:40 preview, 16:45 final, 19:30 stock
-ingest and 21:00 journal check, in IST whatever the Mac's timezone. A slot missed while the
+ingest, 20:30 journal score and 21:00 journal check, in IST whatever the Mac's timezone. A slot missed while the
 laptop slept is caught up on wake within that job's window, otherwise it alerts on Telegram;
 re-run by hand via the dashboard's Momentum tab ("Weekly signal"), `mbt weekly --run
 <preview|final>`, or `bun run --filter @ata/scheduler jobs run momentum-final`. Logs land in

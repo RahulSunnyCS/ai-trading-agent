@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — evidence for the proposed Live premium-momentum view; useful before adding more signal parameters |
-| **Status** | In progress (Phase 1, Stage 1a / 1b and Stage 2 done on P2 + P3, plus an unregistered time-gate look; no registered arm passed; F1450 meets the screening bar as a post-hoc lead among 31 Stage 1 arms tried; owner to decide the P1 question; P1 unread) |
+| **Status** | Done (2026-10-28): a lead, not a result. No registered arm passed; F1450 is a post-hoc lead among 31 Stage 1 arms; the 13 time-gate arms ran without an owner `override:` (a gate breach, descriptive only); P1 unread |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -991,3 +991,13 @@ small decisions taken and logged.
   - **Limitation, stated:** R0 and every stage fill at the engine's forward-filled closes, including
     the vendor's zero-volume carried bars, whereas the episode series refuses a leg stale for more than
     5 minutes (`r0.py` docstring).
+- 2026-10-28 — **Closed as a lead, not a result** (owner, asked in chat, 2026-10-28). No registered arm
+  passed: Stage 1a (18 arms), Stage 1b (Dir D2) and Stage 2's rule R1 all failed their registered rule on
+  P2 + P3, read against a comparator that is not causal (spike day vs no-spike day). F1450 cleared the
+  screening bar, but post hoc, as one of 31 Stage 1 arms tried. **Gate breach:** the 13 time-gate arms
+  (G1400 / G1430 / G1450, F1330 … F1450, commit 392c8c0) were run on the owner's chat request without the
+  owner's `override: <reason>` line that the research gate requires, and none was written later. Their
+  numbers (`research/bl091/out/gates.csv`, the 2026-10-11 Log entry above, TODO 3.26.5) are descriptive
+  only and support no decision. No `override:` is recorded here on the owner's behalf. P1 (2025-12-03 →
+  2026-10-08) stays unread; R3 or F1450 is not registered for it. Findings page updated in the same commit.
+  Status `Done`.

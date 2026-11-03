@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the lists with a portfolio stop (about ₹10k on 6 lots); the Rotation log today shows losses that book could not reach |
-| **Status** | In progress (Phases 1–4 built and merged, #190; trailing modes to confirm against AlgoTest) |
+| **Status** | Done (2026-10-28): Phases 1–4 built and merged (#190); the trailing modes were never compared with the owner's AlgoTest screen; Phase 5 not asked for |
 | **Type** | feature |
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |
@@ -199,7 +199,8 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
    AlgoTest portfolio settings screen (a screenshot), field by field, before Phase 1 is written.
    In particular: does Trail SL count profit from 0 or from the first lock, and may Lock / Lock and
    trail be used with the stop amount cleared? *Proposal:* from 0, and yes (a profit lock without
-   a stop), as written in Phase 1.
+   a stop), as written in Phase 1. **Not done** (item closed 2026-10-28): the comparison was never
+   made, so the three modes stay as written from AlgoTest's wording, not confirmed against its screen.
 
 ## Log
 
@@ -273,3 +274,10 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   first view. Nothing is added to the scheduler (not asked); running it nightly after
   `rotation update` is Phase 5.
 - 2026-10-11 — PR review fixes. Renumbered from BL-092 (taken by forward-dated themes on main) and the TODO row to 3.27 (3.26 went to BL-091 on main). The setting is now in the URL (`pfstop`, `pftrail`) with localStorage as a fallback read after mount; the path cache stamp covers the reference CSVs, symbol master, VIX bars, `SIZING_DATE` and a `CACHE_VERSION`, in one folder per data root, with one replay per key at a time; a cold `/portfolio/days` or `/drawdowns?stop=` answers within 20 s (202 warming / `with_stop_pending`) and the page asks again, so nothing waits past the proxy's 30 s; a list-day whose replay no longer matches the log keeps the log's figure and is counted; `source` on `/portfolio/day` is a filter; `Trail.text()` no longer uses `:g`.
+- 2026-10-28 — **Closed** (owner, asked in chat, 2026-10-28). Delivered: Phases 1–4 (the rule in
+  `rotation/portfolio.py`, the `/portfolio/day|days` and `/drawdowns?stop=&trail=` routes, the Portfolio
+  stop pop-up, Days table, calendar, "Replay the list", hero, headline and Drawdowns), merged in #190 with
+  the review fixes above. **Not done:** open question 1, the field-by-field comparison of Trail SL / Lock
+  profit / Lock and trail with the owner's AlgoTest screen. The trailing figures follow AlgoTest's wording
+  only and are not confirmed. Phase 5 (base and Shadow scoreboard, nightly figure, Telegram line) was never
+  asked for. Status `Done`.

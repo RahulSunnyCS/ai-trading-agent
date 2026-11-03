@@ -467,7 +467,7 @@ def test_the_t1_track_applies_the_same_rule(tmp_path, monkeypatch):
     assert any(underlying_of(n) != index for n in c["unfiltered"]["core"])
     assert journal.verify(store.journal_path(root, "t1")) == []
     assert not store.journal_path(root).exists()
-    assert r.text.startswith("🧪 T1 · TESTING PHASE · not traded")
+    assert r.text.startswith("🧪 Tuned Adaptive (In Testing phase)")
     assert f"⚡ Expiry day · {index} only" in r.text
     # the live list, the same morning, gets the same rule from the same code path
     live = pick.record(MONDAY, root, vix_open=14.01, now_fn=lambda: at)

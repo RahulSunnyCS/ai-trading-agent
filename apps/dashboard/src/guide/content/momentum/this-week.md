@@ -24,6 +24,7 @@ Open this page to read the week, to run something by hand, or to classify a poss
 | Since the 14:40 preview | ETF favourites: what the final changed against the preview, so you know whether a trade made on the preview still stands. |
 | Names at the edge | The weakest names held and the strongest not held, by rank: next rebalance's likely trades. For a group, in the sleeve that trades next. |
 | Telegram message | Folded to one line: whether the headline's message was sent, when, and which run (*sent 16 Oct 20:01 · final*). Click it for the message word for word and **Re-send…**, which opens Run by hand, where a final run can be sent again after you confirm. |
+| Your lots | Only when lots are recorded for the headline (followed lot by lot on Kite): one row per lot with the shares booked to it, their value, its last and next rebalance, which lot is due this Friday and what the last Friday orders said for it; under it, what Kite holds that no lot has booked yet. See below. |
 | Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. **Preview for…** shows another favourite's orders against the same holdings. See below. |
 
 ## Your orders
@@ -79,6 +80,38 @@ time. Nothing here places an order: you place them in your broker yourself.
   the 14:15 job are unchanged. It takes up to a minute when the ranking is not warm; picking another
   favourite meanwhile drops the one waiting, and **Try again** restarts one that failed. Choose
   *Headline: the orders made* to go back. Like the orders, it covers Broad favourites only for now.
+
+## Your lots
+
+Shown above Your orders when the headline is a strategy with a sleeve for every Friday that you
+follow with your Kite money, one **lot** per sleeve (see *Lot by lot* above), once its first lot
+is recorded (`mbt lots seed`). It reads the same ledger as `mbt lots show` and never changes it:
+opening the page or pressing **Refresh** does not read Kite, ask for a price or book a share. Only
+the Friday orders run and `mbt lots seed` / `mbt lots assign` write the ledger. It reads the ledger
+again by itself when Your orders makes orders, syncs or changes its settings.
+
+It is always about now and the coming Friday (on a Friday, that day), even when **Week before**
+shows an earlier week: it then says so. The badge says when Kite was last read: green when read
+today, amber when the snapshot is older (log in on Broker logins and press Sync).
+
+| Column | What it shows |
+|---|---|
+| Lot | Lot 1 is the sleeve that traded on your paper start Friday, Lot 2 the next, and so on. Hover for the sleeve's saved name. |
+| The Friday (*Fri 30 Oct*) | **Due** (with the date) for the lot that rebalances on that Friday, which is highlighted; **Not due** for the others; **Not started** for a lot whose first Friday has not come yet. *last orders were for it* marks the lot whose orders were made last: a change in Kite that the orders did not name is booked to it when it may hold the name. |
+| Holds | The shares the ledger has booked to the lot. A new lot shows *nothing booked yet* until the Friday after you buy it: its Monday buys are booked by that Friday's orders run. |
+| Value | Shares at the last stored daily close (the date, or the range when names' closes differ, is above the table), not a live price. A name with no close is left out of the value and counted as *unpriced* (on the lot and on the *In the lots* total), never as zero. |
+| Last / Next rebalance | The lot's last Friday on its calendar since your paper start, and its next one. |
+| Last orders | What the last orders made on a Friday said for the lot, as the 14:15 Telegram did (orders made by hand earlier in the week plan the coming Friday and are not shown here): *New lot: buy* or *Rebalance* with the money it was given, *Sell only*, or *Not due*. |
+
+**Kite minus the lots** lists every share Kite's last snapshot holds beyond what the lots have
+booked, per stock, with its value and what the last orders told each lot to buy or sell in it.
+After a Monday buy this is the new lot's shares, waiting for Friday. A stock the orders named that
+Kite does not show yet is listed at **0**, *not traded in Kite yet* (a buy you skipped, or one still
+to place). A difference from the orders
+is marked (*1 more than the orders said*): the Friday run books it to the lot whose orders were
+made last when that lot may hold the name, and anything it cannot place stays here as *Not in any
+lot* until you run `mbt lots assign SYMBOL --lot N`. A stock you hold outside the strategy is
+listed too and is never part of a lot; LIQUIDBEES and gold bonds never appear.
 
 ## Reading a group
 

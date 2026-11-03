@@ -1,5 +1,6 @@
 import { CHECK_JOBS } from './checks/index.js';
 import {
+  type DayRule,
   type Schedule,
   everyDay,
   firstWeekdayOfMonth,
@@ -97,7 +98,56 @@ const BROKER_LOGIN = 'packages/broker-login';
 const CONTRACT_NOTES = 'packages/contract-notes';
 const CONTRACT_NOTES_FIX =
   'cd packages/contract-notes && node run.js --dry-run  (the log names the account, session and PDF; after a fix, node run.js --day <day>)';
+
+/** The 00:00 contract-notes run again at `at`, every day, for notes that arrived after it. */
+function contractNotesRetry(id: string, at: string, catchUpHours: number): Job {
+  return {
+    id,
+    description: `The 00:00 contract-notes run again at ${at}, for notes that arrived after it (BL-168); reads only mail newer than the bookmark, so with nothing new it is a few seconds`,
+    schedule: { at, on: everyDay, label: `every day ${at}` },
+    steps: [['node', 'run.js']],
+    cwd: CONTRACT_NOTES,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 20,
+    catchUpHours,
+    group: 'contract-notes',
+    fixHint: CONTRACT_NOTES_FIX,
+  };
+}
+
 const FRIDAY = onWeekdays(5);
+/** Mondays that are trading days: nothing reads Kite on a Monday holiday. */
+const TRADING_MONDAY: DayRule = (day) => tradingDays(day) && onWeekdays(1)(day);
+
+/**
+ * The Fyers login reminder (`mbt token-remind`): silent when Fyers accepts today's token, else one
+ * Telegram message with a link to the hosted Broker logins page, so the owner logs in from a phone.
+ * Fyers has no unattended login (its page has a human check; the refresh-token grant is off).
+ */
+function fyersReminder(
+  id: string,
+  at: string,
+  when: 'morning' | 'evening',
+  catchUpHours: number,
+): Job {
+  return {
+    id,
+    description:
+      when === 'morning'
+        ? 'Fyers: remind to log in (link to the hosted Broker logins page) before the 09:16 pick'
+        : 'Fyers: remind again before the evening collection if still not logged in',
+    schedule: { at, on: tradingDays, label: `trading days ${at}` },
+    steps: [['uv', 'run', 'mbt', 'token-remind', '--send', '--when', when]],
+    cwd: MOMENTUM,
+    timeoutMinutes: 5,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours, // no group: it never opens the catalog, so nothing should queue it
+    fixHint:
+      'Dashboard › Broker logins › Fyers › Log in (or: cd packages/momentum-backtesting && uv run mbt login)',
+  };
+}
 
 const BASE_JOBS: Job[] = [
   {
@@ -145,10 +195,13 @@ const BASE_JOBS: Job[] = [
     fixHint:
       'Check the ANGELONE_* settings in .env, then Broker logins › Angel One › Test connection (or: cd packages/option-backtesting && uv run obt angel test)',
   },
+  fyersReminder('fyers-login-reminder', '08:05', 'morning', 1), // after ~09:05 the pick is near
+  fyersReminder('fyers-login-recheck', '15:30', 'evening', 0.25), // the collection starts 15:45
   {
     // BL-142: the 14:15 orders read the Kite holdings and free cash, and a Kite token dies at
     // 06:00. When Kite is the holdings source and today has no valid login, Telegram the owner
-    // to log in (Broker logins › Kite). Says nothing when the login is fine or Kite is not used.
+    // to log in, with a link to the hosted Broker logins page (a phone login works). Says nothing
+    // when the login is fine or Kite is not used.
     id: 'kite-login-reminder',
     description: 'Kite: remind to log in before the 14:15 orders',
     schedule: { at: '13:30', on: FRIDAY, label: 'Fri 13:30' },
@@ -158,6 +211,20 @@ const BASE_JOBS: Job[] = [
     retries: 0,
     retryDelayMinutes: 0,
     catchUpHours: 0.5, // after ~14:00 a reminder comes too late for 14:15
+    group: 'catalog',
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt kite login',
+  },
+  {
+    // The same on a trading Monday, before the open: Kite's holdings, free cash and fills.
+    id: 'kite-login-reminder-monday',
+    description: 'Kite: remind to log in before the Monday open',
+    schedule: { at: '08:45', on: TRADING_MONDAY, label: 'trading Mondays 08:45' },
+    steps: [['uv', 'run', 'mbt', 'kite', 'remind', '--send', '--when', 'monday']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 5,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 0.5,
     group: 'catalog',
     fixHint: 'cd packages/momentum-backtesting && uv run mbt kite login',
   },
@@ -241,6 +308,25 @@ const BASE_JOBS: Job[] = [
       'cd packages/momentum-backtesting && uv run mbt stocks sync && uv run mbt weekly --run final --only-dataset stock --only-dataset custom_index --only-dataset broad',
   },
   {
+    // BL-024 Phases 2-3: last week's journalled signals scored against this week (the 19:30
+    // run has just recorded the rows and prices it needs), each config re-run on today's code
+    // for the comparison, and the Kite fills reconciled. Writes forward_scores.json only and
+    // sends nothing: the headline's line rides in its 19:30 message.
+    id: 'momentum-journal-score',
+    description:
+      'Score the forward journal against the week after each signal, and reconcile the Kite fills',
+    schedule: { at: '20:30', on: FRIDAY, label: 'Fri 20:30' },
+    steps: [['uv', 'run', 'mbt', 'journal', 'score']],
+    cwd: MOMENTUM,
+    // One engine pass per favourite on cached rankings: about the 19:30 run's own backtests.
+    timeoutMinutes: 60,
+    retries: 1,
+    retryDelayMinutes: 15,
+    catchUpHours: 48,
+    group: 'catalog',
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt journal score',
+  },
+  {
     id: 'momentum-journal-check',
     description: "Check this week's forward journal recorded every favourite",
     schedule: { at: '21:00', on: FRIDAY, label: 'Fri 21:00' },
@@ -272,6 +358,26 @@ const BASE_JOBS: Job[] = [
     alertsItself: true,
     logFile: `${MOMENTUM}/data/launchd-weekly-live-rules.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt live-rules check --send',
+  },
+  {
+    id: 'momentum-history',
+    description:
+      "Check that the stored market history up to a fixed anchor Friday has not changed (BL-001 Phase 4): names each price series, stock's bars or corporate action restated since the baseline",
+    // After the 19:30 stock sync and the evening's other catalog jobs. Read-only on the
+    // catalog (it writes only its baseline file in the Momentum state folder).
+    schedule: { at: '22:00', on: FRIDAY, label: 'Fri 22:00' },
+    steps: [['uv', 'run', 'mbt', 'verify', 'history', '--send']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 10,
+    catchUpHours: 48,
+    group: 'catalog',
+    // A restated history is its own Telegram and exits 0 once Telegram took it; an undelivered
+    // one exits 1 (retried, red on the Jobs page), and a check that cannot run sends its own
+    // message and exits 1.
+    alertsItself: true,
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt verify history --send',
   },
   {
     id: 'options-evening',
@@ -383,7 +489,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'options-rotation-pick',
     description:
-      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 (BL-058) and the T1 parallel track's Adaptive pick in its own journal, and Telegram ONE message: Adaptive, then T1 labelled testing phase (BL-125). Adaptive is never held back by T1; the friends' group gets Adaptive alone",
+      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 (BL-058) and the T1 parallel track's Adaptive pick in its own journal, and Telegram ONE message, to the owner and the friends' group alike: Adaptive, then T1 as Tuned Adaptive (In Testing phase) (BL-125). Adaptive waits for T1 until 09:16:50 at most (20 s after its entry on a later run)",
     // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the evening
     // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
     // and a missed slot is not caught up: it would not be forward.
@@ -403,9 +509,32 @@ const BASE_JOBS: Job[] = [
       'cd packages/option-backtesting && uv run obt rotation pick --with-t1  (a late entry is flagged, not forward)',
   },
   {
+    id: 'rotation-live-board',
+    description:
+      "The Rotation page's Live board (BL-203): today's Adaptive picks, Classic and Tuned, run through the backtest engine on Angel One's 1-minute bars so far, every 5 minutes until 15:31 and whenever the card's Refresh button asks (`obt rotation live-board run`). One Angel One login for the day; nothing written to the lake, nothing sent, nothing traded",
+    // After the 09:16 pick (the board reads its journal entries). One process all session, so the
+    // day takes one Angel One login: the session stays in memory and the login guard's lock is held
+    // only while a refresh reads (angelone/check.py `held`), so the 15:45 collection, a connection
+    // test or `obt angel funds` are never refused for long. A refresh Angel One throttles keeps the
+    // last snapshot and is tried again at the next slot. Exit 3 = a refused login: never retried.
+    // Not in the catalog group: it writes only TRADING_DATA_ROOT/rotation/live-board/*.json.
+    schedule: { at: '09:18', on: tradingDays, label: 'trading days 09:18' },
+    // caffeinate -i: macOS does not idle-sleep while the board runs (as the trade monitor)
+    steps: [['/usr/bin/caffeinate', '-i', 'uv', 'run', 'obt', 'rotation', 'live-board', 'run']],
+    cwd: OPTIONS,
+    timeoutMinutes: 380, // 09:18 to 15:38
+    retries: 2,
+    noRetryExitCodes: [3],
+    retryDelayMinutes: 2,
+    catchUpHours: 6,
+    restartIfInterruptedUntil: '15:25',
+    fixHint:
+      "cd packages/option-backtesting && uv run obt rotation live-board refresh  (one refresh now, the same as the card's Refresh button)",
+  },
+  {
     id: 'algotest-evening',
     description:
-      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
+      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones, then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the morning only has to activate. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
     // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
     // results are incomplete (a late Fyers login), so the retries carry it to 20:40. It deletes the
     // strategies it uploaded that tomorrow drops (--allow-delete, owner 2026-10-20): AlgoTest's own
@@ -433,6 +562,8 @@ const BASE_JOBS: Job[] = [
         '--apply',
         '--allow-delete',
       ],
+      // BL-197: Setup Execution for the T1 picks just uploaded (re-saving a set-up sheet is safe)
+      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--setup', '--apply'],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 15,
@@ -441,7 +572,7 @@ const BASE_JOBS: Job[] = [
     retryDelayMinutes: 60,
     catchUpHours: 4,
     fixHint:
-      'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right)',
+      'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
   },
   {
     id: 'algotest-topup',
@@ -769,20 +900,16 @@ const BASE_JOBS: Job[] = [
     group: 'contract-notes',
     fixHint: CONTRACT_NOTES_FIX,
   },
-  {
-    id: 'contract-notes-retry',
-    description:
-      'The 00:00 contract-notes run again, for notes that arrived after it (BL-168); reads only mail newer than the bookmark, so with nothing new it is a few seconds',
-    schedule: { at: '07:30', on: everyDay, label: 'every day 07:30' },
-    steps: [['node', 'run.js']],
-    cwd: CONTRACT_NOTES,
-    timeoutMinutes: 15,
-    retries: 1,
-    retryDelayMinutes: 20,
-    catchUpHours: 12,
-    group: 'contract-notes',
-    fixHint: CONTRACT_NOTES_FIX,
-  },
+  // Angel One mails a session's note the next morning, and about one in four came after 07:30
+  // (up to 17:10), which left the Trade book a day short until midnight. The owner added
+  // 10:30 and 15:30 (2026-10-28). Before 16:00 a run never looks for that day's own note
+  // (`lastSession` in packages/contract-notes/calendar.js); a 15:30 attempt retried after
+  // 16:00 lists today as waiting, as the 00:00 run does, and closes nothing wrongly.
+  // Every retry catches up until 23:30, so a laptop that slept through one sends no "missed"
+  // alert while a later retry did the same work; a repeated catch-up costs a few seconds.
+  contractNotesRetry('contract-notes-retry', '07:30', 16),
+  contractNotesRetry('contract-notes-retry-1030', '10:30', 13),
+  contractNotesRetry('contract-notes-retry-1530', '15:30', 8),
   {
     // BL-168 Phase 4: the Trade book's capital line. Angel One's free margin at the close, one
     // guarded SmartAPI login (it waits behind the evening collector's, if any). Finvasia is not

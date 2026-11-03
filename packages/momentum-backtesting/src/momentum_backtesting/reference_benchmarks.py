@@ -13,8 +13,8 @@ the strategy beats the obvious off-the-shelf momentum product. These two lines a
 
 Six more TRIs are loaded too (`EXTRA_REFERENCES`, BL-010 Phase 5) for judging a basket
 against the broader market or its own factor family, by name, via
-`criteria.basket_passes(..., indices=...)`. `compare()` and everything that displays comparison
-lines still show only `REFERENCES`, so adding these changed no existing output:
+`criteria.basket_passes(..., indices=...)`. `compare()` shows only `REFERENCES` unless it is
+given another list (`names`), so adding these changed no existing output:
 
 - Nifty Midcap 150 TRI, Nifty Smallcap 250 TRI
 - Nifty Midcap150 Momentum 50 TRI, Nifty500 Momentum 50 TRI
@@ -29,6 +29,12 @@ backtest of the index method, not investable history.
 headline benchmark picker offers (`PICKER`), each with its curve and headline statistics, so the
 page can switch benchmark without running the backtest again. The benchmark never changes the
 simulation itself, only what the result is compared against.
+
+The result chart offers the picker's indices (less the one picked) as optional lines, plus
+`CHART_ONLY`: Nifty 500 TRI, the broad-market line BL-010 judged against, which the picker does
+not offer (BL-036 Phase 1 task 3). `analysis.payload_parts` sends it as `extra_comparisons` only
+when it covers the run, so a result without its data (every golden scenario) is unchanged and
+`comparisons` keeps its two lines.
 
 All of them come from `data/stocks/benchmarks_weekly.csv` (`mbt stocks fetch`, or for just the
 extras `mbt stocks fetch-benchmarks`; niftyindices.com), or the shared database's
@@ -69,6 +75,9 @@ EXTRA_REFERENCES = (
     NIFTY_NEXT50_TRI,
 )
 LOADED = REFERENCES + EXTRA_REFERENCES
+#: Comparison lines the result chart offers that the picker does not (BL-036 Phase 1 task 3);
+#: the picker's own indices reach the chart through `benchmarks`.
+CHART_ONLY = (NIFTY500_TRI,)
 #: The benchmarks the dashboard's headline picker offers, in menu order (owner, 2026-10-07): the
 #: buyable momentum index first. All dividend-inclusive, so any two compare like for like.
 PICKER = (
@@ -160,14 +169,16 @@ def aligned(reference: pd.Series, span: pd.DatetimeIndex) -> pd.Series | None:
     return _align(reference, span)[0]
 
 
-def compare(equity: pd.Series, references: pd.DataFrame) -> list[dict]:
-    """One entry per reference that covers the whole backtest: its rebased curve and the
-    strategy's CAGR edge over it."""
+def compare(
+    equity: pd.Series, references: pd.DataFrame, names: tuple[str, ...] = REFERENCES
+) -> list[dict]:
+    """One entry per index in `names` (default `REFERENCES`, the two every payload shows) that
+    covers the whole backtest: its rebased curve and the strategy's CAGR edge over it."""
     out = []
     if references is None or references.empty or len(equity) < 2:
         return out
     strategy_cagr = metrics.cagr(equity)
-    for name in REFERENCES:
+    for name in names:
         if name not in references:
             continue
         line = aligned(references[name], equity.index)

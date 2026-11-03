@@ -17,7 +17,12 @@ only; their own money is their decision.
   (read-only WebSocket, history and quotes) and, since BL-051 Phase 3, to read the owner's own
   holdings (read-only `/holdings`) for Momentum's "Your orders"; never for order placement.
   **Zerodha Kite** (BL-142, where the Momentum money is from 2026-10-19) is read the same way:
-  holdings and free equity cash through the free Kite Connect Personal plan, never an order.
+  holdings and margins (the free equity cash) through the free Kite Connect Personal plan, never
+  an order; the lot ledger and This week's Lots panel only describe what Kite already holds.
+  **Kite's login is automated** on Fridays and trading Mondays (owner, 2026-10-28, off until
+  `KITE_AUTO_LOGIN=on`), although a Zerodha representative states that automating it is not
+  allowed under exchange regulations (https://kite.trade/forum/discussion/comment/19966/). The
+  owner accepted the risk to the Kite account; turning the switch off ends it.
   AlgoTest strategies run on the owner's own broker accounts.
 - **Offering signals to others (check before doing it):** sharing buy/sell recommendations
   with people outside the owner's own use, especially for a fee, can fall under SEBI's

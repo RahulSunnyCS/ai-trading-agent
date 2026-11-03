@@ -183,6 +183,7 @@ def test_leg_ids_are_stable_and_distinct():
             "trail_peak",
         ),
         ({"leg": {"stop_on": "close"}}, "stop_on: close"),
+        ({"leg": {"reverse_on_sl": {"time_stop_minutes": 30}}}, "reverse_on_sl"),
         ({"square_off": "complete"}, "square_off complete"),
         ({"no_reentry_after": "14:00"}, "no_reentry_after"),
         ({"overall": {"target_inr": 3000}}, "overall target_inr"),

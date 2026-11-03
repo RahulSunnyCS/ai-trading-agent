@@ -42,7 +42,7 @@ the stop button) already runs on the Mac with `.env`, with the locks above.
 Owner, same day, two more for the morning:
 
 - **Enable the Quantiply strategies at 08:00; the 09:16 pick changes only what starts after 09:17**
-  (Phase 4; first asked as "do nothing on the 09:16 Telegram pick"). BL-165
+  (Phase 4; first asked as "do nothing on the 09:16 Telegram pick"). BL-180
   showed the evening's prediction is the real 09:16 pick on 97% of days, with the same return, and the
   09:18 top-up adds nothing measurable. Today the enable is built (`quantiply-deploy.ts`, BL-139 Phase 4)
   but off (`QUANTIPLY_DEPLOY`), scheduled 16:55 for the next session with a 09:21 top-up, and for
@@ -238,7 +238,7 @@ set to that.
 
 - 2026-10-27 — Created from the owner's request; the owner chose GitHub as the backup. Planned.
 - 2026-10-28 — Owner: enable the Quantiply strategies at 08:00 and do nothing on the 09:16 Telegram
-  pick (BL-165: the 09:16 changes make no difference to the result); keep Quantiply's MTM SL at
+  pick (BL-180: the 09:16 changes make no difference to the result); keep Quantiply's MTM SL at
   ₹9,000 for T1 and ₹8,000 for Core, checked each morning and set only when different. Phases 4-6
   added.
 - 2026-10-28 — Owner, later: the 09:16 change is made after all, except where the new strategy enters

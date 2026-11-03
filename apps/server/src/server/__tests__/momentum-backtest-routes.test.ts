@@ -395,6 +395,7 @@ describe('momentum backtest proxy routes', () => {
     ['/api/momentum/weekly/status', 'http://127.0.0.1:8765/api/weekly/status'],
     ['/api/momentum/journal', 'http://127.0.0.1:8765/api/journal'],
     ['/api/momentum/journal?week=2026-10-09', 'http://127.0.0.1:8765/api/journal?week=2026-10-09'],
+    ['/api/momentum/journal/forward', 'http://127.0.0.1:8765/api/journal/forward'],
     [
       '/api/momentum/weekly/stock-sync/jobs/latest',
       'http://127.0.0.1:8765/api/weekly/stock-sync/jobs/latest',
@@ -473,8 +474,10 @@ describe('momentum backtest proxy routes', () => {
       ],
       ['PUT', '/api/momentum/orders/settings', 'http://127.0.0.1:8765/api/orders/settings'],
       ['POST', '/api/momentum/holdings/sync', 'http://127.0.0.1:8765/api/holdings/sync'],
+      ['POST', '/api/momentum/kite/sync', 'http://127.0.0.1:8765/api/kite/sync'],
       ['POST', '/api/momentum/holdings/paste', 'http://127.0.0.1:8765/api/holdings/paste'],
       ['PUT', '/api/momentum/holdings/rules', 'http://127.0.0.1:8765/api/holdings/rules'],
+      ['GET', '/api/momentum/lots', 'http://127.0.0.1:8765/api/lots'],
     ];
     for (const [method, url, upstream] of calls) {
       const response = await server.inject(

@@ -719,3 +719,43 @@ def test_tax_classes_cover_stocks_atomics_and_idle_cash():
     assert classes["Gold"] == classes["Silver"] == tax_mod.GOLD_SILVER
     assert classes["Nasdaq 100"] == classes["Hang Seng"] == tax_mod.INTERNATIONAL
     assert classes[broad.CASH] == tax_mod.DEBT
+
+
+# --------------------------------------------------------------------------
+# _compute_pool_membership: point in time (BL-001 gap, found reading broad.py's docstring).
+# --------------------------------------------------------------------------
+
+
+def _pool_inputs(seed: int = 0):
+    """Four stocks ranked every week from the first week (short lookbacks), all members."""
+    import numpy as np
+
+    weeks = list(pd.date_range("2023-01-06", "2023-10-27", freq="W-FRI"))
+    names = ["AAA", "BBB", "CCC", "DDD"]
+    rng = np.random.default_rng(seed)
+    ranks = pd.DataFrame(
+        [rng.permutation(len(names)) + 1.0 for _ in weeks], index=weeks, columns=names
+    )
+    member = pd.DataFrame(True, index=weeks, columns=names)
+    return weeks, ranks, member
+
+
+def test_pool_membership_at_a_week_never_depends_on_later_ranks():
+    weeks, ranks, member = _pool_inputs()
+    base = broad._compute_pool_membership(ranks, member, weeks, top_n=2, exit_rank=3)
+    for i, week in enumerate(weeks[:-1]):
+        later = ranks.copy()
+        # Reverse every later week's order: a leak of any later rank into this week shows.
+        later.iloc[i + 1 :] = len(later.columns) + 1 - later.iloc[i + 1 :]
+        changed = broad._compute_pool_membership(later, member, weeks, top_n=2, exit_rank=3)
+        assert (changed.iloc[: i + 1] == base.iloc[: i + 1]).all().all(), (
+            f"the pool at or before {week.date()} moved when only later ranks changed"
+        )
+
+
+def test_no_pool_before_the_first_quarter_end_decision():
+    weeks, ranks, member = _pool_inputs()
+    first = broad._quarter_end_weeks(weeks)[0]
+    pool = broad._compute_pool_membership(ranks, member, weeks, top_n=2, exit_rank=3)
+    assert not pool.loc[pool.index < first].any().any()
+    assert pool.loc[first].sum() == 2

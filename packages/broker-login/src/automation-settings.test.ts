@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   DEFAULT_AUTOMATION,
+  algotestDeployBrokers,
   algotestMultiplierRefusal,
   describeSource,
   effectiveRow,
@@ -43,6 +44,7 @@ describe('automation settings for the jobs (BL-140)', () => {
           upload: true,
           multiplier: 1,
           addon: true,
+          dirBoost: false,
           mtmSl: null,
         };
       }),
@@ -129,6 +131,29 @@ describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
   });
 });
 
+describe('Dir ×2 on non-expiry days (BL-183)', () => {
+  it('a snapshot before BL-183 reads as off; a saved value reaches the row', () => {
+    const a = readAutomation(join(import.meta.dirname, 'fixtures', 'automation-settings-v2.json'));
+    assert.ok(Object.values(a.rows).every((r) => r.dirBoost === false));
+    write(
+      saved((s) => {
+        s.rows['quantiply.angelone'].dirBoost = true;
+      }),
+    );
+    assert.equal(effectiveRow(readAutomation(file), 'quantiply', 'angelone').dirBoost, true);
+    assert.equal(effectiveRow(readAutomation(file), 'algotest', 'finvasia').dirBoost, false);
+  });
+
+  it('refuses a value that is not true or false', () => {
+    write(
+      saved((s) => {
+        (s.rows['quantiply.angelone'] as unknown as { dirBoost: unknown }).dirBoost = 'yes';
+      }),
+    );
+    assert.throws(() => readAutomation(file), /dirBoost "yes"/);
+  });
+});
+
 describe('the AlgoTest deployer and a multiplier it cannot set (BL-140 Phase 4)', () => {
   it('does not refuse at 1, and names a row that uploads at more', () => {
     assert.equal(algotestMultiplierRefusal(DEFAULT_AUTOMATION), null);
@@ -173,5 +198,23 @@ describe('MTM SL per Quantiply row (BL-172)', () => {
       write(s);
       assert.throws(() => readAutomation(file), /mtmSl/);
     }
+  });
+});
+
+describe('the brokers an AlgoTest deploy is ticked on (BL-197)', () => {
+  it('every AlgoTest row that uploads the book, and none when the uploads switch is off', () => {
+    const a = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as typeof DEFAULT_AUTOMATION;
+    assert.deepEqual(algotestDeployBrokers(a, 't1'), ['finvasia']);
+    a.rows['algotest.angelone'] = { ...a.rows['algotest.finvasia'] };
+    assert.deepEqual(algotestDeployBrokers(a, 't1'), ['finvasia', 'angelone']);
+    assert.deepEqual(algotestDeployBrokers(a, 'core'), []);
+    a.rows['algotest.angelone'].list = 'core';
+    assert.deepEqual(algotestDeployBrokers(a, 'core'), ['angelone']);
+    // a Quantiply row never puts a broker on AlgoTest's sheet
+    a.rows['quantiply.finvasia'].list = 'core';
+    a.rows['quantiply.finvasia'].upload = true;
+    assert.deepEqual(algotestDeployBrokers(a, 'core'), ['angelone']);
+    a.masters.uploads = false;
+    assert.deepEqual(algotestDeployBrokers(a, 't1'), []);
   });
 });

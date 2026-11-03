@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the messages the owner reads every trading day, from Mon 2026-10-19 |
-| **Status** | In progress — built 2026-10-18 |
+| **Status** | Done (2026-10-28): built 2026-10-18 (#245, #249); BL-173 later gave the pick and result their own message types and levels |
 | **Type** | feature |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -102,3 +102,9 @@ Lists A / B / REF, the journal, scoring, the dashboard's rotation pages, per-tra
   try again; review of #249) and a last `result`; in `send_result` the owner goes first, a failing group copy is retried on its
   own and never holds back the owner's T1 follow-up, and a T1 that cannot be read alerts the owner;
   `obt rotation verify --track t1` checks the T1 journal.
+- 2026-10-28 — **Closed** (owner, asked in chat, 2026-10-28). Delivered: one 09:16 message (Adaptive,
+  then T1 as testing phase, self-explaining labels), the short 16:00 result with tomorrow's strategies in
+  full, the group copies, retries and sent markers (#245, #249), in daily use since Mon 2026-10-19.
+  Changed since by BL-173 (2026-10-28): the pick and the result are typed (`options.pick` / `.result`) with
+  a level each (On / Failures only / Off) on the dashboard's Telegram alerts card; both stay one message,
+  T1 apart only when late. Status `Done`.

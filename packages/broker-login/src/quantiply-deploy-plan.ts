@@ -2,6 +2,7 @@ import {
   FINISHED,
   type QAlgo,
   type QLedgerRow,
+  type QManifest,
   SESSION_OVER_MINUTES,
   ownedIds,
   weekdayOf,
@@ -703,4 +704,45 @@ export function clientwiseBody(
     if (mon.trailingInterval !== undefined) body.trailingInterval = mon.trailingInterval;
   }
   return body;
+}
+
+/** Whether any weekday's clientwise stop-loss is tighter than −`rupees` (or unset). */
+export function clientwiseBelow(days: Record<string, ClientwiseDay>, rupees: number): boolean {
+  return QUANTIPLY_WEEKDAYS.some((d) => {
+    const v = days[d]?.stoploss;
+    return v === null || v === undefined || v === 0 || Math.abs(v) < Math.abs(rupees);
+  });
+}
+
+/** BL-183: what a doubled pick with no MTM SL of its own adds to the book stop, per extra lot. */
+export const NO_STOP_EXTRA_INR = 4000;
+
+/**
+ * BL-183: how far the account's book stop (the clientwise MTM SL) rises for a session whose export
+ * trades a pick at more than 1 lot (the picked Dir on a non-expiry day): each such pick's own MTM SL
+ * per lot times its extra lots and the row's multiplier (₹4,000 a lot when it has none, the owner's
+ * rule), counting only picks the account holds as exported. 0 when the export doubles nothing. Read from the bodies the uploader sent, whose stop is already the doubled one.
+ */
+export function bookStopExtra(
+  manifest: QManifest,
+  body: Map<string, Record<string, unknown>>,
+  /** the row's platform multiplier: the doubled lot runs at it too */
+  multiplier = 1,
+  /** names the account holds as exported (the uploaded content is this body); unset = all */
+  held?: Set<string>,
+): number {
+  if (!manifest.dir_boost) return 0;
+  let extra = 0;
+  for (const s of manifest.strategies) {
+    const lots = s.lots ?? 1;
+    if (s.addon || lots <= 1) continue;
+    // a pick still on the account at another size (uploaded before the switch changed and not
+    // replaced in the morning) does not trade the extra lot, so it does not raise the stop
+    if (held && !held.has(s.name)) continue;
+    const cfg = body.get(s.name)?.configurations as { stoploss?: { value?: unknown } } | undefined;
+    const v = cfg?.stoploss?.value;
+    const perLot = typeof v === 'number' && v < 0 ? Math.abs(v) / lots : NO_STOP_EXTRA_INR;
+    extra += perLot * (lots - 1) * multiplier;
+  }
+  return Math.round(extra);
 }

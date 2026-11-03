@@ -35,10 +35,10 @@ const nextConfig: NextConfig = {
   // 30s rewrite-proxy timeout would drop it as a 500. Matches the Fastify proxy's 180s.
   experimental: { proxyTimeout: 180_000 },
   // The Guide's pages are Markdown files imported as strings (`import body from './x.md?raw'`,
-  // BL-041). Vitest understands `?raw` natively; webpack needs this one rule.
-  webpack(config) {
-    config.module.rules.push({ resourceQuery: /raw/, type: 'asset/source' });
-    return config;
+  // BL-041). Vitest understands `?raw` natively; Turbopack (Next 16's bundler for `next dev`
+  // and `next build`) needs this one rule.
+  turbopack: {
+    rules: { '*.md': { condition: { query: /raw/ }, type: 'raw' } },
   },
   async rewrites() {
     return [
@@ -168,6 +168,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/journal`,
             },
             {
+              source: '/api/momentum/journal/forward',
+              destination: `${momentumDirectOrigin}/api/journal/forward`,
+            },
+            {
               source: '/api/momentum/week',
               destination: `${momentumDirectOrigin}/api/week`,
             },
@@ -181,9 +185,19 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/orders/:path*`,
             },
             {
-              // BL-142: status, login (read-only Kite)
+              // BL-142: status, login, sync (read-only Kite)
               source: '/api/momentum/kite/:path*',
               destination: `${momentumDirectOrigin}/api/kite/:path*`,
+            },
+            {
+              // BL-142 Phase 4: the Lots panel (read-only)
+              source: '/api/momentum/lots',
+              destination: `${momentumDirectOrigin}/api/lots`,
+            },
+            {
+              // BL-200: the Trade book's Momentum rebalance log (read-only)
+              source: '/api/momentum/lots/rebalances',
+              destination: `${momentumDirectOrigin}/api/lots/rebalances`,
             },
             {
               // sync, paste, rules

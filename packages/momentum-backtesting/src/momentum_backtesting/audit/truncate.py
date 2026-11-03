@@ -7,6 +7,9 @@ earlier decision.
 Rows are dropped by date from every dated table and from the daily bars. Tables with no date
 (instrument names, company identities) are copied whole. What this cannot remove is hindsight
 stored without a date: today's index list recorded against every year, and category tags.
+Interval tables are copied whole too (`index_membership`, `company_symbols`, `instruments`'
+listing and delisting dates): a row that starts or ends after the cut is still visible, so a
+rule that reads one of those dates would pass this test while looking ahead.
 """
 
 from __future__ import annotations

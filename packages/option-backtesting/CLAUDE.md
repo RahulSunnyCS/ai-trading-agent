@@ -159,6 +159,15 @@ Otherwise:
   (`daylog._rescore`, `explain`, `rankic`), `tomorrow.expected_picks` uses `rule_index(next session)`, and
   reconstructed history never applies it. Kill switch `ROTATION_EXPIRY_ONLY_FROM` (`YYYY-MM-DD` | `off`, read
   at call time; any other value makes the pick fail loudly).
+- `rotation/sl150_cap.py` — the SL150% cap (BL-192, owner 2026-10-30; BL-191 Amendment 2's arm D2): from
+  `CAP_FROM` (Fri 2026-10-30), on a day NIFTY does not expire, list C holds at most one `N_wide-t1s4` (T1's
+  SL150% NIFTY OTM1 Widesl; Core has none, so Core never changes). A FILTER like BL-122's: only when the
+  selected core holds two or more copies, the best-ranked stays and `score.select` runs again without the
+  others. Applied by `pick.score_history` (the block then carries `sl150_capped`, the core before the cap),
+  `pick.next_best` (never a capped-out copy) and the morning rule (`morning._reproduces` / `choose`, a kept
+  09:17 copy stays). It is decided by the day itself, so every re-derivation applies it and days before the
+  start are unchanged. Kill switch `ROTATION_SL150_CAP_FROM` (`YYYY-MM-DD` | `off`, read at call time; any
+  other value makes the pick fail loudly).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
@@ -171,6 +180,15 @@ Otherwise:
   activate % of entry, out at exit % of its highest, reason TRAIL; with an SL on the same bar the higher
   level wins) and `stop_on: tick | close` (BL-164: `close` judges the SL, target and both trails on the
   bar's close and fills there). The `.algtst` and Quantiply exporters refuse both by name.
+  `reverse_on_sl: {lots_ratio, stop_loss_percent, time_stop_minutes, trail_peak}` (sold legs, BL-186,
+  research only): when the leg's SL fills, the same contract is bought at that fill as its own trade
+  (`<leg>_rev`; ratio 1.0 or 0.5, a fractional quantity), with its own 30% stop by default, an optional
+  time stop (exit at the price N minutes after the buy, reason TIME) and peak trail, else held to the
+  exit; it counts in the overall MTM; a reversed leg is not re-entered, one reversal per leg a day;
+  `_DaySim._reverse_allowed` is the hook a research filter overrides. Both exporters refuse it by name.
+  Amendment 1 adds `strike_premium` (buy the strike priced closest to it, 0.7x-1.4x, filled at the close of the stop bar,
+  none or the stopped contract = no reversal) and `resell_after_reverse` (RE COST waits until the long has closed), both
+  left out of the dump at their defaults; day forensics lists `<leg>_rev` as an attribution row.
   Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`). `fyers/expired.py` repairs holes in the option lake from Fyers' expired-F&O API (`obt fyers expired-options`, 2026-10-21): it plans only the index sessions with no option file (`--all-days` to top up thin ones too), takes expiries and contract symbols from the API (never reconstructed), caches every contract's raw response under `raw/fyers-expired/` (reused only when it covers the requested window), merges by (instrument_id, ts) with existing rows winning, and merges a day only once every expiry it needs is cached (one partition write per day), so a stop anywhere never leaves a day with a file but short of an expiry (which `missing_only` would then skip). `client.response_state` classifies each response: `ok` / `no_data` / `permanent` (an allow-list: "invalid symbol" / "symbol not found" / "no data", on HTTP 200/400 only; cached and listed in `failed_contracts`, asked again only with `--retry-refused`) / `retryable` (everything unrecognised, network, 5xx, other 4xx; not cached; three in a row stop the run) / `blocked` (no subscription to the API, 401/403: stops) / `rate_limited` (stops). Refusals are held (run-wide, keyed by underlying and expiry; `fyers/expired.py`'s `_Fetcher`) and cached only once a later contract answers, or once a contract that answered before (`last_ok`, seeded from any cached `ok` in the plan) answers again when asked, at five in a row, at an expiry's end and at the end of the run. With nothing answered yet, a contract from the middle of the rest of the listing (nearest the money) is asked instead. If the contract asked is refused too, the run stops with none cached (`refused_streak`); with nothing to ask at all, the run ends `refused_unconfirmed` (exit 2). A transient error on that request leaves the refusals to the next run and counts toward the retry stop. A rejected token stops too (CLI exit 1; the other stops exit 2), and the days merged so far are judged and derived even when a run fails (topped-up days with `derived.rebuild(force_days=)`). Days whose expiry set may include one not yet expired (the API lists only expired ones) are listed as `days_short_of_unexpired_expiries` and held (in `pending_days`) unless `--allow-short`; ready days merge `MERGE_CHUNK_DAYS` (5) at a time, the symbol master before the partition; an undecodable listed symbol is skipped and listed. Ingest runs are recorded as source `fyers-expired`; after a repair, `obt legwise rerun` (and `obt rotation update --day D`) refresh stored results. `FyersClient(per_minute=, max_rate_limit_hits=)` is opt-in (Prime: stay under 10/s and 500/min; a second 429 raises `RateLimitedError`, because repeated per-minute breaches block the account for the day); `candles_from_response` reads an expired response's candles by `columns` name. Plan: Prime for the real run.
 - `live/session.py` + `api/live_routes.py` — the Live page's data (BL-117 Phase 3; `GET /legwise/live/days` and
   `/session?underlying=NIFTY|SENSEX&day=`, proxied at `/api/backtest/legwise/live/*`), read-only. One day on the
@@ -239,6 +257,12 @@ Otherwise:
   `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
+  Phase 2 (2026-10-28): `obt-mcp`'s `validate_rule` / `test_rule` / `list_rule_tests` (`mcp/server.py`) call the same
+  `spec.load_spec` / `read_back`, `study.run_test` and `store.ledger` / `counts`; `test_rule` takes the `spec_hash`
+  `validate_rule` returned (a mismatch runs nothing), always runs `mode="locked"` (no `open_all`, no reveal tool: a
+  confirmation test runs only for a rule the owner revealed with `obt rule reveal`) and returns the read-back, the result
+  (per-event `rows` / `equity` only with `include_rows`), the CLI's `render` text, its ledger row and the counts.
+  Synchronous: a new template's first test can take minutes. Tests: `tests/unit/test_mcp_rules.py`.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
@@ -249,18 +273,41 @@ Otherwise:
   in `rotation/messages.py`; strategy names come from `rotation/labels.py` (`label(name)` -> head `N_widesl_OTM1` +
   params `SL115% · TSL15%/10% · REnone · MTMSL2500`, read from the variant's own YAML; an id with no file is shown
   raw, never an error) and `rotation/list_names.json` (also imported by the dashboard) for list names. `rotation/deliver.py`
-  decides when they go: `pick_and_send` (the 09:16 job: Adaptive recorded first and sent to the friends' group at once,
-  T1 right after reusing its VIX read; the owner's message carries both if T1 is in by `t1_deadline` (09:16:50 IST, or
-  20 s after Adaptive's entry), else Adaptive alone with `T1 · follows in a separate message` (or `not recorded today` when T1
-  failed) and T1 follows; a dry run writes nothing, not even the T1 catch-up)
+  decides when they go: `pick_and_send` (the 09:16 job: Adaptive recorded first, T1 right after reusing its VIX read; the
+  message carries both if T1 is in by `t1_deadline` (09:16:50 IST, or 20 s after Adaptive's entry), else Adaptive alone
+  with `· follows in a separate message` (or `· not recorded today` when T1 failed) and T1 follows; the owner and the
+  friends' group get every message alike (2026-10-28), alerts stay private; a dry run writes nothing, not even the T1
+  catch-up)
   and `send_result` (the evening message, under `result.sending_lock`, a per-day `flock`; any error reading T1 degrades
-  to `T1 · result not ready`, alerts the owner and never stops Adaptive's result; the owner's message goes first and a
-  failing group copy is retried on its own, never holding back the owner's T1 follow-up; `--not-before 16:00 --soft-fail` is
+  to `result not ready`, alerts the owner and never stops Adaptive's result; the owner's message goes first and a
+  failing group copy is retried on its own, never holding back the owner's T1 follow-up; the group's copy is the owner's
+  without BL-141's live lines, and a late T1 result follows to the group too (`group-t1-owed` / `group-t1` markers); `--not-before 16:00 --soft-fail` is
   the evening run's last step, so a run that succeeds only on a late retry still sends that evening). `obt rotation verify
-  --track t1` checks the T1 journal. Nothing in them touches a pick, a score, a hash or a journal field.
+  --track t1` checks the T1 journal. Nothing in them touches a pick, a score, a hash or a journal field. The messages
+  call T1 `messages.T1_NAME`, "Tuned Adaptive (In Testing phase)"; alerts and logs still say T1.
+  `rotation/month.py` (owner, 2026-10-30) adds the month so far from `MONTH_FROM` (2026-11-01): each list's paper
+  net and days won over the month's journal days (`result.calculate`; an unscored day left out, never zero; a Dir ×2
+  list's as-traded total by `result.as_traded`) in both copies, and the account's real month (`realised.views.days`'
+  `profit`, up to the day before, the notes arriving at 00:00) in the owner's only; a failure drops those lines, never
+  the message.
+  Slippage (owner, 2026-10-30): `rotation/slip_store.py` keeps a 0.5% slippage copy beside every results file
+  (`store.slip_path`, `<folder>/slip-0.5/`), written by `rotation update`, the base's scoring and `obt rotation
+  slippage-fill`. `store.slipped(pct)` (a context variable; the API's `slippage` parameter sets it per request in
+  `api/slippage_middleware.py`) makes every reader that goes through `store.read_path` / `read_net` /
+  `base.read_column` read the copy; a cache over results keys on `store.reading_slip()`. Anything that re-ranks
+  (`pick.load_history`, `lot_plans.Sources`, `daylog.reconstruction`) reads with `slipped(0)`, and `explain`,
+  `rankic` and `live_compare` read the stored files directly. A new direct reader of a results CSV must go through
+  `store.read_path` unless it re-ranks. The evening message (`rotation/slippage.py`) reads the copy too, copying a
+  missing pick first; a pick that cannot be copied sends the day unslipped, without the label, and drops the month.
+  Unit tests run with the message's slippage off (`tests/conftest.py`).
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs) for the live list or
-  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming). Sent markers are per
-  destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
+  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming).
+  The month-so-far lines (`rotation/month.py`, `messages.month_lines`) give each net as a share of its capital
+  (owner 2026-10-29; `deliver.message_capital`): a list's is `automation_settings.book_capital` (the Settings ›
+  Automation `capital` of the broker accounts whose rows upload that list, each once; ₹8.5 lakh an account by
+  default, and `capital()` never raises, so `read` stays strict for the jobs), the account's real month every
+  account's capital added up. A failure in any of these is echoed and leaves only its lines out. Sent markers are per
+  destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`, `.group-t1-owed.sent`, `.group-t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
   covers owner + group), so a retry never double-sends and a late T1 result still follows as its own message; `obt rotation result --force` resends.
   Days to expiry in the rotation are **weekdays** (Monday to Friday dates after the session up to the expiry;
   holidays are not excluded; BL-109, 2026-10-15): `rotation/dte.py` holds the count, `live.py` builds the live
@@ -483,7 +530,7 @@ Otherwise:
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
 - `research/common/` — code two research items share, imported by module name after a `sys.path` insert of this
-  folder (`varlib`, `early_ref`, `rotparse`; BL-164 added `gap_and_go_specs` (BL-164's rules, which BL-165 subsets); BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
+  folder (`varlib`, `early_ref`, `rotparse`; BL-164 added `gap_and_go_specs` (BL-164's rules, which BL-165 subsets); BL-186 added `adaptive_picks` (Adaptive's picks per book, recorded or reconstructed, moved out of `bl156/replay.py`); BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
   re-exports it) and `breakout_specs` (BL-152's 192 registered rule specs, also used by BL-153)). A script never imports
   from another item's folder.
 - `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
@@ -493,6 +540,15 @@ Otherwise:
   half-years, bootstrap vs template, DTE / VIX / weekday strata, breadth over the 25 slots),
   `stage2.py` (the winners' neighbourhoods and the flatness verdict), `check_regression.py`. Research only:
   never writes a strategy YAML; the pre-registration is the backlog item's Phase 0.
+- `research/bl202/` — BL-202, the Buy-only sweep scored at 1 % slippage: `grid.py` (the registered
+  Buy axes at one slot per band, the Stage-2 axes and the Stage-3 day rules under one SHA, every cell
+  with `slippage_pct` 1.0 inside the strategy; `tests/unit/test_bl202_grid.py` holds the counts),
+  `run_grid.py` (BL-104's runner shape, Buy only; the part signature carries the days actually run, so
+  a resume on a later day still matches; beside the net series it stores day-stop flags, winning and
+  losing trade sums and charges in `series/<cohort>.aux.npz`), `score.py` (the registered gates, the
+  5-day block-bootstrap lower bound with paired resamples, the plateau rule and the per-cohort tables,
+  every figure from ONE half of the window split at `grid.FIT_TO`; `--half test` scores only a
+  committed `--only` finalist list). Results git-ignored under `results/<tag>/`.
 
 ## Commands
 

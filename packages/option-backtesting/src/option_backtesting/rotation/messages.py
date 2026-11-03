@@ -4,7 +4,8 @@ a hash, so the picks, the journal and the scoring are exactly what they were; on
 changes.
 
 Morning (09:16): Adaptive, then the T1 track, in one vertical message. Evening (16:00): the day's
-result for both, then tomorrow's strategies in full. Strategy names come from `labels.label`, so
+result for both, then tomorrow's strategies in full. The owner and the friends' group get the same
+text, except the owner's evening live-vs-paper lines. Strategy names come from `labels.label`, so
 every line says what the strategy does (`N_widesl_OTM1` and its stop loss, trail, re-entry and
 overall stop) instead of an id.
 """
@@ -14,21 +15,23 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date, timedelta
 
-from . import labels
+from . import labels, live_lots
 from .lists import DISPLAY_NAMES
 
 ADAPTIVE_KEY = "C"
 NUMBERS = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣")
 SEPARATOR = "━━━━━━━━━━━━━━━"
-T1_HEAD = "🧪 T1 · TESTING PHASE · not traded"
-T1_NOT_RECORDED = "🧪 T1 · TESTING PHASE · not recorded today"
+#: what the messages call the T1 track (owner, 2026-10-28); alerts and logs still say T1
+T1_NAME = "Tuned Adaptive (In Testing phase)"
+T1_HEAD = f"🧪 {T1_NAME}"
+T1_NOT_RECORDED = f"{T1_HEAD} · not recorded today"
 #: the morning note when T1 is still being recorded (slow, or its results being caught up): it
 #: follows as a message of its own, or an alert says it failed
-T1_FOLLOWS = "🧪 T1 · TESTING PHASE · follows in a separate message"
+T1_FOLLOWS = f"{T1_HEAD} · follows in a separate message"
 #: the evening message's T1 notes
-T1_RESULT_NOT_READY = "🧪 T1 · result not ready"
-T1_RESULT_NOT_RECORDED = "🧪 T1 · not recorded today"
-T1_TOMORROW_NOT_READY = "🧪 T1 · not ready"
+T1_RESULT_NOT_READY = f"{T1_HEAD} · result not ready"
+T1_RESULT_NOT_RECORDED = T1_NOT_RECORDED
+T1_TOMORROW_NOT_READY = f"{T1_HEAD} · not ready"
 LATE_LINE = "⚠️ LATE · not a forward entry"
 MINUS = "−"
 
@@ -44,6 +47,10 @@ def rupees(value: float) -> str:
     rounded = round(value)
     sign = "+" if rounded > 0 else MINUS if rounded < 0 else ""
     return f"{sign}₹{abs(rounded):,}"
+
+
+#: the line a T1 entry the BL-192 cap changed adds to the morning message
+SL150_CAP_LINE = "✂️ One SL150% Widesl only (non-expiry day)"
 
 
 def expiry_day_line(index: str) -> str:
@@ -107,13 +114,17 @@ def pick_lines(
     core: Sequence[str],
     buy: Sequence[str] = (),
     options: dict[str, str | None] | None = None,
+    lots: dict[str, int] | None = None,
 ) -> list[str]:
     """The numbered strategies (by entry time), the Buy add-on when there is one, and the optional
-    next-best line. Each strategy is its time and head, with its full settings underneath."""
+    next-best line. Each strategy is its time and head, with its full settings underneath; a pick
+    traded at more than 1 lot (`lots`, BL-183) says so after its head."""
     lines: list[str] = []
     for i, name in enumerate(_by_time(core)):
         lab = labels.label(name)
-        lines.append(f"{NUMBERS[i] if i < len(NUMBERS) else '▪️'} {_at(name, lab.head)}")
+        n = (lots or {}).get(name, 1)
+        size = f" · {n} lots" if n > 1 else ""
+        lines.append(f"{NUMBERS[i] if i < len(NUMBERS) else '▪️'} {_at(name, lab.head)}{size}")
         if lab.params:
             lines.append(f"   {lab.params}")
     if buy:
@@ -142,6 +153,13 @@ def optional_line(options: dict[str, str | None] | None) -> str:
     return "➕ Optional: " + " · ".join(parts) if parts else ""
 
 
+def lots_line(core: Sequence[str], dte: dict[str, str] | None) -> tuple[str, dict[str, int]]:
+    """BL-183, for a list whose accounts trade the Dir ×2 rule: `🔢 4 lots · Dir ×2`, `🔢 3 lots ·
+    expiry day` or `🔢 3 lots · no Dir picked`, and the lots per pick it describes."""
+    lots = live_lots.lots_for_day(list(core), dte)
+    return f"🔢 {sum(lots.values())} lots · {live_lots.summary(list(core), dte)}", lots
+
+
 def footer(entry: dict) -> str:
     """`🔒 f1a77247 · 09:16`: the entry's chain hash and the minute it was recorded."""
     h = str(entry.get("hash", ""))
@@ -154,18 +172,35 @@ def _entry_picks(entry: dict) -> tuple[list[str], list[str]]:
     return list(block["core"]), list(block["buy"])
 
 
+def _entry_lots(
+    entry: dict, core: list[str], boost: bool
+) -> tuple[list[str], dict[str, int] | None]:
+    """The lots line and lots of an entry's picks when the list trades the Dir ×2 rule."""
+    if not boost:
+        return [], None
+    from .dte import entry_labels
+
+    line, lots = lots_line(core, entry_labels(entry))
+    return [line], lots
+
+
 def _adaptive_block(
-    entry: dict, options: dict[str, str | None] | None, previous: dict | None = None
+    entry: dict,
+    options: dict[str, str | None] | None,
+    previous: dict | None = None,
+    boost: bool = False,
 ) -> list[str]:
     head = f"🎯 {DISPLAY_NAMES.get(ADAPTIVE_KEY, 'Adaptive').upper()} · {day_text(entry['day'])}"
     lines = [_with_dte(head, entry.get("dte"))]
     if entry.get("expiry_only"):
         lines.append(expiry_day_line(entry["expiry_only"]))
     core, buy = _entry_picks(entry)
+    sized, lots = _entry_lots(entry, core, boost)
+    lines += sized
     change = change_line(entry["day"], previous, core, buy)
     if change:
         lines.append(change)
-    return [*lines, "", *pick_lines(core, buy, options)]
+    return [*lines, "", *pick_lines(core, buy, options, lots)]
 
 
 def _t1_block(
@@ -174,30 +209,45 @@ def _t1_block(
     *,
     dated: bool = False,
     previous: dict | None = None,
+    boost: bool = False,
 ) -> list[str]:
     head = f"{T1_HEAD} · {day_text(entry['day'])}" if dated else T1_HEAD
     lines = [head]
     if entry.get("expiry_only"):  # BL-122 restricts T1 as well, so its block says so too
         lines.append(expiry_day_line(entry["expiry_only"]))
+    if (entry.get("lists", {}).get(ADAPTIVE_KEY) or {}).get("sl150_capped"):  # BL-192
+        lines.append(SL150_CAP_LINE)
     # inside the combined message; a T1 message of its own carries LATE as its first line instead
     if not dated and not entry.get("before_first_entry", True):
         lines.append(f"   {LATE_LINE}")
     core, buy = _entry_picks(entry)
+    sized, lots = _entry_lots(entry, core, boost)
+    lines += sized
     change = change_line(entry["day"], previous, core, buy)
     if change:
         lines.append(change)
-    return [*lines, "", *pick_lines(core, buy, options)]
+    return [*lines, "", *pick_lines(core, buy, options, lots)]
 
 
 def _late_prefix(entry: dict) -> list[str]:
     return [] if entry.get("before_first_entry", True) else [LATE_LINE]
 
 
-def render_entry(entry: dict, options: dict[str, dict[str, str | None]] | None = None) -> str:
+def render_entry(
+    entry: dict,
+    options: dict[str, dict[str, str | None]] | None = None,
+    boost: dict[str, bool] | None = None,
+) -> str:
     """One journal entry as a message of its own: Adaptive's layout for the live entry, the T1
-    layout (labelled testing phase) for a track entry."""
+    layout (labelled testing phase) for a track entry. `boost` ({'adaptive', 't1'}: whether that
+    list's accounts trade the Dir ×2 rule, BL-183) adds its lots line."""
     own = (options or {}).get(ADAPTIVE_KEY)
-    body = _t1_block(entry, own, dated=True) if entry.get("track") else _adaptive_block(entry, own)
+    boost = boost or {}
+    body = (
+        _t1_block(entry, own, dated=True, boost=boost.get("t1", False))
+        if entry.get("track")
+        else _adaptive_block(entry, own, boost=boost.get("adaptive", False))
+    )
     lines = [*_late_prefix(entry), *body, "", footer(entry)]
     return "\n".join(lines)
 
@@ -209,25 +259,31 @@ def render_morning(
     t1_options: dict[str, dict[str, str | None]] | None = None,
     t1_note: str = T1_NOT_RECORDED,
     previous: dict | None = None,
-) -> tuple[str, str]:
-    """(the owner's message, the group's copy). The owner sees Adaptive, then the T1 track (or,
-    with no T1 entry, `t1_note`: not recorded, or follows separately); the group sees Adaptive
-    alone. Both end with the Adaptive entry's chain hash. `previous` is the list the evening
-    message sent for this session (`result.read_tentative`): each list then says whether it
-    changed."""
+    boost: dict[str, bool] | None = None,
+) -> str:
+    """The 09:16 message, the same for the owner and the friends' group: Adaptive, then the T1
+    track (or, with no T1 entry, `t1_note`: not recorded, or follows separately), ending with the
+    Adaptive entry's chain hash. `previous` is the list the evening message sent for this session
+    (`result.read_tentative`): each list then says whether it changed."""
     previous = previous or {}
+    boost = boost or {}
     adaptive = _adaptive_block(
-        live, (live_options or {}).get(ADAPTIVE_KEY), previous.get("adaptive")
+        live,
+        (live_options or {}).get(ADAPTIVE_KEY),
+        previous.get("adaptive"),
+        boost.get("adaptive", False),
     )
-    prefix = _late_prefix(live)
-    group = "\n".join([*prefix, *adaptive, "", footer(live)])
     t1_lines = (
         [t1_note]
         if t1 is None
-        else _t1_block(t1, (t1_options or {}).get(ADAPTIVE_KEY), previous=previous.get("t1"))
+        else _t1_block(
+            t1,
+            (t1_options or {}).get(ADAPTIVE_KEY),
+            previous=previous.get("t1"),
+            boost=boost.get("t1", False),
+        )
     )
-    private = "\n".join([*prefix, *adaptive, "", SEPARATOR, *t1_lines, "", footer(live)])
-    return private, group
+    return "\n".join([*_late_prefix(live), *adaptive, "", SEPARATOR, *t1_lines, "", footer(live)])
 
 
 # -- evening ------------------------------------------------------------------------------------
@@ -249,13 +305,88 @@ def _result_rows(strategies: Sequence[tuple[str, float]]) -> list[str]:
 
 
 def result_block(
-    emoji: str, name: str, gain: float, strategies: Sequence[tuple[str, float]]
+    emoji: str,
+    name: str,
+    gain: float,
+    strategies: Sequence[tuple[str, float]],
+    traded: tuple[int, float] | None = None,
 ) -> list[str]:
-    return [f"{emoji} {name.ljust(8)}   {rupees(gain)}", *_result_rows(strategies)]
+    """A list's paper result at 1 lot a strategy; `traded` (BL-183: (lots, rupees) on a day the
+    list's accounts traded the Dir at 2 lots) adds what those lots made."""
+    out = [f"{emoji} {name.ljust(8)}   {rupees(gain)}", *_result_rows(strategies)]
+    if traded is not None:
+        out.append(f"   As traded (Dir ×2, {traded[0]} lots): {rupees(traded[1])}")
+    return out
 
 
-def _next_lines(title: str, picks) -> list[str]:
-    return [title, *pick_lines(picks.core, picks.buy, picks.options)]
+def _won(m) -> str:
+    days = f"{m.days} day{'s' if m.days != 1 else ''}"
+    return f"won {m.won} of {days} ({round(100 * m.won / m.days)}%)"
+
+
+def lakhs(value: float) -> str:
+    """`₹8.5 L`, `₹10 L`."""
+    return f"₹{value / 100_000:.2f}".rstrip("0").rstrip(".") + " L"
+
+
+def _of_capital(value: float, capital: float | None) -> str:
+    """` (+2.7% of ₹8.5 L)`: `value` as a share of `capital`, one decimal; '' with no capital."""
+    if not capital:
+        return ""
+    share = round(100 * value / capital, 1)
+    sign = "+" if share > 0 else MINUS if share < 0 else ""
+    return f" ({sign}{abs(share):.1f}% of {lakhs(capital)})"
+
+
+def _month_rows(head: str, m, capital: float | None = None) -> list[str]:
+    rows = [f"{head}   {rupees(m.net)}{_of_capital(m.net, capital)} · {_won(m)}"]
+    if m.as_traded is not None:
+        rows.append(f"   As traded (Dir ×2): {rupees(m.as_traded)}")
+    return rows
+
+
+def _slip(pct: float | None) -> str:
+    return f" and {pct:g}% slippage" if pct else ""
+
+
+def month_lines(
+    day: date | str, adaptive=None, t1=None, real=None, capital: dict | None = None
+) -> list[str]:
+    """The month so far (`month.Month`s; any may be None and is then left out): each list's paper
+    net and days won, a Dir ×2 list's as-traded net, and the account's real profit (`real`, the
+    owner's copy only). `capital` ({'adaptive', 't1', 'total'}, rupees; owner 2026-10-29) adds
+    each net as a share of its capital: a list's, or every account's for the real one. No lines
+    when there is nothing to show."""
+    capital = capital or {}
+    rows: list[str] = []
+    if adaptive is not None:
+        rows += _month_rows("🎯 Adaptive", adaptive, capital.get("adaptive"))
+    if t1 is not None:
+        rows += _month_rows("🧪 Tuned Adaptive", t1, capital.get("t1"))
+    if real is not None:
+        through = f" to {day_text(real.through)}" if real.through else ""
+        share = _of_capital(real.net, capital.get("total"))
+        rows.append(f"💰 Your account{through}   {rupees(real.net)}{share} · {_won(real)}")
+    if not rows:
+        return []
+    d = date.fromisoformat(day) if isinstance(day, str) else day
+    head = f"📅 {d.strftime('%B')} so far"
+    if adaptive is not None or t1 is not None:
+        head += " · paper, 1 lot per strategy"
+        slips = {m.slippage_pct for m in (adaptive, t1) if m is not None}
+        if len(slips) == 1:
+            pct = slips.pop()
+            head += f", {pct:g}% slippage" if pct else ""
+    return [head, *rows]
+
+
+def _next_lines(title: str, picks, boost: bool = False) -> list[str]:
+    lots = None
+    lines = [title]
+    if boost:
+        line, lots = lots_line(picks.core, getattr(picks, "dte", None))
+        lines.append(line)
+    return [*lines, *pick_lines(picks.core, picks.buy, picks.options, lots)]
 
 
 def render_result(
@@ -267,21 +398,32 @@ def render_result(
     *,
     heading: str = "result",
     live: Sequence[str] | None = None,
+    boost: dict[str, bool] | None = None,
+    traded: dict[str, tuple[int, float] | None] | None = None,
+    month: Sequence[str] | None = None,
+    slippage: float | None = None,
 ) -> str:
     """The evening message. `adaptive` and `t1` are (total, [(strategy, rupees)]); either may be
-    None to leave that list out (the group's copy has no T1; the T1 follow-up has no Adaptive), and
-    `t1` may be a note (`🧪 T1 · result not ready`). `tomorrow_adaptive` / `tomorrow_t1` are
+    None to leave that list out (the T1 follow-up has no Adaptive), and
+    `t1` may be a note (`T1_RESULT_NOT_READY`). `tomorrow_adaptive` / `tomorrow_t1` are
     `tomorrow.NextPicks` (T1's may be a note); with neither there is no tomorrow section. `live` is
-    BL-141's live-vs-paper block (`live_compare.message_lines`), for the owner's copy only."""
-    lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs"]
+    BL-141's live-vs-paper block (`live_compare.message_lines`), for the owner's copy only.
+    BL-183: `boost` ({'adaptive', 't1'}) adds tomorrow's lots line for a list that trades the Dir
+    ×2 rule; `traded` ({'adaptive', 't1'}: (lots, rupees)) adds a day's as-traded line. `month` is
+    the month so far (`month_lines`), after the day's figures. `slippage` (%) says the figures
+    carry that much slippage on every fill (`slippage.apply`)."""
+    boost, traded = boost or {}, traded or {}
+    lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs" + _slip(slippage)]
     if adaptive is not None:
-        lines += ["", *result_block("🎯", "Adaptive", *adaptive)]
+        lines += ["", *result_block("🎯", "Adaptive", *adaptive, traded.get("adaptive"))]
     if isinstance(t1, str):
         lines += ["", t1]
     elif t1 is not None:
-        lines += ["", *result_block("🧪", "T1", *t1)]
+        lines += ["", *result_block("🧪", T1_NAME, *t1, traded.get("t1"))]
     if live:
         lines += ["", *live]
+    if month:
+        lines += ["", *month]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)
     if first is not None:
         lines += ["", f"➡️ {day_text(first.day)} (Tentative)"]
@@ -289,9 +431,15 @@ def render_result(
             lines.append(f"⚡ {first.expiry_only} only")
         lines.append("")
         if tomorrow_adaptive is not None:
-            lines += _next_lines(_with_dte("🎯 Adaptive", tomorrow_adaptive.dte), tomorrow_adaptive)
+            lines += _next_lines(
+                _with_dte("🎯 Adaptive", tomorrow_adaptive.dte),
+                tomorrow_adaptive,
+                boost.get("adaptive", False),
+            )
+            if tomorrow_t1 is not None:
+                lines += ["", SEPARATOR]  # the two lists apart, as in the morning message
         if isinstance(tomorrow_t1, str):
             lines.append(tomorrow_t1)
         elif tomorrow_t1 is not None:
-            lines += _next_lines("🧪 T1", tomorrow_t1)
+            lines += _next_lines(T1_HEAD, tomorrow_t1, boost.get("t1", False))
     return "\n".join(lines)

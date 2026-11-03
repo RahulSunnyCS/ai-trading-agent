@@ -3,12 +3,18 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { MomentumJournal, MomentumJournalEntry } from '../../../types/momentum';
+import type { ForwardView } from '../../../types/momentumForward';
 
 const calls: string[] = [];
 let response: MomentumJournal | null = null;
 
+const forward: ForwardView | null = null;
+
 vi.mock('../../../hooks/usePolledResource', () => ({
   usePolledResource: (url: string) => {
+    if (url.includes('/journal/forward')) {
+      return { data: forward, loading: false, error: null, refetch: () => {} };
+    }
     calls.push(url);
     return { data: response, loading: false, error: null, refetch: () => {} };
   },

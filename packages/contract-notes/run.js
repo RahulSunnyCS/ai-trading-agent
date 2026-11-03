@@ -29,7 +29,7 @@ const { withRetry } = require('./utils/retry');
 // bookmark (cursor.json: the newest message read, per mailbox and account), keeps every note's
 // PDF, reads its F&O figures and stores the session's line under
 // TRADING_DATA_ROOT/contract-notes/. Then it closes the sessions of the window that can have no
-// note (record.js). Scheduler jobs `contract-notes` (00:00) and `contract-notes-retry` (07:30).
+// note (record.js). Scheduler jobs `contract-notes` (00:00) and its retries (07:30, 10:30, 15:30).
 //
 //   node run.js                 new mail since each bookmark; the window is the last 10 sessions
 //   node run.js --dry-run       read and parse, write nothing (not even the bookmark)

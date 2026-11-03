@@ -71,7 +71,7 @@ researching that idea.
 | Top N / Sell when rank > | How many to buy, and the [exit rank](glossary:exit-rank). The ETF default is 5 and 10. |
 | Rebalance | Every week, every 2 or 4 weeks, or monthly. |
 | Fridays: One / All (split) | For a slower cadence (every 2 or 4 weeks). **One** trades a single set of Fridays; **All (split)** runs every set with an equal share of the money each, evens the shares out again each April, and adds them into one account. See [All Fridays](glossary:all-fridays). |
-| Which Fridays | With **One**: which set of Fridays. Try each: if they differ a lot, the result owes much to calendar luck. Hidden for **All (split)**, which holds every set. |
+| Which Fridays | With **One**: which set of Fridays. The sets are fixed on the calendar: count the weeks since Friday 1 Jan 2016 and divide by the interval; phase 1 trades the Fridays that leave 0, phase 2 those that leave 1, and so on (every 4 weeks, phase 3 = remainder 2). The ⓘ beside the field and the cadence chip in the run bar say the same for the current setting. Try each: if they differ a lot, the result owes much to calendar luck. Hidden for **All (split)**, which holds every set. |
 | Sell exits weekly, buy only on the cadence | Sell a fallen name the week it falls, but only buy on cadence Fridays. |
 | Win-rate position sizing | Buy smaller after a losing streak. Off by default; on its own tests it cost return without cutting risk. |
 

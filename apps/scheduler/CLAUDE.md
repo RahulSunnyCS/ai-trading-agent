@@ -4,11 +4,12 @@ Guidance for coding agents working in `apps/scheduler` (`@ata/scheduler`).
 
 ## What this app does
 
-One home for every recurring job (BL-012): broker logins, the Friday momentum runs and,
-in later PRs, the evening options collection, backups and maintenance checks. It replaces
-the one-plist-per-job launchd setup. Every run is recorded, and missed or failed runs
-raise a Telegram alert at once. launchd only keeps this process alive
-(`deploy/launchd/jobs/com.ai-trading-agent.scheduler.plist`); jobs run from the main
+One home for every recurring job (BL-012, done 2026-10-28): broker logins, the Friday momentum
+runs, the evening options collection, contract notes, the AlgoTest/Quantiply jobs, backups and
+the alert-only maintenance checks. It replaced the one-plist-per-job launchd setup. Every run is
+recorded, and missed or failed runs raise a Telegram alert at once. launchd only keeps this
+process alive (`deploy/launchd/jobs/com.ai-trading-agent.scheduler.plist`, installed and running
+as `com.ai-trading-agent.scheduler`); jobs run from the main
 checkout's working tree, so its checked-out branch is the code that runs (the morning
 summary flags anything but `main`).
 
@@ -70,8 +71,11 @@ summary flags anything but `main`).
   the 09:00 summary says a pause is on (`pauseNotice`).
 - `src/automation.ts` — BL-140's automation settings. Three master switches (logins, uploads, deploy) and one
   row per platform + broker (`algotest|quantiply` × `finvasia|angelone`: login, list none/core/t1, upload,
-  `multiplier` 1-10, `addon`) and a `pause.until` day, validated (unknown keys refused). Versions saved before
-  Phase 4 lack the new fields and read as 1, yes and no pause (`withDefaults`).
+  `multiplier` 1-10, `addon`, `dirBoost` (BL-183: the picked Dir at 2 lots on a non-expiry day), `mtmSl`), a
+  `pause.until` day and `capital` (rupees per broker account, `finvasia` / `angelone`, ₹10,000 to ₹10 crore; ₹8.5 lakh
+  each before the field, owner 2026-10-29: the evening message's month as a share of capital), validated (unknown keys
+  refused). Versions saved before Phase 4 lack the new fields and read as
+  1, yes and no pause (`withDefaults`); before BL-183, `dirBoost` off.
   - Every save is a new version in `scheduler.db` (`automation_settings`). Only the `github` outcome column is
     ever written after the insert.
   - The current version is written atomically to `automation-settings.json` beside it (also on `serve` start);
@@ -122,6 +126,15 @@ detail as its error, so the normal failure alert goes out with the job's `fixHin
 daily, so an unfixed problem repeats at most once a day. Inject anything that touches the
 network or disk so the test needs neither. One group per file keeps parallel PRs from clashing.
 
+What each file holds (BL-012 inventory numbers): `drift` S1 Nifty 50 list, S2 lot sizes, Y4
+`check-expiry-calendar` (the Fyers NSE + BSE masters' listed option expiries against
+`expiry_calendar.csv`, holiday shifts from `holidays.csv`, years with no holiday rows skipped,
+and the nearest expiry's commonest strike gap against `strike_step.csv`); `calendar` Y1
+holidays, Y2 RBI dates, M3 margin, Y3 `check-blocked-dates` (`.env`'s `BLOCKED_DATES` from
+`ctx.env`); `stock` M2, W3, S3 `universe-refresh-reminder` (the category CSVs' modification
+day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` honoured);
+`credentials`; `digest`.
+
 ## Gotchas
 
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
@@ -158,6 +171,19 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
   `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
   scheduler or laptop restart (reaped as interrupted, exit -2, by `startLoop` before its first tick) is
   started again while the session lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
+- `momentum-journal-score` (BL-024, Fri 20:30, `mbt journal score`) sits between the 19:30
+  stock-ingest run (which records the week's journal rows and prices it scores against) and the
+  21:00 journal check, in the `catalog` group so it waits for a late 19:30 run. It re-runs every
+  scored favourite on today's code (one engine pass each, cached rankings), writes only
+  `forward_scores.json` in the momentum state dir and sends nothing: the headline's score line is
+  added to its 19:30 message, so the scheduler's own failure alert is the only Telegram it causes.
+- `momentum-history` (BL-001 Phase 4, Fri 22:00) runs `mbt verify history --send`: read-only on the catalog,
+  but in the `catalog` group because DuckDB will not open a read-only connection while another process
+  writes. It `alertsItself`: a restated history is its own Telegram and exits 0 once Telegram took it (like
+  `momentum-live-rules` on a breach), so the scheduler does not alert twice; an undelivered one exits 1 (the
+  retry sends it again, the Jobs page shows it red), as does a check that cannot run (also sent by the command).
+  Like every `alertsItself` job, an exit the command never reached (a `uv` environment that will not build)
+  is silent apart from the Jobs page, unless it is 124 or 127.
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).

@@ -162,9 +162,9 @@ show in the journal and on This week.
 
 ## Open questions
 
-1. Should a **top-up (ADD)** of a held name also be blocked above the limit? Today it is only
-   flagged, because the buffer rule splits sale money equally across the top N and blocking one
-   leg changes the others' sizes. The owner's call.
+1. ~~Should a **top-up (ADD)** of a held name also be blocked above the limit?~~ **Answered (owner,
+   2026-10-28): no.** The gate blocks new BUYs only; a top-up (ADD) of a held name is flagged, not
+   blocked, as built.
 2. Should the gate **enter the engine** for the live path once Phase 2 reports (so the model
    portfolio and the journal's holdings follow the rule)? Proposed: yes if B passes; the owner
    decides at Phase 2 task 3.
@@ -186,3 +186,6 @@ show in the journal and on This week.
   "No trades", info); and the out-of-scope line wrongly said Broad and Custom Index have no ETF
   premium exposure. They rank Nasdaq 100 and Hang Seng as atomics and are what the owner follows,
   so Phase 1b was added as the next step and the Guide says the gate is ETF-favourite-only today.
+- 2026-10-28 — Owner answered open question 1 (asked in chat, 2026-10-28): the gate blocks new BUYs only,
+  not top-ups (ADD) of held names. That is how Phase 1 already behaves (an ADD is flagged), so no code
+  change. Status unchanged.

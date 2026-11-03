@@ -38,6 +38,10 @@ class DailyResult:
     entry_hash: str
     strategies: dict[str, list[tuple[str, float]]] = field(default_factory=dict)
     track: str | None = None
+    #: BL-183: the entry's days to expiry ({'NIFTY', 'SENSEX'}, weekday basis), for the lots
+    dte: dict[str, str] | None = None
+    #: the % slippage on every fill the figures carry (`slippage.apply`), None when they have none
+    slippage_pct: float | None = None
 
 
 def calculate(day: date, root: Path | None = None, track: str | None = None) -> DailyResult:
@@ -74,6 +78,8 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
             f"{where}results for {day} are not complete: {len(missing)} picked strategies missing "
             f"({sample}{suffix})"
         )
+    from .dte import entry_labels
+
     return DailyResult(
         day,
         str(entry.get("weekday", "")),
@@ -81,6 +87,7 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
         str(entry.get("hash", "")),
         strategies,
         track,
+        entry_labels(entry),
     )
 
 
@@ -90,9 +97,13 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
 # and a late T1 result can still be delivered on its own:
 #
 #   <day>-<hash16>.sent        the result message reached the owner
-#   <day>-<hash16>.group.sent  its Adaptive-only copy reached the friends' group
+#   <day>-<hash16>.group.sent  its copy reached the friends' group
 #   <day>-<hash16>.t1.sent     T1 is settled: its result went out (inside the main message or as
 #                              its own follow-up), or the day has no T1 entry and never will
+#   <day>-<hash16>.group-t1-owed.sent  the group's copy went without T1's result, so the group is
+#                              owed T1's follow-up (a group copy sent before 2026-10-28 had no T1
+#                              part and writes no such marker, so it is owed nothing)
+#   <day>-<hash16>.group-t1.sent       the group's T1 is settled, as `.t1.sent` is the owner's
 #
 # Each destination has its own marker, so a failure on the group never makes a retry send the
 # owner's chat the same message again.
@@ -101,7 +112,13 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
 # no T1 part). Such a marker is recognised by its text and still covers every piece, so a day marked
 # under the old scheme is never sent again in part (no group copy, no T1 follow-up).
 
-MARKER_KINDS = {"": ".sent", "group": ".group.sent", "t1": ".t1.sent"}
+MARKER_KINDS = {
+    "": ".sent",
+    "group": ".group.sent",
+    "t1": ".t1.sent",
+    "group-t1-owed": ".group-t1-owed.sent",
+    "group-t1": ".group-t1.sent",
+}
 LEGACY_MARKER_TEXT = "sent to the configured Telegram destinations\n"
 
 
@@ -193,25 +210,75 @@ def _total_and_rows(result: DailyResult) -> tuple[float, list[tuple[str, float]]
     return result.gains[key], result.strategies.get(key, [])
 
 
+def as_traded(result: DailyResult) -> tuple[int, float] | None:
+    """BL-183: (lots, net rupees) of the day's Adaptive picks under the Dir ×2 rule, from the
+    one-lot results; None when the rule doubles nothing that day (an expiry day, no Dir picked).
+    The stored net is after each lot's estimated costs, brokerage included, so a doubled pick
+    counts its brokerage twice although its orders are the same: about ₹94 low on such a day."""
+    from .live_lots import lots_for_day
+
+    rows = result.strategies.get(RESULT_KEYS[0], [])
+    lots = lots_for_day([n for n, _ in rows], result.dte)
+    if not any(v > 1 for v in lots.values()):
+        return None
+    return sum(lots.values()), sum(value * lots[name] for name, value in rows)
+
+
+def _slippage(result: DailyResult, t1) -> float | None:
+    """The slippage the message's figures carry: Adaptive's, when T1's (if there) is the same;
+    None, so the message claims none, when either list could not be slipped."""
+    if isinstance(t1, DailyResult) and t1.slippage_pct != result.slippage_pct:
+        return None
+    return result.slippage_pct
+
+
 def render(
     result: DailyResult,
     t1: DailyResult | str | None = None,
     tomorrow=None,
     tomorrow_t1=None,
     live: list[str] | None = None,
+    boost: dict[str, bool] | None = None,
+    month: list[str] | None = None,
 ) -> str:
     """The evening message (BL-125): Adaptive's result, T1's (or the note saying why it is not
-    there), BL-141's live-vs-paper lines (`live`, the owner's copy only), then tomorrow's
-    strategies in full. `tomorrow` / `tomorrow_t1` are `tomorrow.NextPicks` (or a note for T1);
-    without `tomorrow` there is no section."""
+    there), BL-141's live-vs-paper lines (`live`, the owner's copy only), the month so far
+    (`month`, `messages.month_lines`), then tomorrow's strategies in full. `tomorrow` /
+    `tomorrow_t1` are `tomorrow.NextPicks` (or a note for T1); without `tomorrow` there is no
+    section."""
     t1_part = _total_and_rows(t1) if isinstance(t1, DailyResult) else t1
+    boost = boost or {}
+    traded = {
+        "adaptive": as_traded(result) if boost.get("adaptive") else None,
+        "t1": as_traded(t1) if boost.get("t1") and isinstance(t1, DailyResult) else None,
+    }
     return messages.render_result(
-        result.day, _total_and_rows(result), t1_part, tomorrow, tomorrow_t1, live=live
+        result.day,
+        _total_and_rows(result),
+        t1_part,
+        tomorrow,
+        tomorrow_t1,
+        live=live,
+        boost=boost,
+        traded=traded,
+        month=month,
+        slippage=_slippage(result, t1),
     )
 
 
-def render_t1_followup(t1: DailyResult, tomorrow_t1=None) -> str:
+def render_t1_followup(
+    t1: DailyResult, tomorrow_t1=None, boost: dict[str, bool] | None = None
+) -> str:
     """T1's result as a message of its own, for when it was not ready for the main message."""
+    boost = boost or {}
     return messages.render_result(
-        t1.day, None, _total_and_rows(t1), None, tomorrow_t1, heading="T1 result"
+        t1.day,
+        None,
+        _total_and_rows(t1),
+        None,
+        tomorrow_t1,
+        heading="Tuned Adaptive result",
+        boost={"t1": boost.get("t1", False)},
+        traded={"t1": as_traded(t1) if boost.get("t1") else None},
+        slippage=t1.slippage_pct,
     )

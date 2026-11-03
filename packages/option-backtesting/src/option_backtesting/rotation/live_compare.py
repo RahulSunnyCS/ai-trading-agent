@@ -8,9 +8,10 @@ platforms show it.
 
 For each tool variant, list and platform + broker, every copy that traded is put together:
 
-- per lot = live ₹ of the copies ÷ their multipliers added up (two copies at 1x = 2 lots, so a copy
-  the owner runs on purpose is a count, never slippage); the same variant picked by Core and T1
-  stays two rows;
+- per lot = live ₹ of the copies ÷ their lots added up, a copy's lots being its multiplier times the
+  lots the day's export gave that pick (BL-183: the Dir at 2 lots on a non-expiry day; 1 when the
+  export does not say), so two copies at 1x = 2 lots and a copy the owner runs on purpose is a
+  count, never slippage; the same variant picked by Core and T1 stays two rows;
 - paper = the engine's result for that variant and day at one lot (`rotation/results`, or the T1
   track's), after its estimated costs; the same costs are taken off live;
 - **slippage ₹ per lot = live per lot − paper per lot**, signed: + live did better than paper;
@@ -257,6 +258,22 @@ def _paper_for(
     return memo[variant].get(day.isoformat())
 
 
+def export_lots(platform: str, day: date, book: str, root: Path | None = None) -> dict[str, int]:
+    """BL-183: {variant: lots} from the day's export manifest for this platform and list
+    (`rotation/<platform>/<day>/<book>/manifest.json`, the last export of the day, which is what
+    was uploaded); only the picks it records above 1 lot. Empty when there is none."""
+    path = store.rotation_dir(root) / platform / day.isoformat() / book / "manifest.json"
+    try:
+        strategies = json.loads(path.read_text()).get("strategies") or []
+    except (OSError, ValueError):
+        return {}
+    return {
+        str(s["variant"]): int(s["lots"])
+        for s in strategies
+        if isinstance(s, dict) and isinstance(s.get("lots"), int) and s["lots"] > 1
+    }
+
+
 def compare(
     day: date, root: Path | None = None, memo: dict[str, dict[str, dict]] | None = None
 ) -> DayComparison:
@@ -283,9 +300,13 @@ def compare(
         else:
             key = (r["platform"], str(r["broker"]), str(r.get("book") or ""), r["variant"])
             tool.setdefault(key, []).append(r)
+    exported: dict[tuple[str, str], dict[str, int]] = {}
     for (platform, broker, book, variant), copies in sorted(tool.items()):
+        if (platform, book) not in exported:
+            exported[(platform, book)] = export_lots(platform, day, book, root) if book else {}
+        pick_lots = Decimal(exported[(platform, book)].get(variant, 1))
         multipliers = [c.get("multiplier") for c in copies]
-        lots = sum(
+        lots = pick_lots * sum(
             (_d(m) if isinstance(m, (int, float)) and m > 0 else Decimal(1) for m in multipliers),
             Decimal(0),
         )

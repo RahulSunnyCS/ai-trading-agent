@@ -67,6 +67,9 @@ class _Ranking:
     def __init__(self, prices):
         self.prices = prices
 
+    def cross_section(self):  # BL-001 F6: no membership in this stand-in
+        return None
+
 
 def test_the_api_cache_computes_for_a_new_frame_even_under_a_colliding_key(monkeypatch):
     data = api._Data()

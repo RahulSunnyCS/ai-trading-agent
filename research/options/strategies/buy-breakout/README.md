@@ -1,6 +1,6 @@
 # Buy (range breakout)
 
-**Last updated:** 2026-10-24
+**Last updated:** 2026-10-28
 
 ## Definition
 
@@ -44,6 +44,21 @@ none of 19 robust weightings better and pushed 6 below chance, before charges ([
 Buy is the only family whose daily P&L moves against Widesl (Pearson −0.33 NIFTY, −0.25 SENSEX,
 in-sample; [BL-090][bl090]). So the open question is Buy as a basket hedge, not Buy on its own.
 
+## Full-factorial sweep (BL-104)
+
+Registered grid ([BL-104][bl104], closed 2026-10-28): every combination of strike, leg stop, trail, MTM
+stop and re-entry, with range, source and target for Buy at seven entry slots, NIFTY and SENSEX, 2024-10-09 → 2026-10-09 (488 sessions,
+after charges, ₹ per lot-day). The whole window is the fit, so every figure is **in-sample**; there was no
+forward test. The template (today's rotation file) stays unless a band's winner passes all eight registered
+rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cut were never registered
+(no owner `override:`) and are descriptive only.
+
+- **One band passed all eight rules: SENSEX 09:17–10:02**, ₹150 premium, range 30, SL 30 %, trail 1/1, MTM
+  ₹2,000: +₹158 against the template's −₹33 per lot-day, in-sample. Not adopted, not forward-tested, and the
+  Buy ₹1-per-fill check was not run. No older SENSEX data exists for an advisory run.
+- NIFTY Buy: no cell cleared the gates in any band; the template stays.
+- Breadth (rule 4) failed for SENSEX 10:17–12:02, 12:17–14:02 and 14:17–15:02.
+
 ## Variables
 
 | Variable | Status | One-line takeaway |
@@ -71,7 +86,7 @@ in-sample; [BL-090][bl090]). So the open question is Buy as a basket hedge, not 
 BL-097 Phase 2 changed one setting at a time on all 48 rotation Buy files, fit 2024-10-09 →
 2025-10-08, holdout 2025-10-09 → 2026-10-09, 488 common sessions, ₹20 an order plus STT, exchange,
 SEBI/IPFT, stamp and GST, no slippage ([BL-097][bl097]). It is a screen: its Phase 3 (interactions, the
-pass rule) went to BL-104's full grid, whose results are not on this page yet, so no row has a verdict.
+pass rule) went to BL-104's full grid (summary above, in-sample), so no row on these pages has a verdict.
 
 The tables compare each variant with the baseline on the same file and give the mean over the valid
 files. They were computed for these pages from `research/bl097/results/buy_sweep_postcharge.csv`
@@ -98,3 +113,4 @@ each section's files and ranks by a balanced score.
 [bl097]: ../../../../backlog/BL-097-buy-parameter-sweep.md
 [bl097q]: ../../../../backlog/BL-097-buy-qualified-list-post-charge.md
 [bl099]: ../../../../backlog/BL-099-combined-final-qualified-list-post-charge.md
+[bl104]: ../../../../backlog/BL-104-full-parameter-sweep.md

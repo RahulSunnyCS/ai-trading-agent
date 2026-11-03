@@ -1,7 +1,7 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
 triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
 track-readout (the T1 parallel track); lot-plans (BL-135); algotest-export (BL-137);
-quantiply-export (BL-139); live-compare (BL-141)."""
+quantiply-export (BL-139); live-compare (BL-141); live-board (BL-203)."""
 
 from __future__ import annotations
 
@@ -257,6 +257,32 @@ def _without_addon(picks, platform: str, book: str, settings: dict | None):
     return replace(picks, buy=[])
 
 
+def _with_lots(picks, platform: str, book: str, settings: dict | None, flag: bool | None):
+    """BL-183: the day's lots for this export. `--dir-boost` / `--no-dir-boost` decide a hand run;
+    under --from-settings the rows that upload this list do (`dir_boost_wanted`: all of them on).
+    When it is off the picks are returned untouched, so the export is exactly what it was."""
+    from dataclasses import replace
+
+    from . import automation_settings, live_lots
+
+    if flag is None:
+        if settings is None:
+            return picks
+        flag = automation_settings.dir_boost_wanted(settings, platform, book)
+        if not flag and automation_settings.dir_boost_mixed(settings, platform, book):
+            typer.echo(
+                f"{platform} {book}: Dir ×2 OFF: one export serves every account and another "
+                "account uploading this list has it off, so every pick stays at 1 lot"
+            )
+    if not flag:
+        return picks
+    lots = live_lots.lots_for_day(picks.core, picks.dte)
+    why = live_lots.summary(picks.core, picks.dte) if picks.dte else "days to expiry not known"
+    doubled = [f"{v} at {n} lots" for v, n in lots.items() if n > 1]
+    typer.echo(f"{platform} {book}: Dir ×2 on: {', '.join(doubled) or f'every pick 1 lot ({why})'}")
+    return replace(picks, lots=lots)
+
+
 def _morning(picks, book: str, folder):
     """BL-172 Phase 4: the recorded picks under the owner's 09:17 rule, against the list the
     evening uploaded to `folder`. With no evening upload there (nothing of it is on the platform),
@@ -283,7 +309,9 @@ def _morning(picks, book: str, folder):
             "notes": m.notes,
         },
     }
-    return m.picks, extra
+    from dataclasses import replace
+
+    return replace(m.picks, dte=picks.dte), extra
 
 
 def _end_missing(missing: list[str], books: list[str]) -> None:
@@ -305,6 +333,11 @@ def _settings_books(platform: str) -> tuple[list[str], dict]:
     typer.echo(f"{platform}: {', '.join(books) or 'nothing to upload'} ({source})")
     return books, settings
 
+
+_DIR_BOOST_HELP = (
+    "BL-183: the picked Dir at 2 lots (its MTM SL doubled) on a non-expiry day. Default: off, or "
+    "under --from-settings what Settings › Automation says (every row uploading the list on)."
+)
 
 _FROM_SETTINGS_HELP = (
     "Export every list the dashboard's Settings › Automation uploads to this platform "
@@ -332,6 +365,7 @@ def algotest_export(
     wait: int = typer.Option(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 jobs)."
     ),
+    dir_boost: bool | None = typer.Option(None, "--dir-boost/--no-dir-boost", help=_DIR_BOOST_HELP),
 ) -> None:
     """The day's Adaptive picks as AlgoTest .algtst files plus a zip (BL-137; uploads nothing)."""
     from pathlib import Path
@@ -353,6 +387,7 @@ def algotest_export(
             missing.append(b)
             continue
         picks = _without_addon(picks, "algotest", b, settings)
+        picks = _with_lots(picks, "algotest", b, settings, dir_boost)
         try:
             exports = ax.build(picks)
         except (Unmappable, FileNotFoundError) as error:
@@ -390,6 +425,7 @@ def quantiply_export(
     wait: int = typer.Option(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 job)."
     ),
+    dir_boost: bool | None = typer.Option(None, "--dir-boost/--no-dir-boost", help=_DIR_BOOST_HELP),
     morning_rule: bool = typer.Option(
         False,
         "--morning-rule",
@@ -426,6 +462,7 @@ def quantiply_export(
         if morning_rule and picks.source == "recorded":
             picks, extra = _morning(picks, b, folder)
         picks = _without_addon(picks, "quantiply", b, settings)
+        picks = _with_lots(picks, "quantiply", b, settings, dir_boost)
         try:
             built = qx.build(picks)
         except (Unmappable, FileNotFoundError) as error:
@@ -529,6 +566,107 @@ def live_compare_cmd(
         raise typer.Exit(2)
 
 
+live_board_app = typer.Typer(
+    no_args_is_help=True,
+    help="BL-203: today's Adaptive picks run live on Angel One's bars so far (refreshed every 5 "
+    "minutes by the scheduler, or now).",
+)
+rotation_app.add_typer(live_board_app, name="live-board")
+
+
+def _render_board(snap: dict, lots: bool = False) -> str:
+    from .messages import rupees
+
+    key = "yours" if lots else "per_lot"
+    out = [
+        f"{snap['day']} as at {snap['as_of']} ({snap['source']}, {snap.get('requests', '?')} "
+        f"requests, {snap.get('took_s', '?')} s)"
+    ]
+    for name, s in snap.get("spot", {}).items():
+        out.append(f"  {name} {s['last']:,.2f}")
+    for b in snap["books"]:
+        total = b[key]
+        lots_text = f", {total['lots']} lots" if lots else ", a lot each"
+        out.append(
+            f"\n{b['name']}: {rupees(total['net'])} ({rupees(total['net_slipped'])} after "
+            f"{snap['slippage_pct']}% slippage{lots_text})"
+        )
+        for p in b["picks"]:
+            k = p.get("lots", 0) if lots else 1
+            out.append(
+                f"  {p['variant']:<22} {p['state']:<8} {rupees(k * p['net']):>10}  {p['label']}"
+            )
+            for leg in p["legs"]:
+                end = leg["exit"] or "open"
+                out.append(
+                    f"      {leg['side']} {leg['contract']:<14} {leg['entry']} @ "
+                    f"{leg['entry_price']:>8.2f} -> {end} @ {leg['price'] or 0:>8.2f} "
+                    f"{leg['reason']:<10} {rupees(leg['pnl'])}"
+                )
+    for note in snap.get("notes", []):
+        out.append(f"note: {note}")
+    return "\n".join(out)
+
+
+@live_board_app.command("refresh")
+def live_board_refresh(
+    lots: bool = typer.Option(False, "--lots", help="Show your lots instead of a lot each."),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """ONE refresh now: one guarded Angel One login, the picks' bars read, the snapshot written
+    (TRADING_DATA_ROOT/rotation/live-board/<day>.json). When the 5-minute loop is running, asks
+    it instead, so no second login is made. Exit 1 when no picks are recorded or it failed."""
+    import json
+
+    from ..angelone import check
+    from ..angelone.auth import AngelCredentialsError, AngelNetworkError
+    from . import live_board
+
+    if live_board.loop_status()["running"]:
+        live_board.request_refresh()
+        typer.echo("the live-board loop is running: asked it to refresh now")
+        return
+    try:
+        snap = live_board.Board(log=typer.echo).refresh(by="cli")
+    except (AngelCredentialsError, AngelNetworkError, check.CheckRefused) as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    if snap is None:
+        typer.echo("no picks recorded for today yet")
+        raise typer.Exit(1)
+    typer.echo(json.dumps(snap, indent=1) if as_json else _render_board(snap, lots))
+
+
+@live_board_app.command("show")
+def live_board_show(
+    day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+    lots: bool = typer.Option(False, "--lots", help="Show your lots instead of a lot each."),
+) -> None:
+    """The last snapshot written (no login, nothing read from Angel One)."""
+    from . import live_board
+
+    board = live_board.read_board(day=_day(day))
+    if board["snapshot"] is None:
+        typer.echo("no live-board snapshot yet")
+        raise typer.Exit(1)
+    typer.echo(_render_board(board["snapshot"], lots))
+
+
+@live_board_app.command("run")
+def live_board_run(
+    every: int = typer.Option(300, "--every", help="Seconds between refreshes."),
+    until: str = typer.Option("15:31", "--until", help="Stop after this IST time (HH:MM)."),
+) -> None:
+    """The scheduler's loop (trading days from 09:18): refresh every `--every` seconds and when
+    the dashboard's Refresh button asks, until `--until`. One Angel One login for the day; a
+    rejected session is logged in again once. Exit 3 = a refused login (never retried)."""
+    from . import live_board
+
+    code = live_board.run_loop(every_s=every, until=until, log=typer.echo)
+    if code:
+        raise typer.Exit(code)
+
+
 @rotation_app.command()
 def base(
     backfill: bool = typer.Option(
@@ -583,6 +721,23 @@ def portfolio_warm(
             f"{source}: {len(out['rows'])} days, {n} list-days replayed "
             f"({len(out['errors'])} could not be) in {time.monotonic() - t0:.0f} s"
         )
+
+
+@rotation_app.command("slippage-fill")
+def slippage_fill(
+    day: str = typer.Option(None, "--day", help="Only this day (default: every stored day)."),
+) -> None:
+    """Copy every stored result not yet in its 0.5% slippage copy (`slip_store`): what the Rotation
+    pages read with their Slippage switch on, and the evening message's figures. `rotation update`
+    copies each new day itself; run this once for the history, or after a missed copy. Never
+    changes a stored result; exit 1 when a day or file could not be copied."""
+    from . import slip_store
+
+    out = slip_store.fill(days=[date.fromisoformat(day)] if day else None, log=typer.echo)
+    for line in out["skipped"][:20]:
+        typer.echo(f"  skipped: {line}", err=True)
+    if out["skipped"]:
+        raise typer.Exit(1)
 
 
 @rotation_app.command()

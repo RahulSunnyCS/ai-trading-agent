@@ -32,8 +32,8 @@ import { apiGet } from '../lib/api';
 import { cn } from '../lib/cn';
 import { formatDuration, formatPct, formatPp } from '../lib/format';
 import {
-  benchmarkLabel,
   benchmarkOptions,
+  comparisonLines,
   edgeAgainst,
   resolveBenchmark,
   withBenchmark,
@@ -957,14 +957,10 @@ export function MomentumBacktestingView() {
     () => (result && benchmarkView ? withBenchmark(result.series, benchmarkView) : null),
     [result, benchmarkView],
   );
+  const pickedName = benchmarkView?.name ?? null;
   const otherIndices = useMemo(
-    () =>
-      (result?.benchmarks ?? []).flatMap((choice) =>
-        choice.available && choice.name !== benchmarkView?.name
-          ? [{ name: benchmarkLabel(choice.name), series: choice.series }]
-          : [],
-      ),
-    [result, benchmarkView?.name],
+    () => (result && pickedName !== null ? comparisonLines(result, pickedName) : []),
+    [result, pickedName],
   );
   const datasetLabel = DATASETS.find((item) => item.id === dataset)?.label ?? 'Momentum';
 

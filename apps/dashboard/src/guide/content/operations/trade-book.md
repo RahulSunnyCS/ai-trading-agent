@@ -6,7 +6,7 @@ Nothing here is a backtest and nothing here places an order. Every figure comes 
 
 ## Where the figures come from
 
-- **Contract notes.** The laptop reads each broker's notes from the mailbox after midnight (and again at 07:30) and stores them. A note gives the day's F&O figures per account: the pay-in / pay-out obligation, brokerage, the other charges, total charges and the final net.
+- **Contract notes.** The laptop reads each broker's notes from the mailbox after midnight (and again at 07:30, 10:30 and 15:30, since Angel One often mails mid-morning) and stores them. A note gives the day's F&O figures per account: the pay-in / pay-out obligation, brokerage, the other charges, total charges and the final net.
 - **Ledger e-mails.** Deposits, payouts, quarterly fund settlements, Angel One's collateral-interest e-mail and the margin-shortfall warnings.
 - **Your inputs.** The two columns the sheet asked you to type: the number of algo trades taken that day and the capital. Angel One's capital is also read at 15:50 for the next session; Finvasia's stays what you type and carries forward until you change it.
 
@@ -108,6 +108,16 @@ Filters for source, index and days to expiry sit above the cards and stay in the
 ## Momentum
 
 The Zerodha contract notes. That account trades nothing but Momentum, so every fill on it is a Momentum buy or sell: what was bought and sold, the charges and their share of the turnover, and every fill. **Open Momentum › This week** goes to the weekly plan the fills carried out.
+
+**Rebalances** is the log of the lots, one block per lot on the Friday it was due, newest first. Weeks are counted from the paper start (Fri 16 Oct 2026 is week 1). Each block shows:
+
+- **The status.** **Rebalance done**: every stock the signal or the 14:15 orders asked for was traded, in the shares the orders said. **Partly done**: some were, or in other shares. **Waiting for notes**: nothing is on the notes yet and the notes for the first session after that Friday are not in (a lot is often bought on the Monday). **Rebalance not done**: the notes are in and nothing was traded.
+- **One line per stock actually traded**, the day's fills netted: shares, value and side, straight from the contract notes. What the strategy suggested and nobody bought is never a line, only counted under the table (**2 stocks in the orders not traded**); **not in the orders** is a trade the lot made that nobody asked for.
+- **Every other trade of the week.** A block covers its Friday 14:00 to the next Friday 14:00 and lists every fill on the notes in it, in the strategy or not: a trade no lot's orders claim is marked **not in any lot** (a buy and a later sell of the same stock stay two lines). These count in the week's bought and sold, never in the lot's status or holding. A week no lot was due shows as **No lot due** when the account traded in it.
+- **Folded into**: a week not done says where its trades went. The orders are not changed: the lot rebalances in full the next time it is due, with what it holds and the free cash.
+- **Holding after**: what the lot holds after that Friday, its booked shares plus the week's fills.
+
+The line under the title compares the latest Kite snapshot with what the notes say the account holds: the lots plus any shares bought for no lot (named as **in no lot**). Kite already shows trades whose contract note has not arrived, so a difference is such a trade. **Refresh from Kite** reads the Kite holdings and free cash now (read-only; it needs today's Kite login) and checks them again. Past weeks' trades still come from the contract notes: Kite's API gives only today's. **All fills**, collapsed below, lists every transaction on the notes, to check a figure against a note.
 
 > [!NOTE]
 > The page reads the notes as they were stored. If a figure differs from your sheet for the same day, the day drawer shows the note's own figures and inputs, which is where to look first.

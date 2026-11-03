@@ -464,6 +464,169 @@ def propose_strategy(base_preset: str, changes: dict) -> dict:
     }
 
 
+# --- rule strategies (BL-120 Phase 2) -------------------------------------------------------
+#
+# The tester of `ruletest/`, said in chat: the same functions `obt rule validate|test|ledger` and
+# `/legwise/rules/*` call. The confirmation period stays locked: these tools always test in
+# "locked" mode and offer no reveal and no "open all data", so only the owner can open it (`obt
+# rule reveal <hash>`, or the CLI's labelled `--open-all`). Every test is written to the ledger by
+# `study.run_test` itself, before its result comes back.
+
+MAX_RULE_TEXT = 20_000  # as `/legwise/rules/*`
+RULE_PERIODS = {
+    "learning": ("learning",),
+    "confirmation": ("confirmation",),
+    "both": ("learning", "confirmation"),
+}
+
+
+def _rule_back(rule) -> dict:
+    from ..ruletest.spec import read_back
+
+    return {
+        "spec_hash": rule.spec_hash,
+        "template_hash": rule.template_hash,
+        "sides": list(rule.sides),
+        "window": [rule.spec.window.from_, rule.spec.window.to],
+        **read_back(rule),
+    }
+
+
+def _load_rule(spec_text: str):
+    """(compiled rule, None) or (None, an error dict) — never raises for a bad spec."""
+    from ..ruletest.spec import SpecError, load_spec
+
+    if len(spec_text) > MAX_RULE_TEXT:
+        return None, {"error": "invalid_rule", "message": f"the spec is over {MAX_RULE_TEXT} chars"}
+    try:
+        return load_spec(spec_text), None
+    except SpecError as e:
+        return None, {"error": "invalid_rule", "message": str(e)}
+
+
+@mcp.tool()
+def validate_rule(spec_text: str) -> dict:
+    """Check a rule strategy (YAML text with one top-level `rule:` key, the
+    grammar of `obt rule validate`) and read it back in plain words. Runs
+    nothing and records nothing. Returns {"valid": false, "error": ...} for a
+    spec that does not validate (never raises), else {"valid": true,
+    "spec_hash", "template_hash", "sides", "window", "sentences",
+    "definitions", "when"}. Show the owner the read-back (`sentences`, with
+    `definitions`) and the spec in full BEFORE calling test_rule: test_rule
+    needs this `spec_hash` to run."""
+    rule, error = _load_rule(spec_text)
+    if error is not None:
+        return {"valid": False, **error}
+    return {"valid": True, **_rule_back(rule)}
+
+
+@mcp.tool()
+def test_rule(
+    spec_text: str,
+    spec_hash: str,
+    period: str = "learning",
+    tries: int = 1,
+    include_rows: bool = False,
+) -> dict:
+    """Test a rule strategy over the collected days, exactly as `obt rule
+    test` does: the events, the placebo (same trade, same minute, 20 nearest
+    no-event days), the random-time control and the BL-063 charges, with
+    0.5% / 1% slippage beside them. Every call is a test and is counted in
+    the ledger (a sweep of K variants is one call with tries=K).
+
+    `spec_hash` must be the hash validate_rule returned for this exact text,
+    so the read-back is seen before anything runs. `period` is learning
+    (2024-10 to 2026-10, always open), confirmation or both. The
+    confirmation period (NIFTY 2022-01 to 2024-10) is LOCKED: this tool
+    cannot open it; it runs only for a rule the owner has already revealed
+    with `obt rule reveal <hash>`. The first test of a new template
+    simulates every trade and can take many minutes; later ones are faster.
+
+    Returns {"read_back", "result" (the full result; each period's per-event
+    `rows` and `equity` only with include_rows=true; all of it is kept under
+    TRADING_DATA_ROOT/ruletest/results/<id>.json), "summary" (the CLI's
+    text), "ledger_row" (the Tested strategies row), "counts", "progress"}.
+    Returns {"error": ...} rather than raising for an invalid spec, a hash
+    that does not match, a bad period or a locked confirmation period. The
+    result is a screen, not a finding."""
+    import os
+
+    from ..fyers.daily import data_dir
+    from ..ruletest import store, study
+    from ..ruletest.cli import render
+
+    rule, error = _load_rule(spec_text)
+    if error is not None:
+        return error
+    if spec_hash != rule.spec_hash:
+        return {
+            "error": "spec_hash_mismatch",
+            "message": (
+                f"spec_hash {spec_hash!r} is not this text's ({rule.spec_hash}): validate the "
+                "spec as it will be tested and show its read-back first"
+            ),
+            "read_back": _rule_back(rule),
+        }
+    if period not in RULE_PERIODS:
+        return {"error": "bad_period", "message": f"period must be {', '.join(RULE_PERIODS)}"}
+    if not 1 <= tries <= 500:
+        return {"error": "bad_tries", "message": "tries must be 1 to 500"}
+
+    root = data_dir()
+    log: list[str] = []
+    options = study.Options(
+        periods=RULE_PERIODS[period],
+        mode="locked",  # never exploratory from chat: the confirmation lock holds
+        workers=int(os.environ.get("RULETEST_WORKERS", "4")),
+        tries=tries,
+        progress=log.append,
+    )
+    try:
+        result = study.run_test(root, rule, spec_text, options)
+    except store.LockedError as e:
+        return {"error": "locked", "message": str(e), "read_back": _rule_back(rule)}
+    except store.RuleTestError as e:
+        return {"error": "cannot_test", "message": str(e)}
+
+    rows = store.ledger(root)
+    ledger_row = next((r for r in reversed(rows) if r.get("id") == result["id"]), None)
+    shown = result
+    if not include_rows:
+        shown = {
+            **result,
+            "periods": {
+                name: {k: v for k, v in p.items() if k not in ("rows", "equity")}
+                for name, p in result["periods"].items()
+            },
+        }
+    return {
+        "read_back": _rule_back(rule),
+        "result": shown,
+        "summary": render(result),
+        "ledger_row": ledger_row,
+        "counts": store.counts(rows),
+        "progress": log,
+    }
+
+
+@mcp.tool()
+def list_rule_tests(limit: int = 20) -> dict:
+    """The ledger of rule tests (Tested strategies), newest first, with the
+    running count (a sweep of K counts K) — the same rows as `obt rule
+    ledger` and GET /legwise/rules/tests. Read-only. Returns {"tests": [...]
+    (at most `limit`), "counts": {"week", "month", "total"}, "luck"}."""
+    from ..fyers.daily import data_dir
+    from ..ruletest import store
+
+    rows = store.ledger(data_dir())
+    counts = store.counts(rows)
+    return {
+        "tests": list(reversed(rows))[: max(limit, 0)],
+        "counts": counts,
+        "luck": store.lucky_sentence(counts["month"]),
+    }
+
+
 def main() -> None:
     from ..fyers.auth import load_dotenv
 

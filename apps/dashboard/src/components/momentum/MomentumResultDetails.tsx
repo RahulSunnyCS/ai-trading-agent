@@ -16,6 +16,7 @@ import {
   formatPct,
   formatPp,
 } from '../../lib/format';
+import { isRebalanceWeek, nextRebalanceFriday } from '../../lib/momentumCadence';
 import { describeConfig, hindsightWarning } from '../../lib/momentumConfig';
 import { isAllFridays } from '../../lib/momentumFridays';
 import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from '../../lib/momentumUniverse';
@@ -354,6 +355,20 @@ function NoCombinedSignal() {
   );
 }
 
+/**
+ * The signal's own `explain` line, plus the next trading Friday on a rebalance week of a slower
+ * cadence (an off week's line already names it, from the server).
+ */
+function signalsDescription(
+  week: string,
+  explain: string,
+  config: Record<string, unknown>,
+): string {
+  if (!isRebalanceWeek(week, config)) return explain;
+  const next = nextRebalanceFriday(week, config);
+  return next ? `${explain} Next rebalance Friday: ${formatDay(next)}.` : explain;
+}
+
 /** The Signals half of This week: a fetched section (`latest`). */
 function SignalsHalf({ runId, config }: { runId: string; config: Record<string, unknown> }) {
   const latest = useRunSection(runId, 'latest');
@@ -366,7 +381,7 @@ function SignalsHalf({ runId, config }: { runId: string; config: Record<string, 
           <ResultSection
             padded={false}
             title={`Signals · ${formatDay(week.week)}`}
-            description={week.explain}
+            description={signalsDescription(week.week, week.explain, config)}
           >
             <SignalsTable
               rows={week.rows.map((row) => ({ ...row, reason: signalReason(row, config) }))}

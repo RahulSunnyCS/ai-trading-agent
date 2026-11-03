@@ -143,6 +143,17 @@ interface LocalLogin {
     quantiplyShoonya: { name: string; status: string; detail: string } | null;
     fatal: string | null;
   } | null;
+  /** Kite's unattended login on Fridays and Mondays (owner, 2026-10-28) */
+  kite?: { name: string; status: string; detail: string };
+}
+
+/** Kite's line of the Mac's login file: null when it did not run (not a Friday or Monday, or off). */
+export function kiteLoginCheck(local: LocalLogin | null): Check | null {
+  const kite = local?.kite;
+  if (!kite || kite.status === 'SKIPPED') return null;
+  return kite.status === 'FAIL'
+    ? { ok: false, label: 'Kite login', detail: `${kite.detail} → Broker logins › Kite` }
+    : { ok: true, label: 'Kite login', detail: kite.detail };
 }
 
 /**
@@ -421,6 +432,7 @@ export type SystemChecks = (ctx: BuiltinContext) => Check[];
 
 const systemChecks: SystemChecks = (ctx) => [
   algotestCheck(ctx),
+  ...[kiteLoginCheck(readLocalLogin(ctx))].filter((c): c is Check => c !== null),
   fyersCheck(ctx),
   optionsDataCheck(ctx),
   checkoutCheck(ctx),

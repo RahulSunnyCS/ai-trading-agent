@@ -15,7 +15,7 @@ export const CHART_HEIGHT = 300;
 
 /** Create/resize/theme a Lightweight chart; returns a ref to the live chart. */
 export function useChart(
-  container: RefObject<HTMLDivElement>,
+  container: RefObject<HTMLDivElement | null>,
   withLeftScale: boolean,
   height: number = CHART_HEIGHT,
 ) {

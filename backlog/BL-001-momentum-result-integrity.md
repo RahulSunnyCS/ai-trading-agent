@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — protects the correctness of the numbers favourites and weekly signals are chosen on |
-| **Status** | In progress (Phases 1 and 2 done, F1 fixed; Phase 3 closed as superseded by BL-052; Phase 4 re-scoped, not started) |
+| **Status** | Done (2026-10-28): Phases 1 and 2 done; F1, F6, F7 fixed; Phase 3 closed as superseded by BL-052; Phase 4 built as the history check only, the pinned favourite re-run → BL-177; F3 and F4 deferred |
 | **Type** | improvement |
 | **Area** | momentum (+ trading-data for one migration, dashboard for one provenance line) |
 | **Created** | 2026-10-04 |
@@ -354,6 +354,9 @@ Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
 | F3 | **No scenario depends on `broad_respect_circuits`** (corrected 2026-10-24). Putting it back to its default changes the result of none of the six Broad scenarios that set it: no lock in the fixture falls on a name the ranking ranks that week. `broad_gates_loosened_and_tilted`, once thought to depend on it, sets it to `False`, the default, so the nightly check never varies it, and its result is identical either way (its realism section shows ignoring = respecting locks). The setting is wired: a planted upper lock on a name the Monday-open run buys moves its CAGR (PR #314 review). `blocked_entries` / `blocked_exits` do not prove a result cannot move (they come from the locked run and date fills on Friday). | No golden coverage: a wiring break passes the goldens. Pinned since 2026-10-24 by `test_broad_parity.py::test_respect_circuits_hands_the_engine_masks_for_the_fill_session` (masks built for the fill session and handed to the engine; none when off). | Open: a scenario where a lock blocks a fill would still be the real guard; deferred 2026-10-22 when it was thought one scenario guarded it, so worth re-asking the owner. |
 | F4 | **No scenario makes `max_category` bind**, so a broken group cap would pass. | Same kind of hole. | Open. |
 | F5 | The payload has nulls in the newest week (`holdings_count`, often `idle_share`; the engine never trades its newest week). Before the F1 fix, all-cash weeks had nulls too. | Charts must treat null as a gap in the last point. | Only the newest week may be null; the test now says so. |
+| F6 | **A Broad backtest at a past date depends on data after that date** (2026-10-24, `docs/lookahead-requests-2026-10-24.md`). Running the followed strategy and the Phase 6 ensemble at three cut dates on today's database and on a copy holding nothing later gives different ranks, different trades in the ensemble and, in 24 of 24 pairs, some difference. Two causes, isolated exactly: the `voladj` z-scores run over every column of the frame, including stocks that are in it only because a later year's `turnover_rank` list holds them; and a column that is stale at the end of the data is forward-filled over its whole length, internal gaps included. | CAGR moves by up to 0.12 points for the followed strategy (one extra trade in one sleeve at two cuts) and up to 1.03 points for an ensemble sleeve, both signs. Max drawdown up to 0.21. No effect on the live Friday signal. Every historical Broad figure carries it. | **Fixed 2026-10-25 (owner: "fix F6"), branch `fix/momentum-f6-point-in-time-ranking`; merged 2026-10-28 (`778ba02e`).** Cross-section = the week's point-in-time members behind the gate, also for the stock tilt; only the tail after a stale column's last price is forward-filled (Broad only). `mbt audit lookahead-requests`: 24 of 24 pairs identical. Levels moved: followed strategy 42.93% to 35.03%, worst fall -30.8% to -36.9%; `docs/lookahead-requests-2026-10-24.md` has every strategy. Eight Broad goldens accepted. |
+| F7 | `_compute_pool_membership` gave the weeks before the first quarter-end that quarter's pool, decided with later ranks. Unreachable with a 52-week lookback (those weeks have no rank). | None on any saved favourite (identical results on all 7 distinct lookback/score settings, live data, end 2026-10-16) or on a golden scenario. | **Fixed 2026-10-24**: those weeks have no pool. Two unit tests in `test_broad.py`. |
+| F8 | **A holding can end a week a few thousandths over `max_position + cap_band`.** The trim check runs on the week's value before that week's buy costs are paid. Seen once F6's fix moved the frozen results: ADANIENT#2 at 20.004% against 20% in `broad_category_mode_off`, the week after it drifted from 18.85%. | Costs are a few basis points of the portfolio. | **Documented in the invariant** (`COST_SLACK = 1e-3` in `test_invariants.py`), no engine change. Anything larger is still a failure. |
 
 `tax` on a Broad request is accepted and ignored (documented in `api.py` and `IGNORED_FIELDS`);
 the wiring test lists it as inert with that reason.
@@ -382,7 +385,8 @@ favourite with the end pinned to its last accepted anchor and names the instrume
 - Phase 3: closed as superseded by BL-052. The three empty catalog columns (`code_version`,
   `date_from`, `date_to`) are dropped from scope; the stamp stays in each run's summary.
 - Phase 4: re-scoped to the one missing piece, a weekly check that re-runs each favourite with its
-  end pinned to the last accepted anchor and names the instruments whose history changed. Not started.
+  end pinned to the last accepted anchor and names the instruments whose history changed. Built
+  2026-10-28 as the history check only (see Phase 4 as built).
 - F3 and F4 (a second scenario where a circuit lock changes a fill, one where `max_category` binds):
   **deferred (owner, 2026-10-22, "as per your recommendation").** The live strategy's fills and caps work
   today; the gap is that the tests would not notice a future break. Revisit when the engine is next
@@ -395,6 +399,29 @@ favourite with the end pinned to its last accepted anchor and names the instrume
 3. ~~Phases 3 and 4~~ answered above.
 4. The original Phase 4 questions 2 to 4 (hold a signal on a "same data, different result" alert,
    the anchor date, the badge) matter only when the re-scoped Phase 4 is started.
+   (2026-10-28: they move to BL-177 with the pinned re-run.)
+
+## Phase 4 as built (2026-10-28, owner: "history check only")
+
+- `mbt verify history` (`src/momentum_backtesting/verify.py`, built 2026-10-24): per instrument and
+  calendar year, a row count and an order-independent hash of every `momentum_prices` row, every
+  stock daily bar in the lake, every corporate action and the two stock-action review tables, up to
+  an anchor Friday (the last Friday at least 14 days back, so the Fyers top-up's stopgap rows for the
+  newest week are never inside it). The baseline is `history_baseline.json` in the Momentum state
+  folder (`data/`), every event appended to `history_baseline_log.jsonl`. A clean check whose anchor is
+  more than 28 days behind moves it forward; a change is never accepted without `--accept --reason`.
+- **Exit codes:** a change exits 0 once its own Telegram is delivered (`notify.deliver`; the message
+  is the alert, the same rule as `mbt live-rules check` on a breach), so the scheduler does not alert
+  twice. A change that reached nobody (no `--send`, Telegram off or unreachable) exits 1, as does a
+  check that cannot run (also sent). A missing baseline file is refused while the log shows an earlier
+  one (re-recording it would accept every change since); a baseline recorded under `--send` is
+  messaged. Tests in `tests/test_verify.py` (from the PR #365 review).
+- **Scheduled:** job `momentum-history`, Fri 22:00 IST (after the 19:30 stock sync's two-hour window
+  and the 21:00 / 21:30 checks), `catalog` group, `alertsItself`, one retry 10 minutes later.
+  Replaces the plan's "appended to the 19:30 LaunchAgent": the per-job plists are gone (BL-012).
+- **Not built:** the per-favourite re-run with the end pinned to the anchor (the data changed /
+  result same or changed table above) → [BL-177](BL-177-momentum-favourite-pinned-rerun.md), with
+  open questions 2 to 4.
 
 ## Log
 
@@ -420,3 +447,23 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   PR #314 review found F3 was wrong: no golden scenario depends on the setting
   (`broad_gates_loosened_and_tilted` sets the default and is identical either way). F3 corrected above;
   a unit test now pins the wiring (`test_broad_parity.py`).
+- 2026-10-24 — owner asleep; non-blocking work done on branch `verify/momentum-gaps`. (1) `mbt audit
+  lookahead-requests` runs whole requests (saved favourites, frozen configs) through the real API on
+  the live database and on a cut copy: it covers `turnover_rank` and the followed strategy, which the
+  golden test and `mbt audit lookahead` do not. First live run, 2 groups x 4 sleeves x 3 cuts: all 24
+  pairs differ, by up to 0.12 CAGR points (followed) and 1.03 (ensemble): finding F6. (2) First-quarter
+  pool leak confirmed in a unit test and fixed (F7), no result moves. (3) Phase 4's detector built:
+  `mbt verify history` fingerprints every price series, stock bar and corporate action up to a fixed
+  anchor Friday and names each instrument whose history changed; 3 s on live data; not scheduled, and it
+  does not re-run any strategy (so it says what changed, not whether a result moved).
+- 2026-10-25 — owner: "fix F6" (rank over the week's point-in-time members and gate only, forward-fill only the stale tail, re-accept the goldens, re-measure). Done on `fix/momentum-f6-point-in-time-ranking`: `engine.compute_ranks(cross_section=)`, `broad.cross_section_mask`, tilt ranking and live preview use it; Broad frame fills only the tail. Cut-off check 24 of 24 identical (it first found the stock tilt still ranking the whole frame). Eight Broad goldens accepted (-3.44 to +0.35 points). Live re-measure of every favourite in the doc: the followed strategy loses 7.9 points of headline CAGR and 6 of drawdown depth, its lot 1 trades differently this Friday. F8 (cost-sized cap overshoot) logged. Not merged: the owner decides when, because the next Friday's orders change.
+- 2026-10-28 — F6 merged (owner): PRs #318, #319, #322, merge commit `778ba02e`. On the merge's
+  live re-measure the followed strategy's backtest (Four Sectors Monthly, No Tilt · all Fridays: the
+  four sleeves blended at equal capital, reset each April, as the group shows it) went from 43.2% to
+  35.3% CAGR, and the blend's worst fall from -27.0% to -34.8%, in April 2020. (The F6 row's 42.93% to
+  35.03% and -30.8 to -36.9 are the means of the four sleeves' own figures, a different measure.) The search
+  re-run on the fixed ranking is BL-176; the live-rules drawdown thresholds are BL-025's to revisit.
+- 2026-10-28 — owner: Phase 4 = the history check only. `mbt verify history` now exits 0 on a change
+  once its Telegram is delivered (the message is the alert) and is scheduled as `momentum-history`, Fri 22:00 IST; the first baseline
+  is written once from the main checkout after the merge (owner-approved). The pinned favourite re-run
+  is BL-177 (P2). F3 and F4 stay deferred (owner, 2026-10-22). Status `Done`.

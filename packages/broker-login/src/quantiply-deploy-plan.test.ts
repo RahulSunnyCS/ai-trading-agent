@@ -5,7 +5,10 @@ import {
   type AlgoDetail,
   ENABLE_LEAD_SECONDS,
   type EnableInput,
+  NO_STOP_EXTRA_INR,
   UNKNOWN_BROKER,
+  bookStopExtra,
+  clientwiseBelow,
   clientwiseBody,
   clientwiseHolds,
   clientwiseNow,
@@ -27,7 +30,7 @@ import {
   toggledIds,
   verifyToggles,
 } from './quantiply-deploy-plan.js';
-import { type QAlgo, type QLedgerRow, parseQLedger } from './quantiply-plan.js';
+import { type QAlgo, type QLedgerRow, type QManifest, parseQLedger } from './quantiply-plan.js';
 
 const P = 'Core · ';
 const WED = '2026-10-21';
@@ -606,5 +609,79 @@ describe('clientwise MTM SL (BL-172)', () => {
     const days = parseClientwise(brokers({}), 'b1');
     assert.equal(clientwiseNow(days), 'none');
     assert.deepEqual(clientwiseBody(days, 8000), { stoploss: -8000, target: 0 });
+  });
+});
+
+describe('the book stop on a Dir ×2 day (BL-183)', () => {
+  const entry = (name: string, lots?: number, addon = false) => ({
+    variant: name,
+    name,
+    addon,
+    file: `${name}.json`,
+    unconfirmed: [],
+    ...(lots === undefined ? {} : { lots }),
+  });
+  const bodies = (stops: Record<string, number | null>) =>
+    new Map(
+      Object.entries(stops).map(([name, v]) => [
+        name,
+        { configurations: v === null ? {} : { stoploss: { type: 'TOTAL_AMOUNT', value: v } } },
+      ]),
+    );
+  const manifest = (dirBoost: boolean | undefined, strategies: QManifest['strategies']) =>
+    ({
+      day: '2026-10-29',
+      weekday: 'THU',
+      book: 'core',
+      source: 'preview',
+      strategies,
+      dir_boost: dirBoost,
+    }) as QManifest;
+
+  it('rises by the doubled Dir’s own per-lot stop, read from its 2-lot body', () => {
+    const m = manifest(true, [entry('Core · W', 1), entry('Core · D', 2), entry('Core · W2', 1)]);
+    const b = bodies({ 'Core · W': -2500, 'Core · D': -6000, 'Core · W2': -2500 });
+    assert.equal(bookStopExtra(m, b), 3000);
+  });
+
+  it('counts the row multiplier, and only picks the account holds as exported', () => {
+    const m = manifest(true, [entry('Core · W', 1), entry('Core · D', 2)]);
+    const b = bodies({ 'Core · W': -2500, 'Core · D': -6000 });
+    assert.equal(bookStopExtra(m, b, 2), 6000);
+    // the Dir on the account is still last evening's 1-lot algo: no extra lot trades, no rise
+    assert.equal(bookStopExtra(m, b, 1, new Set(['Core · W'])), 0);
+    assert.equal(bookStopExtra(m, b, 1, new Set(['Core · W', 'Core · D'])), 3000);
+  });
+
+  it('a doubled pick with no stop of its own adds ₹4,000 a lot (the owner’s rule)', () => {
+    const m = manifest(true, [entry('Core · D', 2)]);
+    assert.equal(bookStopExtra(m, bodies({ 'Core · D': null })), NO_STOP_EXTRA_INR);
+  });
+
+  it('adds nothing when the export doubles nothing or predates BL-183', () => {
+    const b = bodies({ 'Core · D': -3000 });
+    assert.equal(bookStopExtra(manifest(false, [entry('Core · D', 1)]), b), 0);
+    assert.equal(bookStopExtra(manifest(undefined, [entry('Core · D')]), b), 0);
+    // the Buy add-on is never doubled, even if a manifest said so
+    assert.equal(
+      bookStopExtra(manifest(true, [entry('Core · B', 2, true)]), bodies({ 'Core · B': -4000 })),
+      0,
+    );
+  });
+
+  it('the top-up widens only: a stop already at or above the target is left alone', () => {
+    const at = (sl: number) =>
+      Object.fromEntries(
+        ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((d) => [
+          d,
+          { stoploss: sl, target: 0, raw: {} },
+        ]),
+      );
+    assert.equal(clientwiseBelow(at(-8000), 11000), true);
+    assert.equal(clientwiseBelow(at(-11000), 11000), false);
+    assert.equal(clientwiseBelow(at(-12000), 11000), false);
+    const one = at(-11000);
+    (one.TUE as { stoploss: number | null }).stoploss = null;
+    assert.equal(clientwiseBelow(one, 11000), true);
   });
 });

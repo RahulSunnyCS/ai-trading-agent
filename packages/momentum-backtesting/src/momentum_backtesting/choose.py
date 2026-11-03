@@ -118,7 +118,10 @@ def martin(curves: pd.DataFrame) -> pd.Series:
 
 
 def nominal_holdings(light: dict) -> int:
-    """The most stocks the config can hold at once (addendum 3)."""
+    """The most stocks the config can hold at once (addendum 3). A direct-rank config (arm B,
+    no category layer) holds its `off_top_n`; BL-176 ranks it beside the category arms."""
+    if "category_top_n" not in light:
+        return int(min(light["off_top_n"], light["pool_top_n"]))
     return int(min(light["category_top_n"] * light["picks_per_category"], light["pool_top_n"]))
 
 
@@ -126,7 +129,7 @@ def simplicity(heavy: dict, light: dict) -> tuple:
     """Smaller is simpler: fewer lookbacks, fewer categories, no stock tilt, plain entry."""
     return (
         len(heavy["lookbacks"]),
-        light["category_top_n"],
+        light.get("category_top_n", 0),  # a direct-rank config has no category layer
         light.get("stock_tilt", 0.0) != 0.0,
         light.get("entry", "wait") != "wait",
     )

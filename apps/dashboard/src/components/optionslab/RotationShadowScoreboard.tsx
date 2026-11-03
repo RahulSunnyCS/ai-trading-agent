@@ -31,6 +31,8 @@ import {
   statusSummary,
   triggerCells,
 } from '../../lib/rotationShadowView';
+import { grossLabel } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type {
   RotationShadowResponse,
   ShadowListKey,
@@ -96,11 +98,12 @@ function Banner({ r }: { r: RotationShadowResponse }) {
 // ---------------------------------------------------------------------------
 
 function TriggerTable({ r }: { r: RotationShadowResponse }) {
+  const slippage = useRotationSlippage();
   return (
     <Card>
       <CardHeader
         title="Triggers against their placebo"
-        description="Each template entered the minute after the trigger, minus the same template at the same minute on the 20 earlier days with no event. ₹ per lot, gross."
+        description={`Each template entered the minute after the trigger, minus the same template at the same minute on the 20 earlier days with no event. ₹ per lot, ${grossLabel(slippage)}.`}
       />
       <Table>
         <THead>
@@ -180,6 +183,7 @@ function listOption(lists: readonly ShadowListSummary[], key: ShadowListKey): st
 
 function OverrideCard({ r }: { r: RotationShadowResponse }) {
   const [key, setKey] = useState<ShadowListKey>(DEFAULT_LIST);
+  const slippage = useRotationSlippage();
   // The response scores the override on every recorded list; only the shown ones are offered.
   const shown = r.override.lists.filter((l) => isVisibleList(l.list));
   const list = shown.find((l) => l.list === key) ?? shown[0];
@@ -195,7 +199,7 @@ function OverrideCard({ r }: { r: RotationShadowResponse }) {
     <Card>
       <CardHeader
         title="Override against the pick it displaces"
-        description={`On a day with a pivot-cross (T1) or RSI-exhaustion (T4) event, the earliest one fires a Dir at that minute and replaces the list's next not-yet-started core pick, one starting ${rule.min_lead_minutes} or more minutes later; skipped if fewer than ${rule.min_widesl} Widesl would remain. Lots are conserved (${rule.lots_per_strategy} per strategy). Each figure is the Dir minus the pick it replaced, gross.`}
+        description={`On a day with a pivot-cross (T1) or RSI-exhaustion (T4) event, the earliest one fires a Dir at that minute and replaces the list's next not-yet-started core pick, one starting ${rule.min_lead_minutes} or more minutes later; skipped if fewer than ${rule.min_widesl} Widesl would remain. Lots are conserved (${rule.lots_per_strategy} per strategy). Each figure is the Dir minus the pick it replaced, ${grossLabel(slippage)}.`}
         actions={
           <ListPicker
             value={list.list}
@@ -353,11 +357,12 @@ function OverrideCard({ r }: { r: RotationShadowResponse }) {
 
 function ResearchCard({ r }: { r: RotationShadowResponse }) {
   const rows = researchRows(r);
+  const slippage = useRotationSlippage();
   return (
     <Card>
       <CardHeader
         title="What the research found"
-        description={`The same override over ${r.research.periods.explore} (the last two years) and ${r.research.periods.confirm}. ₹ on the list's ${r.override.rule.lots_per_strategy} lots per strategy, gross, over the whole window; the controls are the 90th percentile of 200 random draws.`}
+        description={`The same override over ${r.research.periods.explore} (the last two years) and ${r.research.periods.confirm}. ₹ on the list's ${r.override.rule.lots_per_strategy} lots per strategy, ${grossLabel(slippage)}, over the whole window; the controls are the 90th percentile of 200 random draws.`}
       />
       <Table>
         <THead>
@@ -476,6 +481,7 @@ function CandidatesCard({ r }: { r: RotationShadowResponse }) {
 export function RotationShadowScoreboard() {
   const res = useRotationShadow();
   const r = res.data;
+  const slippage = useRotationSlippage();
 
   return (
     <section aria-label="Shadow scoreboard" className="space-y-4">
@@ -486,7 +492,8 @@ export function RotationShadowScoreboard() {
           </h2>
           <p className="mt-0.5 max-w-3xl text-sm text-muted">
             Ideas kept for forward observation, each against the pick it would have replaced, on
-            days the research never saw. Every figure is the idea minus a comparator, gross.
+            days the research never saw. Every figure is the idea minus a comparator,{' '}
+            {grossLabel(slippage)}.
           </p>
         </div>
         <RefreshButton onClick={res.refetch} loading={res.loading} />

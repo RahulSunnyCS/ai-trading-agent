@@ -19,6 +19,8 @@ import {
   type AlgoDetail,
   type DeployMode,
   ENABLE_LEAD_SECONDS,
+  bookStopExtra,
+  clientwiseBelow,
   clientwiseBody,
   clientwiseHolds,
   clientwiseNow,
@@ -471,9 +473,23 @@ async function main(): Promise<number> {
       const brokersJson = await api.brokers();
       const pb = pickBroker(parseBrokers(brokersJson), creds.user);
       // BL-172: the morning run keeps the account's clientwise MTM SL before anything goes live;
-      // an algo never goes live under a wrong or unknown one.
-      if (values.morning && mtmSl !== null) {
-        const want = `₹${mtmSl.toLocaleString('en-IN')}`;
+      // an algo never goes live under a wrong or unknown one. BL-183: on a day the export trades
+      // the Dir at 2 lots the stop rises by the Dir's own stop; the 09:21 top-up only ever widens
+      // it (for a Dir ×2 the 09:16 pick brought), never tightens it while algos are running.
+      const held = new Set(
+        [...ownedForSession(ledger, session, p.sha).values()]
+          .filter((r) => p.sha.get(r.name) === r.sha)
+          .map((r) => r.name),
+      );
+      const extra = mtmSl === null ? 0 : bookStopExtra(p.manifest, p.body, multiplier, held);
+      const topupWiden = !values.morning && extra > 0;
+      if ((values.morning || topupWiden) && mtmSl !== null) {
+        const target = mtmSl + extra;
+        const want =
+          `₹${target.toLocaleString('en-IN')}` +
+          (extra
+            ? ` (₹${mtmSl.toLocaleString('en-IN')} + ₹${extra.toLocaleString('en-IN')} for Dir ×2)`
+            : '');
         if ('error' in pb) {
           attention = true;
           lines.push(
@@ -482,22 +498,23 @@ async function main(): Promise<number> {
           throw new Reported('mtm sl');
         }
         const days = parseClientwise(brokersJson, pb.id);
-        const body = clientwiseBody(days, mtmSl);
-        if (!body) lines.push(`MTM SL ${want} ✓`);
+        const body =
+          topupWiden && !clientwiseBelow(days, target) ? null : clientwiseBody(days, target);
+        if (!body) lines.push(`MTM SL ${topupWiden ? clientwiseNow(days) : want} ✓`);
         else if (!apply)
           lines.push(`MTM SL is ${clientwiseNow(days)}: would set ${want} (dry run)`);
         else {
           const was = clientwiseNow(days);
           await api.setClientwise(pb.id, body);
           changed = true;
-          await record({ action: 'mtm-sl', broker: pb.id, from: was, to: mtmSl, ok: true });
+          await record({ action: 'mtm-sl', broker: pb.id, from: was, to: target, ok: true });
           let back = parseClientwise(await api.brokers(), pb.id);
-          if (!clientwiseHolds(back, mtmSl)) {
+          if (!clientwiseHolds(back, target)) {
             // the save may land a moment after it answers: one more read before calling it failed
             await new Promise((r) => setTimeout(r, 3_000));
             back = parseClientwise(await api.brokers(), pb.id);
           }
-          if (!clientwiseHolds(back, mtmSl)) {
+          if (!clientwiseHolds(back, target)) {
             attention = true;
             lines.push(
               `❌ MTM SL set to ${want} but reads back ${clientwiseNow(back)}: nothing switched on, check Quantiply`,

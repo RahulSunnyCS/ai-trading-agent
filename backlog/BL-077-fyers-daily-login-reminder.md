@@ -66,3 +66,4 @@ Anything that completes or evades Fyers' human check, or calls its undocumented 
 
 - 2026-10-10 — created after BL-076's spike showed the refresh-token API is disabled.
 - 2026-10-10 — superseded: the owner removed the 08:05 job and chose Angel One as the fallback source (BL-079). The dashboard already shows a Fyers token banner (`TokenBanner.tsx`).
+- 2026-10-28 — re-checked: the Cloudflare check is still on Fyers' login page in a headless browser (Continue stays disabled), and SEBI's retail-algo rules (1 Apr 2026) make the daily two-step login the rule, so the refresh-token grant is not coming back. Phase 1's reminder was built as a phone login instead: TODO 1.13.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — this month's goal is Momentum with real money (BL-010, BL-024, BL-025); this is the next research line, separate from it |
-| **Status** | In progress |
+| **Status** | Done (2026-10-28): killed on development (portfolio 7.8% CAGR vs Nifty 500 TRI 13.5%, PBO 0.32); the 2024–26 hold-out stays sealed; Phases 6–7 not run |
 | **Type** | research |
 | **Area** | momentum (the `patterns/` module; a separate sleeve, not the momentum ranking) |
 | **Created** | 2026-10-07 |
@@ -262,3 +262,7 @@ Answered when the owner started the item (2026-10-07):
     ranges and flags as a standalone swing system do not beat simply holding a mid-cap index.
     No rule here is worth spending the sealed hold-out on. Recommended to the owner: close
     BL-043 as "no edge after costs".
+- 2026-10-28 — **Closed as killed** (owner, asked in chat, 2026-10-28). The development test failed its
+  registered rule (portfolio 7.8% CAGR vs Nifty 500 TRI 13.5% over the 2015–2023 walk-forward, PBO 0.32);
+  the follow-up looks above are exploratory. Phase 6 (the one hold-out run) is not run: the 2024–26 hold-out
+  stays sealed and unclaimed. Phase 7 (daily scan and paper tracking) is not built. Status `Done`.

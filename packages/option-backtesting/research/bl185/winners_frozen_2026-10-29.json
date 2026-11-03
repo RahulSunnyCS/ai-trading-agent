@@ -1,0 +1,5711 @@
+[
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W244",
+   "strike": "OTM3",
+   "leg_sl": 120,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": null,
+   "stop": 3500,
+   "exit": "13:00",
+   "score": 90.78375403261808,
+   "valid_share": 1.0,
+   "pieces": 2.75,
+   "net_per_lot_day": 446.6663963054206
+  },
+  "runners_up": [
+   {
+    "cell": "W226",
+    "strike": "OTM3",
+    "leg_sl": 60,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 750,
+    "exit": "13:00",
+    "score": 89.81798825167171,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 366.04046944876677
+   },
+   {
+    "cell": "W226",
+    "strike": "OTM3",
+    "leg_sl": 60,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 1000,
+    "exit": "13:00",
+    "score": 88.96480054705555,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 385.8779536353198
+   },
+   {
+    "cell": "W224",
+    "strike": "OTM3",
+    "leg_sl": 60,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 750,
+    "exit": "13:00",
+    "score": 88.21058415149564,
+    "valid_share": 1.0,
+    "pieces": 2.5,
+    "net_per_lot_day": 339.1526235953477
+   },
+   {
+    "cell": "W236",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 3000,
+    "exit": "13:00",
+    "score": 87.5058422636642,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 415.09896999966946
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W236",
+   "strike": "OTM3",
+   "leg_sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": 3500,
+   "exit": "13:00",
+   "score": 47.54534484158023,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.4285714285714284,
+   "net_per_lot_day": 102.51304971638562
+  },
+  "runners_up": [
+   {
+    "cell": "W236",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "13:00",
+    "score": 47.5440063600725,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 102.51304971638562
+   },
+   {
+    "cell": "W238",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 3500,
+    "exit": "13:00",
+    "score": 47.00360924057899,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 97.78965573898431
+   },
+   {
+    "cell": "W238",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "13:00",
+    "score": 46.961664464508935,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 97.78965573898431
+   },
+   {
+    "cell": "W236",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 3000,
+    "exit": "13:00",
+    "score": 45.77244947554745,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 102.51304971638562
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W030",
+   "strike": "ITM3",
+   "leg_sl": 150,
+   "trail": null,
+   "reentry": null,
+   "stop": null,
+   "exit": "15:28",
+   "score": 52.43975666041577,
+   "valid_share": 0.8,
+   "pieces": 2.8,
+   "net_per_lot_day": 392.0852462862676
+  },
+  "runners_up": [
+   {
+    "cell": "W031",
+    "strike": "ITM3",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 43.532945768061175,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 392.0852462862676
+   },
+   {
+    "cell": "W067",
+    "strike": "ITM2",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 34.78038650311994,
+    "valid_share": 1.0,
+    "pieces": 2.4,
+    "net_per_lot_day": 458.7734238749989
+   },
+   {
+    "cell": "W025",
+    "strike": "ITM3",
+    "leg_sl": 120,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 33.93524006278168,
+    "valid_share": 0.8,
+    "pieces": 2.4,
+    "net_per_lot_day": 213.26187055355103
+   },
+   {
+    "cell": "W024",
+    "strike": "ITM3",
+    "leg_sl": 120,
+    "trail": null,
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 33.93524006278168,
+    "valid_share": 0.8,
+    "pieces": 2.4,
+    "net_per_lot_day": 213.26187055355103
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W340",
+   "strike": "PHIGH",
+   "leg_sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": null,
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 8904.843030411279,
+   "valid_share": 0.75,
+   "pieces": 2.25,
+   "net_per_lot_day": 156.08492212497035
+  },
+  "runners_up": [
+   {
+    "cell": "W341",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 8904.843030411279,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 156.08492212497035
+   },
+   {
+    "cell": "W339",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 4930.636949585368,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 154.55121273185622
+   },
+   {
+    "cell": "W338",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 4930.432675720667,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 154.55121273185622
+   },
+   {
+    "cell": "W341",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 4651.10354547292,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 156.08492212497035
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W240",
+   "strike": "OTM3",
+   "leg_sl": 120,
+   "trail": null,
+   "reentry": null,
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 176.7915139348415,
+   "valid_share": 1.0,
+   "pieces": 2.75,
+   "net_per_lot_day": 660.5590965757151
+  },
+  "runners_up": [
+   {
+    "cell": "W240",
+    "strike": "OTM3",
+    "leg_sl": 120,
+    "trail": null,
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 169.86700722586698,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 664.9455404099173
+   },
+   {
+    "cell": "W242",
+    "strike": "OTM3",
+    "leg_sl": 120,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 160.99746270596683,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 694.9096861099528
+   },
+   {
+    "cell": "W242",
+    "strike": "OTM3",
+    "leg_sl": 120,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 156.84397217251347,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 688.9051485209355
+   },
+   {
+    "cell": "W244",
+    "strike": "OTM3",
+    "leg_sl": 120,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 143.80197971405443,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 652.1850782671896
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W236",
+   "strike": "OTM3",
+   "leg_sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 106.17483746987052,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 295.70552640700186
+  },
+  "runners_up": [
+   {
+    "cell": "W236",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 104.22750788850244,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 293.2510429063446
+   },
+   {
+    "cell": "W238",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 103.4728032183914,
+    "valid_share": 1.0,
+    "pieces": 2.857142857142857,
+    "net_per_lot_day": 280.1768276470186
+   },
+   {
+    "cell": "W238",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 102.02533305991115,
+    "valid_share": 1.0,
+    "pieces": 2.857142857142857,
+    "net_per_lot_day": 282.99940140117707
+   },
+   {
+    "cell": "W236",
+    "strike": "OTM3",
+    "leg_sl": 100,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 101.30276499506178,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 295.70552640700186
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W030",
+   "strike": "ITM3",
+   "leg_sl": 150,
+   "trail": null,
+   "reentry": null,
+   "stop": null,
+   "exit": "15:28",
+   "score": 52.43975666041577,
+   "valid_share": 0.8,
+   "pieces": 2.8,
+   "net_per_lot_day": 392.0852462862676
+  },
+  "runners_up": [
+   {
+    "cell": "W031",
+    "strike": "ITM3",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 43.532945768061175,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 392.0852462862676
+   },
+   {
+    "cell": "W067",
+    "strike": "ITM2",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 34.78038650311994,
+    "valid_share": 1.0,
+    "pieces": 2.4,
+    "net_per_lot_day": 458.7734238749989
+   },
+   {
+    "cell": "W025",
+    "strike": "ITM3",
+    "leg_sl": 120,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 33.93524006278168,
+    "valid_share": 0.8,
+    "pieces": 2.4,
+    "net_per_lot_day": 213.26187055355103
+   },
+   {
+    "cell": "W024",
+    "strike": "ITM3",
+    "leg_sl": 120,
+    "trail": null,
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 33.93524006278168,
+    "valid_share": 0.8,
+    "pieces": 2.4,
+    "net_per_lot_day": 213.26187055355103
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W340",
+   "strike": "PHIGH",
+   "leg_sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": null,
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 8904.843030411279,
+   "valid_share": 0.75,
+   "pieces": 2.25,
+   "net_per_lot_day": 156.08492212497035
+  },
+  "runners_up": [
+   {
+    "cell": "W341",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 8904.843030411279,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 156.08492212497035
+   },
+   {
+    "cell": "W339",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 4930.636949585368,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 154.55121273185622
+   },
+   {
+    "cell": "W338",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 4930.432675720667,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 154.55121273185622
+   },
+   {
+    "cell": "W341",
+    "strike": "PHIGH",
+    "leg_sl": 80,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 4651.10354547292,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 156.08492212497035
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "W188",
+   "strike": "OTM2",
+   "leg_sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": 2000,
+   "exit": "12:30",
+   "score": 8.726406919627992,
+   "valid_share": 0.75,
+   "pieces": 2.25,
+   "net_per_lot_day": 137.02252984224074
+  },
+  "runners_up": [
+   {
+    "cell": "W153",
+    "strike": "OTM1",
+    "leg_sl": 60,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "12:30",
+    "score": 8.427804849347677,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 166.40903694427985
+   },
+   {
+    "cell": "W190",
+    "strike": "OTM2",
+    "leg_sl": 60,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 2000,
+    "exit": "12:30",
+    "score": 8.13398499260117,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 135.65648005999182
+   },
+   {
+    "cell": "W118",
+    "strike": "ATM",
+    "leg_sl": 60,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 2500,
+    "exit": "13:00",
+    "score": 7.484534298463807,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 151.26047814832407
+   },
+   {
+    "cell": "W188",
+    "strike": "OTM2",
+    "leg_sl": 60,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 2000,
+    "exit": "13:00",
+    "score": 7.459331449516907,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 124.60483031213768
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "other",
+  "winner": null,
+  "why": "no cell passes the gates, breadth and half-year rules"
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "W143",
+   "strike": "ATM",
+   "leg_sl": 150,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 26.915685682877218,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 291.39601659895663
+  },
+  "runners_up": [
+   {
+    "cell": "W142",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 26.915685682877218,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 291.39601659895663
+   },
+   {
+    "cell": "W139",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 26.792843438904782,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 291.39601659895663
+   },
+   {
+    "cell": "W138",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 26.792843438904782,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 291.39601659895663
+   },
+   {
+    "cell": "W140",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 26.791351177088625,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 296.02878870157855
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "other",
+  "winner": {
+   "cell": "W140",
+   "strike": "ATM",
+   "leg_sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": 3000,
+   "exit": "15:28",
+   "score": 25.229697136585497,
+   "valid_share": 0.75,
+   "pieces": 2.5,
+   "net_per_lot_day": 123.78511665586623
+  },
+  "runners_up": [
+   {
+    "cell": "W141",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.229697136585497,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   },
+   {
+    "cell": "W143",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.03241293999066,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   },
+   {
+    "cell": "W142",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.03241293999066,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   },
+   {
+    "cell": "W139",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.03241293999066,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "W105",
+   "strike": "ITM1",
+   "leg_sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 15.943440753341992,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 501.84048608510244
+  },
+  "runners_up": [
+   {
+    "cell": "W104",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 15.943440753341992,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 501.84048608510244
+   },
+   {
+    "cell": "W356",
+    "strike": "PHIGH",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 15.821590076852116,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 456.61855489197603
+   },
+   {
+    "cell": "W357",
+    "strike": "PHIGH",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 15.810010721555221,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 456.61855489197603
+   },
+   {
+    "cell": "W358",
+    "strike": "PHIGH",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 15.73036843734279,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 439.4808389569498
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "other",
+  "winner": {
+   "cell": "W146",
+   "strike": "OTM1",
+   "leg_sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": 3000,
+   "exit": "15:28",
+   "score": 18.405476410948346,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.7142857142857144,
+   "net_per_lot_day": 237.13302854748173
+  },
+  "runners_up": [
+   {
+    "cell": "W148",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 18.16824641464165,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 241.4916249027574
+   },
+   {
+    "cell": "W038",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 17.961021861892924,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 315.98277883286374
+   },
+   {
+    "cell": "W146",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 17.813182073858044,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.5714285714285716,
+    "net_per_lot_day": 216.27729528229574
+   },
+   {
+    "cell": "W108",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 17.810797886026595,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 255.29859755897402
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "W143",
+   "strike": "ATM",
+   "leg_sl": 150,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 26.915685682877218,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 291.39601659895663
+  },
+  "runners_up": [
+   {
+    "cell": "W142",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 26.915685682877218,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 291.39601659895663
+   },
+   {
+    "cell": "W139",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 26.792843438904782,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 291.39601659895663
+   },
+   {
+    "cell": "W138",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 26.792843438904782,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 291.39601659895663
+   },
+   {
+    "cell": "W140",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 26.791351177088625,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 296.02878870157855
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "other",
+  "winner": {
+   "cell": "W140",
+   "strike": "ATM",
+   "leg_sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": 3000,
+   "exit": "15:28",
+   "score": 25.229697136585497,
+   "valid_share": 0.75,
+   "pieces": 2.5,
+   "net_per_lot_day": 123.78511665586623
+  },
+  "runners_up": [
+   {
+    "cell": "W141",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.229697136585497,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   },
+   {
+    "cell": "W143",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.03241293999066,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   },
+   {
+    "cell": "W142",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.03241293999066,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   },
+   {
+    "cell": "W139",
+    "strike": "ATM",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 25.03241293999066,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 123.78511665586623
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D217",
+   "strike": "OTM3",
+   "leg_sl": 10,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 750,
+   "exit": "13:00",
+   "score": 67.65827163820292,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 224.85877603188624
+  },
+  "runners_up": [
+   {
+    "cell": "D262",
+    "strike": "PLOW",
+    "leg_sl": 15,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "13:00",
+    "score": 59.53339552121499,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 547.413265981875
+   },
+   {
+    "cell": "D262",
+    "strike": "PLOW",
+    "leg_sl": 15,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "12:30",
+    "score": 59.27582533104802,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 508.25217586211414
+   },
+   {
+    "cell": "D247",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 750,
+    "exit": "13:00",
+    "score": 59.11086024000362,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 362.0871908597943
+   },
+   {
+    "cell": "D241",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1000,
+    "exit": "13:00",
+    "score": 58.89797442858027,
+    "valid_share": 1.0,
+    "pieces": 2.25,
+    "net_per_lot_day": 313.2903465527782
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D240",
+   "strike": "OTM3",
+   "leg_sl": 30,
+   "trail": null,
+   "reentry": null,
+   "stop": 1250,
+   "exit": "13:00",
+   "score": 35.173925158282046,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.142857142857143,
+   "net_per_lot_day": 83.04507125005964
+  },
+  "runners_up": [
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "13:00",
+    "score": 33.75830195815874,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.2857142857142856,
+    "net_per_lot_day": 247.48372585372317
+   },
+   {
+    "cell": "D127",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "13:00",
+    "score": 32.512560682307914,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.0,
+    "net_per_lot_day": 264.88017448248047
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "13:00",
+    "score": 32.379338034011674,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.142857142857143,
+    "net_per_lot_day": 256.48868731432486
+   },
+   {
+    "cell": "D172",
+    "strike": "OTM1",
+    "leg_sl": 30,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "13:00",
+    "score": 31.902589583917017,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.142857142857143,
+    "net_per_lot_day": 205.70646563733777
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D139",
+   "strike": "ATM",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2500,
+   "exit": "15:28",
+   "score": 17.85666124544169,
+   "valid_share": 1.0,
+   "pieces": 2.4,
+   "net_per_lot_day": 265.69131145700624
+  },
+  "runners_up": [
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 17.85214835903948,
+    "valid_share": 1.0,
+    "pieces": 2.4,
+    "net_per_lot_day": 248.22429265725273
+   },
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 17.34843817602948,
+    "valid_share": 1.0,
+    "pieces": 2.2,
+    "net_per_lot_day": 235.10059274452942
+   },
+   {
+    "cell": "D034",
+    "strike": "ITM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 16.963359137954445,
+    "valid_share": 1.0,
+    "pieces": 2.0,
+    "net_per_lot_day": 346.0679674972138
+   },
+   {
+    "cell": "D033",
+    "strike": "ITM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 16.28374581057534,
+    "valid_share": 1.0,
+    "pieces": 2.0,
+    "net_per_lot_day": 419.88264648376116
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D067",
+   "strike": "ITM2",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 120.4734555928362,
+   "valid_share": 1.0,
+   "pieces": 2.5,
+   "net_per_lot_day": 418.8148966142606
+  },
+  "runners_up": [
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1000,
+    "exit": "15:28",
+    "score": 117.61050179351246,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 290.17415909538107
+   },
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 116.74101928336154,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 388.4035222420707
+   },
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 115.36931592337872,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 388.4035222420707
+   },
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 114.58800176529985,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 388.4035222420707
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D250",
+   "strike": "OTM3",
+   "leg_sl": 40,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 113.62647508360644,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 489.5050054776775
+  },
+  "runners_up": [
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 111.96678171480448,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 489.5050054776775
+   },
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1250,
+    "exit": "15:28",
+    "score": 103.75228907247114,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 441.77027417346915
+   },
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "15:28",
+    "score": 99.29229580989208,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 435.8346491815648
+   },
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 97.47498659343292,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 487.81829112100934
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D243",
+   "strike": "OTM3",
+   "leg_sl": 30,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": null,
+   "stop": 750,
+   "exit": "15:28",
+   "score": 90.77606153479829,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.4285714285714284,
+   "net_per_lot_day": 139.4577567170532
+  },
+  "runners_up": [
+   {
+    "cell": "D240",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": null,
+    "stop": 1250,
+    "exit": "15:28",
+    "score": 73.5184662570749,
+    "valid_share": 1.0,
+    "pieces": 2.857142857142857,
+    "net_per_lot_day": 210.7804377056893
+   },
+   {
+    "cell": "D213",
+    "strike": "OTM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 1000,
+    "exit": "15:28",
+    "score": 70.69317516137342,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 212.22062394208984
+   },
+   {
+    "cell": "D202",
+    "strike": "OTM2",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 70.38968858325974,
+    "valid_share": 1.0,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 275.491752277344
+   },
+   {
+    "cell": "D240",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": null,
+    "stop": 1000,
+    "exit": "15:28",
+    "score": 70.06594916914744,
+    "valid_share": 1.0,
+    "pieces": 2.857142857142857,
+    "net_per_lot_day": 199.93872387634855
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D139",
+   "strike": "ATM",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2500,
+   "exit": "15:28",
+   "score": 17.85666124544169,
+   "valid_share": 1.0,
+   "pieces": 2.4,
+   "net_per_lot_day": 265.69131145700624
+  },
+  "runners_up": [
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 17.85214835903948,
+    "valid_share": 1.0,
+    "pieces": 2.4,
+    "net_per_lot_day": 248.22429265725273
+   },
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 17.34843817602948,
+    "valid_share": 1.0,
+    "pieces": 2.2,
+    "net_per_lot_day": 235.10059274452942
+   },
+   {
+    "cell": "D034",
+    "strike": "ITM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 16.963359137954445,
+    "valid_share": 1.0,
+    "pieces": 2.0,
+    "net_per_lot_day": 346.0679674972138
+   },
+   {
+    "cell": "D033",
+    "strike": "ITM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 16.28374581057534,
+    "valid_share": 1.0,
+    "pieces": 2.0,
+    "net_per_lot_day": 419.88264648376116
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D067",
+   "strike": "ITM2",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 120.4734555928362,
+   "valid_share": 1.0,
+   "pieces": 2.5,
+   "net_per_lot_day": 418.8148966142606
+  },
+  "runners_up": [
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1000,
+    "exit": "15:28",
+    "score": 117.61050179351246,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 290.17415909538107
+   },
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 116.74101928336154,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 388.4035222420707
+   },
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 115.36931592337872,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 388.4035222420707
+   },
+   {
+    "cell": "D070",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 114.58800176529985,
+    "valid_share": 1.0,
+    "pieces": 2.75,
+    "net_per_lot_day": 388.4035222420707
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "D196",
+   "strike": "OTM2",
+   "leg_sl": 20,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 1500,
+   "exit": "13:00",
+   "score": 9.102955166338417,
+   "valid_share": 0.75,
+   "pieces": 2.5,
+   "net_per_lot_day": 230.66185807293584
+  },
+  "runners_up": [
+   {
+    "cell": "D184",
+    "strike": "OTM2",
+    "leg_sl": 10,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "13:00",
+    "score": 8.856853694945226,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 184.88345303295185
+   },
+   {
+    "cell": "D232",
+    "strike": "OTM3",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1250,
+    "exit": "12:00",
+    "score": 8.823293637162388,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 136.7945310540583
+   },
+   {
+    "cell": "D220",
+    "strike": "OTM3",
+    "leg_sl": 10,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "13:00",
+    "score": 8.517032338182617,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 155.6521063784323
+   },
+   {
+    "cell": "D273",
+    "strike": "PLOW",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 1250,
+    "exit": "11:30",
+    "score": 8.145864925548315,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 93.54614020308014
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "other",
+  "winner": {
+   "cell": "D165",
+   "strike": "OTM1",
+   "leg_sl": 25,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": null,
+   "stop": 1250,
+   "exit": "12:00",
+   "score": 3.7097097627815865,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.142857142857143,
+   "net_per_lot_day": 56.10546816860016
+  },
+  "runners_up": [
+   {
+    "cell": "D198",
+    "strike": "OTM2",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": null,
+    "stop": 1250,
+    "exit": "12:00",
+    "score": 3.639940839420619,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.142857142857143,
+    "net_per_lot_day": 45.693024344800754
+   },
+   {
+    "cell": "D165",
+    "strike": "OTM1",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 1500,
+    "exit": "12:00",
+    "score": 3.362104612701715,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.2857142857142856,
+    "net_per_lot_day": 51.887364196509246
+   },
+   {
+    "cell": "D198",
+    "strike": "OTM2",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": null,
+    "stop": 1500,
+    "exit": "12:00",
+    "score": 3.2914441221081723,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.142857142857143,
+    "net_per_lot_day": 48.990300146437555
+   },
+   {
+    "cell": "D198",
+    "strike": "OTM2",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": null,
+    "stop": 2000,
+    "exit": "12:00",
+    "score": 3.182165561668362,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.142857142857143,
+    "net_per_lot_day": 47.39595761737321
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "D166",
+   "strike": "OTM1",
+   "leg_sl": 25,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 12.208288678904639,
+   "valid_share": 0.8,
+   "pieces": 2.8,
+   "net_per_lot_day": 169.2911838817552
+  },
+  "runners_up": [
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "15:28",
+    "score": 11.869642227158336,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 158.71747000332113
+   },
+   {
+    "cell": "D138",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 1500,
+    "exit": "15:28",
+    "score": 11.84838569232775,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 161.35478687959366
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 11.67080967420449,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 225.5869362029207
+   },
+   {
+    "cell": "D163",
+    "strike": "OTM1",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 11.484372702519938,
+    "valid_share": 0.8,
+    "pieces": 2.8,
+    "net_per_lot_day": 157.80292336972053
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "other",
+  "winner": {
+   "cell": "D139",
+   "strike": "ATM",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2000,
+   "exit": "15:28",
+   "score": 24.477401932649737,
+   "valid_share": 0.75,
+   "pieces": 2.25,
+   "net_per_lot_day": 126.25225569862219
+  },
+  "runners_up": [
+   {
+    "cell": "D138",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 24.101712115816444,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 126.31058499407548
+   },
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 24.066272502487763,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 125.19947835114992
+   },
+   {
+    "cell": "D138",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 23.758726523484466,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 125.23086504386087
+   },
+   {
+    "cell": "D142",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 23.659335214133865,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 124.47024975214893
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "D232",
+   "strike": "OTM3",
+   "leg_sl": 20,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 1500,
+   "exit": "15:28",
+   "score": 13.754980226827593,
+   "valid_share": 0.75,
+   "pieces": 2.75,
+   "net_per_lot_day": 219.8859674293336
+  },
+  "runners_up": [
+   {
+    "cell": "D232",
+    "strike": "OTM3",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 13.412194861896188,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 208.13971082420449
+   },
+   {
+    "cell": "D232",
+    "strike": "OTM3",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 13.131794365054793,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 215.07584053138015
+   },
+   {
+    "cell": "D190",
+    "strike": "OTM2",
+    "leg_sl": 15,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 12.627400311568028,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 288.03552799894
+   },
+   {
+    "cell": "D232",
+    "strike": "OTM3",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 12.622372608762968,
+    "valid_share": 0.75,
+    "pieces": 2.75,
+    "net_per_lot_day": 221.71596680070425
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "other",
+  "winner": {
+   "cell": "D100",
+   "strike": "ITM1",
+   "leg_sl": 30,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3000,
+   "exit": "15:28",
+   "score": 17.458763210878647,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.5714285714285716,
+   "net_per_lot_day": 309.57649541014524
+  },
+  "runners_up": [
+   {
+    "cell": "D069",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 17.26421785818232,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.5714285714285716,
+    "net_per_lot_day": 277.6055956128901
+   },
+   {
+    "cell": "D138",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 17.246977429850126,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 255.29859755897402
+   },
+   {
+    "cell": "D174",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 17.244902259027025,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 233.46310756813062
+   },
+   {
+    "cell": "D207",
+    "strike": "OTM2",
+    "leg_sl": 30,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 17.234791139292852,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 231.7152581556426
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "D166",
+   "strike": "OTM1",
+   "leg_sl": 25,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 12.208288678904639,
+   "valid_share": 0.8,
+   "pieces": 2.8,
+   "net_per_lot_day": 169.2911838817552
+  },
+  "runners_up": [
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "15:28",
+    "score": 11.869642227158336,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 158.71747000332113
+   },
+   {
+    "cell": "D138",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 1500,
+    "exit": "15:28",
+    "score": 11.84838569232775,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 161.35478687959366
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 11.67080967420449,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 225.5869362029207
+   },
+   {
+    "cell": "D163",
+    "strike": "OTM1",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 11.484372702519938,
+    "valid_share": 0.8,
+    "pieces": 2.8,
+    "net_per_lot_day": 157.80292336972053
+   }
+  ]
+ },
+ {
+  "underlying": "NIFTY",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "other",
+  "winner": {
+   "cell": "D139",
+   "strike": "ATM",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2000,
+   "exit": "15:28",
+   "score": 24.477401932649737,
+   "valid_share": 0.75,
+   "pieces": 2.25,
+   "net_per_lot_day": 126.25225569862219
+  },
+  "runners_up": [
+   {
+    "cell": "D138",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 24.101712115816444,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 126.31058499407548
+   },
+   {
+    "cell": "D139",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 24.066272502487763,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 125.19947835114992
+   },
+   {
+    "cell": "D138",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 23.758726523484466,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 125.23086504386087
+   },
+   {
+    "cell": "D142",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 23.659335214133865,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 124.47024975214893
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W185",
+   "strike": "OTM2",
+   "leg_sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 1500,
+   "exit": "12:00",
+   "score": 63.309785579917445,
+   "valid_share": 0.75,
+   "pieces": 2.5,
+   "net_per_lot_day": 501.9767806555175
+  },
+  "runners_up": [
+   {
+    "cell": "W149",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "12:00",
+    "score": 62.93162595012087,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 607.4975389986803
+   },
+   {
+    "cell": "W149",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "13:00",
+    "score": 61.518204899264965,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 677.4743450570185
+   },
+   {
+    "cell": "W147",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "12:30",
+    "score": 61.01567699964659,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 526.8343151180261
+   },
+   {
+    "cell": "W146",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 1500,
+    "exit": "12:00",
+    "score": 60.57222545307533,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 469.7340237017557
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W074",
+   "strike": "ITM1",
+   "leg_sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": null,
+   "exit": "13:00",
+   "score": 35.22333446307515,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.0,
+   "net_per_lot_day": 228.9261829536318
+  },
+  "runners_up": [
+   {
+    "cell": "W075",
+    "strike": "ITM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "13:00",
+    "score": 34.56962037224571,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.2857142857142856,
+    "net_per_lot_day": 322.9753441561261
+   },
+   {
+    "cell": "W075",
+    "strike": "ITM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "13:00",
+    "score": 33.68703532900582,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.2857142857142856,
+    "net_per_lot_day": 319.34510934487986
+   },
+   {
+    "cell": "W075",
+    "strike": "ITM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "13:00",
+    "score": 33.58781160098252,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.142857142857143,
+    "net_per_lot_day": 320.20437994108585
+   },
+   {
+    "cell": "W075",
+    "strike": "ITM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "13:00",
+    "score": 33.31384976151891,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.142857142857143,
+    "net_per_lot_day": 302.735279767143
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W217",
+   "strike": "OTM3",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 354.9506462044222,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 387.39412021344845
+  },
+  "runners_up": [
+   {
+    "cell": "W217",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 353.3333588959766,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 376.2694048932805
+   },
+   {
+    "cell": "W219",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 352.4790135185996,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 372.35044937554665
+   },
+   {
+    "cell": "W221",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 352.1165087843991,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 377.480007568579
+   },
+   {
+    "cell": "W219",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 348.3988314998159,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 374.0771624711827
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W321",
+   "strike": "PMID",
+   "leg_sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 1089.7653233953934,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 194.45884784121344
+  },
+  "runners_up": [
+   {
+    "cell": "W320",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 1089.7653233953934,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 194.45884784121344
+   },
+   {
+    "cell": "W323",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 983.9522045760644,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 189.65783817403974
+   },
+   {
+    "cell": "W322",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 983.9522045760644,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 189.65783817403974
+   },
+   {
+    "cell": "W319",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 889.3519481680015,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 174.01900281077823
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W219",
+   "strike": "OTM3",
+   "leg_sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 91.41776895168204,
+   "valid_share": 0.75,
+   "pieces": 2.5,
+   "net_per_lot_day": 618.6172623717795
+  },
+  "runners_up": [
+   {
+    "cell": "W147",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 89.63803360164054,
+    "valid_share": 0.75,
+    "pieces": 2.75,
+    "net_per_lot_day": 947.1771086842249
+   },
+   {
+    "cell": "W219",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 86.27504567857149,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 630.0199478282333
+   },
+   {
+    "cell": "W185",
+    "strike": "OTM2",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 84.83903322225468,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 807.5508746295902
+   },
+   {
+    "cell": "W149",
+    "strike": "OTM1",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 84.6379731156478,
+    "valid_share": 0.75,
+    "pieces": 2.75,
+    "net_per_lot_day": 1024.4529497704543
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W222",
+   "strike": "OTM3",
+   "leg_sl": 60,
+   "trail": null,
+   "reentry": null,
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 111.3547369919671,
+   "valid_share": 0.8571428571428571,
+   "pieces": 2.7142857142857144,
+   "net_per_lot_day": 417.2681215545899
+  },
+  "runners_up": [
+   {
+    "cell": "W222",
+    "strike": "OTM3",
+    "leg_sl": 60,
+    "trail": null,
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 103.87155836289439,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.5714285714285716,
+    "net_per_lot_day": 383.94388279434185
+   },
+   {
+    "cell": "W228",
+    "strike": "OTM3",
+    "leg_sl": 80,
+    "trail": null,
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 99.58666945950195,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 423.9380517305157
+   },
+   {
+    "cell": "W224",
+    "strike": "OTM3",
+    "leg_sl": 60,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 98.85985308193442,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 380.0531752720823
+   },
+   {
+    "cell": "W226",
+    "strike": "OTM3",
+    "leg_sl": 60,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 93.44346756578659,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.5714285714285716,
+    "net_per_lot_day": 388.0234449579721
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W217",
+   "strike": "OTM3",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 354.9506462044222,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 387.39412021344845
+  },
+  "runners_up": [
+   {
+    "cell": "W217",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 353.3333588959766,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 376.2694048932805
+   },
+   {
+    "cell": "W219",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 352.4790135185996,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 372.35044937554665
+   },
+   {
+    "cell": "W221",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 352.1165087843991,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 377.480007568579
+   },
+   {
+    "cell": "W219",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 348.3988314998159,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 374.0771624711827
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "W321",
+   "strike": "PMID",
+   "leg_sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 1089.7653233953934,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 194.45884784121344
+  },
+  "runners_up": [
+   {
+    "cell": "W320",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 1089.7653233953934,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 194.45884784121344
+   },
+   {
+    "cell": "W323",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 983.9522045760644,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 189.65783817403974
+   },
+   {
+    "cell": "W322",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 983.9522045760644,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 189.65783817403974
+   },
+   {
+    "cell": "W319",
+    "strike": "PMID",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 889.3519481680015,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 174.01900281077823
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "W185",
+   "strike": "OTM2",
+   "leg_sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2000,
+   "exit": "13:00",
+   "score": 11.701098353399734,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 186.11510895388702
+  },
+  "runners_up": [
+   {
+    "cell": "W039",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "11:30",
+    "score": 11.654645278841151,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 193.92470603964668
+   },
+   {
+    "cell": "W221",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "12:30",
+    "score": 11.255924223606437,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 169.56055960827976
+   },
+   {
+    "cell": "W185",
+    "strike": "OTM2",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "13:00",
+    "score": 11.229108793311992,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 175.84479098773141
+   },
+   {
+    "cell": "W041",
+    "strike": "ITM2",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "11:30",
+    "score": 11.098229105184709,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 197.3633897651387
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "other",
+  "winner": {
+   "cell": "W148",
+   "strike": "OTM1",
+   "leg_sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": null,
+   "stop": 3000,
+   "exit": "13:00",
+   "score": 4.523321089494215,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.4285714285714284,
+   "net_per_lot_day": 85.79907304648648
+  },
+  "runners_up": []
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "W106",
+   "strike": "ITM1",
+   "leg_sl": 150,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": null,
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 5.464203891153279,
+   "valid_share": 0.8,
+   "pieces": 2.0,
+   "net_per_lot_day": 106.42659608140784
+  },
+  "runners_up": [
+   {
+    "cell": "W103",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.464203891153279,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   },
+   {
+    "cell": "W102",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.464203891153279,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   },
+   {
+    "cell": "W107",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.464203891153279,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   },
+   {
+    "cell": "W105",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.175572233055037,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "other",
+  "winner": null,
+  "why": "no cell passes the gates, breadth and half-year rules"
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "W242",
+   "strike": "OTM3",
+   "leg_sl": 120,
+   "trail": [
+    15,
+    10
+   ],
+   "reentry": null,
+   "stop": null,
+   "exit": "15:28",
+   "score": 5.24116658635005,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 254.59916910115248
+  },
+  "runners_up": [
+   {
+    "cell": "W243",
+    "strike": "OTM3",
+    "leg_sl": 120,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 5.178916292306108,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 231.85490172070092
+   },
+   {
+    "cell": "W206",
+    "strike": "OTM2",
+    "leg_sl": 120,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 5.115448350133047,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 234.178905936964
+   },
+   {
+    "cell": "W098",
+    "strike": "ITM1",
+    "leg_sl": 120,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 4.95478170075661,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 227.02902181100123
+   },
+   {
+    "cell": "W244",
+    "strike": "OTM3",
+    "leg_sl": 120,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": null,
+    "exit": "15:28",
+    "score": 4.949433391508097,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 243.6847464976901
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "other",
+  "winner": {
+   "cell": "W148",
+   "strike": "OTM1",
+   "leg_sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": null,
+   "stop": 3000,
+   "exit": "15:28",
+   "score": 4.230213192030762,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.5714285714285716,
+   "net_per_lot_day": 139.86707167616458
+  },
+  "runners_up": [
+   {
+    "cell": "W184",
+    "strike": "OTM2",
+    "leg_sl": 40,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 2.9689559710471047,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.5714285714285716,
+    "net_per_lot_day": 119.05710233295488
+   },
+   {
+    "cell": "W108",
+    "strike": "ATM",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 2.8240441304796238,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.0,
+    "net_per_lot_day": 91.5789662952415
+   },
+   {
+    "cell": "W180",
+    "strike": "OTM2",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 2.7234033373193567,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 100.46853281108834
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "W106",
+   "strike": "ITM1",
+   "leg_sl": 150,
+   "trail": [
+    25,
+    15
+   ],
+   "reentry": null,
+   "stop": 4000,
+   "exit": "15:28",
+   "score": 5.464203891153279,
+   "valid_share": 0.8,
+   "pieces": 2.0,
+   "net_per_lot_day": 106.42659608140784
+  },
+  "runners_up": [
+   {
+    "cell": "W103",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.464203891153279,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   },
+   {
+    "cell": "W102",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": null,
+    "reentry": null,
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.464203891153279,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   },
+   {
+    "cell": "W107",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": [
+     25,
+     15
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.464203891153279,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   },
+   {
+    "cell": "W105",
+    "strike": "ITM1",
+    "leg_sl": 150,
+    "trail": [
+     15,
+     10
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.175572233055037,
+    "valid_share": 0.8,
+    "pieces": 2.0,
+    "net_per_lot_day": 106.42659608140784
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "W",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "other",
+  "winner": null,
+  "why": "no cell passes the gates, breadth and half-year rules"
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D196",
+   "strike": "OTM2",
+   "leg_sl": 20,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 1750,
+   "exit": "12:00",
+   "score": 90.20320587009955,
+   "valid_share": 0.75,
+   "pieces": 2.25,
+   "net_per_lot_day": 467.0773594627147
+  },
+  "runners_up": [
+   {
+    "cell": "D196",
+    "strike": "OTM2",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1000,
+    "exit": "12:00",
+    "score": 84.04407437635811,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 441.1136247673939
+   },
+   {
+    "cell": "D196",
+    "strike": "OTM2",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "12:00",
+    "score": 83.21364759089094,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 459.9296864837969
+   },
+   {
+    "cell": "D196",
+    "strike": "OTM2",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1250,
+    "exit": "12:00",
+    "score": 81.83405635150415,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 464.5310183633225
+   },
+   {
+    "cell": "D196",
+    "strike": "OTM2",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "12:00",
+    "score": 81.52646406934723,
+    "valid_share": 0.75,
+    "pieces": 2.25,
+    "net_per_lot_day": 448.6002642073724
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D136",
+   "strike": "ATM",
+   "leg_sl": 30,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2000,
+   "exit": "13:00",
+   "score": 57.605263411870396,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.2857142857142856,
+   "net_per_lot_day": 316.58447777863023
+  },
+  "runners_up": [
+   {
+    "cell": "D118",
+    "strike": "ATM",
+    "leg_sl": 15,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "13:00",
+    "score": 52.24887559273545,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 328.33598441630085
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "13:00",
+    "score": 51.72025010470723,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 282.7529768893244
+   },
+   {
+    "cell": "D118",
+    "strike": "ATM",
+    "leg_sl": 15,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "13:00",
+    "score": 51.329203537109876,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 331.490653817329
+   },
+   {
+    "cell": "D205",
+    "strike": "OTM2",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "12:00",
+    "score": 51.09231640557697,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.2857142857142856,
+    "net_per_lot_day": 173.57471504884694
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D241",
+   "strike": "OTM3",
+   "leg_sl": 30,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 423.2483984943947,
+   "valid_share": 1.0,
+   "pieces": 2.8,
+   "net_per_lot_day": 386.91664648154375
+  },
+  "runners_up": [
+   {
+    "cell": "D241",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 422.3163247563957,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 383.81076412860256
+   },
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 410.2898534780846,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 367.44313367951804
+   },
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 409.8887474661944,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 365.71642058386476
+   },
+   {
+    "cell": "D241",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 397.2664336084034,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 388.7323327560536
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D283",
+   "strike": "PLOW",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3000,
+   "exit": "15:28",
+   "score": 168.41755390481282,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 376.31026471014525
+  },
+  "runners_up": [
+   {
+    "cell": "D283",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 167.5174600639548,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 374.31026471014525
+   },
+   {
+    "cell": "D283",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 165.13669732949353,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 367.2920218498658
+   },
+   {
+    "cell": "D283",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 150.08914063731393,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 351.35790662189936
+   },
+   {
+    "cell": "D282",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 148.36874700090888,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 363.8779380920713
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D346",
+   "strike": "PHIGH",
+   "leg_sl": 25,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 99.11575931369205,
+   "valid_share": 1.0,
+   "pieces": 3.0,
+   "net_per_lot_day": 1434.084476194063
+  },
+  "runners_up": [
+   {
+    "cell": "D304",
+    "strike": "PMID",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 96.50170586857331,
+    "valid_share": 0.75,
+    "pieces": 2.75,
+    "net_per_lot_day": 1153.068100692537
+   },
+   {
+    "cell": "D244",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 95.07001246911044,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 643.2983147528288
+   },
+   {
+    "cell": "D310",
+    "strike": "PMID",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 94.3285746642021,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 1330.674433461966
+   },
+   {
+    "cell": "D310",
+    "strike": "PMID",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 94.2621908830707,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 1356.3931133918786
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D355",
+   "strike": "PHIGH",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 94.11972250909129,
+   "valid_share": 1.0,
+   "pieces": 2.7142857142857144,
+   "net_per_lot_day": 946.6743250562288
+  },
+  "runners_up": [
+   {
+    "cell": "D247",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 92.1227859349649,
+    "valid_share": 1.0,
+    "pieces": 3.0,
+    "net_per_lot_day": 553.6666578413187
+   },
+   {
+    "cell": "D127",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "15:28",
+    "score": 91.72370358735995,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.857142857142857,
+    "net_per_lot_day": 764.0084949339841
+   },
+   {
+    "cell": "D121",
+    "strike": "ATM",
+    "leg_sl": 20,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 91.71624170590638,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.857142857142857,
+    "net_per_lot_day": 812.7582525002566
+   },
+   {
+    "cell": "D079",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 91.46615906735188,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 957.4019421596124
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D241",
+   "strike": "OTM3",
+   "leg_sl": 30,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 423.2483984943947,
+   "valid_share": 1.0,
+   "pieces": 2.8,
+   "net_per_lot_day": 386.91664648154375
+  },
+  "runners_up": [
+   {
+    "cell": "D241",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 422.3163247563957,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 383.81076412860256
+   },
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 410.2898534780846,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 367.44313367951804
+   },
+   {
+    "cell": "D250",
+    "strike": "OTM3",
+    "leg_sl": 40,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 409.8887474661944,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 365.71642058386476
+   },
+   {
+    "cell": "D241",
+    "strike": "OTM3",
+    "leg_sl": 30,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3000,
+    "exit": "15:28",
+    "score": 397.2664336084034,
+    "valid_share": 1.0,
+    "pieces": 2.8,
+    "net_per_lot_day": 388.7323327560536
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "expiry",
+  "winner": {
+   "cell": "D283",
+   "strike": "PLOW",
+   "leg_sl": 40,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3000,
+   "exit": "15:28",
+   "score": 168.41755390481282,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 376.31026471014525
+  },
+  "runners_up": [
+   {
+    "cell": "D283",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 167.5174600639548,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 374.31026471014525
+   },
+   {
+    "cell": "D283",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 165.13669732949353,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 367.2920218498658
+   },
+   {
+    "cell": "D283",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 150.08914063731393,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 351.35790662189936
+   },
+   {
+    "cell": "D282",
+    "strike": "PLOW",
+    "leg_sl": 40,
+    "trail": null,
+    "reentry": null,
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 148.36874700090888,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 363.8779380920713
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "D232",
+   "strike": "OTM3",
+   "leg_sl": 20,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 1250,
+   "exit": "11:30",
+   "score": 22.620081049240472,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 213.56382653494197
+  },
+  "runners_up": [
+   {
+    "cell": "D229",
+    "strike": "OTM3",
+    "leg_sl": 20,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "11:30",
+    "score": 22.46398986826874,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 222.48948696227646
+   },
+   {
+    "cell": "D229",
+    "strike": "OTM3",
+    "leg_sl": 20,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1250,
+    "exit": "11:30",
+    "score": 21.71374478527412,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 229.01006833589665
+   },
+   {
+    "cell": "D232",
+    "strike": "OTM3",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1500,
+    "exit": "11:30",
+    "score": 21.647315448230543,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 212.56960098972607
+   },
+   {
+    "cell": "D124",
+    "strike": "ATM",
+    "leg_sl": 20,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 1750,
+    "exit": "13:00",
+    "score": 21.420762608041187,
+    "valid_share": 0.75,
+    "pieces": 2.75,
+    "net_per_lot_day": 325.5357397738952
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "morning",
+  "band": "B",
+  "stratum": "other",
+  "winner": {
+   "cell": "D147",
+   "strike": "OTM1",
+   "leg_sl": 10,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": null,
+   "stop": 1250,
+   "exit": "13:00",
+   "score": 8.887595104067042,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.4285714285714284,
+   "net_per_lot_day": 133.25279071819156
+  },
+  "runners_up": [
+   {
+    "cell": "D039",
+    "strike": "ITM2",
+    "leg_sl": 10,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": null,
+    "stop": 1750,
+    "exit": "13:00",
+    "score": 8.780106528098937,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.5714285714285716,
+    "net_per_lot_day": 169.71179224985352
+   },
+   {
+    "cell": "D144",
+    "strike": "OTM1",
+    "leg_sl": 10,
+    "trail": null,
+    "reentry": null,
+    "stop": 2500,
+    "exit": "13:00",
+    "score": 8.703410867991272,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 129.63141114824947
+   },
+   {
+    "cell": "D144",
+    "strike": "OTM1",
+    "leg_sl": 10,
+    "trail": null,
+    "reentry": null,
+    "stop": 3500,
+    "exit": "13:00",
+    "score": 8.655615273345672,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 125.54527460215608
+   },
+   {
+    "cell": "D144",
+    "strike": "OTM1",
+    "leg_sl": 10,
+    "trail": null,
+    "reentry": null,
+    "stop": 4000,
+    "exit": "13:00",
+    "score": 8.651652481096791,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 125.27489865246388
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "D094",
+   "strike": "ITM1",
+   "leg_sl": 25,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 5.411074076802882,
+   "valid_share": 0.8,
+   "pieces": 2.4,
+   "net_per_lot_day": 128.03823143761102
+  },
+  "runners_up": [
+   {
+    "cell": "D094",
+    "strike": "ITM1",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.348149263430592,
+    "valid_share": 0.8,
+    "pieces": 2.2,
+    "net_per_lot_day": 122.3119285470638
+   },
+   {
+    "cell": "D094",
+    "strike": "ITM1",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 5.276238479795004,
+    "valid_share": 0.8,
+    "pieces": 2.2,
+    "net_per_lot_day": 122.11438281751126
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 4.376539891327953,
+    "valid_share": 0.8,
+    "pieces": 2.6,
+    "net_per_lot_day": 97.04005594203319
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 4.102898826382977,
+    "valid_share": 0.8,
+    "pieces": 2.4,
+    "net_per_lot_day": 89.9728880886548
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "half",
+  "half": "afternoon",
+  "band": "D",
+  "stratum": "other",
+  "winner": {
+   "cell": "D079",
+   "strike": "ITM1",
+   "leg_sl": 15,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2500,
+   "exit": "15:28",
+   "score": 5.281219781837059,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 38.09812247699652
+  },
+  "runners_up": [
+   {
+    "cell": "D079",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 5.093296106204429,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 38.81245739762248
+   },
+   {
+    "cell": "D079",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.080340690593128,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 37.8834426080802
+   },
+   {
+    "cell": "D082",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 5.019030172802963,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 35.35397752096921
+   },
+   {
+    "cell": "D079",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 4.870660010806147,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 38.03865409786323
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "A",
+  "stratum": "other",
+  "winner": {
+   "cell": "D055",
+   "strike": "ITM2",
+   "leg_sl": 25,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 10.673011361355535,
+   "valid_share": 0.75,
+   "pieces": 2.25,
+   "net_per_lot_day": 282.7646452585199
+  },
+  "runners_up": [
+   {
+    "cell": "D310",
+    "strike": "PMID",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 10.48233878534807,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 201.3447869080822
+   },
+   {
+    "cell": "D100",
+    "strike": "ITM1",
+    "leg_sl": 30,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 10.461794099121821,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 230.44771541513225
+   },
+   {
+    "cell": "D064",
+    "strike": "ITM2",
+    "leg_sl": 30,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 10.217447180772927,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 260.2797383893517
+   },
+   {
+    "cell": "D091",
+    "strike": "ITM1",
+    "leg_sl": 25,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 10.188465107519121,
+    "valid_share": 0.75,
+    "pieces": 2.5,
+    "net_per_lot_day": 245.78110365008666
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "B",
+  "stratum": "other",
+  "winner": {
+   "cell": "D076",
+   "strike": "ITM1",
+   "leg_sl": 10,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 3500,
+   "exit": "15:28",
+   "score": 10.263429428553367,
+   "valid_share": 0.7142857142857143,
+   "pieces": 2.2857142857142856,
+   "net_per_lot_day": 223.99958606120373
+  },
+  "runners_up": [
+   {
+    "cell": "D001",
+    "strike": "ITM3",
+    "leg_sl": 10,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 10.228673299246369,
+    "valid_share": 0.7142857142857143,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 262.22214088554784
+   },
+   {
+    "cell": "D004",
+    "strike": "ITM3",
+    "leg_sl": 10,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 10.152308979298033,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 286.1332000351094
+   },
+   {
+    "cell": "D076",
+    "strike": "ITM1",
+    "leg_sl": 10,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2000,
+    "exit": "15:28",
+    "score": 10.072473177920918,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.4285714285714284,
+    "net_per_lot_day": 239.7514848406092
+   },
+   {
+    "cell": "D004",
+    "strike": "ITM3",
+    "leg_sl": 10,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 9.902845974063526,
+    "valid_share": 0.8571428571428571,
+    "pieces": 2.7142857142857144,
+    "net_per_lot_day": 275.2282685039218
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "C",
+  "stratum": "other",
+  "winner": {
+   "cell": "D094",
+   "strike": "ITM1",
+   "leg_sl": 25,
+   "trail": [
+    10,
+    5
+   ],
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": null,
+   "exit": "15:28",
+   "score": 5.411074076802882,
+   "valid_share": 0.8,
+   "pieces": 2.4,
+   "net_per_lot_day": 128.03823143761102
+  },
+  "runners_up": [
+   {
+    "cell": "D094",
+    "strike": "ITM1",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.348149263430592,
+    "valid_share": 0.8,
+    "pieces": 2.2,
+    "net_per_lot_day": 122.3119285470638
+   },
+   {
+    "cell": "D094",
+    "strike": "ITM1",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 5.276238479795004,
+    "valid_share": 0.8,
+    "pieces": 2.2,
+    "net_per_lot_day": 122.11438281751126
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 4.376539891327953,
+    "valid_share": 0.8,
+    "pieces": 2.6,
+    "net_per_lot_day": 97.04005594203319
+   },
+   {
+    "cell": "D130",
+    "strike": "ATM",
+    "leg_sl": 25,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 4.102898826382977,
+    "valid_share": 0.8,
+    "pieces": 2.4,
+    "net_per_lot_day": 89.9728880886548
+   }
+  ]
+ },
+ {
+  "underlying": "SENSEX",
+  "cohort": "D",
+  "mode": "whole",
+  "half": "whole",
+  "band": "D",
+  "stratum": "other",
+  "winner": {
+   "cell": "D079",
+   "strike": "ITM1",
+   "leg_sl": 15,
+   "trail": null,
+   "reentry": [
+    "cost",
+    1
+   ],
+   "stop": 2500,
+   "exit": "15:28",
+   "score": 5.281219781837059,
+   "valid_share": 0.75,
+   "pieces": 2.0,
+   "net_per_lot_day": 38.09812247699652
+  },
+  "runners_up": [
+   {
+    "cell": "D079",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": null,
+    "exit": "15:28",
+    "score": 5.093296106204429,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 38.81245739762248
+   },
+   {
+    "cell": "D079",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 4000,
+    "exit": "15:28",
+    "score": 5.080340690593128,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 37.8834426080802
+   },
+   {
+    "cell": "D082",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": [
+     10,
+     5
+    ],
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 2500,
+    "exit": "15:28",
+    "score": 5.019030172802963,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 35.35397752096921
+   },
+   {
+    "cell": "D079",
+    "strike": "ITM1",
+    "leg_sl": 15,
+    "trail": null,
+    "reentry": [
+     "cost",
+     1
+    ],
+    "stop": 3500,
+    "exit": "15:28",
+    "score": 4.870660010806147,
+    "valid_share": 0.75,
+    "pieces": 2.0,
+    "net_per_lot_day": 38.03865409786323
+   }
+  ]
+ }
+]

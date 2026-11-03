@@ -9,6 +9,7 @@
 
 import type { MomentumCompanion, MomentumFillCompanion } from '../types/momentum';
 import { formatNumber, formatPct, formatPp } from './format';
+import { cadenceRule } from './momentumCadence';
 import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
 
 /**
@@ -31,6 +32,8 @@ export interface MomentumConfigChip {
   id: string;
   label: string;
   section: MomentumSettingsSection;
+  /** What the chip means, for its tooltip (the cadence chip: which Fridays trade). */
+  title?: string;
 }
 
 export interface MomentumConfigDescription {
@@ -84,6 +87,7 @@ export function describeConfig(
       : everyN
         ? `Every ${every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
         : 'Weekly rebalance';
+  const cadenceTitle = cadenceRule(config);
 
   let selection: string;
   let selectionShort: string;
@@ -134,7 +138,12 @@ export function describeConfig(
       label: selectionShort,
       section: broad ? 'selection' : 'portfolio',
     },
-    { id: 'cadence', label: cadenceChip, section: 'portfolio' },
+    {
+      id: 'cadence',
+      label: cadenceChip,
+      section: 'portfolio',
+      ...(cadenceTitle ? { title: cadenceTitle } : {}),
+    },
     {
       id: 'portfolio',
       label: config.portfolio === 'slots' ? 'Fixed slots' : 'Buffer rule',
@@ -151,6 +160,22 @@ export function describeConfig(
   );
   if (!broad) {
     chips.push({ id: 'tax', label: config.tax ? 'After tax' : 'Pre-tax', section: 'costs' });
+  }
+  // BL-176 settings the panel has no control for: shown here so a run carrying them says so.
+  if (broad && config.voladj_lookbacks === true) {
+    chips.push({
+      id: 'voladj_lookbacks',
+      label: 'Vol-adjusted on own lookbacks',
+      section: 'ranking',
+    });
+  }
+  const topWeight = Number(config.broad_top_sector_weight ?? 1);
+  if (broad && Number.isFinite(topWeight) && topWeight !== 1) {
+    chips.push({
+      id: 'top_sector_weight',
+      label: `Top category ${formatNumber(topWeight, 2, { trim: true })}× money`,
+      section: 'portfolio',
+    });
   }
 
   return {
@@ -258,6 +283,9 @@ const KEYS: Record<string, KeyInfo> = {
     fraction: true,
     ...BROAD,
   },
+  voladj_lookbacks: { section: 'ranking', label: 'Vol-adjusted on own lookbacks', ...BROAD },
+  voladj_skip: { section: 'ranking', label: 'Lookbacks skipping the latest 4 weeks', ...BROAD },
+  broad_top_sector_weight: { section: 'portfolio', label: 'Top category money ×', ...BROAD },
 
   portfolio: { section: 'portfolio', label: 'Portfolio rule' },
   entry: { section: 'portfolio', label: 'New name, nothing sold' },

@@ -28,6 +28,7 @@ const SETTINGS: AutomationSettings = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'algotest.angelone': {
@@ -36,6 +37,7 @@ const SETTINGS: AutomationSettings = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'quantiply.angelone': {
@@ -44,6 +46,7 @@ const SETTINGS: AutomationSettings = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     },
     'quantiply.finvasia': {
@@ -52,10 +55,12 @@ const SETTINGS: AutomationSettings = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
   },
   pause: { until: null },
+  capital: { finvasia: 850_000, angelone: 850_000 },
 };
 
 const view = (
@@ -108,6 +113,7 @@ describe('automation helpers', () => {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     });
   });
@@ -174,6 +180,7 @@ describe('multiplier, add-on and pause', () => {
   it('settings from a scheduler that predates them mean 1, yes and no pause', () => {
     const old = JSON.parse(JSON.stringify(SETTINGS)) as Record<string, unknown>;
     delete old.pause;
+    delete old.capital;
     for (const row of Object.values(old.rows as Record<string, Record<string, unknown>>)) {
       row.multiplier = undefined;
       row.addon = undefined;
@@ -213,9 +220,45 @@ describe('AutomationSettingsCard', () => {
     expect(await screen.findByText('Pause: until 2026-10-23 → none')).toBeTruthy();
   });
 
+  it('saves Dir ×2 on non-expiry days (BL-183) per row', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? ok({ ...view(JSON.parse(String(init.body)), 1), next_session: '2026-10-29' })
+        : ok({ ...view(SETTINGS), next_session: '2026-10-29' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<AutomationSettingsCard />);
+    const toggles = await screen.findAllByLabelText('Dir ×2 on non-expiry days');
+    fireEvent.click(toggles[2] as HTMLElement); // Quantiply · Angel One
+    expect(await screen.findByText('Quantiply · Angel One Dir ×2: off → on')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    const body = JSON.parse(String(put?.[1]?.body)) as AutomationSettings;
+    expect(body.rows['quantiply.angelone'].dirBoost).toBe(true);
+    expect(body.rows['algotest.finvasia'].dirBoost).toBe(false);
+  });
+
+  it('saves each account’s capital and shows the total', async () => {
+    const fetchMock = stub((body) => ok(view(body, 1)));
+    render(<AutomationSettingsCard />);
+    expect(await screen.findByText(/now ₹17,00,000/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/^Angel One/), { target: { value: '1000000' } });
+    expect(await screen.findByText('Angel One capital: ₹8,50,000 → ₹10,00,000')).toBeTruthy();
+    expect(screen.getByText(/now ₹18,50,000/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).capital).toEqual({
+      finvasia: 850_000,
+      angelone: 1_000_000,
+    });
+  });
+
   it('works against a scheduler that does not send the new fields yet', async () => {
     const old = JSON.parse(JSON.stringify(SETTINGS)) as Record<string, unknown>;
     delete old.pause;
+    delete old.capital;
     for (const row of Object.values(old.rows as Record<string, Record<string, unknown>>)) {
       row.multiplier = undefined;
       row.addon = undefined;
@@ -225,8 +268,10 @@ describe('AutomationSettingsCard', () => {
       vi.fn(async () => ok(view(old as unknown as AutomationSettings))),
     );
     render(<AutomationSettingsCard />);
-    // four multipliers, and the MTM SL of the one Quantiply row with a list (BL-172 default)
-    expect(await screen.findAllByRole('spinbutton')).toHaveLength(5);
+    // four multipliers, the MTM SL of the one Quantiply row with a list (BL-172 default) and
+    // the two accounts' capital (₹8.5 lakh each by default)
+    expect(await screen.findAllByRole('spinbutton')).toHaveLength(7);
+    expect((screen.getByLabelText(/^Shoonya/) as HTMLInputElement).value).toBe('850000');
     expect(screen.queryByRole('button', { name: /Skip next session/ })).toBeNull();
     expect(screen.queryByText(/unsaved change/)).toBeNull();
   });

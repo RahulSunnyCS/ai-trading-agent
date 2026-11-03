@@ -17,7 +17,7 @@ function useSingleSeriesChart<T extends SeriesType>(
   height: number,
   addSeries: (chart: IChartApi) => ISeriesApi<T>,
 ): {
-  containerRef: RefObject<HTMLDivElement>;
+  containerRef: RefObject<HTMLDivElement | null>;
   chartRef: RefObject<IChartApi | null>;
   seriesRef: RefObject<ISeriesApi<T> | null>;
 } {

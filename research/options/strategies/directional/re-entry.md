@@ -1,6 +1,6 @@
 # Directional: re-entry
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-29
 
 ## What it is
 
@@ -32,6 +32,8 @@ Mean of the 100 bases, holdout, before charges: 25% / ₹4,000 with COST ×2 ₹
 - Engine/AlgoTest parity is still incomplete for some re-entry details (BL-096 risks), so re-entry results
   carry more model risk than stop results.
 
+- A different strategy in place of a pick that stopped out by 12:15 (BL-190, book level, not this strategy's own re-entry): the strongest later Widesl or Dir adds nothing on T1 (−₹9 / −₹10 a margin lot-day, 95 % intervals ±₹45) and deepens the drawdown; slightly positive on NIFTY 2022-24 ([BL-190](../../../../backlog/BL-190-replace-early-stopped-pick.md)).
+
 ## Not yet tested
 
 - A summary of the none / ASAP / cut-off rows, and their charged versions.
@@ -39,6 +41,7 @@ Mean of the 100 bases, holdout, before charges: 25% / ₹4,000 with COST ×2 ₹
 
 ## Related
 
+- [Stop-and-reverse](stop-and-reverse.md): buying the stopped leg instead of re-selling it (BL-186, killed; losing the RE COST re-sale is most of the cost).
 - [Widesl re-entry](../widesl/re-entry.md) (none live); [charges](../../common/charges.md).
 - Results: `research/bl096/results/` (git-ignored); `research/bl096/run_enriched.py` regenerates the
   diagnostic files; the 4,400-row secondary screen's script is not in the repo.
