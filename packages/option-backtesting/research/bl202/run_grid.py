@@ -372,11 +372,14 @@ def load_cells_file(path: Path) -> dict[tuple[str, str], list[dict[str, Any] | N
 
 def signature(args: argparse.Namespace, job: tuple[Any, ...]) -> dict[str, Any]:
     """What a part was run with; a part on disk is reused only when this matches (a smoke part
-    left under a tag must not be mistaken for a whole cohort)."""
+    left under a tag must not be mistaken for a whole cohort). The window is the days actually
+    run, not `--to`: its default is today, and a resume on a later day must still match."""
+    days = job[3]
     return {
         "grid": grid.grid_sha(),
-        "from": args.start,
-        "to": args.end,
+        "from": days[0].isoformat() if days else args.start,
+        "to": days[-1].isoformat() if days else args.end,
+        "n_days": len(days),
         "n_cells": len(job[2]),
         "slippage": job[5],
     }

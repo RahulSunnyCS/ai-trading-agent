@@ -535,6 +535,11 @@ Otherwise:
   half-years, bootstrap vs template, DTE / VIX / weekday strata, breadth over the 25 slots),
   `stage2.py` (the winners' neighbourhoods and the flatness verdict), `check_regression.py`. Research only:
   never writes a strategy YAML; the pre-registration is the backlog item's Phase 0.
+- `research/bl202/` — BL-202, the Buy-only sweep scored at 1 % slippage: `grid.py` (the registered
+  Buy axes at one slot per band, the Stage-2 axes and the Stage-3 day rules under one SHA, every cell
+  with `slippage_pct` 1.0 inside the strategy; `tests/unit/test_bl202_grid.py` holds the counts),
+  `run_grid.py` (BL-104's runner shape, Buy only; the part signature carries the days actually run, so
+  a resume on a later day still matches). Results git-ignored under `results/<tag>/`.
 
 ## Commands
 

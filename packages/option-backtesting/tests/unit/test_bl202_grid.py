@@ -145,3 +145,46 @@ def test_chains_cover_every_axis_value() -> None:
     for axis, values in grid.AXES.items():
         covered = {v for chain in grid.CHAINS[axis] for v in chain}
         assert covered == set(values), axis
+
+
+# --- the runner's resume signature and part round trip -------------------------------------
+
+
+def _load_runner():
+    path = GRID_PY.with_name("run_grid.py")
+    spec = importlib.util.spec_from_file_location("bl202_run_grid", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules["bl202_run_grid"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_signature_is_the_days_run_not_the_to_flag(tmp_path: Path) -> None:
+    import argparse
+    from datetime import date
+
+    import numpy as np
+
+    runner = _load_runner()
+    days = [date(2024, 10, 9), date(2024, 10, 10)]
+    job = ("N", "09:17", [None, {"x": 1}], days, str(tmp_path), 1.0)
+    today = argparse.Namespace(start="2024-10-09", end="2026-11-03")
+    later = argparse.Namespace(start="2024-10-09", end="2026-11-05")
+    assert runner.signature(today, job) == runner.signature(later, job)
+    sig = runner.signature(today, job)
+    assert sig["to"] == "2024-10-10" and sig["n_days"] == 2 and sig["n_cells"] == 2
+    assert sig["slippage"] == 1.0 and sig["grid"] == grid.grid_sha()
+    # A part written with that signature is reused; one from another run is not.
+    result = {
+        "rows": [{"cohort": "B_N_0917", "label": "a", "net_inr": 1.0}],
+        "matrix": np.zeros((2, 1), dtype=np.float32),
+        "labels": ["a"],
+        "days": [d.isoformat() for d in days],
+        "skipped": {},
+        "run": sig,
+    }
+    runner.write_part(tmp_path, "B_N_0917", result)
+    assert runner.part_matches(tmp_path, "B_N_0917", sig)
+    assert not runner.part_matches(tmp_path, "B_N_0917", {**sig, "slippage": 0.0})
+    assert not runner.part_matches(tmp_path, "B_S_0917", sig)
