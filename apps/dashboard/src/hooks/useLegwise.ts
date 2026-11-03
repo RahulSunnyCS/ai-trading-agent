@@ -5,6 +5,8 @@
 
 import { useState } from 'react';
 
+import { withSlippage } from '../lib/rotationSlippage';
+import { useRotationSlippage, useSlippageUrl } from '../store/rotationSlippage';
 import type {
   AnatomyResponse,
   CorrelationAvailable,
@@ -71,9 +73,15 @@ export function useDayForensics(
   /** `strategy` is a rotation variant name (N_wide_0917), not a saved strategy's id. */
   rotationVariant = false,
 ) {
+  // A rotation variant's replay follows the Rotation pages' slippage switch; a saved strategy's
+  // day (`/day`) is not a rotation read and never takes it.
+  const slippage = useRotationSlippage();
   return usePolledResource<DayForensics>(
     rotationVariant
-      ? `${BASE}/rotation/forensics${query({ variant: strategy, day, cuts: cuts.join(',') })}`
+      ? withSlippage(
+          `${BASE}/rotation/forensics${query({ variant: strategy, day, cuts: cuts.join(',') })}`,
+          slippage,
+        )
       : `${BASE}/day${query({ strategy, day, sha, cuts: cuts.join(',') })}`,
   );
 }
@@ -91,7 +99,9 @@ export function useAnatomy(
 
 /** Strategies that have daily results now, and the groups a picker offers (BL-090). */
 export function useCorrelationAvailable() {
-  return usePolledResource<CorrelationAvailable>(`${BASE}/correlation/available`, { cache: true });
+  return usePolledResource<CorrelationAvailable>(useSlippageUrl(`${BASE}/correlation/available`), {
+    cache: true,
+  });
 }
 
 /**
@@ -107,7 +117,7 @@ export function useCorrelation(
   enabled = true,
 ) {
   return usePolledResource<CorrelationResponse>(
-    `${BASE}/correlation${query({ selectors, window: String(window), ...range })}`,
+    useSlippageUrl(`${BASE}/correlation${query({ selectors, window: String(window), ...range })}`),
     { enabled },
   );
 }
@@ -125,15 +135,17 @@ export interface PickParams {
 /** A basket of k strategies none of which are alike (in-sample; a description, not a test). */
 export function useCorrelationPick(p: PickParams) {
   return usePolledResource<CorrelationPick>(
-    `${BASE}/correlation/pick${query({
-      selectors: p.selectors,
-      k: String(p.k),
-      max_corr: String(p.maxCorr),
-      measure: p.measure,
-      require: p.require.join(','),
-      from: p.from,
-      to: p.to,
-    })}`,
+    useSlippageUrl(
+      `${BASE}/correlation/pick${query({
+        selectors: p.selectors,
+        k: String(p.k),
+        max_corr: String(p.maxCorr),
+        measure: p.measure,
+        require: p.require.join(','),
+        from: p.from,
+        to: p.to,
+      })}`,
+    ),
   );
 }
 

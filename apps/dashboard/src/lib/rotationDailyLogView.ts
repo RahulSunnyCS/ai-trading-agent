@@ -73,12 +73,17 @@ export function windowRange(
  * new URL loads, so after a switch of source or window the old rows would sit under the new
  * label. A reconstructed row read as a forward day is the one mistake this screen must not make. */
 export function logMatches(
-  log: Pick<RotationLog, 'source' | 'from' | 'to'>,
+  log: Pick<RotationLog, 'source' | 'from' | 'to' | 'track'>,
   source: RotationLogSource,
   range: { from?: string | undefined; to?: string | undefined },
+  /** The track asked for (`t1`), or none for the live journal. */
+  track: string | null = null,
 ): boolean {
   return (
-    log.source === source && log.from === (range.from ?? null) && log.to === (range.to ?? null)
+    log.source === source &&
+    log.from === (range.from ?? null) &&
+    log.to === (range.to ?? null) &&
+    (log.track ?? null) === track
   );
 }
 

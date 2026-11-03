@@ -4,6 +4,7 @@
  * once a morning, so it is fetched on mount, when the focus list or index changes, and on Reload.
  */
 
+import { useSlippageUrl } from '../store/rotationSlippage';
 import type { PulseIndex, PulseListKey, PulseResponse } from '../types/rotationPulse';
 import { usePolledResource } from './usePolledResource';
 
@@ -12,5 +13,7 @@ const BASE = '/api/backtest/legwise/rotation/pulse';
 export function useRotationPulse(list: PulseListKey, index: PulseIndex) {
   const q = new URLSearchParams({ list });
   if (index !== 'both') q.set('index', index);
-  return usePolledResource<PulseResponse>(`${BASE}?${q.toString()}`, { cache: true });
+  return usePolledResource<PulseResponse>(useSlippageUrl(`${BASE}?${q.toString()}`), {
+    cache: true,
+  });
 }

@@ -185,7 +185,7 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/orders/:path*`,
             },
             {
-              // BL-142: status, login (read-only Kite)
+              // BL-142: status, login, sync (read-only Kite)
               source: '/api/momentum/kite/:path*',
               destination: `${momentumDirectOrigin}/api/kite/:path*`,
             },
@@ -193,6 +193,11 @@ const nextConfig: NextConfig = {
               // BL-142 Phase 4: the Lots panel (read-only)
               source: '/api/momentum/lots',
               destination: `${momentumDirectOrigin}/api/lots`,
+            },
+            {
+              // BL-200: the Trade book's Momentum rebalance log (read-only)
+              source: '/api/momentum/lots/rebalances',
+              destination: `${momentumDirectOrigin}/api/lots/rebalances`,
             },
             {
               // sync, paste, rules

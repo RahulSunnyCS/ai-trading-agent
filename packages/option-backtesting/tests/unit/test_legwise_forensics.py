@@ -214,3 +214,34 @@ def test_anatomy_reports_unavailable_regime_source_by_status(client, root, monke
     assert resp.status_code == 200
     assert resp.json()["t33"] == {"status": status, "message": f"because {status}"}
     assert all(d["t33"] is None for d in resp.json()["days"])
+
+
+def test_a_reversal_long_has_its_own_attribution_row():
+    """BL-186: the engine's `<id>_rev` trades must reach the per-leg attribution, so its rows add
+    up to the headline totals."""
+    from option_backtesting.legwise.forensics import build_forensics
+    from option_backtesting.legwise.market import DayData, Series, minute_index
+
+    flat = [100.0] * 375
+    ce = Series(list(flat), list(flat), list(flat), list(flat))
+    m = minute_index("10:00")
+    ce.high[m], ce.close[m] = 125.0, 124.0  # touches a 21% stop (121)
+    for i in range(m + 1, 375):
+        ce.open[i] = ce.high[i] = ce.low[i] = ce.close[i] = 150.0
+    leg = {**SPEC["legs"][0], "stop_loss": {"percent": 21}, "reverse_on_sl": {}}
+    strategy = LegwiseStrategy.model_validate({**SPEC, "legs": [leg]})
+    spot = Series(*([[22000.0] * 375] * 4))
+    data = DayData(
+        day=DAY,
+        underlying="NIFTY",
+        spot=spot,
+        chain={(EXPIRY, 22000.0, "CE"): ce},
+        listed_expiries=[EXPIRY],
+        master_lot_size=65,
+    )
+    result = simulate_day(strategy, data)
+    out = build_forensics(strategy, data, result, [], None, "sha")
+    rows = {r["leg"]: r for r in out["attribution"]}
+    assert set(rows) == {"ce", "ce_rev"}
+    assert rows["ce_rev"]["trades"] == 1
+    assert sum(r["gross"] for r in rows.values()) == pytest.approx(out["gross"])

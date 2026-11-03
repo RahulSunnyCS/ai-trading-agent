@@ -25,7 +25,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import drawdowns, warm
+from ..rotation import drawdowns, store, warm
 from ..rotation.portfolio import PortfolioStopError, settings_from_query
 from .rotation_routes import track_and_lots
 
@@ -59,7 +59,8 @@ def get_drawdowns(
         return _error(422, str(error))
     pf = setting if (setting[0] is not None and setting[0] > 0) or setting[1] else None
     root = data_dir()
-    key = (root, list_, window, min_depth, None if pf is None else (pf[0], pf[1]), lots_)
+    pf_key = None if pf is None else (pf[0], pf[1])
+    key = (root, list_, window, min_depth, pf_key, lots_, store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)

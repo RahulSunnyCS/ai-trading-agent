@@ -62,6 +62,26 @@ backtest (TODO.md 3.10.7):
   that bar's close and cancels pending entries.
 - Slippage (% of price) is applied adversely to every fill; a flat cost is
   charged per order (entry and exit are one order each).
+- **Stop-and-reverse** (`reverse_on_sl`, sold legs, BL-186) — when the leg's
+  SL fills, the same contract is bought at that fill (before slippage; each
+  fill then slips on its own) as a separate trade, leg id `<id>_rev`, qty =
+  the leg's qty x `lots_ratio`. Bought intrabar, its own bar is skipped like
+  any intrabar entry (a stop filled at a gapped open buys at that open and the
+  bar is judged). Its own SL (`stop_loss_percent` below its entry) and peak
+  trail follow the bought-leg rules above; the time stop exits at the price at
+  entry minute + N (the close of the bar ending then). It counts in the
+  overall MTM and closes with everything at the overall stop or exit time. A
+  leg that reversed is not re-entered; at most one reversal per leg a day; a
+  stop that does not reverse (a subclass's `_reverse_allowed` said no) arms
+  RE COST as usual, and a later stop of the re-sold leg may reverse.
+  Amendment 1: with `strike_premium` the long is a different contract (same expiry and
+  option type): of the strikes priced before the stop minute (`price_at(m)`), the one closest
+  to that premium, within 0.7x-1.4x of it (a tie to the lower; none, or the stopped contract,
+  = no reversal and the stop arms RE COST as for a plain stop; a note says which). It fills at
+  the close of the stop bar (`price_at(m + 1)`: the stopped leg's move in that bar is in the
+  price), is judged from the next bar, and its time stop counts from that fill.
+  With `resell_after_reverse` the stopped leg also arms RE COST, which waits until the long has
+  closed.
 """
 
 from __future__ import annotations
@@ -178,6 +198,11 @@ class _LegRun:
     peak: float = 0.0  # BL-164: the highest price since entry, for trail_peak
     rolls_done: int = 0  # BL-105: how many times this leg has been rolled today
     roll_pending: bool = False  # BL-105: the next entry is the roll's (consumed by _enter)
+    exit_raw: float = 0.0  # the last exit's fill before slippage (BL-186: the reversal's price)
+    reversed: bool = False  # BL-186: this sold leg has turned long today
+    time_stop_min: int | None = None  # BL-186: a reversal long's time stop (minute index)
+    parent: _LegRun | None = None  # BL-186: set on a reversal long, the sold leg it came from
+    child: _LegRun | None = None  # BL-186: set on a sold leg that reversed, its long
 
     @property
     def sign(self) -> int:
@@ -240,6 +265,7 @@ class _DaySim:
 
     def _exit(self, run: _LegRun, minute: int, raw: float, reason: str) -> None:
         assert run.trade is not None
+        run.exit_raw = raw
         run.trade.exit_price = self._slip(raw, buying=run.spec.position == "sell")
         run.trade.exit_min = minute
         run.trade.exit_reason = reason
@@ -453,6 +479,102 @@ class _DaySim:
         if run.spec.trail_peak is not None:
             run.peak = max(run.peak, high)
 
+    def _reverse_allowed(self, run: _LegRun, minute: int) -> bool:
+        """BL-186: whether a sold leg whose stop just filled at `minute` turns long. Always, in the
+        engine; research subclasses filter here (reading only bars before `minute`)."""
+        return True
+
+    def _maybe_reverse(self, run: _LegRun, minute: int) -> bool:
+        """BL-186: buy the stopped sold leg's contract at its stop fill. True if it reversed."""
+        rev = run.spec.reverse_on_sl
+        if (
+            rev is None
+            or run.reversed
+            or run.trade is None
+            or run.trade.exit_reason != "SL"
+            or not self._reverse_allowed(run, minute)
+        ):
+            return False
+        assert run.series is not None and run.contract is not None
+        spec = run.spec
+        contract, series, raw, fill_at = run.contract, run.series, run.exit_raw, minute
+        if rev.strike_premium is not None:
+            picked = self._pick_premium(run, minute, rev.strike_premium)
+            if picked is None:
+                return False
+            contract, series = picked
+            raw = (
+                series.price_at(minute + 1) if minute + 1 < N_MINUTES else None
+            )  # the stop bar's close
+            if raw is None:
+                self.notes.append(f"{spec.id}: reverse skipped, the {contract} has no price yet")
+                return False
+            fill_at = minute  # judged from the next bar, like an intrabar entry
+        long_spec = Leg(
+            id=f"{spec.id}_rev",
+            lots=spec.lots,
+            position="buy",
+            option_type=spec.option_type,
+            expiry=spec.expiry,
+            strike=spec.strike,
+            stop_loss=(
+                Amount(percent=rev.stop_loss_percent) if rev.stop_loss_percent is not None else None
+            ),
+            trail_peak=rev.trail_peak,
+            stop_on=spec.stop_on,
+        )
+        long = _LegRun(long_spec, run.qty * rev.lots_ratio if rev.lots_ratio != 1 else run.qty)
+        long.contract, long.series, long.parent = contract, series, run
+        if rev.strike_premium is None:
+            self._enter(long, minute, raw, intrabar=raw != series.open[minute])
+        else:
+            self._enter(long, fill_at, raw, intrabar=True)
+        if rev.time_stop_minutes is not None:
+            long.time_stop_min = (
+                minute + (0 if rev.strike_premium is None else 1) + (rev.time_stop_minutes)
+            )
+        run.reversed = True
+        run.child = long
+        self.legs.append(long)  # stepped from the next leg in this minute's loop on
+        if rev.resell_after_reverse:
+            self._arm_reentry(run, minute, "sl")  # waits in _step_reentry until the long is closed
+        return True
+
+    def _pick_premium(self, run: _LegRun, minute: int, target: float) -> tuple | None:
+        """Amendment 1: the long's contract, the strike priced closest to `target` before `minute`
+        among the stopped leg's expiry and option type, within 0.7x-1.4x of it; None (with a
+        note) when there is none or it is the stopped contract itself."""
+        spec = run.spec
+        assert run.contract is not None
+        expiry = run.contract[0]
+        low, high = 0.7 * target, 1.4 * target
+        priced = [
+            (abs(p - target), p, k)
+            for k, series in self.data.chain.items()
+            if k[0] == expiry
+            and k[2] == spec.option_type
+            and (p := series.price_at(minute)) is not None
+            and low - _EPS <= p <= high + _EPS
+        ]
+        if not priced:
+            self.notes.append(f"{spec.id}: reverse skipped, no strike priced {low:g}-{high:g}")
+            return None
+        key = min(priced)[2]
+        if key == run.contract:
+            self.notes.append(f"{spec.id}: reverse skipped, the closest strike is the stopped one")
+            return None
+        return key, self.data.chain[key]
+
+    def _time_stop(self, run: _LegRun, minute: int) -> bool:
+        """BL-186: a reversal long past its time stop exits at the price at that time."""
+        if run.time_stop_min is None or minute < run.time_stop_min or run.series is None:
+            return False
+        price = run.series.price_at(minute)
+        if price is None:
+            return False
+        self._exit(run, minute, price, "TIME")
+        return True
+
     def _arm_reentry(self, run: _LegRun, minute: int, why: str) -> None:
         spec = run.spec.reentry_on_sl if why == "sl" else run.spec.reentry_on_target
         left = run.reentries_sl if why == "sl" else run.reentries_target
@@ -470,6 +592,8 @@ class _DaySim:
         if minute > self.last_reentry_min:
             run.state = "done"
             return
+        if run.child is not None and run.child.state != "done":
+            return  # BL-186 Amendment 1: re-sell only after the long has closed
         if run.reentry_mode == "asap":
             if self._select(run, minute):
                 self._enter(run, minute, run.series.open[minute], intrabar=False)  # type: ignore[union-attr,arg-type]
@@ -550,8 +674,10 @@ class _DaySim:
         curve: list[tuple[int, float]] = []
         for minute in range(start, end):
             for run in self.legs:
-                if minute == start:
+                if minute == start and run.parent is None:
                     self._start(run, minute)
+                if run.state == "open" and self._time_stop(run, minute):
+                    continue
                 if run.state == "range":
                     self._step_range(run, minute)
                 if run.state == "armed":
@@ -564,7 +690,7 @@ class _DaySim:
                     hit = self._step_open(run, minute)
                     if hit and self.s.square_off == "complete":
                         self._close_all(minute, "close", "SQUARE_OFF")
-                    elif hit:
+                    elif hit and not (hit == "sl" and self._maybe_reverse(run, minute)):
                         self._arm_reentry(run, minute, hit)
             self._roll_exhausted_legs(minute)
             mtm = self._mtm(minute)

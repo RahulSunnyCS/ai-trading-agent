@@ -54,6 +54,12 @@ Three master switches, then one block per platform and broker.
 
 A warning badge on a block means its master switch holds it back.
 
+**Capital.** Below the blocks, the money in each broker account: **Angel One** and **Shoonya**, in whole rupees (₹8.5 lakh each until you change them). The page shows their total. They feed the month-so-far lines of the 16:00 result message on Telegram, from November 2026:
+
+- Each list's paper month (Adaptive and Tuned Adaptive) also reads as a share of that list's capital (`🎯 Adaptive   +₹23,400 (+2.8% of ₹8.5 L) · won 9 of 13 days`). A list's capital is the capital of the accounts whose rows upload it, each counted once.
+- In your own chat only, the account's real month from the contract notes reads as a share of the total of both accounts (`💰 Your account to Mon 2 Nov   +₹25,000 (+1.5% of ₹17 L)`).
+- The friends' group sees the per-list lines, never the real money.
+
 **Pause uploads and deploys.** Below the blocks, pick a day, or press **Skip next session**, to stop every upload, top-up and deploy for each session up to and including that day. **Clear pause** removes it.
 
 - The evening jobs prepare the next trading session; the 09:16–09:21 top-ups and deploys are for today. A pause through Monday therefore also holds Friday's evening jobs.

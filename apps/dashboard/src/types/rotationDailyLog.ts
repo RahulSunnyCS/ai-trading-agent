@@ -140,6 +140,9 @@ export interface RotationLog {
   source: RotationLogSource;
   from: string | null;
   to: string | null;
+  /** The parallel track this log was read from (`t1`), null for the live journal. Absent from
+   * responses that predate tracks. */
+  track?: string | null;
   registered: {
     first_day: string;
     record_time: string;

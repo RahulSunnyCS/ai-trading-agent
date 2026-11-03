@@ -31,6 +31,8 @@ import {
   perDayVsComparator,
   readoutLines,
 } from '../../lib/rotationLotPlansView';
+import { SLIPPAGE_TEXT } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { LotPlanBook, RotationLotPlansResponse } from '../../types/rotationLotPlans';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader } from '../ui/Card';
@@ -191,6 +193,7 @@ export function RotationLotPlans() {
   const [book, setBook] = useState<LotPlanBook>('core');
   const res = useRotationLotPlans(book);
   const d = res.data;
+  const slippage = useRotationSlippage();
   const current = d !== null && d.book === book;
   const lines = useMemo(() => (d && current ? chartLines(d) : []), [d, current]);
   const empty = d && current ? emptyState(d) : null;
@@ -198,7 +201,7 @@ export function RotationLotPlans() {
     <Card>
       <CardHeader
         title="Lot plans"
-        description={`${BOOK_LABEL[book]}: As picked (3 lots, one per pick) against Dir Boost and Duo, from the Adaptive picks recorded each morning since Mon 19 Oct. Net after estimated brokerage; Buy left out.`}
+        description={`${BOOK_LABEL[book]}: As picked (3 lots, one per pick) against Dir Boost and Duo, from the Adaptive picks recorded each morning since Mon 19 Oct. Net after estimated brokerage${slippage ? ` and ${SLIPPAGE_TEXT} slippage on every entry and exit` : ''}; Buy left out.`}
         actions={
           <span className="flex items-center gap-2">
             <SegmentedControl

@@ -73,7 +73,8 @@ def _number(text: str | None) -> float | None:
 def read_rows(name: str, root: Path) -> dict[date, dict]:
     """{day: {gross, worst_mtm, stopped_by, n_trades}} of one variant's stored results. A row that
     does not parse is left out (a missing day is never read as zero)."""
-    path = store.result_path(name, root)  # a parallel track's variants live in its own folder
+    # a parallel track's variants live in its own folder; the slippage copy under `store.slipped`
+    path = store.read_path(store.result_path(name, root))
     if not path.exists():
         return {}
     out: dict[date, dict] = {}
@@ -337,7 +338,8 @@ def reconstruction(root: Path, names: list[str] | None = None, basis: str = "wee
         for stale in [k for k in _recon_cache if k[0] == str(root)]:
             del _recon_cache[stale]
         try:
-            matrix = store.load_matrix(names, root)
+            with store.slipped(0.0):  # rebuilds the ranking: the stored figures, never the copy
+                matrix = store.load_matrix(names, root)
             attrs = store.read_days(root, basis)
         except (ValueError, KeyError) as error:
             # a stored file with a row that does not parse: the recorded rows do not need the

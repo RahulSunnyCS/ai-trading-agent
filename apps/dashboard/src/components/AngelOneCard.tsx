@@ -45,7 +45,7 @@ function buttonLabel(kind: TestButtonKind, secondsLeft: number, status: AngelSta
     case 'testing':
       return 'Testing…';
     case 'collecting':
-      return 'Collection running';
+      return status.running_source === 'live-board' ? 'Live board reading' : 'Collection running';
     case 'cooldown':
       return `Wait ${secondsLeft} s`;
     case 'held':

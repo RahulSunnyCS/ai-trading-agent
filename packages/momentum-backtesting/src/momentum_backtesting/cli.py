@@ -235,7 +235,7 @@ _TRACK = typer.Option(
     "always on the index.",
 )
 _EXECUTION = typer.Option(
-    "fri_close", help="Trades fill at: fri_close | mon_open | mon_10am (after the signal)."
+    "fri_close", help="Trades fill at: fri_close | mon_open | mon_close | mon_10am."
 )
 
 
@@ -1594,11 +1594,38 @@ def search_score(
     tags: str = typer.Option(None, help="Category tags to use: curated or extended."),
     limit: int = typer.Option(None, help="Only the first N configs of each ranking (a trial run)."),
     max_rankings: int = typer.Option(None, help="Score at most this many rankings, then stop."),
+    ids_file: Path = typer.Option(
+        None, "--ids", help="Score only the config ids listed in this file, one per line."
+    ),
+    per_sleeve: bool = typer.Option(
+        False,
+        "--per-sleeve",
+        help="The space's capital is one sleeve (BL-176): each Friday runs with all of it, "
+        "blended with equal capital reset each April.",
+    ),
+    overrides: list[str] = typer.Option(
+        None,
+        "--set",
+        help="Replace a space setting, KEY=VALUE, repeatable: capital or max_stock_price only "
+        "(BL-176 Stage 3: --set capital=200000 --set max_stock_price=10000).",
+    ),
+    own_phase: bool = typer.Option(
+        False,
+        "--own-phase",
+        help="Run each config on the Friday the search sampled only (BL-176's entry re-rank).",
+    ),
 ) -> None:
     """Re-score every config of a finished search on all its rebalance phases and keep the
     weekly curves (BL-010 Phase 4), then report the probability of backtest overfitting.
     Resumable: a ranking already scored is skipped."""
     from . import method, reference_benchmarks
+
+    fixed: dict[str, float] = {}
+    for item in overrides or []:
+        key, sep, value = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--set needs KEY=VALUE, got {item!r}")
+        fixed[key.strip()] = float(value)
 
     dest = dest or out / "scored"
     runner = {}
@@ -1614,6 +1641,10 @@ def search_score(
         runner=runner,
         limit=limit,
         max_rankings=max_rankings,
+        ids=set(ids_file.read_text().split()) if ids_file else None,
+        per_sleeve=per_sleeve,
+        fixed=fixed,
+        own_phase=own_phase,
         echo=typer.echo,
     )
     scores, curves = method.load_scores(dest)
@@ -1631,21 +1662,38 @@ def search_score(
     )
 
 
+def _arm_pairs(out: Path, scored: Path, also: list[str] | None) -> list[tuple[Path, Path]]:
+    """`out`/`scored` plus each `--also RESULTS=SCORED`: the arms one tag ranking pools."""
+    pairs = [(out, scored)]
+    for item in also or []:
+        results, sep, scoring = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"--also needs RESULTS=SCORED, got {item!r}")
+        pairs.append((Path(results), Path(scoring)))
+    return pairs
+
+
 @search_app.command("choose")
 def search_choose(
     out: Path = typer.Argument(..., help="A finished search's results folder."),
     scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
     dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase5)."),
+    also: list[str] = typer.Option(
+        None,
+        "--also",
+        help="Another arm to choose among, RESULTS=SCORED, repeatable (BL-176: a tag ranking's "
+        "arms are ranked together).",
+    ),
 ) -> None:
     """BL-010 Phase 5: robustness over financial years, the walk-forward of the choice rule,
     the factor check and the choice per drawdown basket, as committed in criteria addendum 3.
     Reads stored curves only; writes report.json and report.md."""
-    from . import bias, choose, db_read, method, phase5, reference_benchmarks
+    from . import choose, db_read, method, phase5, reference_benchmarks
 
     scored = scored or out / "scored_pit"
     dest = dest or out / "phase5"
-    scores, curves = method.load_scores(scored)
-    facts = choose.config_facts(bias.load_records(out, set(curves.columns)))
+    scores, curves, records = method.load_pooled(_arm_pairs(out, scored, also))
+    facts = choose.config_facts(records)
     refs = reference_benchmarks.load_references()
     closes = db_read.weekly_closes_from_db_or_none()
     if closes is None:
@@ -1666,6 +1714,12 @@ def search_ensemble(
     freeze: bool = typer.Option(
         False, "--freeze", help="Write search_spaces/bl010_phase6_frozen.json if the rule passes."
     ),
+    also: list[str] = typer.Option(
+        None,
+        "--also",
+        help="Another arm to pick among, RESULTS=SCORED, repeatable (BL-176, as `choose`). "
+        "Not with --freeze: a pooled pick spans several spaces.",
+    ),
 ) -> None:
     """BL-010 Phase 6 step 0: the ensemble criteria addendum 4 picks, after its own
     walk-forward. Reads stored curves only; writes ensemble.json and ensemble.md, and with
@@ -1678,8 +1732,14 @@ def search_ensemble(
 
     scored = scored or out / "scored_pit"
     dest = dest or out / "phase6"
-    scores, curves = method.load_scores(scored)
-    records = bias.load_records(out, set(curves.columns))
+    if also and freeze:
+        typer.echo("--freeze reads one search's space: a pick pooled with --also is frozen apart")
+        raise typer.Exit(1)
+    if also:
+        scores, curves, records = method.load_pooled(_arm_pairs(out, scored, also))
+    else:
+        scores, curves = method.load_scores(scored)
+        records = bias.load_records(out, set(curves.columns))
     facts = choose.config_facts(records)
     refs = reference_benchmarks.load_references()
     series = {name: refs[name] for name in (phase5.MOM30, phase5.MIDCAP, phase5.SMALLCAP)}

@@ -19,6 +19,8 @@ import {
   stoppedShare,
   valueText,
 } from '../../lib/rotationMatrixView';
+import { grossLabelSentence } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { MatrixCellDay, MatrixCellDetail, MatrixListId } from '../../types/rotationMatrix';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -96,10 +98,12 @@ const H = 150;
 function Detail({ d }: { d: MatrixCellDetail }) {
   const s = d.stats;
   const empty = d.days.length === 0;
+  const slippage = useRotationSlippage();
   return (
     <div className="space-y-5">
       <p className="text-xs text-muted">
-        Gross per one-lot strategy-day, before costs. {d.pooling}.
+        {grossLabelSentence(slippage)} per one-lot strategy-day, before {slippage ? 'other ' : ''}
+        costs. {d.pooling}.
       </p>
       {empty ? (
         <StateMessage

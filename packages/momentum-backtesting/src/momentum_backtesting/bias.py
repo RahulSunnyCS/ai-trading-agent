@@ -96,7 +96,7 @@ class Runner:
 
         self.api = api
         self.space = space
-        self.universe_kind = universe_kind or search.ARMS[space.arm][0]
+        self.universe_kind = universe_kind or search.universe_of(space)
         self.category_tags = category_tags
         self.common = dict(
             outer_prices=api.DATA.get(),
@@ -105,6 +105,7 @@ class Runner:
         )
         self.refs = reference_benchmarks.load_references()
         self._tilt_cache: dict[tuple, Any] = {}
+        self._lock_cache: dict[tuple, Any] = {}
 
     def heavy_args(self, heavy: dict[str, Any], **override: Any) -> tuple[dict[str, Any], Any]:
         from .categories.liquidity import LiquidityConfig
@@ -142,10 +143,24 @@ class Runner:
             series_breaks=h.get("series_break_policy", "verified"),
         )
 
-    def locks(self, ranking):
+    def locks(self, ranking, session: str = "last"):
         from .categories import circuit_exposure as cx
 
-        return cx.lock_masks(ranking.column_to_base_symbol, ranking.prices.index)
+        return cx.lock_masks(ranking.column_to_base_symbol, ranking.prices.index, session=session)
+
+    def _session_locks(self, base, ranking, session: str):
+        """Masks for a fill session, kept per base (the masks depend on its columns and weeks
+        only). The entry holds `base`, so its id cannot be reused while cached."""
+        cache = self.__dict__.setdefault("_lock_cache", {})  # tests build a Runner by hand
+        key = (id(base), session)
+        hit = cache.get(key)
+        if hit is not None and hit[0] is base:
+            return hit[1]
+        masks = self.locks(ranking, session)
+        if len(cache) >= 4:
+            cache.pop(next(iter(cache)))
+        cache[key] = (base, masks)
+        return masks
 
     def run(
         self,
@@ -170,7 +185,12 @@ class Runner:
         if self.category_tags is not None:
             kwargs["category_tags"] = self.category_tags
         if kwargs.pop("respect_circuits", False):
-            kwargs["uc_locked"], kwargs["lc_locked"] = locks or self.locks(ranking)
+            session = search.fill_session(kwargs)
+            # Callers pass Friday masks they built once (`locks`); a Monday fill trades on
+            # Monday's session, so it gets its own masks instead (BL-176).
+            if locks is None or session != "last":
+                locks = self._session_locks(base, ranking, session)
+            kwargs["uc_locked"], kwargs["lc_locked"] = locks
         heavy_kwargs, _ = self.heavy_args(heavy)
         tilt = merged.get("stock_tilt", 0.0)
         if tilt > 0 and "stock_tilt_ranks" not in kwargs:

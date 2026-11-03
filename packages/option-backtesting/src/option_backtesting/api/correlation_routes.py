@@ -23,7 +23,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from ..analytics import correlation as c
-from ..rotation import journal
+from ..rotation import journal, store
 from ..rotation import series as rseries
 from ..rotation.variants import is_dir, is_wide
 
@@ -47,7 +47,7 @@ def _error(status: int, message: str) -> JSONResponse:
 def _available() -> list[rseries.Available]:
     from ..fyers.daily import data_dir
 
-    root = data_dir()
+    root = (data_dir(), store.reading_slip())  # one cache per slippage the series are read at
     now = time.monotonic()
     if (
         _cache["value"] is not None
@@ -55,7 +55,7 @@ def _available() -> list[rseries.Available]:
         and now - _cache["at"] < CACHE_SECONDS
     ):
         return _cache["value"]
-    value = rseries.available(root)
+    value = rseries.available(root[0])
     _cache.update(at=now, root=root, value=value)
     return value
 
@@ -65,7 +65,7 @@ def _lists() -> list[rseries.Available]:
     longer than the strategies (the journal changes twice a day)."""
     from ..fyers.daily import data_dir
 
-    root = data_dir()
+    root = (data_dir(), store.reading_slip())
     now = time.monotonic()
     if (
         _list_cache["value"] is not None
@@ -73,7 +73,7 @@ def _lists() -> list[rseries.Available]:
         and now - _list_cache["at"] < LIST_CACHE_SECONDS
     ):
         return _list_cache["value"]
-    value = rseries.lists_available(root)
+    value = rseries.lists_available(root[0])
     _list_cache.update(at=now, root=root, value=value)
     return value
 

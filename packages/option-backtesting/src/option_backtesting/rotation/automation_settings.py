@@ -105,6 +105,40 @@ def read(path: Path | None = None) -> tuple[dict, str]:
     return data, f"settings v{data.get('version', 0)}"
 
 
+#: what an account's capital reads as when the settings have none (owner, 2026-10-29: ₹8.5 lakh)
+DEFAULT_CAPITAL = 850_000
+#: the brokers' names in messages
+BROKER_NAMES = {"angelone": "Angel One", "finvasia": "Shoonya"}
+
+
+def capital(settings: dict) -> dict[str, int]:
+    """{broker: rupees}, each account's capital from Settings › Automation; the default where the
+    settings have none. For the messages only, so it never raises: `read` stays as strict as the
+    jobs that place strategies need, and a bad figure here only reads as the default."""
+    raw = settings.get("capital")
+    raw = raw if isinstance(raw, dict) else {}
+    return {
+        b: v if isinstance(v, int) and not isinstance(v, bool) and v > 0 else DEFAULT_CAPITAL
+        for b in BROKERS
+        for v in [raw.get(b)]
+    }
+
+
+def book_capital(settings: dict, book: str) -> int:
+    """The capital behind a list (`core` or `t1`): the accounts with a row that uploads it, each
+    counted once (two platforms on one account share its money); the default when none does."""
+    per = capital(settings)
+    brokers = {
+        b
+        for p in PLATFORMS
+        for b in BROKERS
+        if (row := settings["rows"].get(f"{p}.{b}"))
+        and row.get("list") == book
+        and row.get("upload")
+    }
+    return sum(per[b] for b in brokers) if brokers else DEFAULT_CAPITAL
+
+
 def paused_for(settings: dict, session: str) -> str | None:
     """The pause's last day when a session on `session` (an IST day, YYYY-MM-DD) is paused, else
     None. Inclusive."""

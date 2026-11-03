@@ -1,6 +1,6 @@
 # Directional ("Dir")
 
-**Last updated:** 2026-10-28
+**Last updated:** 2026-10-29
 
 ## Definition
 
@@ -61,6 +61,7 @@ rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cu
 | [Overall MTM stop](mtm-sl.md) | Tested | The ₹3,000 stop costs more than it saves; net rises with the stop up to ₹4,000, the grid edge |
 | [Trail](trail.md) | Descriptive | Helps only with a 30% leg stop; mixed elsewhere |
 | [Re-entry](re-entry.md) | Descriptive | COST ×2 is net-neutral after charges with a slightly smaller drawdown |
+| [Stop-and-reverse](stop-and-reverse.md) | Tested | Killed (BL-186): buying the stopped option earns on its own, but the book loses the RE COST re-sale and draws down deeper; a cheaper ₹50 long and a re-sale toggle (Amendment 1) change nothing |
 | [Exit time](exit-time.md) | Descriptive | 15:28 is clearly best after charges (₹136 a day vs ₹62 at 15:10) |
 | [Session split](session-split.md) | Tested | One morning Dir closed at 13:00 plus one afternoon Dir is a wash with a deeper drawdown under Adaptive (BL-184); the morning half is the problem, the afternoon Dir alone nearly matches the whole day |
 | [Days to expiry](days-to-expiry.md) | Descriptive | NIFTY strong at 0–1 days, negative 6 days out; SENSEX peaks 2 days out; within noise |
