@@ -76,8 +76,10 @@ import {
   parseDayWiseListed,
   parseDeployedOn,
   parseMarginCsv,
+  parseMarginPlan,
   pauseNote,
   pickNeed,
+  planPerLot,
   pnlFromSocketFrame,
   quantiplyReading,
   readMtmCardsInPage,
@@ -166,7 +168,13 @@ const BOOK_NAME: Record<Book, string> = { core: 'Core', t1: 'T1' };
 
 interface DayState {
   /** `skipped`: the monitor started after 09:10, said once */
-  margin?: { at: string; ok: boolean; skipped?: boolean };
+  margin?: {
+    at: string;
+    ok: boolean;
+    skipped?: boolean;
+    /** BL-205: the free margin read per broker, for the evening block's comparison */
+    free?: Partial<Record<Broker, number | null>>;
+  };
   deploy?: { at: string; ok: boolean };
   loss: MtmNoticeState & {
     warned: boolean;
@@ -767,6 +775,7 @@ class Monitor {
 
   async margin(): Promise<void> {
     const accounts: AccountMargin[] = [];
+    const free: Partial<Record<Broker, number | null>> = {};
     const csv = readFileSync(
       new URL(
         '../../option-backtesting/src/option_backtesting/data/reference/margin.csv',
@@ -775,6 +784,14 @@ class Monitor {
       'utf8',
     );
     const perStraddle = parseMarginCsv(csv);
+    // BL-205 Phase 4: last evening's per-lot figure for today, when the result message saved one
+    let plan: ReturnType<typeof parseMarginPlan> = null;
+    try {
+      const planFile = join(this.root, 'rotation', 'margin-plan', `${this.day}.json`);
+      plan = parseMarginPlan(JSON.parse(await readFile(planFile, 'utf8')), this.day);
+    } catch {
+      plan = null; // no plan (an evening without the block): the margin.csv estimate, as before
+    }
     const lotOf = (u: string) => {
       try {
         return lotSize(u as Underlying);
@@ -858,7 +875,19 @@ class Monitor {
       } catch (error) {
         account.source = `not read: ${describe(error)}`;
       }
+      const perLot = planPerLot(plan, broker);
+      if (plan && perLot !== null) {
+        const cash = plan.cash[broker];
+        account.planned = {
+          perLot,
+          bufferPct: plan.bufferPct,
+          type: plan.type,
+          // Shoonya is held to the 50:50 rule strictly, as in the evening block
+          ...(broker === 'finvasia' && cash !== undefined ? { cashCap: 2 * cash } : {}),
+        };
+      }
       accounts.push(account);
+      free[broker] = account.free;
     }
     if (!accounts.length) {
       console.log(
@@ -870,7 +899,7 @@ class Monitor {
     }
     const m = marginMessage(this.day, accounts);
     if (await this.send(m.text, 'monitor.margin')) {
-      this.state.margin = { at: new Date().toISOString(), ok: m.ok };
+      this.state.margin = { at: new Date().toISOString(), ok: m.ok, free };
       await this.save();
     }
   }

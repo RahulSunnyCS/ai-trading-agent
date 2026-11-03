@@ -211,6 +211,27 @@ def test_a_type_with_no_day_yet_uses_the_most_of_any_type(tmp_path):
     assert "no NIFTY expiry day yet: the most of any day type" in text
 
 
+def test_the_block_saves_tomorrows_plan_and_compares_this_mornings_figure(tmp_path):
+    _store(tmp_path)
+    settings = _settings(algotest_finvasia={"upload": True, "list": "t1"})
+    # last evening's plan for today said Shoonya would have ₹10 L; at 09:05 AlgoTest showed ₹9.5 L
+    plan = tmp_path / "rotation" / "margin-plan" / "2026-10-29.json"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text(json.dumps({"accounts": {"finvasia": {"free": 1_000_000}}}))
+    state = tmp_path / "monitor" / "2026-10-29.json"
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text(json.dumps({"margin": {"free": {"finvasia": 950_000, "angelone": None}}}))
+    lines = margin_lines.owner_lines(TODAY, {"t1": _picks()}, tmp_path, settings=settings)
+    assert (
+        "Shoonya at 09:05 today: AlgoTest showed ₹9.5 L free (last evening's figure ₹10 L)" in lines
+    )
+    assert lines[-1].startswith("Your own strategies")
+    saved = json.loads((tmp_path / "rotation" / "margin-plan" / "2026-10-30.json").read_text())
+    assert saved["day"] == "2026-10-30" and saved["type"] == "normal" and saved["bufferPct"] == 10
+    assert saved["accounts"]["finvasia"]["lots"] == 3
+    assert saved["accounts"]["finvasia"]["perLot"] == 200000
+
+
 def test_an_older_statement_adds_every_day_since_and_says_when_one_is_missing(tmp_path):
     root = tmp_path
     _jsonl(
