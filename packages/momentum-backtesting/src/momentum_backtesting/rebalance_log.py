@@ -5,10 +5,13 @@ lot's due week to the Kite contract-note fills and gives every stock a status; t
 (BL-142) says what the lot held before. Pure: the caller reads the catalog and the files.
 
 - **Week number:** from the paper start (that Friday is week 1), one per Friday.
+- **Only real trades:** a block lists what the contract notes show was bought or sold, never
+  what the strategy suggested (owner, 2026-11-03). A stock the orders asked for and that was not
+  traded is only counted (`not_traded`), for the status.
 - **Status:** `done` when every stock the signal or the 14:15 orders asked for was traded,
   `partly done` when some were, `waiting for notes` when none were and the notes for the first
   session after the Friday are not in yet (a lot is often bought on the Monday), `not done`
-  otherwise. A stock the orders asked for and that is still unfilled is listed as planned.
+  otherwise.
 - **Missed weeks:** a `not done` week says where it was folded in: the lot's next due week. Orders
   are not changed: a lot rebalances in full the next time it is due (owner, 2026-11-02).
 - **Holding after:** the lot's shares from the ledger before that Friday, plus that week's fills.
@@ -85,34 +88,18 @@ def _value(row: dict) -> float | None:
 
 
 def _lines(rebalance: dict) -> list[dict]:
-    lines = []
-    for row in rebalance["rows"]:
-        status = row["status"]
-        if status in TRADED and row.get("shares"):
-            lines.append(
-                {
-                    "symbol": row["symbol"],
-                    "side": row["side"],
-                    "shares": row["shares"],
-                    "value": _value(row),
-                    "planned_shares": row.get("plan_shares"),
-                    "status": status,
-                }
-            )
-        elif status == "missed":
-            shares = row.get("plan_shares") or row.get("model_shares")
-            price = row.get("plan_price") or row.get("friday_close")
-            lines.append(
-                {
-                    "symbol": row["symbol"],
-                    "side": row["side"],
-                    "shares": None,
-                    "value": shares * price if shares and price else None,
-                    "planned_shares": shares,
-                    "status": status,
-                }
-            )
-    return lines
+    """The lot's real trades of the week, from the notes; nothing the strategy only suggested."""
+    return [
+        {
+            "symbol": row["symbol"],
+            "side": row["side"],
+            "shares": row["shares"],
+            "value": _value(row),
+            "status": row["status"],
+        }
+        for row in rebalance["rows"]
+        if row["status"] in TRADED and row.get("shares")
+    ]
 
 
 def _friday_of(day: str, time: str | None) -> str:
@@ -137,7 +124,6 @@ def _outside_lines(fills: list[dict]) -> list[dict]:
                 "side": f["side"],
                 "shares": 0.0,
                 "value": 0.0,
-                "planned_shares": None,
                 "status": OUTSIDE,
             },
         )
@@ -171,6 +157,7 @@ def _add_outside(blocks: list[dict], fills: list[dict], paper_start: str) -> Non
                 "first_trade_day": min(f["day"] for f in week_fills),
                 "orders_at": None,
                 "lines": [],
+                "not_traded": 0,
                 "bought": 0.0,
                 "sold": 0.0,
                 "charges": None,
@@ -183,11 +170,11 @@ def _add_outside(blocks: list[dict], fills: list[dict], paper_start: str) -> Non
         block["sold"] += sum(x["value"] for x in lines if x["side"] == "sell")
 
 
-def _status(lines: list[dict], final: bool) -> str:
+def _status(rows: list[dict], final: bool) -> str:
     """Done only when the fills cover every order: a stock traded in other shares than the
-    orders said leaves the week partly done (owner, 2026-11-02). Outside lines never count."""
-    traded = sum(1 for line in lines if line["status"] in TRADED)
-    short = sum(1 for line in lines if line["status"] in ("missed", "shares differ"))
+    orders said leaves the week partly done (owner, 2026-11-02). Outside fills never count."""
+    traded = sum(1 for row in rows if row["status"] in TRADED and row.get("shares"))
+    short = sum(1 for row in rows if row["status"] in ("missed", "shares differ"))
     if traded and not short:
         return DONE
     if traded:
@@ -279,7 +266,7 @@ def build(
             lines = _lines(r)
             session = r.get("next_session") or _monday_after(week)
             final = bool(notes_through) and notes_through >= session
-            status = _status(lines, final)
+            status = _status(r["rows"], final)
             folded = None
             if status == NOT_DONE:
                 later = sorted(w for w in due[r["sleeve_id"]] if w > week)
@@ -293,7 +280,6 @@ def build(
                     "week_no": week_number(target, paper_start),
                     "scheduled": not later,
                 }
-            traded = [line for line in lines if line["status"] in TRADED]
             blocks.append(
                 {
                     "week": week,
@@ -306,8 +292,9 @@ def build(
                     "first_trade_day": r.get("first_trade_day"),
                     "orders_at": r.get("orders_at"),
                     "lines": lines,
-                    "bought": sum(x["value"] or 0 for x in traded if x["side"] == "buy"),
-                    "sold": sum(x["value"] or 0 for x in traded if x["side"] == "sell"),
+                    "not_traded": sum(1 for row in r["rows"] if row["status"] == "missed"),
+                    "bought": sum(x["value"] or 0 for x in lines if x["side"] == "buy"),
+                    "sold": sum(x["value"] or 0 for x in lines if x["side"] == "sell"),
                     "charges": (r.get("totals") or {}).get("real_charges"),
                     "holding_after": _holding(
                         events.get(group["group_id"], []), r["sleeve_id"], week, lines

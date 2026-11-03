@@ -76,9 +76,10 @@ def test_status_done_partly_and_the_lines_net_per_stock():
     assert blocks["2026-10-16"]["status"] == rl.DONE
     week2 = blocks["2026-10-23"]
     assert week2["status"] == rl.PARTLY
-    assert [line["symbol"] for line in week2["lines"]] == ["BRAVO", "CHARLIE"]  # held: no trade
+    # only what was traded: the suggested CHARLIE is counted, never listed; held is no trade
+    assert [line["symbol"] for line in week2["lines"]] == ["BRAVO"]
     assert week2["lines"][0]["value"] == 42 * 310
-    assert week2["lines"][1]["shares"] is None and week2["lines"][1]["planned_shares"] == 21
+    assert week2["not_traded"] == 1
     assert week2["bought"] == 42 * 310
 
 
@@ -88,6 +89,7 @@ def test_nothing_traded_waits_for_the_monday_notes_then_is_not_done_and_folded()
     assert waiting["status"] == rl.WAITING and waiting["folded_into"] is None
     missed = _build([rebalance], through="2026-11-02")["2026-10-30"]
     assert missed["status"] == rl.NOT_DONE
+    assert missed["lines"] == [] and missed["not_traded"] == 1
     # no later due week stored yet: the lot's next turn, four Fridays on
     assert missed["folded_into"] == {"week": "2026-11-27", "week_no": 7, "scheduled": True}
 
