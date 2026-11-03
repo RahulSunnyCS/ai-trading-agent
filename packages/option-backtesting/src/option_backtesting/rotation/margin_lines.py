@@ -303,6 +303,19 @@ def render(
     return lines
 
 
+def compact(lines: list[str]) -> list[str]:
+    """The block in one line per account, for a message that would pass Telegram's limit whole:
+    the heading, each account's name with its verdict, and the closing note."""
+    out = [lines[0]]
+    name = None
+    for line in lines[1:-1]:
+        if not line.startswith("  "):
+            name = line.split(" · ")[0]
+        elif name and ("✅ fits" in line or "⚠️ short" in line):
+            out.append(f"{name}: {line.strip()}")
+    return out + [lines[-1]]
+
+
 def owner_lines(
     today: date,
     picks: dict[str, object],

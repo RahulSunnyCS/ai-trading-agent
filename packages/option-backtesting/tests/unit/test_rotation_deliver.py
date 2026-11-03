@@ -711,3 +711,23 @@ def test_a_failing_margin_block_is_left_out(evening, monkeypatch):
     sent = Sent()
     assert _send(evening, sent) == 0
     assert "🏦" not in sent.to(None)[0]
+
+
+def test_a_long_message_gets_the_margin_block_one_line_per_account(evening, monkeypatch):
+    from option_backtesting.rotation import margin_lines
+
+    _t1_ready(evening)
+    block = [
+        "🏦 Margin for Wed",
+        "Angel One · T1 3 lots (AlgoTest)",
+        "  needs ≈ ₹6 L: " + "x" * 4000,
+        "  ✅ fits, ₹1 L spare",
+        "Your own strategies on these accounts come on top of these needs.",
+    ]
+    monkeypatch.setattr(
+        margin_lines, "owner_lines", lambda today, picks, root=None, echo=print: block
+    )
+    sent = Sent()
+    assert _send(evening, sent) == 0
+    private = sent.to(None)[0]
+    assert "Angel One: ✅ fits, ₹1 L spare" in private and "xxxx" not in private
