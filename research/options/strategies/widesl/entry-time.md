@@ -1,6 +1,6 @@
 # Widesl: entry time
 
-**Status:** Tested · **Last updated:** 2026-10-28
+**Status:** Tested · **Last updated:** 2026-10-29
 
 ## What it is
 
@@ -26,6 +26,7 @@ times for each family.
 | BL-145 Q4 | NIFTY OTM1 entering 09:47 (`N_wide_0947`), split by the opening range 09:15 to 09:44 on quiet-week days (R7 lowest third) | learning 2025-10-20 → 2026-10-19 (80 days), confirmation 2024-10-09 → 2025-10-17 (46); gross per lot-day, no charges | Low-OR days beat high-OR days: +1,446 [+426, +2,578] (46 vs 7 days), confirmed thinly +723 [−92, +1,879] (22 vs 5 days); the registered rule is met | [BL-145][bl145] |
 | [BL-182][bl182] | A 13:00 entry (exit 15:28) as the afternoon half of a two-set day, beside the 09:17 whole day | 2024-10-09 → 2026-10-27, 501 days, after charges, seen data | A 13:00–15:28 set alone earns +138 (NIFTY OTM1) / +83 (SENSEX OTM2) net a day, stopped a third as often as a whole-day set; T1's OTM1 settings +187 / +232. Not adopted as part of the split (interval includes zero) | [Session split](session-split.md) |
 | BL-187 | Strongest Widesl by Adaptive's morning ranking among starts from 14:02, run in place of the picked Dir (cut 2 minutes before) | 434 pick days 2025-01-10 → 2026-10-27, T1 and Core, after charges, seen data | The late Widesl earns +₹75 [+44, +106] net per margin lot-day and beats a random late Widesl by +₹44 [+8, +79]; entered 14:02 on half the days; the book gain of +₹32 [−11, +74] is gone at ₹115 late-fill cost per lot; not adopted | [BL-187][bl187] |
+| BL-188 | The strongest 14:02 Widesl in place of the picked Dir (cut at 14:00) | NIFTY 2022-04-05 → 2024-10-08, 618 pick days, after charges | **Killed**: the late Widesl added earned +₹33 a margin lot-day (+₹75 in 2025-26), the swap −₹44 [−78, −12]; no live entry after 13:17 to measure 14:00 slippage (23 midday copies: median −₹6.5 a lot) | [BL-188][bl188] |
 
 Average ₹ per day per lot, mean of the start-time means, before charges ([BL-059][bl059]):
 
@@ -78,3 +79,4 @@ After charges, the band leaders earn (₹ per day, [BL-098 report][bl098q]): NIF
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
 [bl182]: ../../../../backlog/BL-182-widesl-split-session.md
 [bl187]: ../../../../backlog/BL-187-dir-cut-late-widesl.md
+[bl188]: ../../../../backlog/BL-188-fixed-1400-dir-cut-nifty-2022-24.md

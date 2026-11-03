@@ -1,6 +1,6 @@
 # Directional: re-entry
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-29
 
 ## What it is
 
@@ -31,6 +31,8 @@ Mean of the 100 bases, holdout, before charges: 25% / ₹4,000 with COST ×2 ₹
 - The item gives no summary for no re-entry, ASAP or the cut-offs; those rows are in the raw files only.
 - Engine/AlgoTest parity is still incomplete for some re-entry details (BL-096 risks), so re-entry results
   carry more model risk than stop results.
+
+- A different strategy in place of a pick that stopped out by 12:15 (BL-190, book level, not this strategy's own re-entry): the strongest later Widesl or Dir adds nothing on T1 (−₹9 / −₹10 a margin lot-day, 95 % intervals ±₹45) and deepens the drawdown; slightly positive on NIFTY 2022-24 ([BL-190](../../../../backlog/BL-190-replace-early-stopped-pick.md)).
 
 ## Not yet tested
 
