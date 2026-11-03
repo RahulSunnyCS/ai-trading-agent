@@ -98,10 +98,12 @@ def choose(
     comp: np.ndarray,
     names: list[str],
     rule_index: str | None = None,
+    cap: bool = False,
 ) -> Morning:
     """The day's list under the owner's rule (module docstring). `comp` is the 09:16 composite of
     the Adaptive list over `names`; `rule_index` the BL-122 expiring index when the entry has one
-    (the pool is then that index's variants, the kept 09:17 strategy aside)."""
+    (the pool is then that index's variants, the kept 09:17 strategy aside); `cap` the BL-192
+    SL150% cap (at most one `N_wide-t1s4`: a kept 09:17 copy, else the best-ranked)."""
     evening_all = [*evening.core, *evening.buy]
     keep = [v for v in evening.core if is_early(v)]
     allowed = [
@@ -110,6 +112,18 @@ def choose(
         for n in names
     ]
     core = select_keeping(comp, names, keep, allowed)
+    if cap:
+        from .sl150_cap import SETTING
+
+        mine = [n for n in core if n.startswith(SETTING)]
+        if len(mine) >= 2:
+            kept = [k for k in keep if k.startswith(SETTING)]
+            stay = kept[0] if kept else mine[0]  # `core` is in composite order
+            allowed = [
+                a and (not n.startswith(SETTING) or n == stay)
+                for a, n in zip(allowed, names, strict=True)
+            ]
+            core = select_keeping(comp, names, keep, allowed)
     # The add-on: the evening's stays when it enters at 09:17 (already running); otherwise the
     # 09:16 pick's own, unless that one enters at 09:17 (too late to add).
     early_buy = [v for v in evening.buy if is_early(v)]
@@ -155,14 +169,19 @@ def _ranking(day: date, book: str, entry: dict, root: Path):
     raise ValueError("no Adaptive (C) ranking")
 
 
-def _reproduces(entry_block: dict, names: list[str], comp: np.ndarray, rule: str | None) -> str:
-    """'' when the rebuilt ranking gives the journal's own picks and composites, else why not."""
-    from . import expiry
+def _reproduces(
+    entry_block: dict, names: list[str], comp: np.ndarray, rule: str | None, cap: bool = False
+) -> str:
+    """'' when the rebuilt ranking gives the journal's own picks and composites, else why not.
+    `cap`: the day's BL-192 SL150% cap applies (as `pick.score_history` applied it)."""
+    from . import expiry, sl150_cap
     from .score import select
 
     picks = select(comp, names)
     if rule:
         picks = expiry.filter_picks(comp, names, picks, rule)
+    elif cap:
+        picks = sl150_cap.cap_picks(comp, names, picks)
     if list(picks.core) != list(entry_block["core"]) or list(picks.buy) != list(
         entry_block.get("buy") or []
     ):
@@ -194,7 +213,11 @@ def morning_list(day: date, book: str, evening: DayPicks, root: Path | None = No
     except Exception as error:  # a short history, a missing file: never guess
         return unchanged(evening, recorded, f"the 09:16 ranking could not be rebuilt ({error})")
     rule = entry.get("expiry_only")
-    why = _reproduces(entry["lists"][LIST_KEY], names, comp, rule)
+    from . import dte as dte_mod
+    from . import sl150_cap
+
+    cap = not rule and sl150_cap.applies(day, dte_mod.entry_labels(entry)["NIFTY"])
+    why = _reproduces(entry["lists"][LIST_KEY], names, comp, rule, cap)
     if why:
         return unchanged(evening, recorded, why)
-    return choose(evening, recorded, comp, names, rule)
+    return choose(evening, recorded, comp, names, rule, cap)

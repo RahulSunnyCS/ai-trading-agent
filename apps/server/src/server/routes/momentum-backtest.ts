@@ -594,6 +594,11 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   fastify.get('/api/momentum/lots', async (_request, reply) => {
     await forward(reply, '/api/lots');
   });
+  // BL-200: the Trade book's Momentum rebalance log, read-only; keeps the from/to query.
+  fastify.get('/api/momentum/lots/rebalances', async (request, reply) => {
+    const query = new URLSearchParams(request.query as Record<string, string>).toString();
+    await forward(reply, `/api/lots/rebalances${query ? `?${query}` : ''}`);
+  });
 
   // BL-142: the Kite connection (read-only). Login returns Kite's login URL as JSON; the login
   // itself comes back to the Momentum API on the laptop, never through this proxy.

@@ -49,6 +49,10 @@ def rupees(value: float) -> str:
     return f"{sign}₹{abs(rounded):,}"
 
 
+#: the line a T1 entry the BL-192 cap changed adds to the morning message
+SL150_CAP_LINE = "✂️ One SL150% Widesl only (non-expiry day)"
+
+
 def expiry_day_line(index: str) -> str:
     """The one line a BL-122 rule day adds to the morning message."""
     return f"⚡ Expiry day · {index} only"
@@ -211,6 +215,8 @@ def _t1_block(
     lines = [head]
     if entry.get("expiry_only"):  # BL-122 restricts T1 as well, so its block says so too
         lines.append(expiry_day_line(entry["expiry_only"]))
+    if (entry.get("lists", {}).get(ADAPTIVE_KEY) or {}).get("sl150_capped"):  # BL-192
+        lines.append(SL150_CAP_LINE)
     # inside the combined message; a T1 message of its own carries LATE as its first line instead
     if not dated and not entry.get("before_first_entry", True):
         lines.append(f"   {LATE_LINE}")
@@ -313,6 +319,47 @@ def result_block(
     return out
 
 
+def _won(m) -> str:
+    days = f"{m.days} day{'s' if m.days != 1 else ''}"
+    return f"won {m.won} of {days} ({round(100 * m.won / m.days)}%)"
+
+
+def _month_rows(head: str, m) -> list[str]:
+    rows = [f"{head}   {rupees(m.net)} · {_won(m)}"]
+    if m.as_traded is not None:
+        rows.append(f"   As traded (Dir ×2): {rupees(m.as_traded)}")
+    return rows
+
+
+def _slip(pct: float | None) -> str:
+    return f" and {pct:g}% slippage" if pct else ""
+
+
+def month_lines(day: date | str, adaptive=None, t1=None, real=None) -> list[str]:
+    """The month so far (`month.Month`s; any may be None and is then left out): each list's paper
+    net and days won, a Dir ×2 list's as-traded net, and the account's real profit (`real`, the
+    owner's copy only). No lines when there is nothing to show."""
+    rows: list[str] = []
+    if adaptive is not None:
+        rows += _month_rows("🎯 Adaptive", adaptive)
+    if t1 is not None:
+        rows += _month_rows("🧪 Tuned Adaptive", t1)
+    if real is not None:
+        through = f" to {day_text(real.through)}" if real.through else ""
+        rows.append(f"💰 Your account{through}   {rupees(real.net)} · {_won(real)}")
+    if not rows:
+        return []
+    d = date.fromisoformat(day) if isinstance(day, str) else day
+    head = f"📅 {d.strftime('%B')} so far"
+    if adaptive is not None or t1 is not None:
+        head += " · paper, 1 lot per strategy"
+        slips = {m.slippage_pct for m in (adaptive, t1) if m is not None}
+        if len(slips) == 1:
+            pct = slips.pop()
+            head += f", {pct:g}% slippage" if pct else ""
+    return [head, *rows]
+
+
 def _next_lines(title: str, picks, boost: bool = False) -> list[str]:
     lots = None
     lines = [title]
@@ -333,6 +380,8 @@ def render_result(
     live: Sequence[str] | None = None,
     boost: dict[str, bool] | None = None,
     traded: dict[str, tuple[int, float] | None] | None = None,
+    month: Sequence[str] | None = None,
+    slippage: float | None = None,
 ) -> str:
     """The evening message. `adaptive` and `t1` are (total, [(strategy, rupees)]); either may be
     None to leave that list out (the T1 follow-up has no Adaptive), and
@@ -340,9 +389,11 @@ def render_result(
     `tomorrow.NextPicks` (T1's may be a note); with neither there is no tomorrow section. `live` is
     BL-141's live-vs-paper block (`live_compare.message_lines`), for the owner's copy only.
     BL-183: `boost` ({'adaptive', 't1'}) adds tomorrow's lots line for a list that trades the Dir
-    ×2 rule; `traded` ({'adaptive', 't1'}: (lots, rupees)) adds a day's as-traded line."""
+    ×2 rule; `traded` ({'adaptive', 't1'}: (lots, rupees)) adds a day's as-traded line. `month` is
+    the month so far (`month_lines`), after the day's figures. `slippage` (%) says the figures
+    carry that much slippage on every fill (`slippage.apply`)."""
     boost, traded = boost or {}, traded or {}
-    lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs"]
+    lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs" + _slip(slippage)]
     if adaptive is not None:
         lines += ["", *result_block("🎯", "Adaptive", *adaptive, traded.get("adaptive"))]
     if isinstance(t1, str):
@@ -351,6 +402,8 @@ def render_result(
         lines += ["", *result_block("🧪", T1_NAME, *t1, traded.get("t1"))]
     if live:
         lines += ["", *live]
+    if month:
+        lines += ["", *month]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)
     if first is not None:
         lines += ["", f"➡️ {day_text(first.day)} (Tentative)"]

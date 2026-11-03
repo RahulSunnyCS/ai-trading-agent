@@ -36,6 +36,7 @@ from datetime import date
 from pathlib import Path
 
 from ..legwise.market import N_MINUTES, minute_label
+from . import store
 
 DEFAULT_STOP_INR = 10_000.0
 MODES = ("sl", "lock", "locktrail")
@@ -291,7 +292,8 @@ def _stamp(root: Path, day: date, name: str) -> tuple:
     from .variants import underlying_of
 
     underlying = base.UNDERLYING if name == base.DIR_NAME else underlying_of(name)
-    parts: list = [CACHE_VERSION, SIZING_DATE]
+    # the slippage the replay runs at (`store.slipped`, the Rotation pages' switch)
+    parts: list = [CACHE_VERSION, SIZING_DATE, store.reading_slip()]
     for kind, symbol in (("option", underlying), ("index", underlying), ("index", "INDIAVIX")):
         parts.append(_mtime(lake.bars_1m_path(root, kind, symbol, day)))
     parts.append(_mtime(lake.symbol_master_path(root, "fyers", day)))
@@ -314,9 +316,13 @@ def _root_dir(root: str) -> str:
 
 
 def _disk_file(key: tuple) -> Path:
+    """A replayed path's file. A path replayed at a slippage (`store.slipped`, which the stamp
+    also carries) lives in its own folder, so the two never evict each other."""
     root, day, name, stamp = key
+    slip = store.reading_slip()
+    folder = f"{name}@slip{slip:g}" if slip else name
     digest = hashlib.sha1(repr(stamp).encode()).hexdigest()[:12]  # noqa: S324 - a cache key
-    return cache_dir() / _root_dir(root) / name / f"{day.isoformat()}.{digest}.json"
+    return cache_dir() / _root_dir(root) / folder / f"{day.isoformat()}.{digest}.json"
 
 
 def _disk_read(key: tuple) -> tuple[float, ...] | None:
@@ -425,8 +431,13 @@ def _replay(root: Path, day: date, name: str, loaded: dict) -> tuple[float, ...]
     try:
         if underlying not in loaded:
             loaded[underlying] = load_day(root, underlying, day)
+        spec = load_legwise(strategy_file(name))
+        if slip := store.reading_slip():  # as the slippage copy (`slip_store`) was made
+            spec = spec.model_copy(
+                update={"execution": spec.execution.model_copy(update={"slippage_pct": slip})}
+            )
         result = simulate_day(
-            load_legwise(strategy_file(name)),
+            spec,
             loaded[underlying],
             default_reference_data(),
             date.fromisoformat(SIZING_DATE),

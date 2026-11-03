@@ -100,11 +100,23 @@ def update_day(
         out["written"] += 1
     if write_days and not out["errors"]:  # a parallel track never writes the live days.csv
         store.append_day(day_attributes(root, day), root)
+    _fill_slippage(root, day, names, log)
     log(
         f"{day}: {out['written']} variants written, {out['already']} already there, "
         f"{len(out['errors'])} errors"
     )
     return out
+
+
+def _fill_slippage(root: Path, day: date, names: list[str], log: Callable[[str], None]) -> None:
+    """The day's slippage copy (`slip_store`), for display only: a failure is logged, never
+    stops the stored results (`obt rotation slippage-fill` copies what is missing later)."""
+    from . import slip_store
+
+    try:
+        slip_store.fill(root, days=[day], names=names, log=log)
+    except Exception as error:  # noqa: BLE001
+        log(f"{day}: slippage copy not written: {type(error).__name__}: {error}")
 
 
 def update_track(

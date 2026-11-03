@@ -4,6 +4,9 @@
  * same-shape baskets for the focus list. Hand-drawn SVG, like the
  * Correlation tab's heatmap, so nothing here pulls in a chart library.
  *
+ * `nameOf` names the lines (the Tuned view calls list C "Adaptive Tuned"); `baseOnly` draws the
+ * fixed base alone, with no list, band or toggles (the page's Fixed base view).
+ *
  * Follow tooltip below the cursor. A click pins a day; the slider under the chart does the same
  * from the keyboard (arrow keys), and Clear releases it.
  */
@@ -46,6 +49,8 @@ export function RotationHero({
   onToggle,
   showBase,
   onToggleBase,
+  nameOf = listName,
+  baseOnly = false,
 }: {
   points: HeroPoint[];
   focus: RotationListKey;
@@ -53,6 +58,10 @@ export function RotationHero({
   onToggle: (key: RotationListKey) => void;
   showBase: boolean;
   onToggleBase: () => void;
+  /** The legend's and tooltip's name for a list; default its list name. */
+  nameOf?: (key: RotationListKey) => string;
+  /** Only the fixed base's line: no list lines, no band, no toggles. */
+  baseOnly?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const tip = useRef<HTMLDivElement>(null);
@@ -140,7 +149,13 @@ export function RotationHero({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        {LIST_KEYS.map((k) => (
+        {baseOnly ? (
+          <span className="flex items-center gap-1.5 rounded-full border border-border-strong px-2.5 py-1 text-foreground">
+            <span className="h-0.5 w-3 bg-muted" />
+            Fixed base
+          </span>
+        ) : null}
+        {(baseOnly ? [] : LIST_KEYS).map((k) => (
           <button
             key={k}
             type="button"
@@ -152,27 +167,31 @@ export function RotationHero({
             } disabled:cursor-default`}
           >
             <span className={`h-2 w-2 rounded-full ${SWATCH[k]}`} />
-            {listName(k)}
+            {nameOf(k)}
             {k === focus && SEVERAL_LISTS_VISIBLE ? (
               <span className="text-faint">focus</span>
             ) : null}
           </button>
         ))}
-        <button
-          type="button"
-          aria-pressed={showBase}
-          onClick={onToggleBase}
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
-            showBase ? 'border-border-strong text-foreground' : 'border-border text-faint'
-          }`}
-        >
-          <span className="h-0.5 w-3 bg-muted" />
-          Fixed base
-        </button>
-        <span className="flex items-center gap-1.5 text-faint">
-          <span className="h-2 w-3 rounded-sm bg-faint/25" />
-          random baskets, P10 to P90
-        </span>
+        {baseOnly ? null : (
+          <>
+            <button
+              type="button"
+              aria-pressed={showBase}
+              onClick={onToggleBase}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
+                showBase ? 'border-border-strong text-foreground' : 'border-border text-faint'
+              }`}
+            >
+              <span className="h-0.5 w-3 bg-muted" />
+              Fixed base
+            </button>
+            <span className="flex items-center gap-1.5 text-faint">
+              <span className="h-2 w-3 rounded-sm bg-faint/25" />
+              random baskets, P10 to P90
+            </span>
+          </>
+        )}
       </div>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: pointer shortcut for the day slider below, which is the keyboard path to the same pin */}
       <div
@@ -185,7 +204,11 @@ export function RotationHero({
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label={`Cumulative gross of ${LIST_KEYS.map(listName).join(', ')}, the fixed base and the random-basket band, by day`}
+          aria-label={
+            baseOnly
+              ? 'Cumulative gross of the fixed base, by day'
+              : `Cumulative gross of ${LIST_KEYS.map(nameOf).join(', ')}, the fixed base and the random-basket band, by day`
+          }
           className="h-auto w-full"
         >
           {scale.ticks.map((t) => (
@@ -277,7 +300,7 @@ export function RotationHero({
             <div className="font-medium text-foreground">{formatDay(point.day)}</div>
             {LIST_KEYS.filter((k) => shown.has(k)).map((k) => (
               <div key={k} className="flex justify-between gap-3 font-mono text-muted">
-                <span>{listName(k)}</span>
+                <span>{nameOf(k)}</span>
                 <span>{formatInr(point.lists[k], { compact: true })}</span>
               </div>
             ))}
@@ -329,7 +352,7 @@ export function RotationHero({
           <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 font-mono text-muted">
             {LIST_KEYS.filter((k) => point.lists[k] !== undefined).map((k) => (
               <span key={k}>
-                {listName(k)} {formatInr(point.lists[k], { compact: true })}
+                {nameOf(k)} {formatInr(point.lists[k], { compact: true })}
               </span>
             ))}
             <span>Base {formatInr(point.base, { compact: true })}</span>

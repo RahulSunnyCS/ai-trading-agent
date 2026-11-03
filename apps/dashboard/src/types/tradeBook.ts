@@ -320,3 +320,66 @@ export interface TradeBookInputs {
   capital_total?: number | null;
   capital?: { finvasia?: number | null; angelone?: number | null } | null;
 }
+
+/** BL-200: GET /api/momentum/lots/rebalances, one block per lot per due week. */
+export type RebalanceStatus =
+  | 'done'
+  | 'partly done'
+  | 'waiting for notes'
+  | 'not done'
+  /** A week no lot was due, listed because the account traded in it. */
+  | 'no lot due';
+
+export interface RebalanceLine {
+  symbol: string;
+  side: 'buy' | 'sell';
+  /** Shares traded, from the contract notes. */
+  shares: number;
+  value: number | null;
+  /** forward_fills' per-stock status (done / shares differ / extra), or `outside`: a fill on
+   * the account that no lot's orders claim. A stock only suggested is never a line. */
+  status: string;
+}
+
+export interface RebalanceBlock {
+  week: string;
+  week_no: number;
+  /** Null for a week no lot was due. */
+  lot: string | null;
+  sleeve_id: string | null;
+  new_lot: boolean;
+  status: RebalanceStatus;
+  notes_final: boolean;
+  first_trade_day: string | null;
+  orders_at: string | null;
+  /** Real trades only. */
+  lines: RebalanceLine[];
+  /** How many stocks the lot's orders named that were not traded (counted, never listed). */
+  not_traded: number;
+  bought: number;
+  sold: number;
+  charges: number | null;
+  holding_after: { symbol: string; shares: number }[];
+  folded_into: { week: string; week_no: number; scheduled: boolean } | null;
+}
+
+export interface RebalanceKiteCheck {
+  synced_at: string | null;
+  cash: number | null;
+  matches: boolean;
+  differences: { symbol: string; kite: number; lots: number }[];
+}
+
+export interface RebalanceLogResponse {
+  paper_start: string | null;
+  notes_through: string | null;
+  /** The latest stored Kite snapshot against what the lots hold now; null with no snapshot. */
+  kite_check: RebalanceKiteCheck | null;
+  groups: {
+    group_id: string;
+    name: string | null;
+    lots: number;
+    blocks: RebalanceBlock[];
+    outside_lots: number;
+  }[];
+}

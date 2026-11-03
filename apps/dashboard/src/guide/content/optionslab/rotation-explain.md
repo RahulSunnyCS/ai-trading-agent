@@ -101,7 +101,8 @@ it, because the weights were chosen on them.
 - Neighbouring days share look-back windows, so the band is a little narrower than it should be.
 - A research day is scored on the stored results as they stand now. If results were repaired after
   the fact, an old entry and its research rebuild can differ; the flag says when.
-- Everything is gross. The stored costs are zero.
+- Everything is gross. The stored costs are zero, and there is no slippage even while the page's
+  Slippage switch is on: the picks are ranked without it.
 - Rank correlation says whether the ordering carried information, not that the top three made money
   on a given day.
 
