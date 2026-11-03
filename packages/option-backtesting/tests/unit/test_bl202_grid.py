@@ -150,14 +150,28 @@ def test_chains_cover_every_axis_value() -> None:
 # --- the runner's resume signature and part round trip -------------------------------------
 
 
-def _load_runner():
-    path = GRID_PY.with_name("run_grid.py")
-    spec = importlib.util.spec_from_file_location("bl202_run_grid", path)
+def _load_sibling(filename: str, name: str):
+    """Load a bl202 script that does a bare `import grid`. Another research folder's `grid`
+    (bl104's) may already sit in sys.modules under that name when the whole suite runs, so the
+    script is pointed at this folder's grid while it imports, and the old entry put back."""
+    spec = importlib.util.spec_from_file_location(name, GRID_PY.with_name(filename))
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    sys.modules["bl202_run_grid"] = module
-    spec.loader.exec_module(module)
+    sys.modules[name] = module
+    previous = sys.modules.get("grid")
+    sys.modules["grid"] = grid
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous is None:
+            sys.modules.pop("grid", None)
+        else:
+            sys.modules["grid"] = previous
     return module
+
+
+def _load_runner():
+    return _load_sibling("run_grid.py", "bl202_run_grid")
 
 
 def test_signature_is_the_days_run_not_the_to_flag(tmp_path: Path) -> None:
@@ -201,13 +215,7 @@ def test_signature_is_the_days_run_not_the_to_flag(tmp_path: Path) -> None:
 
 
 def _load_scorer():
-    path = GRID_PY.with_name("score.py")
-    spec = importlib.util.spec_from_file_location("bl202_score", path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules["bl202_score"] = module
-    spec.loader.exec_module(module)
-    return module
+    return _load_sibling("score.py", "bl202_score")
 
 
 def test_half_split_is_at_fit_to() -> None:
