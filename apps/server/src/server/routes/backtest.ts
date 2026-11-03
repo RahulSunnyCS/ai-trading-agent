@@ -73,6 +73,12 @@
  *  GET  /api/backtest/legwise/rotation/portfolio/days — every scored list-day with and without the stop.
  *                                                 Both requireAccess; the stop and trail are echoed back
  *                                                 as typed, bad values are refused here.
+ *  GET  /api/backtest/legwise/rotation/live-board — today's Adaptive picks run on Angel One's bars so
+ *                                                 far: the snapshot, the refresh state, the loop
+ *                                                 (BL-203). requireAccess
+ *  POST /api/backtest/legwise/rotation/live-board/refresh — refresh now (no body): 202 at once (the
+ *                                                 loop is asked, or ONE guarded login runs upstream);
+ *                                                 the guard's 409 / 429 pass through. requireAccess
  *  GET  /api/backtest/legwise/angel/status      — the Broker logins page's Angel One card: which
  *                                                 credentials are set (names only), the last
  *                                                 check and collection, the guard. requireAccess
@@ -994,6 +1000,30 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation live vs paper ---
+
+  // --- rotation live board --- the Rotation page's "Live board" card (BL-203,
+  // rotation/live_board.py). The GET reads a snapshot file upstream; the POST forwards no client
+  // body, so nothing from the browser reaches the Angel One login, and it answers at once (202).
+  fastify.get(
+    '/api/backtest/legwise/rotation/live-board',
+    { preHandler: requireAccess },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/rotation/live-board');
+    },
+  );
+
+  fastify.post(
+    '/api/backtest/legwise/rotation/live-board/refresh',
+    { preHandler: requireAccess, bodyLimit: 1024 },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/rotation/live-board/refresh', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: '{}',
+      });
+    },
+  );
+  // --- end rotation live board ---
 
   // --- contract notes --- the Trade book page (BL-168, realised/views.py over the contract-notes
   // store, read-only except PUT /inputs). `from` / `to` / `day` are plain days and `account` is
