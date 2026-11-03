@@ -16,7 +16,8 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | Trail | [D](strategies/widesl/trail.md) | [D](strategies/directional/trail.md) | [D](strategies/buy-breakout/trail.md) |
 | Re-entry | [D](strategies/widesl/re-entry.md) | [D](strategies/directional/re-entry.md) | [D](strategies/buy-breakout/re-entry.md) |
 | Stop-and-reverse | — | [T](strategies/directional/stop-and-reverse.md) | — |
-| Exit time | [D](strategies/widesl/exit-time.md) | [T](strategies/directional/exit-time.md) | [D](strategies/buy-breakout/exit-time.md) |
+| Exit time | [T](strategies/widesl/exit-time.md) | [T](strategies/directional/exit-time.md) | [D](strategies/buy-breakout/exit-time.md) |
+| Session split (two sets a day) | [T](strategies/widesl/session-split.md) | [T](strategies/directional/session-split.md) | — |
 | Days to expiry | [D](strategies/widesl/days-to-expiry.md) | [D](strategies/directional/days-to-expiry.md) | [D](strategies/buy-breakout/days-to-expiry.md) |
 | VIX | [T](strategies/widesl/vix.md) | [T](strategies/directional/vix.md) | [D](strategies/buy-breakout/vix.md) |
 | Weekday | [D](strategies/widesl/weekday.md) | [D](strategies/directional/weekday.md) | [D](strategies/buy-breakout/weekday.md) |
@@ -41,6 +42,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083, BL-022 |
 | [Correlation and diverse baskets](common/correlation.md) | Tested | BL-090 |
 | [Previous-session state (VRP, skew, put/call ratio)](common/previous-session-state.md) | Descriptive (screen, no lead) | BL-159 reads 1–3 |
+| [Two-session sweep (half-day sets)](common/two-session-sweep.md) | Tested (killed) | BL-185 |
 
 ## Other strategies
 
