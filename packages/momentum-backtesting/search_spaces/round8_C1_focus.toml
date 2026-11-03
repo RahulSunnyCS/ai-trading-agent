@@ -1,0 +1,51 @@
+# BL-176 Stage 2 (focused), derived by scripts/bl176_focus.py from /Users/rahul/Projects/ai-trading-agent/packages/momentum-backtesting/data/search/round8_C1
+# (Stage 1 space round8_C1). Written by rule, never by hand: see the script's
+# docstring and BL-176 Phase 0. Never edited after a run starts.
+#   uv run mbt search run search_spaces/round8_C1_focus.toml --heavy 48 --light 146 --seed 9 --workers 3
+# TOML has no null: the string "none" means None.
+name = "round8_C1_focus"
+arm = "C1"
+
+[fixed]
+series_break_policy = "verified"
+start = "2017-01-01"
+cost_model = "itemised"
+slippage_bps = 15.0
+capital = 50000
+respect_circuits = true
+min_ranked = 1
+momentum_sizing = false
+cap_band = 0.05
+max_stock_price = 5000
+sell_every_week = false
+liq_min_turnover_cr = 2.0
+liq_min_price = 30.0
+liq_floor_ratio = 0.25
+liq_circuit = true
+liq_circuit_run = 3
+voladj_skip_recent_month = true
+category_tags = "extended"
+
+[heavy]
+lookbacks = { choice = [[26, 52], [13, 26, 52], [13, 26]] }
+weight_scheme = { choice = ["equal", "recent", "long"] }
+score = { choice = ["voladj", "blend"] }
+voladj_lookbacks = { choice = [false, true] }
+voladj_skip = { choice = ["long", "none"] }
+
+[light]
+coverage_floor = { float = [0.1305, 0.4501] }
+pool_top_n = { int = [91, 384] }
+pool_band = { int = [16, 190] }
+category_top_n = { int = [3, 10] }
+category_band = { int = [1, 10] }
+picks_per_category = { int = [1, 4] }
+max_position = { choice = [0.15, 0.2, 0.25, 0.35, 0.5, "none"] }
+max_category = { choice = ["none", 0.3, 0.5] }
+rebalance_every = { choice = [1, 2, 4] }
+rebalance_offset_raw = { int = [0, 3] }
+entry = { choice = ["wait", "make_room"] }
+stock_tilt = { choice = [0.0, 1.0] }
+stock_tilt_screen_pct = { choice = [0.0, 0.3] }
+top_sector_weight = { choice = [1.0, 1.5, 2.0] }
+fill = { choice = ["next_fri_close", "mon_open", "mon_close"] }

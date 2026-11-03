@@ -1,0 +1,317 @@
+{
+  "frozen": "2026-11-02T20:22:01+05:30",
+  "item": "backlog/BL-176-momentum-search-on-f6-ranking.md",
+  "ranking": "curated",
+  "rule": "search_spaces/bl010_criteria_addendum_4.json (via bl176_criteria.json)",
+  "ensemble_code_commit": "cc077c67",
+  "finalists_code_commit": "fe9e1e9d",
+  "data_snapshot": {
+    "last_bar": "2026-10-30",
+    "last_week": "2026-10-30",
+    "factors": "4d066205752f"
+  },
+  "scored_curves_sha256": {
+    "curated__round8_A_curated": "2ee1557c00b3d1da32b377c3cfa1de72d09665018d1f1419854114b8eff56dac",
+    "curated__round8_B": "182c1d12188074e6cdc18d348441300e1975b724e35ac71c56daddb2ff3ea875",
+    "curated__round8_A_curated_focus": "c7e0aa3cbab354c2e10712fbf97622480c06577878540f677be23e8bb7686919"
+  },
+  "basket": "medium",
+  "money": "Rs 2 lakh a sleeve, Rs 10,000 price ceiling (owner override 2026-11-01)",
+  "capital": "equal per config, reset to equal at the last week before each 1 April",
+  "phase_meaning": "rebalance_offset: trade on Fridays whose week number since engine.CADENCE_EPOCH (2016-01-01) is the offset mod rebalance_every",
+  "configs": [
+    {
+      "id": "42797fbde4d5",
+      "holdings": 9,
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [1, 4, 13, 26, 52],
+        "weight_scheme": "long",
+        "score": "blend",
+        "voladj_lookbacks": false,
+        "voladj_skip": "long"
+      },
+      "light": {
+        "coverage_floor": 0.1388,
+        "pool_top_n": 336,
+        "category_top_n": 9,
+        "picks_per_category": 1,
+        "max_position": 0.25,
+        "max_category": 0.3,
+        "rebalance_every": 4,
+        "entry": "make_room",
+        "stock_tilt": 1.0,
+        "stock_tilt_screen_pct": 0.0,
+        "top_sector_weight": 1.5,
+        "fill": "next_fri_close",
+        "pool_exit_rank": 340,
+        "category_exit_rank": 19,
+        "rebalance_offset": 1
+      },
+      "rebalance_offset": 0,
+      "arm": "round8_A_curated",
+      "space": "search_spaces/round8_A_curated.toml",
+      "fixed_settings": {
+        "universe_kind": "turnover_rank",
+        "series_break_policy": "verified",
+        "start": "2017-01-01",
+        "cost_model": "itemised",
+        "slippage_bps": 15.0,
+        "capital": 200000.0,
+        "respect_circuits": true,
+        "min_ranked": 1,
+        "momentum_sizing": false,
+        "cap_band": 0.05,
+        "max_stock_price": 10000.0,
+        "sell_every_week": false,
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "category_tags": "curated"
+      }
+    },
+    {
+      "id": "d8a3f07e9e34",
+      "holdings": 12,
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [13, 26, 52],
+        "weight_scheme": "equal",
+        "score": "voladj",
+        "voladj_lookbacks": true,
+        "voladj_skip": "none"
+      },
+      "light": {
+        "coverage_floor": 0.1147,
+        "pool_top_n": 321,
+        "category_top_n": 6,
+        "picks_per_category": 2,
+        "max_position": 0.25,
+        "max_category": 0.5,
+        "rebalance_every": 4,
+        "entry": "make_room",
+        "stock_tilt": 0.25,
+        "stock_tilt_screen_pct": 0.3,
+        "top_sector_weight": 1.5,
+        "fill": "next_fri_close",
+        "pool_exit_rank": 444,
+        "category_exit_rank": 10,
+        "rebalance_offset": 0
+      },
+      "rebalance_offset": 1,
+      "arm": "round8_A_curated",
+      "space": "search_spaces/round8_A_curated.toml",
+      "fixed_settings": {
+        "universe_kind": "turnover_rank",
+        "series_break_policy": "verified",
+        "start": "2017-01-01",
+        "cost_model": "itemised",
+        "slippage_bps": 15.0,
+        "capital": 200000.0,
+        "respect_circuits": true,
+        "min_ranked": 1,
+        "momentum_sizing": false,
+        "cap_band": 0.05,
+        "max_stock_price": 10000.0,
+        "sell_every_week": false,
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "category_tags": "curated"
+      }
+    },
+    {
+      "id": "086b1949a637",
+      "holdings": 8,
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [4, 13, 26],
+        "weight_scheme": "long",
+        "score": "voladj",
+        "voladj_lookbacks": true,
+        "voladj_skip": "none"
+      },
+      "light": {
+        "coverage_floor": 0.0061,
+        "pool_top_n": 298,
+        "category_top_n": 8,
+        "picks_per_category": 1,
+        "max_position": 0.5,
+        "max_category": null,
+        "rebalance_every": 4,
+        "entry": "make_room",
+        "stock_tilt": 0.25,
+        "stock_tilt_screen_pct": 0.0,
+        "top_sector_weight": 2.0,
+        "fill": "next_fri_close",
+        "pool_exit_rank": 464,
+        "category_exit_rank": 16,
+        "rebalance_offset": 0
+      },
+      "rebalance_offset": 2,
+      "arm": "round8_A_curated",
+      "space": "search_spaces/round8_A_curated.toml",
+      "fixed_settings": {
+        "universe_kind": "turnover_rank",
+        "series_break_policy": "verified",
+        "start": "2017-01-01",
+        "cost_model": "itemised",
+        "slippage_bps": 15.0,
+        "capital": 200000.0,
+        "respect_circuits": true,
+        "min_ranked": 1,
+        "momentum_sizing": false,
+        "cap_band": 0.05,
+        "max_stock_price": 10000.0,
+        "sell_every_week": false,
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "category_tags": "curated"
+      }
+    },
+    {
+      "id": "3d537a9932da",
+      "holdings": 10,
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [13, 26],
+        "weight_scheme": "long",
+        "score": "ranksum",
+        "voladj_lookbacks": false,
+        "voladj_skip": "long"
+      },
+      "light": {
+        "coverage_floor": 0.1275,
+        "pool_top_n": 344,
+        "category_top_n": 10,
+        "picks_per_category": 1,
+        "max_position": 0.5,
+        "max_category": 0.3,
+        "rebalance_every": 4,
+        "entry": "wait",
+        "stock_tilt": 1.0,
+        "stock_tilt_screen_pct": 0.3,
+        "top_sector_weight": 2.0,
+        "fill": "next_fri_close",
+        "pool_exit_rank": 423,
+        "category_exit_rank": 13,
+        "rebalance_offset": 0
+      },
+      "rebalance_offset": 3,
+      "arm": "round8_A_curated",
+      "space": "search_spaces/round8_A_curated.toml",
+      "fixed_settings": {
+        "universe_kind": "turnover_rank",
+        "series_break_policy": "verified",
+        "start": "2017-01-01",
+        "cost_model": "itemised",
+        "slippage_bps": 15.0,
+        "capital": 200000.0,
+        "respect_circuits": true,
+        "min_ranked": 1,
+        "momentum_sizing": false,
+        "cap_band": 0.05,
+        "max_stock_price": 10000.0,
+        "sell_every_week": false,
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "category_tags": "curated"
+      }
+    }
+  ],
+  "expected_pre_tax": {
+    "ensemble_cagr": 0.3342423439025879,
+    "ensemble_max_drawdown": -0.3233068585395813,
+    "walk_forward_cagr_fy2020_fy2026": 0.3640976292595748,
+    "group_median_walk_forward": 0.3589390901877625,
+    "mom30_walk_forward": 0.1498392306814944
+  },
+  "finalist_verdict": "MIXED",
+  "finalist_record": "search_spaces/bl176_finalists_curated.json",
+  "realistic": {
+    "cagr": 0.23715039109875247,
+    "mdd": -0.27926293402250346,
+    "ulcer": 0.11360374036639324
+  },
+  "lookahead": {
+    "method": "mbt audit lookahead (search runner, database truncated at each cut)",
+    "cuts": ["2019-06-28", "2021-06-25", "2024-03-28"],
+    "per_config": {
+      "42797fbde4d5": {
+        "lines": [
+          "2019-06-28 cur_42797fbde4d5__to_2019-06-28: same",
+          "2021-06-25 cur_42797fbde4d5__to_2021-06-25: same",
+          "2024-03-28 cur_42797fbde4d5__to_2024-03-28: same"
+        ],
+        "identical": true
+      },
+      "d8a3f07e9e34": {
+        "lines": [
+          "2019-06-28 cur_d8a3f07e9e34__to_2019-06-28: same",
+          "2021-06-25 cur_d8a3f07e9e34__to_2021-06-25: same",
+          "2024-03-28 cur_d8a3f07e9e34__to_2024-03-28: same"
+        ],
+        "identical": true
+      },
+      "086b1949a637": {
+        "lines": [
+          "2019-06-28 cur_086b1949a637__to_2019-06-28: same",
+          "2021-06-25 cur_086b1949a637__to_2021-06-25: same",
+          "2024-03-28 cur_086b1949a637__to_2024-03-28: same"
+        ],
+        "identical": true
+      },
+      "3d537a9932da": {
+        "lines": [
+          "2019-06-28 cur_3d537a9932da__to_2019-06-28: same",
+          "2021-06-25 cur_3d537a9932da__to_2021-06-25: same",
+          "2024-03-28 cur_3d537a9932da__to_2024-03-28: same"
+        ],
+        "identical": true
+      }
+    },
+    "all_identical": true
+  }
+}

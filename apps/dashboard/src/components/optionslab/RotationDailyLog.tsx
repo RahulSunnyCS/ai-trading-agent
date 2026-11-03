@@ -7,6 +7,10 @@
  * foot say how often the structural things happened (a Buy qualified, the Widesl minimum applied,
  * the lists agreed, a stop fired).
  *
+ * With `track="t1"` it reads the T1 track's journal instead (Adaptive Tuned, list C, recorded days
+ * from 19 Oct): no reconstructed history and no placement record, and the live column compares the
+ * T1 book.
+ *
  * Gross basis, 1 lot a strategy; ₹ per lot-day is the unit lists are compared in (3 strategies, or 4 with the
  * Buy add-on) and they are alternative baskets, never added together. A day with no figure shows
  * its reason. The filters are for browsing: a set selected by its outcome is biased, so no
@@ -17,7 +21,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { ROTATION_PAGE_LOTS } from '../../hooks/useRotation';
-import { useRotationLog } from '../../hooks/useRotationDailyLog';
+import { type RotationLogTrack, useRotationLog } from '../../hooks/useRotationDailyLog';
 import { useRotationLive } from '../../hooks/useRotationLive';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { cn } from '../../lib/cn';
@@ -49,6 +53,8 @@ import {
 import { DEFAULT_LIST, isVisibleList, listLabel, listName } from '../../lib/rotationListNames';
 import { liveForLog } from '../../lib/rotationLiveView';
 import { hasOverlay, overlayBook, unmatched } from '../../lib/rotationPortfolioView';
+import { grossLabel, grossLabelSentence } from '../../lib/rotationSlippage';
+import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { RotationListKey, RotationLog, RotationLogSource } from '../../types/rotationDailyLog';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -79,8 +85,15 @@ const WINDOW_OPTIONS: SegmentedOption<WindowChoice>[] = (['all', '126', '63', '2
   (value) => ({ value, label: WINDOW_LABEL[value] }),
 );
 
-function EmptyJournal({ log, onBrowseHistory }: { log: RotationLog; onBrowseHistory: () => void }) {
-  const can = log.reconstructable.available > 0;
+function EmptyJournal({
+  log,
+  onBrowseHistory,
+}: {
+  log: RotationLog;
+  /** Absent for a track, which has no reconstructed history. */
+  onBrowseHistory?: (() => void) | undefined;
+}) {
+  const can = onBrowseHistory !== undefined && log.reconstructable.available > 0;
   return (
     <div className="rounded-lg border border-dashed border-border px-6 py-8">
       <p className="text-base font-semibold text-foreground">{emptyHeadline(log)}</p>
@@ -126,14 +139,21 @@ function EmptyJournal({ log, onBrowseHistory }: { log: RotationLog; onBrowseHist
 export function RotationDailyLog({
   focus: focusProp,
   portfolio,
+  track,
+  bookName,
 }: {
   focus?: RotationListKey;
   /** The page's portfolio stop; used on its own, the widget keeps (and offers) its own. */
   portfolio?: PortfolioStopSetting;
+  /** Read a parallel track's journal (`t1`: Adaptive Tuned) instead of the live one. */
+  track?: RotationLogTrack | undefined;
+  /** What the shaded list is called on this page ("Adaptive Tuned"); default its list name. */
+  bookName?: string | undefined;
 } = {}) {
   const today = useMemo(() => istToday(), []);
   const [ownPortfolio, setOwnPortfolio] = usePortfolioStop();
   const setting = portfolio ?? ownPortfolio;
+  const slippage = useRotationSlippage();
   const [source, setSource] = useState<RotationLogSource>('recorded');
   const [windowChoice, setWindowChoice] = useState<WindowChoice>(defaultWindow('recorded'));
   // The page's focus list when it passes one; otherwise this widget's own (the first shown list).
@@ -156,23 +176,31 @@ export function RotationDailyLog({
     () => windowRange(windowChoice, today, source),
     [windowChoice, today, source],
   );
-  const res = useRotationLog(source, range);
+  const res = useRotationLog(source, range, track);
   // `usePolledResource` keeps the previous response while a new URL loads: only an answer to THIS
-  // request is shown, so reconstructed rows never sit under a Recorded label or the reverse.
-  const log = res.data !== null && logMatches(res.data, source, range) ? res.data : null;
+  // request is shown, so reconstructed rows never sit under a Recorded label, nor one journal's
+  // rows under the other's name.
+  const log =
+    res.data !== null && logMatches(res.data, source, range, track ?? null) ? res.data : null;
   // The 15:40 live capture beside the log (the same request as the Live vs paper card's): the
-  // live book behind Adaptive (list C) is Core. Recorded days only; a reconstructed day never traded.
+  // live book behind Adaptive (list C) is Core, or T1 on the T1 track. Recorded days only; a
+  // reconstructed day never traded.
   const showLive = source === 'recorded' && focus === 'C';
+  const liveBook = track === 't1' ? 't1' : 'core';
   const liveRes = useRotationLive(showLive);
   const liveData = liveRes.data;
   const live = useMemo(
-    () => (showLive ? (day: string) => liveForLog(liveData, day, 'core', today) : undefined),
-    [showLive, liveData, today],
+    () => (showLive ? (day: string) => liveForLog(liveData, day, liveBook, today) : undefined),
+    [showLive, liveData, liveBook, today],
   );
+  const shadedName = bookName ?? listName(focus);
 
   // The stopped figures (BL-095). Only an answer to THIS source and setting is laid over the log;
   // until it lands the log's own figures stay, and the note below says so.
-  const book = useRotationPortfolioDays(source, range, setting, { lots: ROTATION_PAGE_LOTS });
+  const book = useRotationPortfolioDays(source, range, setting, {
+    lots: ROTATION_PAGE_LOTS,
+    ...(track ? { track } : {}),
+  });
   const bookNow =
     book.data !== null &&
     book.data.source === (source === 'reconstructed' ? 'reconstructed' : 'recorded') &&
@@ -205,21 +233,23 @@ export function RotationDailyLog({
     <div className="space-y-5">
       <Card>
         <CardHeader
-          title="Daily log"
-          description="What the list picked at 09:16, and what those picks then did. Gross, per lot-day."
+          title={track ? `Daily log · ${shadedName}` : 'Daily log'}
+          description={`What ${track ? shadedName : 'the list'} picked at 09:16, and what those picks then did. ${grossLabelSentence(slippage)}, per lot-day.${track ? ' Recorded days only: this track has no reconstructed history.' : ''}`}
           actions={<RefreshButton onClick={res.refetch} loading={res.loading} />}
         />
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted">Show</span>
-            <SegmentedControl
-              value={source}
-              options={SOURCE_OPTIONS}
-              onChange={pickSource}
-              ariaLabel="Recorded entries or reconstructed history"
-              size="sm"
-            />
-          </div>
+          {track ? null : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted">Show</span>
+              <SegmentedControl
+                value={source}
+                options={SOURCE_OPTIONS}
+                onChange={pickSource}
+                ariaLabel="Recorded entries or reconstructed history"
+                size="sm"
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted">Window</span>
             <SegmentedControl
@@ -344,6 +374,7 @@ export function RotationDailyLog({
                 list={listReplay.list}
                 source={source}
                 setting={setting}
+                track={track}
                 onClose={() => setListReplay(null)}
               />
             </div>
@@ -369,7 +400,10 @@ export function RotationDailyLog({
 
           {rows.length === 0 ? (
             log.journal_entries === 0 && source === 'recorded' ? (
-              <EmptyJournal log={log} onBrowseHistory={() => pickSource('reconstructed')} />
+              <EmptyJournal
+                log={log}
+                onBrowseHistory={track ? undefined : () => pickSource('reconstructed')}
+              />
             ) : (
               <StateMessage
                 variant="empty"
@@ -386,7 +420,7 @@ export function RotationDailyLog({
               <Card>
                 <CardHeader
                   title="Calendar"
-                  description={`Shaded by the ${listName(focus)} list's gross per lot-day. Click a day to open it.`}
+                  description={`Shaded by ${track ? shadedName : `the ${listName(focus)} list`}'s gross per lot-day. Click a day to open it.`}
                 />
                 <RotationDailyLogCalendar
                   month={shownMonth}
@@ -411,7 +445,7 @@ export function RotationDailyLog({
                       : `${filtered.length} of ${rows.length} days, newest first.`
                   }${
                     hasOverlay(rows)
-                      ? ` With a ${formatInr(amountOf(setting))} portfolio stop applied; the log's own figure is struck through where the stop fired. In-sample, gross.`
+                      ? ` With a ${formatInr(amountOf(setting))} portfolio stop applied; the log's own figure is struck through where the stop fired. In-sample, ${grossLabel(slippage)}.`
                       : ''
                   }`}
                   actions={
@@ -466,6 +500,7 @@ export function RotationDailyLog({
 
       <RotationDailyLogDrawer
         day={openDay}
+        track={track}
         onClose={() => setOpenDay(null)}
         onChanged={res.refetch}
         onReplay={(variant, day) => {

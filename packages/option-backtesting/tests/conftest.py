@@ -19,3 +19,13 @@ def _isolated_trading_data_root(tmp_path_factory, monkeypatch):
     """No test may read or write the real ~/TradingData (TRADING_DATA_ROOT). A test that
     wants a specific root still sets its own; this is only the safe default underneath."""
     monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path_factory.mktemp("trading_data_root")))
+
+
+@pytest.fixture(autouse=True)
+def _no_message_slippage(monkeypatch):
+    """The evening message's figures after slippage (`rotation.slippage`) read the results'
+    slippage copy, copying a missing pick from the day's bars. Tests run without it unless they
+    set `SLIPPAGE_PCT` themselves."""
+    from option_backtesting.rotation import slippage
+
+    monkeypatch.setattr(slippage, "SLIPPAGE_PCT", 0.0)

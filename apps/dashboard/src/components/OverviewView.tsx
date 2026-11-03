@@ -60,9 +60,11 @@ import {
   rulesLine,
   tradeBookOverview,
 } from '../lib/overviewView';
+import { SLIPPAGE_TEXT } from '../lib/rotationSlippage';
 import { buildPath } from '../lib/routes';
 import type { SchedulerJob } from '../lib/scheduler';
 import { fiscalYearOf, fyLabel, fyRange } from '../lib/tradeBookView';
+import { useRotationSlippage } from '../store/rotationSlippage';
 import type { MomentumLiveRules, MomentumWeekView } from '../types/momentum';
 import type { RotationLiveResponse } from '../types/rotationLive';
 import type { KiteStatus } from './KiteCard';
@@ -220,6 +222,8 @@ function RotationCard() {
   const live = usePolledResource<RotationLiveResponse>(ROTATION_LIVE_URL, {
     intervalMs: LIVE_POLL_MS,
   });
+  // The Rotation pages' slippage switch: the paper day follows it, the live read never takes it.
+  const slippage = useRotationSlippage();
 
   let body: ReactNode;
   if (!summary.data && !overview.data) {
@@ -243,7 +247,9 @@ function RotationCard() {
           <>
             <Row label={formatDayShort(paper.day, { weekday: true })}>
               <Inr value={paper.value} />{' '}
-              <span className="text-muted">paper, gross, one lot a strategy</span>
+              <span className="text-muted">
+                paper, gross{slippage ? ` after ${SLIPPAGE_TEXT} slippage` : ''}, one lot a strategy
+              </span>
             </Row>
             <Row label="Live">
               <Inr
@@ -254,6 +260,7 @@ function RotationCard() {
                 <span className="text-muted">
                   {' '}
                   vs <Inr value={liveResult.paper} /> on paper, per lot after costs
+                  {slippage ? ', without slippage' : ''}
                   {liveResult.accounts > 1 ? `, ${formatInt(liveResult.accounts)} accounts` : ''}
                   {liveResult.reason ? (
                     <span className="text-warning"> ({liveResult.reason})</span>

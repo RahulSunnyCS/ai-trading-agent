@@ -190,7 +190,13 @@ def _result_dirs(root: Path, universe: str) -> list[Path]:
 
 
 def _result_files(root: Path, universe: str) -> list[Path]:
-    return [p for d in _result_dirs(root, universe) if d.exists() for p in sorted(d.glob("*.csv"))]
+    """The universe's results files, or their slippage copies under `store.slipped`."""
+    return [
+        store.read_path(p)
+        for d in _result_dirs(root, universe)
+        if d.exists()
+        for p in sorted(d.glob("*.csv"))
+    ]
 
 
 def _signature(root: Path, universe: str = "core") -> tuple:
@@ -205,7 +211,7 @@ def _signature(root: Path, universe: str = "core") -> tuple:
 
 
 #: one cached cube per universe, each keyed on its files' size and mtime
-_CUBE_CACHE: dict[str, dict[str, Any]] = {}
+_CUBE_CACHE: dict[str, dict[str, Any]] = {}  # keyed '<universe>@<slippage>'
 
 
 def load_cube(root: Path | None = None, universe: str = "core") -> Cube:
@@ -217,11 +223,12 @@ def load_cube(root: Path | None = None, universe: str = "core") -> Cube:
 
     root = root or data_dir()
     key = (str(root), _signature(root, universe))
-    slot = _CUBE_CACHE.get(universe)
+    cache_key = f"{universe}@{store.reading_slip():g}"
+    slot = _CUBE_CACHE.get(cache_key)
     if slot and slot["key"] == key:
         return slot["cube"]
     cube = _read_cube(root, universe)
-    _CUBE_CACHE[universe] = {"key": key, "cube": cube}
+    _CUBE_CACHE[cache_key] = {"key": key, "cube": cube}
     return cube
 
 
@@ -265,7 +272,7 @@ def _read_cube(root: Path, universe: str = "core") -> Cube:
         return _assemble(root, rows, weekend, "core")
     # T1: the Core cube as already loaded (never parsed twice) plus the track's own files
     core = load_cube(root, "core")
-    live = store.results_dir(root)
+    live = store.read_path(store.results_dir(root) / "_.csv").parent  # Core's (copy) folder
     rows, weekend = _read_rows([p for p in _result_files(root, universe) if p.parent != live])
     days = sorted(set(core.days) | {d for by_day in rows.values() for d in by_day})
     extra = _assemble(root, rows, weekend | set(core.weekend_days), universe, days=days)

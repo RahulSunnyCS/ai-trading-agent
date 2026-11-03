@@ -23,6 +23,7 @@ from . import forward_fills as ff
 from . import forward_journal as journal
 from . import forward_score as fs
 from . import holdings_store, lots, monday_fills, runs_store, this_week
+from . import rebalance_log as rebalance_log_mod
 from .config import PACKAGE_ROOT
 from .db_read import read_catalog, stock_bars
 from .engine import CASH
@@ -249,18 +250,72 @@ def _fills_stamp() -> tuple:
     return (str(root), notes, catalog_mtime(root), this_week.paper_start())
 
 
+def cached_fills() -> dict:
+    """`compute_fills()`, reused while nothing it reads has changed (`_fills_stamp`)."""
+    stamp = _fills_stamp()
+    cached = _FILLS_CACHE.get("value")
+    if cached is not None and _FILLS_CACHE.get("stamp") == stamp:
+        return cached
+    fills = compute_fills()
+    _FILLS_CACHE.update(stamp=stamp, value=fills)
+    return fills
+
+
+def rebalance_log(start: str | None = None, end: str | None = None) -> dict:
+    """GET /api/lots/rebalances (BL-200): one block per lot per due week, from the fills
+    reconciliation, the ledger and how far the Kite notes have been read."""
+    from trading_data.db import data_root
+
+    fills = cached_fills()
+    events: dict[str, list[dict]] = {}
+    sizes: dict[str, int] = {}
+    kite = None
+    if fills["groups"]:
+        with read_catalog() as con:
+            who = holdings_store.owner()
+            snapshot = holdings_store.latest_holdings(con, who, ("kite",))
+            if snapshot:
+                rules = holdings_store.rules(con, who)
+                kite = {
+                    "synced_at": str(snapshot["synced_at"]),
+                    "cash": snapshot.get("cash"),
+                    # Options margin (LIQUIDBEES, SGBs) is never Momentum's, as in Your orders.
+                    "holdings": {
+                        r["symbol"]: float(r["quantity"])
+                        for r in snapshot["rows"]
+                        if holdings_store.treatment(r["symbol"], rules) is None
+                    },
+                }
+            members = {g["id"]: len(g.get("members", [])) for g in runs_store.list_groups(con)}
+            for group in fills["groups"]:
+                events[group["group_id"]] = lots.history(con, who, group["group_id"])
+                sizes[group["group_id"]] = members.get(group["group_id"]) or len(
+                    {r["sleeve_id"] for r in group["rebalances"]}
+                )
+    cursor_path = data_root() / "contract-notes" / "cursor.json"
+    try:
+        cursor = json.loads(cursor_path.read_text())
+    except (OSError, ValueError):
+        cursor = {}
+    newest = max((n.get("day") for n in fills.get("notes") or [] if n.get("day")), default=None)
+    return rebalance_log_mod.build(
+        fills["groups"],
+        events,
+        paper_start=fills.get("paper_start"),
+        notes_through=rebalance_log_mod.notes_through(cursor, newest),
+        lots_per_group=sizes,
+        kite=kite,
+        start=start,
+        end=end,
+    )
+
+
 def view() -> dict:
     """GET /api/journal/forward: the stored score (the Friday job's) and the fills, live."""
     score = fs.load(this_week.state_dir())
     stored_fills = score.pop("fills", None) if score else None
     try:
-        stamp = _fills_stamp()
-        cached = _FILLS_CACHE.get("value")
-        if cached is not None and _FILLS_CACHE.get("stamp") == stamp:
-            fills = cached
-        else:
-            fills = compute_fills()
-            _FILLS_CACHE.update(stamp=stamp, value=fills)
+        fills = cached_fills()
         fills_error = None
     except Exception as error:  # the score must still show; the job's copy is the fallback
         fills, fills_error = stored_fills, f"{type(error).__name__}: {error}"

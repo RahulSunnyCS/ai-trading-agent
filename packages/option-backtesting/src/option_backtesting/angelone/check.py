@@ -65,7 +65,7 @@ LOCK_WAIT_S = 180
 MANUAL_LOCK_WAIT_S = 1.0
 OPTIONAL = ("ANGELONE_PUBLIC_IP",)
 KEYS = (*auth.REQUIRED, *OPTIONAL)
-SOURCES = ("manual", "scheduled", "collector", "margin")
+SOURCES = ("manual", "scheduled", "collector", "margin", "live-board")
 #: ok, not_configured (no login sent), rejected (Angel One refused the login), network (not
 #: reached), unavailable (HTTP 5xx or a rate-limited login), error (anything else, e.g. a TOTP
 #: seed that is not base32).
@@ -254,6 +254,8 @@ def _holder(root: Path) -> str | None:
 def _busy_message(root: Path) -> str:
     if _holder(root) == "collector":
         return "Angel One data is being collected right now. Test when the collection finishes."
+    if _holder(root) == "live-board":
+        return "The live board is reading Angel One right now. Try again in a minute."
     return "An Angel One connection test is already running. Try again when it finishes."
 
 
@@ -470,6 +472,29 @@ def session(
         yield sess
     finally:
         pending.release()
+
+
+@contextlib.contextmanager
+def held(
+    source: str = "live-board",
+    *,
+    root: Path | None = None,
+    now: Clock = time.time,
+    sleep: Sleep = time.sleep,
+) -> Iterator[None]:
+    """The guard's lock without a login (BL-203): the live board keeps the session it logged in
+    with in memory and takes the lock only while it reads, so no test or collection logs in on the
+    same account mid-refresh. No login is sent, so nothing is recorded and no cool-down starts.
+    Raises CheckRefused ("running") when the lock is still held after LOCK_WAIT_S."""
+    if source not in SOURCES:
+        raise ValueError(f"source must be one of {SOURCES}")
+    root = root or data_dir()
+    fh = _acquire(root, LOCK_WAIT_S, now, sleep)
+    try:
+        _marker(root).write_text(json.dumps({"started_at": _iso(now()), "source": source}))
+        yield
+    finally:
+        _release(root, fh)
 
 
 # --- status ---------------------------------------------------------------------------------

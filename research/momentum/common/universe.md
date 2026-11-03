@@ -1,6 +1,6 @@
 # Momentum: universe, dates and weekly data
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-11-02
 
 ## What it is
 
@@ -35,6 +35,7 @@ Which names can be ranked, over which dates, and how daily prices become weekly 
 | BL-010 Phase 3 | the 50 best configs re-run on the point-in-time universe | Broad, 2017-2026, pre-tax | **Arm A's headline killed** by the committed rule ([`bl010_criteria.json`](../../../packages/momentum-backtesting/search_spaces/bl010_criteria.json)) | Median loss 22 to 25 points of CAGR; 45 of 50 lose more than 10. The typical top config still returns 31-34% pre-tax against 17.1% for the momentum index |
 | BL-010 Phase 4 | all 8,003 configs re-scored on the point-in-time universe | same | Single-winner selection killed (PBO) | Median 28.1%, best 56.0% (today's list 33.4% / 77.3%; Mom30 TRI 17.0%). PBO 0.69, 0.53 within the 40% drawdown ceiling (today's list 0.48 / 0.20). 82% of configs still beat Mom30 TRI by 5 points pre-tax |
 | BL-036 Phase 1 | default Broad run, today's list vs point in time | 2017-01-06 to 2026-10-09, pre-tax, circuit locks and tradability filter on | Point in time made the default | Today's list 41.4%, worst fall -29.3%, Sharpe 1.28; point in time 33.3%, -33.6%, Sharpe 1.09 |
+| [BL-176](../../../backlog/BL-176-momentum-search-on-f6-ranking.md) arms | point-in-time `turnover_rank` pool (A, B) vs the ~4,000-name all-liquid universe (C1, extended tags) | Broad, 2017-01 to 2026-10, F6 ranking, Stage 1 (one sampled Friday, ₹50k sleeve; 20,000 runs per arm A tag set, 10,000 B, 4,000 C1) | Descriptive: the wider universe is no better; direct rank (B) far worse | Median lower-bound FY excess / CAGR: A curated about −9.6 / 22.0%, A extended −9.2 / 20.9%, C1 −11.4 / 19.4%, B −20.4 / 8.0%. One C1 config (`d7b06967be4e`) made the extended ensemble. `search_spaces/bl176_stage1_axes.csv` |
 
 ## What we know
 

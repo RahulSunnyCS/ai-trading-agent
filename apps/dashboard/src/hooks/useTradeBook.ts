@@ -7,6 +7,7 @@
 
 import { TRADE_BOOK_API, readQuery } from '../lib/tradeBookView';
 import type {
+  RebalanceLogResponse,
   TradeBookDayDetail,
   TradeBookDaysResponse,
   TradeBookMomentumResponse,
@@ -72,6 +73,15 @@ export function useTradeBookMomentum(range: TradeBookRange, enabled = true) {
     `${TRADE_BOOK_API}/momentum${readQuery({ from: range.from, to: range.to })}`,
     { cache: true, enabled },
   );
+}
+
+/** BL-200: the Momentum rebalance log (one block per lot per due week), from the Momentum API. */
+export function useMomentumRebalanceLog(range: TradeBookRange, enabled = true) {
+  const query = readQuery({ from: range.from, to: range.to });
+  return usePolledResource<RebalanceLogResponse>(`/api/momentum/lots/rebalances${query}`, {
+    cache: true,
+    enabled,
+  });
 }
 
 export function useTradeBookDay(day: string | null) {

@@ -40,6 +40,8 @@ class DailyResult:
     track: str | None = None
     #: BL-183: the entry's days to expiry ({'NIFTY', 'SENSEX'}, weekday basis), for the lots
     dte: dict[str, str] | None = None
+    #: the % slippage on every fill the figures carry (`slippage.apply`), None when they have none
+    slippage_pct: float | None = None
 
 
 def calculate(day: date, root: Path | None = None, track: str | None = None) -> DailyResult:
@@ -222,6 +224,14 @@ def as_traded(result: DailyResult) -> tuple[int, float] | None:
     return sum(lots.values()), sum(value * lots[name] for name, value in rows)
 
 
+def _slippage(result: DailyResult, t1) -> float | None:
+    """The slippage the message's figures carry: Adaptive's, when T1's (if there) is the same;
+    None, so the message claims none, when either list could not be slipped."""
+    if isinstance(t1, DailyResult) and t1.slippage_pct != result.slippage_pct:
+        return None
+    return result.slippage_pct
+
+
 def render(
     result: DailyResult,
     t1: DailyResult | str | None = None,
@@ -229,11 +239,13 @@ def render(
     tomorrow_t1=None,
     live: list[str] | None = None,
     boost: dict[str, bool] | None = None,
+    month: list[str] | None = None,
 ) -> str:
     """The evening message (BL-125): Adaptive's result, T1's (or the note saying why it is not
-    there), BL-141's live-vs-paper lines (`live`, the owner's copy only), then tomorrow's
-    strategies in full. `tomorrow` / `tomorrow_t1` are `tomorrow.NextPicks` (or a note for T1);
-    without `tomorrow` there is no section."""
+    there), BL-141's live-vs-paper lines (`live`, the owner's copy only), the month so far
+    (`month`, `messages.month_lines`), then tomorrow's strategies in full. `tomorrow` /
+    `tomorrow_t1` are `tomorrow.NextPicks` (or a note for T1); without `tomorrow` there is no
+    section."""
     t1_part = _total_and_rows(t1) if isinstance(t1, DailyResult) else t1
     boost = boost or {}
     traded = {
@@ -249,6 +261,8 @@ def render(
         live=live,
         boost=boost,
         traded=traded,
+        month=month,
+        slippage=_slippage(result, t1),
     )
 
 
@@ -266,4 +280,5 @@ def render_t1_followup(
         heading="Tuned Adaptive result",
         boost={"t1": boost.get("t1", False)},
         traded={"t1": as_traded(t1) if boost.get("t1") else None},
+        slippage=t1.slippage_pct,
     )

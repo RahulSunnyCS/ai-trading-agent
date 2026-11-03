@@ -39,6 +39,7 @@ Mean of the 100 bases, holdout, before charges: 25% / ₹4,000 with COST ×2 ₹
 
 ## Related
 
+- [Stop-and-reverse](stop-and-reverse.md): buying the stopped leg instead of re-selling it (BL-186, killed; losing the RE COST re-sale is most of the cost).
 - [Widesl re-entry](../widesl/re-entry.md) (none live); [charges](../../common/charges.md).
 - Results: `research/bl096/results/` (git-ignored); `research/bl096/run_enriched.py` regenerates the
   diagnostic files; the 4,400-row secondary screen's script is not in the repo.

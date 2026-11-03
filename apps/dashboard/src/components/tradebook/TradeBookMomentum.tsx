@@ -2,7 +2,8 @@
 
 /**
  * The Momentum view: the Zerodha (Kite) contract notes, every transaction booked to Momentum since
- * that account trades nothing else. What was bought and sold, the charges, and every fill.
+ * that account trades nothing else. What was bought and sold, the charges, the rebalance log
+ * (BL-200: one block per lot per due week) and, collapsed below it, every fill.
  */
 
 import { ExternalLink } from 'lucide-react';
@@ -19,10 +20,12 @@ import {
   formatPct,
 } from '../../lib/format';
 import { kiteTotals } from '../../lib/tradeBookView';
+import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-import { Loaded, Stat, TradeBookWidget } from './parts';
+import { TradeBookRebalances } from './TradeBookRebalances';
+import { Loaded, Stat } from './parts';
 
 export function TradeBookMomentum({ range }: { range: TradeBookRange }) {
   const res = useTradeBookMomentum(range);
@@ -63,68 +66,70 @@ export function TradeBookMomentum({ range }: { range: TradeBookRange }) {
                 </Button>
               </div>
             </section>
-            <TradeBookWidget
-              title="Fills"
-              badge={`${formatInt(t.buys + t.sells)}`}
-              description="Every transaction on the Zerodha notes, newest first. That account trades nothing but Momentum."
-            >
-              {() =>
-                data.notes.length === 0 ? (
-                  <p className="text-xs text-faint">No Zerodha notes in this period.</p>
-                ) : (
-                  <Table maxHeight={640}>
-                    <THead>
-                      <Th dense>Day</Th>
-                      <Th dense>Time</Th>
-                      <Th dense>Symbol</Th>
-                      <Th dense>Side</Th>
-                      <Th dense align="right">
-                        Qty
-                      </Th>
-                      <Th dense align="right">
-                        Price
-                      </Th>
-                      <Th dense align="right">
-                        Value
-                      </Th>
-                    </THead>
-                    <tbody>
-                      {[...data.notes].reverse().flatMap((n) =>
-                        // Newest first within a note too: by fill time, latest first.
-                        [...n.trades]
-                          .map((tr, i) => ({ tr, i }))
-                          .sort(
-                            (a, b) => (b.tr.time ?? '').localeCompare(a.tr.time ?? '') || b.i - a.i,
-                          )
-                          .map(({ tr, i }) => (
-                            <TRow key={`${n.day}-${n.account}-${i}`} className="whitespace-nowrap">
-                              <Td dense>{formatDayShort(n.day, { weekday: true })}</Td>
-                              <Td dense numeric align="right">
-                                {tr.time?.slice(0, 5) ?? EMPTY}
-                              </Td>
-                              <Td dense>{tr.symbol}</Td>
-                              <Td dense>
-                                <Badge tone={tr.side === 'buy' ? 'info' : 'accent'}>
-                                  {tr.side}
-                                </Badge>
-                              </Td>
-                              <Td dense numeric align="right">
-                                {formatInt(tr.qty)}
-                              </Td>
-                              <Td dense numeric align="right">
-                                {formatNumber(tr.price, 2)}
-                              </Td>
-                              <Td dense numeric align="right">
-                                {formatInr(Math.abs(tr.value))}
-                              </Td>
-                            </TRow>
-                          )),
-                      )}
-                    </tbody>
-                  </Table>
-                )
+            <TradeBookRebalances range={range} />
+            <Accordion
+              title="All fills"
+              badge={
+                <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-muted">
+                  {formatInt(t.buys + t.sells)}
+                </span>
               }
-            </TradeBookWidget>
+              description="Every transaction on the Zerodha notes, newest first, to check a figure against a note"
+              defaultOpen={false}
+            >
+              {data.notes.length === 0 ? (
+                <p className="text-xs text-faint">No Zerodha notes in this period.</p>
+              ) : (
+                <Table maxHeight={640}>
+                  <THead>
+                    <Th dense>Day</Th>
+                    <Th dense>Time</Th>
+                    <Th dense>Symbol</Th>
+                    <Th dense>Side</Th>
+                    <Th dense align="right">
+                      Qty
+                    </Th>
+                    <Th dense align="right">
+                      Price
+                    </Th>
+                    <Th dense align="right">
+                      Value
+                    </Th>
+                  </THead>
+                  <tbody>
+                    {[...data.notes].reverse().flatMap((n) =>
+                      // Newest first within a note too: by fill time, latest first.
+                      [...n.trades]
+                        .map((tr, i) => ({ tr, i }))
+                        .sort(
+                          (a, b) => (b.tr.time ?? '').localeCompare(a.tr.time ?? '') || b.i - a.i,
+                        )
+                        .map(({ tr, i }) => (
+                          <TRow key={`${n.day}-${n.account}-${i}`} className="whitespace-nowrap">
+                            <Td dense>{formatDayShort(n.day, { weekday: true })}</Td>
+                            <Td dense numeric align="right">
+                              {tr.time?.slice(0, 5) ?? EMPTY}
+                            </Td>
+                            <Td dense>{tr.symbol}</Td>
+                            <Td dense>
+                              <Badge tone={tr.side === 'buy' ? 'info' : 'accent'}>{tr.side}</Badge>
+                            </Td>
+                            <Td dense numeric align="right">
+                              {formatInt(tr.qty)}
+                            </Td>
+                            <Td dense numeric align="right">
+                              {formatNumber(tr.price, 2)}
+                            </Td>
+                            <Td dense numeric align="right">
+                              {formatInr(Math.abs(tr.value))}
+                            </Td>
+                          </TRow>
+                        )),
+                    )}
+                  </tbody>
+                </Table>
+              )}
+            </Accordion>
           </div>
         );
       }}

@@ -509,9 +509,32 @@ const BASE_JOBS: Job[] = [
       'cd packages/option-backtesting && uv run obt rotation pick --with-t1  (a late entry is flagged, not forward)',
   },
   {
+    id: 'rotation-live-board',
+    description:
+      "The Rotation page's Live board (BL-203): today's Adaptive picks, Classic and Tuned, run through the backtest engine on Angel One's 1-minute bars so far, every 5 minutes until 15:31 and whenever the card's Refresh button asks (`obt rotation live-board run`). One Angel One login for the day; nothing written to the lake, nothing sent, nothing traded",
+    // After the 09:16 pick (the board reads its journal entries). One process all session, so the
+    // day takes one Angel One login: the session stays in memory and the login guard's lock is held
+    // only while a refresh reads (angelone/check.py `held`), so the 15:45 collection, a connection
+    // test or `obt angel funds` are never refused for long. A refresh Angel One throttles keeps the
+    // last snapshot and is tried again at the next slot. Exit 3 = a refused login: never retried.
+    // Not in the catalog group: it writes only TRADING_DATA_ROOT/rotation/live-board/*.json.
+    schedule: { at: '09:18', on: tradingDays, label: 'trading days 09:18' },
+    // caffeinate -i: macOS does not idle-sleep while the board runs (as the trade monitor)
+    steps: [['/usr/bin/caffeinate', '-i', 'uv', 'run', 'obt', 'rotation', 'live-board', 'run']],
+    cwd: OPTIONS,
+    timeoutMinutes: 380, // 09:18 to 15:38
+    retries: 2,
+    noRetryExitCodes: [3],
+    retryDelayMinutes: 2,
+    catchUpHours: 6,
+    restartIfInterruptedUntil: '15:25',
+    fixHint:
+      "cd packages/option-backtesting && uv run obt rotation live-board refresh  (one refresh now, the same as the card's Refresh button)",
+  },
+  {
     id: 'algotest-evening',
     description:
-      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
+      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones, then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the morning only has to activate. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
     // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
     // results are incomplete (a late Fyers login), so the retries carry it to 20:40. It deletes the
     // strategies it uploaded that tomorrow drops (--allow-delete, owner 2026-10-20): AlgoTest's own
@@ -539,6 +562,8 @@ const BASE_JOBS: Job[] = [
         '--apply',
         '--allow-delete',
       ],
+      // BL-197: Setup Execution for the T1 picks just uploaded (re-saving a set-up sheet is safe)
+      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--setup', '--apply'],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 15,
@@ -547,7 +572,7 @@ const BASE_JOBS: Job[] = [
     retryDelayMinutes: 60,
     catchUpHours: 4,
     fixHint:
-      'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right)',
+      'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
   },
   {
     id: 'algotest-topup',
