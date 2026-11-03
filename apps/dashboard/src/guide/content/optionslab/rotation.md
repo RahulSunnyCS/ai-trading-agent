@@ -48,6 +48,9 @@ The screen is one page, in the order you read it:
   Fyers token state, the days collected, the Day field, *Collect data first*, *Send summary to
   Telegram* and the log. The scheduler runs it at 15:45 on trading days; this is for running it by
   hand.
+- **Live board** — today's picks for both Adaptive books run through the backtest on Angel One's
+  prices so far, refreshed every 5 minutes and on Refresh, a lot each or at your lots. See
+  [Rotation: live board](guide:optionslab/rotation-live-board).
 - **The books** — the data health line, the Books table (Adaptive Classic, Adaptive Tuned and the
   Fixed base, one row each) with the registered verdict under it, the cumulative chart, and the
   latest baskets of both Adaptive books. Before the first scored day it shows a short note instead

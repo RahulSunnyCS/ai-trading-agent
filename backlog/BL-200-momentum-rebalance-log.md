@@ -65,3 +65,6 @@ Answered 2026-11-02 (owner, in chat):
 - 2026-11-03 — a block lists only what the contract notes show was traded, never what the strategy
   suggested (owner: "only whatever we have purchased in that particular week"). Suggested stocks
   nobody traded are counted under the table for the status, not listed.
+- 2026-11-03 — the Kite check counts the shares bought for no lot (owner: a share bought outside any
+  lot read as a difference), and the card has **Refresh from Kite** (owner): reads the Kite
+  holdings and free cash now through `POST /api/kite/sync`, read-only.
