@@ -28,13 +28,16 @@ export const ROTATION_PAGE_LOTS = 1;
 export interface RotationReadOptions {
   lots?: number;
   track?: 't1';
+  /** Read the forward sessions from this day ('YYYY-MM-DD') instead of the journal's first. */
+  from?: string;
 }
 
-/** "?lots=1&track=t1", or "" for the defaults. */
+/** "?lots=1&track=t1&from=2026-10-19", or "" for the defaults. */
 export function readQuery(opts: RotationReadOptions = {}): string {
   const q = new URLSearchParams();
   if (opts.lots !== undefined) q.set('lots', String(opts.lots));
   if (opts.track) q.set('track', opts.track);
+  if (opts.from) q.set('from', opts.from);
   const text = q.toString();
   return text ? `?${text}` : '';
 }

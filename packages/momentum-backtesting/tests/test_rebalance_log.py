@@ -76,9 +76,10 @@ def test_status_done_partly_and_the_lines_net_per_stock():
     assert blocks["2026-10-16"]["status"] == rl.DONE
     week2 = blocks["2026-10-23"]
     assert week2["status"] == rl.PARTLY
-    assert [line["symbol"] for line in week2["lines"]] == ["BRAVO", "CHARLIE"]  # held: no trade
+    # only what was traded: the suggested CHARLIE is counted, never listed; held is no trade
+    assert [line["symbol"] for line in week2["lines"]] == ["BRAVO"]
     assert week2["lines"][0]["value"] == 42 * 310
-    assert week2["lines"][1]["shares"] is None and week2["lines"][1]["planned_shares"] == 21
+    assert week2["not_traded"] == 1
     assert week2["bought"] == 42 * 310
 
 
@@ -88,6 +89,7 @@ def test_nothing_traded_waits_for_the_monday_notes_then_is_not_done_and_folded()
     assert waiting["status"] == rl.WAITING and waiting["folded_into"] is None
     missed = _build([rebalance], through="2026-11-02")["2026-10-30"]
     assert missed["status"] == rl.NOT_DONE
+    assert missed["lines"] == [] and missed["not_traded"] == 1
     # no later due week stored yet: the lot's next turn, four Fridays on
     assert missed["folded_into"] == {"week": "2026-11-27", "week_no": 7, "scheduled": True}
 
@@ -197,7 +199,7 @@ def test_kite_check_compares_the_snapshot_with_what_the_lots_hold_now():
         start="2026-10-20",  # the date filter does not hide what a lot holds now
     )
     check = out["kite_check"]
-    assert check["differences"] == [{"symbol": "DELTA", "kite": 1, "lots": 0.0}]
+    assert check["differences"] == [{"symbol": "DELTA", "kite": 1, "lots": 0.0, "outside": 0.0}]
     assert check["matches"] is False and check["cash"] == 40000.0
     assert rl.kite_check(None, {}) is None
 
@@ -329,3 +331,89 @@ def test_every_fill_of_the_week_shows_even_when_no_lot_claims_it():
     ]
     alone = blocks["2026-11-06"]
     assert alone["lot"] is None and alone["status"] == rl.NO_LOT and alone["week_no"] == 4
+
+
+def test_shares_bought_outside_any_lot_count_in_the_kite_check():
+    rebalances = [
+        _rebalance("2026-10-23", "Lot 2", "b", [_row("ECHO", "done", shares=1, avg=7000)]),
+    ]
+    outside = [
+        # the same stock bought once more that week, for no lot
+        {
+            "day": "2026-10-23",
+            "time": "14:33:42",
+            "symbol": "ECHO",
+            "side": "buy",
+            "qty": 1,
+            "price": 7100,
+        },
+        {
+            "day": "2026-10-27",
+            "time": "10:00:00",
+            "symbol": "FOX",
+            "side": "buy",
+            "qty": 5,
+            "price": 10,
+        },
+        {
+            "day": "2026-10-28",
+            "time": "10:00:00",
+            "symbol": "FOX",
+            "side": "sell",
+            "qty": 5,
+            "price": 11,
+        },
+    ]
+    groups = [{"group_id": "g", "name": "F", "rebalances": rebalances, "outside_lots": outside}]
+
+    def check(holdings):
+        return rl.build(
+            groups,
+            {"g": []},
+            paper_start=START,
+            notes_through="2026-11-10",
+            lots_per_group={"g": 4},
+            kite={"synced_at": "x", "cash": 1.0, "holdings": holdings},
+        )["kite_check"]
+
+    both = check({"ECHO": 2})
+    assert both["matches"] is True
+    assert both["not_in_lots"] == [{"symbol": "ECHO", "shares": 1.0}]  # FOX was sold again
+    short = check({"ECHO": 3})
+    assert short["differences"] == [{"symbol": "ECHO", "kite": 3, "lots": 1, "outside": 1.0}]
+
+    # once the owner books that share to a lot, it is the lot's, not counted twice
+    assign = {
+        "sleeve_id": "b",
+        "symbol": "ECHO",
+        "delta": 1,
+        "at": "2026-11-03T09:00",
+        "kind": "assigned",
+    }
+    booked = rl.build(
+        groups,
+        {"g": [assign]},
+        paper_start=START,
+        notes_through="2026-11-10",
+        lots_per_group={"g": 4},
+        kite={"synced_at": "x", "cash": 1.0, "holdings": {"ECHO": 2}},
+    )["kite_check"]
+    assert booked["matches"] is True and booked["not_in_lots"] == []
+
+
+def test_the_kite_sync_route_reads_kite_whatever_the_holdings_source(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from momentum_backtesting import api, holdings_sync, kite
+
+    seen = []
+    monkeypatch.setattr(holdings_sync, "sync", lambda source: seen.append(source) or {"rows": []})
+    client = TestClient(api.create_app())
+    assert client.post("/api/kite/sync").json() == {"rows": []}
+    assert seen == ["kite"]
+
+    def refused(source):
+        raise kite.KiteCredentialsError("expired")
+
+    monkeypatch.setattr(holdings_sync, "sync", refused)
+    assert client.post("/api/kite/sync").status_code == 409

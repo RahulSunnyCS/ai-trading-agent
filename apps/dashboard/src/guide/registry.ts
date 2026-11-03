@@ -43,6 +43,7 @@ import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?
 import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md?raw';
 import optionsRotationDrift from './content/optionslab/rotation-drift.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
+import optionsRotationLiveBoard from './content/optionslab/rotation-live-board.md?raw';
 import optionsRotationLive from './content/optionslab/rotation-live.md?raw';
 import optionsRotationLotPlans from './content/optionslab/rotation-lot-plans.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
@@ -368,6 +369,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
       'As picked, Dir Boost and Duo: the same morning picks traded three ways, followed forward for Core and T1.',
     kind: 'Screen',
     body: optionsRotationLotPlans,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-live-board',
+    title: 'Rotation: live board',
+    summary:
+      "Today's picks run through the backtest on Angel One's prices so far, refreshed every 5 minutes and on demand.",
+    kind: 'Screen',
+    body: optionsRotationLiveBoard,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {

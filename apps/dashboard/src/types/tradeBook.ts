@@ -333,13 +333,11 @@ export type RebalanceStatus =
 export interface RebalanceLine {
   symbol: string;
   side: 'buy' | 'sell';
-  /** Shares traded; null when the stock was asked for and not traded. */
-  shares: number | null;
-  /** Traded value, or the planned value for a stock not traded yet. */
+  /** Shares traded, from the contract notes. */
+  shares: number;
   value: number | null;
-  planned_shares: number | null;
-  /** forward_fills' per-stock status (done / shares differ / extra / missed), or `outside`: a
-   * fill on the account that no lot's orders claim. */
+  /** forward_fills' per-stock status (done / shares differ / extra), or `outside`: a fill on
+   * the account that no lot's orders claim. A stock only suggested is never a line. */
   status: string;
 }
 
@@ -354,7 +352,10 @@ export interface RebalanceBlock {
   notes_final: boolean;
   first_trade_day: string | null;
   orders_at: string | null;
+  /** Real trades only. */
   lines: RebalanceLine[];
+  /** How many stocks the lot's orders named that were not traded (counted, never listed). */
+  not_traded: number;
   bought: number;
   sold: number;
   charges: number | null;
@@ -365,8 +366,11 @@ export interface RebalanceBlock {
 export interface RebalanceKiteCheck {
   synced_at: string | null;
   cash: number | null;
+  /** Kite against the lots plus the shares held outside any lot. */
   matches: boolean;
-  differences: { symbol: string; kite: number; lots: number }[];
+  differences: { symbol: string; kite: number; lots: number; outside: number }[];
+  /** Shares the notes show bought (net of sales) for no lot since the paper start. */
+  not_in_lots: { symbol: string; shares: number }[];
 }
 
 export interface RebalanceLogResponse {

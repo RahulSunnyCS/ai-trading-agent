@@ -2,11 +2,14 @@
 
 /**
  * The Momentum rebalance log (BL-200): one block per lot per due week, newest first. What the
- * lot was told to trade, what the Zerodha notes show it did (netted per stock), and what the
- * lot holds after. A missed week says where it was folded in. Every figure is the server's.
+ * Zerodha notes show was bought and sold that week (netted per stock; never what the strategy
+ * only suggested), and what the lot holds after. A missed week says where it was folded in. Every figure is the server's.
  */
 
+import { useState } from 'react';
+
 import { type TradeBookRange, useMomentumRebalanceLog } from '../../hooks/useTradeBook';
+import { apiPost } from '../../lib/api';
 import { EMPTY, formatDayShort, formatInr, formatInt } from '../../lib/format';
 import {
   REBALANCE_TONE,
@@ -14,22 +17,45 @@ import {
   holdingLine,
   kiteCheckLine,
   lineNote,
+  notTradedLine,
   rebalanceStatusLabel,
   rebalanceTitle,
 } from '../../lib/momentumRebalanceLog';
 import type { RebalanceBlock, RebalanceLogResponse } from '../../types/tradeBook';
 import { Badge } from '../ui/Badge';
+import { RefreshButton } from '../ui/RefreshButton';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { toast } from '../ui/Toast';
 import { Loaded, TradeBookWidget } from './parts';
 
 export function TradeBookRebalances({ range }: { range: TradeBookRange }) {
   const res = useMomentumRebalanceLog(range);
   const blocks = res.data?.groups.flatMap((g) => g.blocks) ?? [];
   const through = res.data?.notes_through;
+  const [syncing, setSyncing] = useState(false);
+
+  /** Read Kite's holdings and free cash now (read-only), then the log again. */
+  async function refreshFromKite(): Promise<void> {
+    setSyncing(true);
+    const response = await apiPost('/api/momentum/kite/sync', {});
+    setSyncing(false);
+    if (!response.ok) toast(`Could not read Kite: ${response.error}`, 'error');
+    else toast('Holdings read from Kite');
+    res.refetch();
+  }
+
   return (
     <TradeBookWidget
       title="Rebalances"
       badge={res.data ? formatInt(blocks.length) : undefined}
+      actions={
+        <RefreshButton
+          label="Refresh from Kite"
+          loading={syncing}
+          onClick={() => void refreshFromKite()}
+          title="Read the Kite holdings and free cash now (read-only) and check them against the notes"
+        />
+      }
       description={`One block per lot on its Friday, newest first: the trades netted per stock and what the lot holds after. Zerodha notes read through ${
         through ? formatDayShort(through, { weekday: true }) : EMPTY
       }.`}
@@ -72,6 +98,7 @@ function KiteCheck({ check }: { check: RebalanceLogResponse['kite_check'] }) {
 
 function RebalanceCard({ block }: { block: RebalanceBlock }) {
   const folded = foldedLine(block);
+  const notTraded = notTradedLine(block);
   return (
     <article
       aria-label={rebalanceTitle(block)}
@@ -112,7 +139,7 @@ function RebalanceCard({ block }: { block: RebalanceBlock }) {
               >
                 <Td dense>{line.symbol}</Td>
                 <Td dense numeric align="right">
-                  {line.shares === null ? EMPTY : formatInt(line.shares)}
+                  {formatInt(line.shares)}
                 </Td>
                 <Td dense numeric align="right">
                   {line.value === null ? EMPTY : formatInr(line.value)}
@@ -128,6 +155,7 @@ function RebalanceCard({ block }: { block: RebalanceBlock }) {
           </tbody>
         </Table>
       ) : null}
+      {notTraded ? <p className="mt-2 text-xs text-faint">{notTraded}</p> : null}
       {folded ? <p className="mt-2 text-xs text-warning">{folded}</p> : null}
       <p className="mt-2 text-xs text-muted">
         <span className="text-faint">Holding after: </span>
