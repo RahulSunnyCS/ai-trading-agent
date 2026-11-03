@@ -6,6 +6,7 @@ import {
   holdingLine,
   kiteCheckLine,
   lineNote,
+  notTradedLine,
   rebalanceStatusLabel,
   rebalanceTitle,
 } from '../momentumRebalanceLog';
@@ -21,6 +22,7 @@ const BLOCK: RebalanceBlock = {
   first_trade_day: null,
   orders_at: null,
   lines: [],
+  not_traded: 6,
   bought: 0,
   sold: 0,
   charges: null,
@@ -46,12 +48,23 @@ describe('momentumRebalanceLog', () => {
   });
 
   it('notes a line that is not a plain trade', () => {
-    const line = { symbol: 'X', side: 'buy' as const, shares: null, value: 1, planned_shares: 21 };
-    expect(lineNote({ ...line, status: 'missed' })).toBe('not traded (21 planned)');
-    expect(lineNote({ ...line, shares: 20, status: 'shares differ' })).toBe('21 planned');
-    expect(lineNote({ ...line, shares: 1, status: 'extra' })).toBe('not in the orders');
-    expect(lineNote({ ...line, shares: 21, status: 'done' })).toBeNull();
-    expect(lineNote({ ...line, shares: 50, status: 'outside' })).toBe('not in any lot');
+    const line = { symbol: 'X', side: 'buy' as const, shares: 20, value: 1 };
+    expect(lineNote({ ...line, status: 'shares differ' })).toBeNull();
+    expect(lineNote({ ...line, status: 'extra' })).toBe('not in the orders');
+    expect(lineNote({ ...line, status: 'done' })).toBeNull();
+    expect(lineNote({ ...line, status: 'outside' })).toBe('not in any lot');
+  });
+
+  it('counts the stocks the orders named and nobody traded, never lists them', () => {
+    expect(notTradedLine(BLOCK)).toBe(
+      'Nothing bought or sold this week. 6 stocks in the orders not traded.',
+    );
+    const one = { symbol: 'X', side: 'buy' as const, shares: 5, value: 1, status: 'done' };
+    expect(notTradedLine({ ...BLOCK, lines: [one], not_traded: 1 })).toBe(
+      '1 stock in the orders not traded.',
+    );
+    expect(notTradedLine({ ...BLOCK, lines: [one], not_traded: 0 })).toBeNull();
+    expect(notTradedLine({ ...BLOCK, lot: null, not_traded: 0 })).toBeNull();
   });
 
   it('lists the holding after, or says nothing is held', () => {

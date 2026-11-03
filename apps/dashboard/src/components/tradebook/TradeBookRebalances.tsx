@@ -2,8 +2,8 @@
 
 /**
  * The Momentum rebalance log (BL-200): one block per lot per due week, newest first. What the
- * lot was told to trade, what the Zerodha notes show it did (netted per stock), and what the
- * lot holds after. A missed week says where it was folded in. Every figure is the server's.
+ * Zerodha notes show was bought and sold that week (netted per stock; never what the strategy
+ * only suggested), and what the lot holds after. A missed week says where it was folded in. Every figure is the server's.
  */
 
 import { type TradeBookRange, useMomentumRebalanceLog } from '../../hooks/useTradeBook';
@@ -14,6 +14,7 @@ import {
   holdingLine,
   kiteCheckLine,
   lineNote,
+  notTradedLine,
   rebalanceStatusLabel,
   rebalanceTitle,
 } from '../../lib/momentumRebalanceLog';
@@ -72,6 +73,7 @@ function KiteCheck({ check }: { check: RebalanceLogResponse['kite_check'] }) {
 
 function RebalanceCard({ block }: { block: RebalanceBlock }) {
   const folded = foldedLine(block);
+  const notTraded = notTradedLine(block);
   return (
     <article
       aria-label={rebalanceTitle(block)}
@@ -112,7 +114,7 @@ function RebalanceCard({ block }: { block: RebalanceBlock }) {
               >
                 <Td dense>{line.symbol}</Td>
                 <Td dense numeric align="right">
-                  {line.shares === null ? EMPTY : formatInt(line.shares)}
+                  {formatInt(line.shares)}
                 </Td>
                 <Td dense numeric align="right">
                   {line.value === null ? EMPTY : formatInr(line.value)}
@@ -128,6 +130,7 @@ function RebalanceCard({ block }: { block: RebalanceBlock }) {
           </tbody>
         </Table>
       ) : null}
+      {notTraded ? <p className="mt-2 text-xs text-faint">{notTraded}</p> : null}
       {folded ? <p className="mt-2 text-xs text-warning">{folded}</p> : null}
       <p className="mt-2 text-xs text-muted">
         <span className="text-faint">Holding after: </span>
