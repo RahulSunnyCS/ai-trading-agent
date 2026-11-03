@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-11-03 |
 | **Depends on** | BL-104 (the Buy grid and its archive), BL-164 (peak trail, `stop_on: close`), the `slip_store` copies (owner, 2026-10-30); CPU free of BL-176 |
-| **TODO.md row** | 3.10.57 |
+| **TODO.md row** | 3.10.59 |
 
 ## Context
 
