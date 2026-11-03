@@ -1,5 +1,6 @@
 """The evening message reports complete net paper results for the three public strategies."""
 
+import json
 from datetime import date
 
 import pytest
@@ -78,3 +79,26 @@ def test_sent_marker_is_specific_to_the_day_and_entry(tmp_path):
     assert result.was_sent(completed, tmp_path)
     changed = result.DailyResult(DAY, "Tue", completed.gains, "different")
     assert not result.was_sent(changed, tmp_path)
+
+
+# -- capital and month to date (owner, 2026-10-29) ------------------------------------------------
+
+
+def test_capital_comes_from_the_accounts_that_upload_each_list():
+    from option_backtesting.rotation import automation_settings as auto
+
+    settings = json.loads(json.dumps(auto.DEFAULT))
+    for row in settings["rows"].values():
+        row.update(list="none", upload=False)
+    settings["rows"]["quantiply.angelone"].update(list="core", upload=True)
+    settings["rows"]["quantiply.finvasia"].update(list="t1", upload=True)
+    settings["rows"]["algotest.finvasia"].update(list="t1", upload=True)  # same money, once
+    assert auto.capital(settings) == {"finvasia": 850_000, "angelone": 850_000}  # none saved yet
+    settings["capital"] = {"finvasia": 900_000, "angelone": "lots"}  # a bad figure: the default
+    assert auto.capital(settings) == {"finvasia": 900_000, "angelone": 850_000}
+    assert auto.book_capital(settings, "t1") == 900_000
+    assert auto.book_capital(settings, "core") == 850_000
+    settings["rows"]["quantiply.angelone"]["upload"] = False  # nobody uploads Core: the default
+    assert auto.book_capital(settings, "core") == 850_000
+    settings["rows"]["algotest.angelone"].update(list="t1", upload=True)
+    assert auto.book_capital(settings, "t1") == 1_750_000

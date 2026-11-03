@@ -324,8 +324,22 @@ def _won(m) -> str:
     return f"won {m.won} of {days} ({round(100 * m.won / m.days)}%)"
 
 
-def _month_rows(head: str, m) -> list[str]:
-    rows = [f"{head}   {rupees(m.net)} · {_won(m)}"]
+def lakhs(value: float) -> str:
+    """`₹8.5 L`, `₹10 L`."""
+    return f"₹{value / 100_000:.2f}".rstrip("0").rstrip(".") + " L"
+
+
+def _of_capital(value: float, capital: float | None) -> str:
+    """` (+2.7% of ₹8.5 L)`: `value` as a share of `capital`, one decimal; '' with no capital."""
+    if not capital:
+        return ""
+    share = round(100 * value / capital, 1)
+    sign = "+" if share > 0 else MINUS if share < 0 else ""
+    return f" ({sign}{abs(share):.1f}% of {lakhs(capital)})"
+
+
+def _month_rows(head: str, m, capital: float | None = None) -> list[str]:
+    rows = [f"{head}   {rupees(m.net)}{_of_capital(m.net, capital)} · {_won(m)}"]
     if m.as_traded is not None:
         rows.append(f"   As traded (Dir ×2): {rupees(m.as_traded)}")
     return rows
@@ -335,18 +349,24 @@ def _slip(pct: float | None) -> str:
     return f" and {pct:g}% slippage" if pct else ""
 
 
-def month_lines(day: date | str, adaptive=None, t1=None, real=None) -> list[str]:
+def month_lines(
+    day: date | str, adaptive=None, t1=None, real=None, capital: dict | None = None
+) -> list[str]:
     """The month so far (`month.Month`s; any may be None and is then left out): each list's paper
     net and days won, a Dir ×2 list's as-traded net, and the account's real profit (`real`, the
-    owner's copy only). No lines when there is nothing to show."""
+    owner's copy only). `capital` ({'adaptive', 't1', 'total'}, rupees; owner 2026-10-29) adds
+    each net as a share of its capital: a list's, or every account's for the real one. No lines
+    when there is nothing to show."""
+    capital = capital or {}
     rows: list[str] = []
     if adaptive is not None:
-        rows += _month_rows("🎯 Adaptive", adaptive)
+        rows += _month_rows("🎯 Adaptive", adaptive, capital.get("adaptive"))
     if t1 is not None:
-        rows += _month_rows("🧪 Tuned Adaptive", t1)
+        rows += _month_rows("🧪 Tuned Adaptive", t1, capital.get("t1"))
     if real is not None:
         through = f" to {day_text(real.through)}" if real.through else ""
-        rows.append(f"💰 Your account{through}   {rupees(real.net)} · {_won(real)}")
+        share = _of_capital(real.net, capital.get("total"))
+        rows.append(f"💰 Your account{through}   {rupees(real.net)}{share} · {_won(real)}")
     if not rows:
         return []
     d = date.fromisoformat(day) if isinstance(day, str) else day
