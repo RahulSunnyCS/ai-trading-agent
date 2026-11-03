@@ -20,6 +20,7 @@ One set a day, 09:17–15:28 (the rotation files) or 09:24–15:28 (the owner's 
 |---|---|---|---|---|
 | [BL-184][bl184] | Adaptive (list C) picking one morning Dir (09:17–12:47 → 13:00) and one afternoon Dir (13:02–15:02 → 15:28) from Core's four Dir families (ATM and ITM1, both indices), against its one whole-day Dir from the same families | 434 pick days 2025-01-10 → 2026-10-27, after charges, per margin lot-day, 90 % block bootstrap, seen data | **Killed on the rule.** Net +₹31 [−214, +251], gross +137 [−106, +356]; drawdown −31,740 vs −26,486 (deeper); the gain in T1's selection year only (+255) and negative after (−133). The morning Dir alone +81 (DD −42,574); the afternoon Dir alone +276 (DD −16,944) against the whole day's +326 (DD −26,486) | BL-184 Result |
 | BL-184, fixed files (descriptive) | `N_dir_0917` and `S_dir_0917` split at 13:00 plus their 13:02 file, against the 09:17 whole day | 501 days, after charges | NIFTY +₹203 [+58, +348] net a day (whole +141 → split +343), drawdown −44,390 → −46,750; SENSEX +98 [−56, +265], drawdown −18,590 → −55,766. A lead on NIFTY, not the registered comparison | BL-184 Result |
+| [BL-185][bl185] | The same sweep and replay with Dir cohorts included (tight stops, ITM3–OTM3 and premiums) | 250 test days, after charges, per margin lot-day | Killed with the Widesl result: the combined split reads +₹16 [−201, +224] over its whole-day control and −₹260 [−446, −85] against T1 as traded; the Dir winners on other days transferred worst on the whole-day side (NIFTY Dir band A +220 → −65) | [Two-session sweep](../../common/two-session-sweep.md) |
 
 ## What we know
 
@@ -62,3 +63,4 @@ One set a day, 09:17–15:28 (the rotation files) or 09:24–15:28 (the owner's 
   (outputs git-ignored; regenerate with it).
 
 [bl184]: ../../../../backlog/BL-184-directional-split-session.md
+[bl185]: ../../../../backlog/BL-185-two-session-sweep.md
