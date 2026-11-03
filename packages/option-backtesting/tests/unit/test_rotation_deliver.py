@@ -681,3 +681,33 @@ def test_the_morning_says_whether_each_list_changed_since_the_evening(tmp_path):
     assert group == private
     assert "✅ No change from yesterday's list" in private.split("━")[0]
     assert "🔄 Changed from yesterday's list: ➕ 13:17  N_widesl_p150" in private
+
+
+def test_the_margin_block_goes_to_the_owner_only_and_never_holds_the_message(evening, monkeypatch):
+    from option_backtesting.rotation import margin_lines
+
+    _t1_ready(evening)
+    monkeypatch.setattr(
+        margin_lines,
+        "owner_lines",
+        lambda today, picks, root=None, echo=print: ["🏦 Margin for Wed"],
+    )
+    sent = Sent()
+    assert _send(evening, sent) == 0
+    private, group = sent.to(None)[0], sent.to("-456")[0]
+    assert private.rstrip().endswith("🏦 Margin for Wed")
+    assert "🏦" not in group
+
+
+def test_a_failing_margin_block_is_left_out(evening, monkeypatch):
+    from option_backtesting.rotation import automation_settings
+
+    _t1_ready(evening)
+
+    def broken(*a, **k):
+        raise OSError("settings unreadable")
+
+    monkeypatch.setattr(automation_settings, "read", broken)
+    sent = Sent()
+    assert _send(evening, sent) == 0
+    assert "🏦" not in sent.to(None)[0]

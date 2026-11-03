@@ -238,3 +238,17 @@ the reading predates today's close.
   Phase 3 uses. Angel One's cash half is ₹0.7–1.1 L against ₹3–4.3 L the rule asks, which is
   the interest the e-mails charge; Finvasia's main account's cash (funds, Liquid BeES, SGBs) is
   about ₹4.6–5.2 L, so the strict rule caps it at about ₹9.3–10.4 L of its ₹12 L.
+- 2026-11-04 — Phase 2 reviewed (four findings: two fixed, the day types checked against the T1
+  journal's recorded labels, 11 of 11 agree, the cache stamp left at its 20 s bound). Phase 3
+  built: `rotation/margin_lines.py` appends the block to the owner's 16:00 copy only (never the
+  group's; any failure leaves it out). Lots per account come from the evening's expected picks as
+  each platform's export trades them; free is Angel One's 15:50 reading or the newest statement
+  plus today's capture P&L; Shoonya is capped at twice its cash, Angel One's cash gap is costed at
+  the interest e-mails' rate. Settings › Automation gets `margin` (buffer 0–50%, days 1–30;
+  defaults 10 and 6); a save from a dashboard without the field (the hosted one, built from
+  `release`) keeps the current values. On 3 Nov's data the block for Wed 4 Nov read: both
+  accounts 3 T1 lots, needs ≈ ₹6.3 L (₹1.91 L a lot, +10%); Shoonya ₹12.8 L free, ₹10.4 L usable
+  under 50:50, fits with ₹4.1 L spare; Angel One ₹9.2 L free, fits with ₹2.9 L spare, its cash
+  ₹2 L short of half the need (about ₹58 a day of interest). Not built: the first fortnight's
+  comparison with Shoonya's morning AlgoTest figure (the 09:05 monitor does not store what it
+  reads); Phase 4 adds that.

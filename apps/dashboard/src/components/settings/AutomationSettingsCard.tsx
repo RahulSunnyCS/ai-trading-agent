@@ -12,6 +12,10 @@ import {
   CAPITAL_MIN,
   LIST_LABEL,
   type List,
+  MARGIN_BUFFER_MAX,
+  MARGIN_BUFFER_MIN,
+  MARGIN_DAYS_MAX,
+  MARGIN_DAYS_MIN,
   MASTER_LABEL,
   MTM_SL_MAX,
   MTM_SL_MIN,
@@ -25,6 +29,7 @@ import {
   heldByMaster,
   totalCapital,
   withCapital,
+  withMargin,
   withMaster,
   withPause,
   withRow,
@@ -310,6 +315,53 @@ export function AutomationSettingsCard() {
                 />
               </div>
             ))}
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-4" aria-label="Margin check">
+            <div>
+              <p className="text-sm font-medium text-foreground">Margin check</p>
+              <p className="text-xs text-muted">
+                The evening result message ends with whether tomorrow&apos;s lots fit each
+                account&apos;s margin: the most a lot needed on the last days of tomorrow&apos;s
+                type (from Angel One&apos;s margin statements), times the lots, plus this buffer.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <label htmlFor="margin-buffer" className="text-sm font-medium text-foreground">
+                Buffer (%)
+                <span className="ml-2 text-xs font-normal text-muted">
+                  {MARGIN_BUFFER_MIN} to {MARGIN_BUFFER_MAX}.
+                </span>
+              </label>
+              <NumberField
+                id="margin-buffer"
+                className="w-36"
+                min={MARGIN_BUFFER_MIN}
+                max={MARGIN_BUFFER_MAX}
+                step={1}
+                value={draft.margin.bufferPct}
+                disabled={saving}
+                onChange={(pct) => setDraft(withMargin(draft, { bufferPct: Math.round(pct) }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <label htmlFor="margin-days" className="text-sm font-medium text-foreground">
+                Days of each type to look back over
+                <span className="ml-2 text-xs font-normal text-muted">
+                  {MARGIN_DAYS_MIN} to {MARGIN_DAYS_MAX}.
+                </span>
+              </label>
+              <NumberField
+                id="margin-days"
+                className="w-36"
+                min={MARGIN_DAYS_MIN}
+                max={MARGIN_DAYS_MAX}
+                step={1}
+                value={draft.margin.days}
+                disabled={saving}
+                onChange={(days) => setDraft(withMargin(draft, { days: Math.round(days) }))}
+              />
+            </div>
           </section>
 
           <section className="space-y-3 border-t border-border pt-4" aria-label="Pause">

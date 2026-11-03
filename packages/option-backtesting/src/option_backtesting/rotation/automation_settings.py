@@ -124,6 +124,24 @@ def capital(settings: dict) -> dict[str, int]:
     }
 
 
+#: the margin block's defaults (BL-205, owner 2026-11-04): a 10% buffer on the largest per-lot
+#: requirement of the last 6 days of tomorrow's type
+DEFAULT_MARGIN = {"bufferPct": 10, "days": 6}
+
+
+def margin(settings: dict) -> dict[str, int]:
+    """{'bufferPct', 'days'} for the evening message's margin block (Settings › Automation).
+    For the message only, so it never raises: a missing or bad value reads as the default."""
+    raw = settings.get("margin")
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for key, low, high in (("bufferPct", 0, 50), ("days", 1, 30)):
+        v = raw.get(key)
+        ok = isinstance(v, int) and not isinstance(v, bool) and low <= v <= high
+        out[key] = v if ok else DEFAULT_MARGIN[key]
+    return out
+
+
 def book_capital(settings: dict, book: str) -> int:
     """The capital behind a list (`core` or `t1`): the accounts with a row that uploads it, each
     counted once (two platforms on one account share its money); the default when none does."""

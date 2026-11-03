@@ -60,6 +60,13 @@ A warning badge on a block means its master switch holds it back.
 - In your own chat only, the account's real month from the contract notes reads as a share of the total of both accounts (`💰 Your account to Mon 2 Nov   +₹25,000 (+1.5% of ₹17 L)`).
 - The friends' group sees the per-list lines, never the real money.
 
+**Margin check.** Below the capital, two numbers for the margin block at the end of your copy of the 16:00 result message (never the group's): the **buffer** (10% until you change it) and how many **days of each type** it looks back over (6). For every account whose row uploads a list, the block says whether tomorrow's lots fit:
+
+- **Needs**: the most a lot needed on the last days of tomorrow's type (NIFTY expiry, SENSEX expiry, both, or non-expiry), from Angel One's daily margin statements and the lots open together that day, times tomorrow's lots (the Dir ×2, add-on and multiplier of that row's export), plus the buffer. Your own strategies on the account come on top.
+- **Free**: Angel One's free margin as the 15:50 job read it after the close; for Shoonya, its newest margin statement plus today's profit or loss.
+- **50:50**: the exchange wants half the margin in cash (cash, pledged Liquid BeES and other liquid funds, pledged SGBs). Shoonya is held to it strictly: it can use at most twice its cash. For Angel One a line says how much cash would clear the shortfall and what the collateral interest on it costs a day (`cash ₹1.1 L of the ₹3.2 L 50:50 wants: add ₹2 L to clear about ₹58 a day of interest`).
+- The verdict is `✅ fits, ₹2.9 L spare` or `⚠️ short ₹1 L · 2 lots fit`. Nothing is changed for you: the lots stay as the settings say.
+
 **Pause uploads and deploys.** Below the blocks, pick a day, or press **Skip next session**, to stop every upload, top-up and deploy for each session up to and including that day. **Clear pause** removes it.
 
 - The evening jobs prepare the next trading session; the 09:16–09:21 top-ups and deploys are for today. A pause through Monday therefore also holds Friday's evening jobs.

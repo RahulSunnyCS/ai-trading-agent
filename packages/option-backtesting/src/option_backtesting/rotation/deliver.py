@@ -27,7 +27,17 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import journal, live_compare, messages, month, result, slippage, store, tomorrow
+from . import (
+    journal,
+    live_compare,
+    margin_lines,
+    messages,
+    month,
+    result,
+    slippage,
+    store,
+    tomorrow,
+)
 from . import pick as pick_mod
 from .journal import AlreadyRecorded
 from .pick import PickError, PickResult
@@ -531,6 +541,10 @@ def _send_result_locked(
             boost=boost,
             month=messages.month_lines(day, *paper, capital=capital),
         )
+        # BL-205: whether tomorrow's lots fit each account's margin, the owner's copy only
+        block = margin_lines.owner_lines(day, {"core": next_adaptive, "t1": next_t1}, root, echo)
+        if block:
+            private = f"{private}\n\n" + "\n".join(block)
         echo(private)
         if not telegram:
             return 0
