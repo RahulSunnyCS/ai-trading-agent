@@ -2,8 +2,9 @@
 account that a Settings › Automation row uploads a list to, whether tomorrow's lots fit.
 
 - **Lots**: the next session's expected picks (the same ones the message lists) as each platform's
-  export trades them: the Dir ×2 rule when its export has it (`live_lots`), the Buy add-on when the
-  export carries it, times the row's multiplier; rows on one account add up.
+  export trades them: the Dir ×2 rule when its export has it (`live_lots`), times the row's
+  multiplier; rows on one account add up. A Buy add-on pick is bought, so it needs only its
+  premium, not a lot's margin: it is named, not counted.
 - **Needs**: the largest per-lot requirement of the last N days of tomorrow's type (NIFTY expiry,
   SENSEX expiry, both, non-expiry; `realised.margin.table`, Angel One's statements), times the
   lots, plus the buffer (Settings › Automation, default 10% and 6 days; owner 2026-11-04).
@@ -39,6 +40,8 @@ class Account:
     broker: str
     lots: int = 0
     uses: list[str] = field(default_factory=list)
+    #: Buy add-on picks: bought, so their premium only
+    buys: int = 0
 
 
 def tomorrow_lots(settings: dict, picks: dict[str, object]) -> dict[str, Account]:
@@ -58,12 +61,12 @@ def tomorrow_lots(settings: dict, picks: dict[str, object]) -> dict[str, Account
                 continue
             boost = auto.dir_boost_wanted(settings, platform, book)
             per_pick = live_lots.lots_for_day(list(nxt.core), nxt.dte, on=boost)
-            lots = sum(per_pick.values())
-            if auto.addon_wanted(settings, platform, book):
-                lots += len(nxt.buy)
-            lots *= int(row.get("multiplier") or 1)
+            multiplier = int(row.get("multiplier") or 1)
+            lots = sum(per_pick.values()) * multiplier
             acc = out.setdefault(broker, Account(broker))
             acc.lots += lots
+            if auto.addon_wanted(settings, platform, book):
+                acc.buys += len(nxt.buy) * multiplier
             acc.uses.append(f"{LIST_NAMES[book]} {lots} lots ({PLATFORM_NAMES[platform]})")
     return out
 
@@ -138,6 +141,7 @@ def _angel_reading(book: rstore.Book, nxt: date, today: date) -> float | None:
 class Verdict:
     broker: str
     lots: int
+    buys: int
     uses: list[str]
     per_lot: float | None
     per_lot_note: str
@@ -212,6 +216,7 @@ def assess(
         verdict = Verdict(
             broker,
             acc.lots,
+            acc.buys,
             acc.uses,
             per_lot,
             note,
@@ -259,7 +264,8 @@ def render(
     lines = [f"🏦 Margin for {nxt:%a} {nxt.day} {nxt:%b} ({_type_name(kind)})"]
     for v in verdicts:
         name = auto.BROKER_NAMES.get(v.broker, v.broker)
-        lines.append(f"{name} · {' + '.join(v.uses)}")
+        buys = f" · {v.buys} Buy add-on (premium only)" if v.buys else ""
+        lines.append(f"{name} · {' + '.join(v.uses)}{buys}")
         if v.needs is None:
             lines.append("  no per-lot figure yet (no Angel One statement with lots captured)")
         else:
