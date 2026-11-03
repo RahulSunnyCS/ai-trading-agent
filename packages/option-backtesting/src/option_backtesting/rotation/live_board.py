@@ -32,8 +32,10 @@ in on the same account mid-refresh. A rejected session is logged in again once.
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import json
 import os
+import threading
 import time
 from bisect import bisect_left, bisect_right
 from collections.abc import Callable, Iterable
@@ -55,7 +57,7 @@ from ..legwise.market import (
 )
 from ..legwise.schema import LegwiseStrategy, load_legwise
 from . import journal, labels, live_lots, slip_store, store
-from .automation_settings import BROKERS, PLATFORMS
+from .automation_settings import BROKERS, PLATFORMS, paused_for
 from .automation_settings import read as read_settings
 from .lists import SIZING_DATE
 from .variants import strategy_path, underlying_of
@@ -173,13 +175,20 @@ def todays_picks(day: date, root: Path | None = None) -> list[BookPicks]:
     return out
 
 
-def real_lots(picks: BookPicks, settings: dict) -> tuple[dict[str, int], list[str]]:
+def real_lots(
+    picks: BookPicks, settings: dict, day: date | None = None
+) -> tuple[dict[str, int], list[str]]:
     """({variant: lots across every account that trades this list}, ["quantiply · angelone ×1"]).
     An account is a Settings › Automation row whose list is this book and that uploads it; its
     lots are its multiplier, times 2 for the Dir on a non-expiry day when its Dir ×2 is on
-    (`live_lots.lots_for_day`), and the Buy add-on only when its add-on is on."""
+    (`live_lots.lots_for_day`), and the Buy add-on only when its add-on is on. Nothing trades
+    while the uploads master is off or the settings pause covers `day`."""
     lots = {n: 0 for n in [*picks.core, *picks.buy]}
     accounts: list[str] = []
+    if not (settings.get("masters") or {}).get("uploads", True):
+        return lots, []
+    if day is not None and paused_for(settings, day.isoformat()):
+        return lots, []
     for platform in PLATFORMS:
         for broker in BROKERS:
             row = settings.get("rows", {}).get(f"{platform}.{broker}") or {}
@@ -301,9 +310,12 @@ def _with_slippage(spec: LegwiseStrategy, pct: float) -> LegwiseStrategy:
     )
 
 
-def _trade_rows(result: DayResult, data: DayData, last: int) -> tuple[list[dict], float, bool]:
+def _trade_rows(
+    result: DayResult, data: DayData, last: int, exit_slip_pct: float = 0.0
+) -> tuple[list[dict], float, bool]:
     """(legs, gross, any open) for the trades entered by the last bar; a leg the engine closed
-    after the last bar is open, marked at that bar's close."""
+    after the last bar is open, marked at that bar's close. `exit_slip_pct` fills that mark against
+    the trade (a sell bought back higher), as its exit will be, for the slipped copy."""
     legs: list[dict] = []
     gross = 0.0
     any_open = False
@@ -318,6 +330,8 @@ def _trade_rows(result: DayResult, data: DayData, last: int) -> tuple[list[dict]
             mark = series.close[last] if series is not None else None
             if mark is None:
                 mark = t.exit_price if t.exit_price is not None else t.entry_price
+            elif exit_slip_pct:
+                mark = mark * (1 - sign * exit_slip_pct / 100)
             pnl = sign * (mark - t.entry_price) * t.qty
             any_open = True
         else:
@@ -344,6 +358,28 @@ def _trade_rows(result: DayResult, data: DayData, last: int) -> tuple[list[dict]
     return legs, gross, any_open
 
 
+def blank_row(name: str, spec: LegwiseStrategy, state: str, role: str = "core") -> dict:
+    """A pick with nothing to show yet: `waiting` (before its entry) or `no_data` (no bars)."""
+    head, params = labels.label(name)
+    return {
+        "variant": name,
+        "label": head,
+        "params": params,
+        "role": role,
+        "underlying": spec.underlying,
+        "entry_time": spec.entry_time,
+        "exit_time": spec.exit_time,
+        "state": state,
+        "legs": [],
+        "gross": 0.0,
+        "net": 0.0,
+        "net_slipped": 0.0,
+        "worst_mtm": 0.0,
+        "stopped_by": None,
+        "curve": [],
+    }
+
+
 def run_pick(
     name: str,
     spec: LegwiseStrategy,
@@ -367,23 +403,13 @@ def run_pick(
         "exit_time": spec.exit_time,
     }
     if minute_index(spec.entry_time) > last + 1:
-        return {
-            **base,
-            "state": "waiting",
-            "legs": [],
-            "gross": 0.0,
-            "net": 0.0,
-            "net_slipped": 0.0,
-            "worst_mtm": 0.0,
-            "stopped_by": None,
-            "curve": [],
-        }
+        return blank_row(name, spec, "waiting", role)
     reference = reference or default_reference_data()
     sizing = sizing or date.fromisoformat(SIZING_DATE)
     result = simulate_day(spec, data, reference, sizing)
     legs, gross, any_open = _trade_rows(result, data, last)
     slipped = simulate_day(_with_slippage(spec, slip_pct), data, reference, sizing)
-    _, gross_slipped, _ = _trade_rows(slipped, data, last)
+    _, gross_slipped, _ = _trade_rows(slipped, data, last, exit_slip_pct=slip_pct)
     curve = [(m, v) for m, v in result.mtm if m <= last]
     # an overall stop closes every leg, so one reported while a leg is open came after the last bar
     stopped = None if any_open else result.stopped_by
@@ -436,6 +462,7 @@ def build_board(
     edges: dict[tuple[str, str], tuple[float, float]] | None = None,
     unfixed: set[str] | None = None,
     unsure: set[str] | None = None,
+    specs: dict[str, LegwiseStrategy] | None = None,
 ) -> dict:
     """The snapshot: every book's picks run on the bars so far, per lot and at your lots."""
     reference = default_reference_data()
@@ -443,32 +470,15 @@ def build_board(
     notes = list(notes or [])
     out_books = []
     for b in books:
-        lots, accounts = real_lots(b, settings)
+        lots, accounts = real_lots(b, settings, day)
         rows = []
         for role, names in (("core", b.core), ("buy", b.buy)):
             for name in names:
                 u = underlying_of(name)
-                spec = load_legwise(strategy_path(name))
+                spec = (specs or {}).get(name) or load_legwise(strategy_path(name))
                 if u not in days:
-                    rows.append(
-                        {
-                            "variant": name,
-                            "label": labels.label(name)[0],
-                            "params": labels.label(name)[1],
-                            "role": role,
-                            "underlying": u,
-                            "entry_time": spec.entry_time,
-                            "exit_time": spec.exit_time,
-                            "state": "no_data",
-                            "legs": [],
-                            "gross": 0.0,
-                            "net": 0.0,
-                            "net_slipped": 0.0,
-                            "worst_mtm": 0.0,
-                            "stopped_by": None,
-                            "curve": [],
-                        }
-                    )
+                    blank = blank_row(name, spec, "no_data", role)
+                    rows.append({**blank, "lots": lots.get(name, 0)})
                     continue
                 row = run_pick(
                     name, spec, days[u], last[u], role=role, reference=reference, sizing=sizing
@@ -538,13 +548,21 @@ def build_board(
 _MASTER: tuple[date, list[dict]] | None = None
 
 
+def _wanted(row: dict) -> bool:
+    """The master rows the board reads: the index rows, and NIFTY / SENSEX index options."""
+    if row.get("instrumenttype") == "AMXIDX":
+        return (row.get("exch_seg"), row.get("symbol")) in set(INDEX_ROWS.values())
+    return row.get("instrumenttype") == "OPTIDX" and row.get("name") in OPTION_SEGMENT
+
+
 def scrip_master(day: date, loader: Callable[[], list[dict]] | None = None) -> list[dict]:
-    """Angel One's scrip master, downloaded once a day per process (it is about 40 MB)."""
+    """The rows of Angel One's scrip master the board reads, downloaded once a day per process.
+    Only those are kept: the whole master is about 40 MB, the rows a few thousand."""
     global _MASTER
     if _MASTER is None or _MASTER[0] != day:
         from ..angelone.symbols import download_master
 
-        _MASTER = (day, (loader or download_master)())
+        _MASTER = (day, [row for row in (loader or download_master)() if _wanted(row)])
     return _MASTER[1]
 
 
@@ -576,9 +594,13 @@ def fixed_contracts(previous: dict | None, specs: dict[str, LegwiseStrategy]) ->
 def _read_bars(client, exchange: str, token: str, day: date, cutoff: float) -> Bars | None:
     """One instrument's bars so far; None when Angel One would not answer (rate limit, an error)
     after one more try. A rejected session is raised (the caller logs in again)."""
+    from ..angelone.auth import AngelCredentialsError
+
     for attempt in range(2):
         try:
             return complete(client.bars(exchange, token, day), cutoff)
+        except AngelCredentialsError:
+            raise  # a rejected session: the caller logs in again (it subclasses RuntimeError)
         except RuntimeError:
             if attempt == 0:
                 time.sleep(3)
@@ -691,6 +713,7 @@ def fetch_and_build(
         edges=edges,
         unfixed={n for n in names if n not in fixed},
         unsure=unsure,
+        specs=by_name,
     )
 
 
@@ -702,9 +725,18 @@ def read_state(root: Path | None = None) -> dict:
 
 
 def _update_state(root: Path | None, **fields) -> None:
-    state = read_state(root)
-    state.update(fields)
-    _write_json(board_dir(root) / "state.json", state)
+    """Merge `fields` into state.json under an exclusive lock: the loop and the API both write it.
+    A finished refresh (`refreshing` False) stamps `last_done_at` whatever its outcome, which is
+    what the card waits for after a Refresh click."""
+    folder = board_dir(root)
+    folder.mkdir(parents=True, exist_ok=True)
+    if fields.get("refreshing") is False:
+        fields.setdefault("last_done_at", _iso(now_ist()))
+    with open(folder / "state.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        state = read_state(root)
+        state.update(fields)
+        _write_json(folder / "state.json", state)
 
 
 def mark_refreshing(by: str, root: Path | None = None) -> None:
@@ -868,7 +900,12 @@ class Board:
 
         day = now_ist().date()
         if not todays_picks(day, self.root):
-            _update_state(self.root, refreshing=False, last_note=f"no picks recorded for {day} yet")
+            _update_state(
+                self.root,
+                refreshing=False,
+                last_error=None,
+                last_note=f"no picks recorded for {day} yet",
+            )
             return None
         for attempt in range(2):
             if self.session is None:
@@ -884,6 +921,46 @@ class Board:
         return None
 
 
+class _Heartbeat:
+    """Writes the loop's heartbeat every few seconds from a thread, so the loop reads as running
+    through a refresh that takes minutes (a first band read, a wait for the guard's lock)."""
+
+    def __init__(self, path: Path, every_s: int, interval_s: float = 5.0) -> None:
+        self.path, self.every_s, self.interval_s = path, every_s, interval_s
+        self.started = _iso(now_ist())
+        self.next_at: float = time.time()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="live-board-beat", daemon=True)
+
+    def beat(self) -> None:
+        with contextlib.suppress(OSError):
+            _write_json(
+                self.path,
+                {
+                    "pid": os.getpid(),
+                    "started_at": self.started,
+                    "beat_at": time.time(),
+                    "every_s": self.every_s,
+                    "next_at": _iso(datetime.fromtimestamp(self.next_at, IST)),
+                },
+            )
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.interval_s):
+            self.beat()
+
+    def __enter__(self) -> _Heartbeat:
+        self.beat()
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._stop.set()
+        self._thread.join(timeout=self.interval_s * 2)
+        with contextlib.suppress(OSError):
+            self.path.unlink()
+
+
 def run_loop(
     every_s: int = EVERY_S,
     until: str = UNTIL,
@@ -892,22 +969,21 @@ def run_loop(
     sleep: Callable[[float], None] = time.sleep,
 ) -> int:
     """Refresh every `every_s` seconds and whenever the dashboard's button asks, until `until`
-    (IST). A failed refresh is recorded and retried at the next slot; a refused login stops the
-    loop (exit 3: retrying would only repeat it)."""
+    (IST). A failed refresh, Angel One unreachable or rate-limiting the login, or the guard's lock
+    busy is recorded and retried at the next slot; a refused login stops the loop (exit 3:
+    retrying would only repeat it)."""
     from ..angelone import check
     from ..angelone.auth import AngelCredentialsError, AngelNetworkError
 
     root = root or data_dir()
     board = Board(root, log)
-    stop = until
     last_run = 0.0
-    beat_path = board_dir(root) / "loop.json"
-    started = _iso(now_ist())
-    try:
-        while now_ist().strftime("%H:%M") < stop:
+    with _Heartbeat(board_dir(root) / "loop.json", every_s) as heart:
+        while now_ist().strftime("%H:%M") < until:
             asked = _take_request(root)
             if asked or time.time() - last_run >= every_s:
                 last_run = time.time()
+                heart.next_at = last_run + every_s
                 try:
                     snap = board.refresh(by="button" if asked else "loop")
                     if snap is not None:
@@ -915,28 +991,19 @@ def run_loop(
                             f"{b['name']} {b['per_lot']['net']:+,.0f}" for b in snap["books"]
                         )
                         log(f"{snap['as_of']}: {totals} (a lot each)")
+                # AngelNetworkError (and AngelUnavailableError, a rate-limited login) subclass
+                # AngelCredentialsError: they must be caught first, or a blip would end the day
+                except (AngelNetworkError, check.CheckRefused) as error:
+                    record_error(f"refresh skipped: {error}", root)
+                    log(f"refresh skipped: {error}")
                 except AngelCredentialsError as error:
+                    record_error(f"stopped: {error}", root)
                     log(f"stopped: {error}")
                     return 3
-                except (AngelNetworkError, check.CheckRefused) as error:
-                    log(f"refresh skipped: {error}")
                 except Exception as error:  # noqa: BLE001 - recorded in state.json; carry on
                     log(f"refresh failed: {type(error).__name__}: {error}")
-            _write_json(
-                beat_path,
-                {
-                    "pid": os.getpid(),
-                    "started_at": started,
-                    "beat_at": time.time(),
-                    "every_s": every_s,
-                    "next_at": _iso(datetime.fromtimestamp(last_run + every_s, IST)),
-                },
-            )
             sleep(5)
         # one last refresh after the close, so the board ends on the session's final bars
         with contextlib.suppress(Exception):
             board.refresh(by="loop")
-        return 0
-    finally:
-        with contextlib.suppress(OSError):
-            beat_path.unlink()
+    return 0

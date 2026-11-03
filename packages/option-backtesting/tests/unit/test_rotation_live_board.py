@@ -293,3 +293,126 @@ def test_the_board_reads_the_newest_snapshot(tmp_path, monkeypatch):
     got = TestClient(create_app()).get("/legwise/rotation/live-board").json()
     assert got["snapshot"]["day"] == "2026-11-02" and got["loop"]["running"] is False
     assert isinstance(Series.empty().close, list)
+
+
+# --- review fixes ----------------------------------------------------------------------------
+
+
+class RejectingClient(FakeClient):
+    def bars(self, exchange, token, day):
+        from option_backtesting.angelone.auth import AngelCredentialsError
+
+        raise AngelCredentialsError("Angel One rejected the session: AG8001 Invalid Token")
+
+
+def test_a_rejected_session_is_raised_not_read_as_a_failed_bar(monkeypatch):
+    from option_backtesting.angelone.auth import AngelCredentialsError
+
+    monkeypatch.setattr(lb.time, "sleep", lambda s: None)
+    with pytest.raises(AngelCredentialsError, match="rejected the session"):
+        lb.fetch_and_build(
+            RejectingClient(40),
+            DAY,
+            books(),
+            {"rows": {}},
+            master=master_rows(),
+            now=lambda: start(41) + 1,
+            log=lambda m: None,
+        )
+
+
+def _clock(times: list[str]):
+    it = iter(times)
+    last = {"t": times[0]}
+
+    def now():
+        last["t"] = next(it, last["t"])
+        h, m = map(int, last["t"].split(":"))
+        return datetime(2026, 11, 3, h, m, tzinfo=lb.IST)
+
+    return now
+
+
+def test_a_network_blip_on_login_does_not_end_the_day(tmp_path, monkeypatch):
+    from option_backtesting.angelone.auth import AngelNetworkError
+
+    calls: list[str] = []
+
+    def refresh(self, by="loop"):
+        calls.append(by)
+        if len(calls) == 1:
+            raise AngelNetworkError("Angel One could not be reached")
+        return None
+
+    monkeypatch.setattr(lb.Board, "refresh", refresh)
+    monkeypatch.setattr(lb, "now_ist", _clock(["09:20", "09:20", "09:21", "09:22", "15:32"]))
+    code = lb.run_loop(every_s=0, root=tmp_path, log=lambda m: None, sleep=lambda s: None)
+    assert code == 0 and len(calls) >= 2
+    assert "refresh skipped" in lb.read_state(tmp_path)["last_error"]
+
+
+def test_a_refused_login_stops_the_loop(tmp_path, monkeypatch):
+    from option_backtesting.angelone.auth import AngelCredentialsError
+
+    def refresh(self, by="loop"):
+        raise AngelCredentialsError("Angel One login failed: AB1050 Invalid PIN")
+
+    monkeypatch.setattr(lb.Board, "refresh", refresh)
+    # the heartbeat reads the clock once on start
+    monkeypatch.setattr(lb, "now_ist", _clock(["09:20", "09:20", "09:20", "15:32"]))
+    assert lb.run_loop(root=tmp_path, log=lambda m: None, sleep=lambda s: None) == 3
+
+
+def test_the_loop_reads_as_running_through_a_long_refresh(tmp_path):
+    path = tmp_path / "rotation" / "live-board" / "loop.json"
+    with lb._Heartbeat(path, 300, interval_s=0.01):
+        assert lb.loop_status(tmp_path)["running"] is True
+    assert not path.exists()
+
+
+def test_nothing_trades_while_paused_or_with_uploads_off():
+    picks = lb.BookPicks("t1", "Adaptive Tuned", ["N_wide_0947"], [], {"NIFTY": "0"}, False, None)
+    row = {"list": "t1", "upload": True, "multiplier": 1}
+    paused = {
+        "masters": {"uploads": True},
+        "pause": {"until": "2026-11-05"},
+        "rows": {"algotest.finvasia": row},
+    }
+    assert lb.real_lots(picks, paused, DAY) == ({"N_wide_0947": 0}, [])
+    off = {"masters": {"uploads": False}, "rows": {"algotest.finvasia": row}}
+    assert lb.real_lots(picks, off, DAY) == ({"N_wide_0947": 0}, [])
+    on = {
+        "masters": {"uploads": True},
+        "pause": {"until": "2026-11-02"},
+        "rows": {"algotest.finvasia": row},
+    }
+    assert lb.real_lots(picks, on, DAY)[0] == {"N_wide_0947": 1}
+
+
+def test_an_open_leg_in_the_slipped_copy_pays_its_exit_slippage():
+    spec = load_legwise(strategy_path("N_wide_0947"))
+    data = synthetic_day(40)
+    result = lb.simulate_day(spec, data, lb.default_reference_data(), date(2026, 10, 12))
+    plain, gross, _ = lb._trade_rows(result, data, 40)
+    slipped, gross_slipped, _ = lb._trade_rows(result, data, 40, exit_slip_pct=0.5)
+    assert [leg["price"] for leg in slipped] == [round(leg["price"] * 1.005, 2) for leg in plain]
+    assert gross_slipped < gross
+
+
+def test_every_finished_refresh_stamps_last_done_at(tmp_path):
+    lb._update_state(tmp_path, refreshing=True)
+    assert "last_done_at" not in lb.read_state(tmp_path)
+    lb._update_state(tmp_path, refreshing=False, last_note="no picks recorded")
+    assert lb.read_state(tmp_path)["last_done_at"]
+
+
+def test_the_cached_master_keeps_only_the_rows_the_board_reads():
+    lb._MASTER = None
+    rows = [
+        *master_rows(),
+        {"instrumenttype": "OPTSTK", "name": "RELIANCE"},
+        {"instrumenttype": "OPTIDX", "name": "BANKNIFTY"},
+    ]
+    kept = lb.scrip_master(DAY, loader=lambda: rows)
+    assert len(kept) == len(master_rows())
+    lb._MASTER = None

@@ -99,6 +99,8 @@ export interface LiveBoardState {
   last_error?: string | null;
   last_error_at?: string;
   last_note?: string | null;
+  /** Stamped when any refresh finishes, whatever its outcome */
+  last_done_at?: string;
 }
 
 export interface LiveBoardResponse {

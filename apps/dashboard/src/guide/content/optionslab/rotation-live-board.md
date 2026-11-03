@@ -33,7 +33,8 @@ Angel One's minute prices can run a few minutes behind the clock.
 - **A lot each / Your lots.** A lot each is one lot per strategy, as in the 16:00 message. Your lots
   multiplies each pick by the lots your accounts trade it at, from
   [Settings › Automation](app:/settings): each account's list, its multiplier, Dir ×2 on non-expiry
-  days, and the Buy add-on. The line under the list's name says which accounts those are.
+  days, and the Buy add-on. The line under the list's name says which accounts those are. While
+  the settings are paused, or uploads are off, nothing trades, so every list shows 0 lots.
 - **Slippage** follows the Rotation page's switch: on, every entry and exit is filled 0.5% against
   the trade, which is the figure the 16:00 message gives.
 

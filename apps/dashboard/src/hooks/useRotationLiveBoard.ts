@@ -19,7 +19,7 @@ const FAST_FOR_MS = 5 * 60_000;
 /** Whether the refresh asked for at `askedAt` has finished, by the state's last outcome. */
 export function refreshDone(data: LiveBoardResponse | null, askedAt: number): boolean {
   if (!data || data.state.refreshing) return false;
-  const done = [data.state.last_ok_at, data.state.last_error_at]
+  const done = [data.state.last_done_at, data.state.last_ok_at, data.state.last_error_at]
     .map((t) => (t ? Date.parse(t) : Number.NaN))
     .filter((t) => !Number.isNaN(t));
   return done.some((t) => t >= askedAt - 1000);

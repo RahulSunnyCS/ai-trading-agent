@@ -127,6 +127,12 @@ describe('live board view', () => {
     expect(legExit({ exit: '13:35', reason: 'SL' })).toBe('13:35 SL');
   });
 
+  it('treats a refresh that found no picks as finished', () => {
+    const asked = Date.parse('2026-11-03T09:10:00+05:30');
+    const state = { last_done_at: '2026-11-03T09:10:02+05:30', last_note: 'no picks recorded' };
+    expect(refreshDone(response({ state }), asked)).toBe(true);
+  });
+
   it('knows when the refresh it asked for has finished', () => {
     const asked = Date.parse('2026-11-03T15:15:00+05:30');
     expect(refreshDone(response({ state: { refreshing: true } }), asked)).toBe(false);

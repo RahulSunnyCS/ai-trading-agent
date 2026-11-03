@@ -24,6 +24,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from ..angelone import check
+from ..angelone.auth import AngelCredentialsError
 from ..rotation import live_board
 
 router = APIRouter(prefix="/legwise/rotation/live-board")
@@ -42,6 +43,8 @@ def _run(pending: check.Pending) -> None:
             live_board.record_error(f"Angel One login failed: {result.message}")
             return
         live_board.refresh(session, by="button", log=lambda _m: None)
+    except AngelCredentialsError as error:  # refresh() re-raises it unrecorded, for the loop
+        live_board.record_error(str(error))
     except Exception as error:  # noqa: BLE001 - recorded by refresh(); nothing above a thread
         print(f"live board refresh failed: {type(error).__name__}: {error}", file=sys.stderr)
     finally:
