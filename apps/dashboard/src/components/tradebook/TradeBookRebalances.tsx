@@ -6,7 +6,10 @@
  * only suggested), and what the lot holds after. A missed week says where it was folded in. Every figure is the server's.
  */
 
+import { useState } from 'react';
+
 import { type TradeBookRange, useMomentumRebalanceLog } from '../../hooks/useTradeBook';
+import { apiPost } from '../../lib/api';
 import { EMPTY, formatDayShort, formatInr, formatInt } from '../../lib/format';
 import {
   REBALANCE_TONE,
@@ -20,17 +23,39 @@ import {
 } from '../../lib/momentumRebalanceLog';
 import type { RebalanceBlock, RebalanceLogResponse } from '../../types/tradeBook';
 import { Badge } from '../ui/Badge';
+import { RefreshButton } from '../ui/RefreshButton';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { toast } from '../ui/Toast';
 import { Loaded, TradeBookWidget } from './parts';
 
 export function TradeBookRebalances({ range }: { range: TradeBookRange }) {
   const res = useMomentumRebalanceLog(range);
   const blocks = res.data?.groups.flatMap((g) => g.blocks) ?? [];
   const through = res.data?.notes_through;
+  const [syncing, setSyncing] = useState(false);
+
+  /** Read Kite's holdings and free cash now (read-only), then the log again. */
+  async function refreshFromKite(): Promise<void> {
+    setSyncing(true);
+    const response = await apiPost('/api/momentum/kite/sync', {});
+    setSyncing(false);
+    if (!response.ok) toast(`Could not read Kite: ${response.error}`, 'error');
+    else toast('Holdings read from Kite');
+    res.refetch();
+  }
+
   return (
     <TradeBookWidget
       title="Rebalances"
       badge={res.data ? formatInt(blocks.length) : undefined}
+      actions={
+        <RefreshButton
+          label="Refresh from Kite"
+          loading={syncing}
+          onClick={() => void refreshFromKite()}
+          title="Read the Kite holdings and free cash now (read-only) and check them against the notes"
+        />
+      }
       description={`One block per lot on its Friday, newest first: the trades netted per stock and what the lot holds after. Zerodha notes read through ${
         through ? formatDayShort(through, { weekday: true }) : EMPTY
       }.`}

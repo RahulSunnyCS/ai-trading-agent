@@ -185,7 +185,7 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/orders/:path*`,
             },
             {
-              // BL-142: status, login (read-only Kite)
+              // BL-142: status, login, sync (read-only Kite)
               source: '/api/momentum/kite/:path*',
               destination: `${momentumDirectOrigin}/api/kite/:path*`,
             },

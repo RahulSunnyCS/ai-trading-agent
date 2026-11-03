@@ -86,11 +86,14 @@ describe('momentumRebalanceLog', () => {
       synced_at: '2026-11-02T22:17:12+05:30',
       cash: 40000,
       matches: false,
-      differences: [{ symbol: 'DELTA', kite: 3, lots: 2 }],
+      differences: [{ symbol: 'DELTA', kite: 4, lots: 2, outside: 1 }],
+      not_in_lots: [{ symbol: 'DELTA', shares: 1 }],
     };
-    expect(kiteCheckLine(check)).toMatch(/differs from the lots: DELTA Kite 3, lots 2/);
+    expect(kiteCheckLine(check)).toMatch(
+      /differs from the notes: DELTA Kite 4, notes 3 \(lots 2 \+ 1 in no lot\)/,
+    );
     expect(kiteCheckLine({ ...check, matches: true, differences: [] })).toMatch(
-      /holds exactly what the lots hold · free cash ₹40,000\.$/,
+      /holds exactly what the notes show \(DELTA 1 in no lot\) · free cash ₹40,000\.$/,
     );
   });
 });
