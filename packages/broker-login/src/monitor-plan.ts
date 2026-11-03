@@ -551,7 +551,8 @@ export interface PickNeed {
   borrowed: string[];
   /** a bought leg whose premium is not known before entry (chosen by strike): need not estimated */
   unestimated: boolean;
-  /** the pick's lots: its legs' largest (a straddle at 2 lots has two 2-lot legs) */
+  /** the pick's lots: its sold legs' largest (a straddle at 2 lots has two 2-lot legs); 0 for a
+   * pick that only buys, which needs its premium, not a lot's margin */
   lots?: number;
 }
 
@@ -584,7 +585,7 @@ export function pickNeed(
     }
     total += (straddle / 2) * leg.lots;
   }
-  const lots = legs.reduce((m, l) => Math.max(m, l.lots), 0);
+  const lots = legs.filter((l) => l.sell).reduce((m, l) => Math.max(m, l.lots), 0);
   return { name, inr: total, borrowed: [...borrowed], unestimated, lots };
 }
 
@@ -662,13 +663,15 @@ export function marginMessage(
   for (const a of accounts) {
     const lots = a.picks.reduce((s, p) => s + (p.lots ?? 0), 0);
     const plan = a.planned;
+    // a pick that only buys needs its premium (the margin.csv estimate's figure for it)
+    const bought = a.picks.filter((p) => !p.lots);
     // BL-205: the plan's per-lot figure already carries its buffer, so enough is enough (no
     // second 20% cushion); without a plan, the documented margin.csv estimate as before
     const need = plan
-      ? lots * plan.perLot * (1 + plan.bufferPct / 100)
+      ? lots * plan.perLot * (1 + plan.bufferPct / 100) + bought.reduce((s, p) => s + p.inr, 0)
       : a.picks.reduce((s, p) => s + p.inr, 0);
     if (!plan) estimated = true;
-    const unest = plan ? [] : a.picks.filter((p) => p.unestimated).map((p) => p.name);
+    const unest = (plan ? bought : a.picks).filter((p) => p.unestimated).map((p) => p.name);
     const judged: MarginVerdict = plan
       ? a.free === null
         ? 'unknown'

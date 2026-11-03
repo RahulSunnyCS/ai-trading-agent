@@ -641,6 +641,21 @@ test('BL-205: the evening plan gives the need: lots × per-lot + buffer, no seco
   );
   assert.match(m.text, /❌ Finvasia .*SHORT by ₹60,000/);
   assert.doesNotMatch(m.text, /estimated with NIFTY|not estimated|Estimate: half/);
+  // a pick that only buys adds its premium, not a lot's margin
+  const withBuy = marginMessage('2026-11-04', [
+    {
+      account: 'Angel One',
+      uses: ['AlgoTest T1'],
+      picks: [
+        pick('dir', 2),
+        { name: 'buy', inr: 5000, borrowed: [], unestimated: false, lots: 0 },
+      ],
+      free: 500000,
+      source: 's',
+      planned,
+    },
+  ]);
+  assert.match(withBuy.text, /need ~₹4,45,000 for 2 picks \(2 lots × ₹2,00,000 a lot \+10%\)/);
   assert.match(m.text, /Need: last evening's per-lot figure/);
 });
 
