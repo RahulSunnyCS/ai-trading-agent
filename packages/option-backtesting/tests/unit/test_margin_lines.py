@@ -43,7 +43,8 @@ def test_lots_follow_the_export_dir_boost_add_on_and_multiplier():
     picks = {"t1": _picks(), "core": _picks(buy=["N_buy_1047"])}
     out = margin_lines.tomorrow_lots(settings, picks)
     assert out["finvasia"].lots == (2 + 1 + 1) * 2  # the Dir doubled, times the multiplier
-    assert out["angelone"].lots == 3 + 1  # no boost, the Buy add-on in
+    assert out["angelone"].lots == 3  # no boost; the Buy add-on needs only its premium
+    assert out["angelone"].buys == 1
     assert out["finvasia"].uses == ["T1 8 lots (AlgoTest)"]
 
 
