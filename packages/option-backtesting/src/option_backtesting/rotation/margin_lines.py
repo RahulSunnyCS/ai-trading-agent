@@ -68,8 +68,8 @@ def tomorrow_lots(settings: dict, picks: dict[str, object]) -> dict[str, Account
     return out
 
 
-def today_pnl(day: date, root: Path | None) -> dict[str, float] | None:
-    """{broker: rupees} of everything the live capture saw trade today; None when not captured."""
+def day_pnl(day: date, root: Path | None) -> dict[str, float] | None:
+    """{broker: rupees} the live capture saw trade on `day`; None when not captured."""
     lines = live_compare.read_lines(day, root)
     if lines is None:
         return None
@@ -83,6 +83,29 @@ def today_pnl(day: date, root: Path | None) -> dict[str, float] | None:
             broker = str(row.get("broker"))
             out[broker] = out.get(broker, 0.0) + float(row["pnl"])
     return out
+
+
+def pnl_since(after: date, today: date, root: Path | None) -> tuple[dict[str, float], bool]:
+    """({broker: rupees} the captures saw from the day after `after` to `today`, whether every
+    trading day in between was captured). A statement older than yesterday's needs every day
+    since it, not only today's."""
+    from ..data.reference.loader import default_reference_data
+
+    total: dict[str, float] = {}
+    complete = True
+    ref = default_reference_data()
+    d = after
+    while d < today:
+        d = date.fromordinal(d.toordinal() + 1)
+        if d.weekday() >= 5 or ref.is_holiday(d):
+            continue
+        day = day_pnl(d, root)
+        if day is None:
+            complete = False
+            continue
+        for broker, value in day.items():
+            total[broker] = total.get(broker, 0.0) + value
+    return total, complete
 
 
 def _latest_statement(rows: list[dict], broker: str, today: date) -> dict | None:
@@ -144,7 +167,6 @@ def assess(
     kind = rmargin.day_type(nxt)
     book = rstore.load_cached(root)
     rate = rmargin.interest_rate(book, today)
-    pnl = today_pnl(today, root)
     out = []
     for broker, acc in accounts.items():
         t = table[kind]
@@ -161,18 +183,19 @@ def assess(
             note = f"no {_type_name(kind)} day yet: the most of any day type"
         needs = per_lot * acc.lots * (1 + buffer_pct / 100) if per_lot else None
         stmt = _latest_statement(rows, broker, today)
-        moved = (pnl or {}).get(broker, 0.0) if stmt and stmt["day"] < today.isoformat() else 0.0
         free, free_note, cash = None, "no margin statement yet", None
         if stmt:
-            cash = stmt["cash"] + moved
-            free = stmt["available"] + moved
+            moved, complete = pnl_since(date.fromisoformat(stmt["day"]), today, root)
+            change = moved.get(broker, 0.0)
+            cash = stmt["cash"] + change
+            free = stmt["available"] + change
             free_note = f"{_short(stmt['day'])} statement"
             if stmt["day"] < today.isoformat():
-                free_note += (
-                    f", today {messages.rupees(moved)}"
-                    if pnl is not None
-                    else ", today's P&L not known"
-                )
+                yesterday_only = _previous_session(today) <= date.fromisoformat(stmt["day"])
+                since = "today" if yesterday_only else f"since {_short(stmt['day'])}"
+                free_note += f", {since} {messages.rupees(change)}"
+                if not complete:
+                    free_note += " (a day's P&L not captured)"
         reading = _angel_reading(book, nxt, today) if broker == "angelone" else None
         if reading is not None:
             free, free_note = reading, "15:50 reading"
@@ -207,6 +230,16 @@ def assess(
                 verdict.interest_day = verdict.cash_short * rate["rate"]
         out.append(verdict)
     return kind, out, rate
+
+
+def _previous_session(day: date) -> date:
+    from ..data.reference.loader import default_reference_data
+
+    ref = default_reference_data()
+    d = date.fromordinal(day.toordinal() - 1)
+    while d.weekday() >= 5 or ref.is_holiday(d):
+        d = date.fromordinal(d.toordinal() - 1)
+    return d
 
 
 def _short(day: str) -> str:

@@ -208,3 +208,67 @@ def test_a_type_with_no_day_yet_uses_the_most_of_any_type(tmp_path):
     text = "\n".join(margin_lines.owner_lines(TODAY, picks, tmp_path, settings=settings))
     assert "(NIFTY expiry)" in text
     assert "no NIFTY expiry day yet: the most of any day type" in text
+
+
+def test_an_older_statement_adds_every_day_since_and_says_when_one_is_missing(tmp_path):
+    root = tmp_path
+    _jsonl(
+        root / "contract-notes" / "margin" / "2026-10-27.jsonl",
+        [_statement("2026-10-27", "finvasia", "F1", 500000, 1000000)],
+    )
+    # an Angel One day with lots, so a per-lot figure exists
+    _jsonl(
+        root / "contract-notes" / "margin" / "2026-10-26.jsonl",
+        [_statement("2026-10-26", "angelone", "R1", 1, 600000, upfront=600000)],
+    )
+    _jsonl(
+        root / "rotation" / "live" / "2026-10-26.jsonl",
+        [
+            {
+                "kind": "strategy",
+                "broker": "angelone",
+                "variant": "N_x_0917",
+                "source": "tool",
+                "traded": True,
+                "multiplier": 3,
+                "fills": [],
+                "pnl": 0,
+            }
+        ],
+    )
+    _jsonl(
+        root / "rotation" / "live" / "2026-10-28.jsonl",
+        [
+            {
+                "kind": "strategy",
+                "broker": "finvasia",
+                "variant": "N_x_0917",
+                "source": "tool",
+                "traded": True,
+                "multiplier": 1,
+                "fills": [],
+                "pnl": -10000,
+            }
+        ],
+    )
+    _jsonl(
+        root / "rotation" / "live" / "2026-10-29.jsonl",
+        [
+            {
+                "kind": "strategy",
+                "broker": "finvasia",
+                "variant": "N_x_0917",
+                "source": "tool",
+                "traded": True,
+                "multiplier": 1,
+                "fills": [],
+                "pnl": -5000,
+            }
+        ],
+    )
+    settings = _settings(algotest_finvasia={"upload": True, "list": "t1"})
+    text = "\n".join(margin_lines.owner_lines(TODAY, {"t1": _picks()}, root, settings=settings))
+    assert "free ₹9.85 L (27 Oct statement, since 27 Oct −₹15,000)" in text
+    (root / "rotation" / "live" / "2026-10-28.jsonl").unlink()
+    text = "\n".join(margin_lines.owner_lines(TODAY, {"t1": _picks()}, root, settings=settings))
+    assert "since 27 Oct −₹5,000 (a day's P&L not captured)" in text
