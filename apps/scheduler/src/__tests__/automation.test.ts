@@ -272,6 +272,23 @@ describe('API /settings/automation', () => {
     expect(store.current().version).toBe(1); // nothing saved
   });
 
+  it('PUT from a dashboard without the margin block keeps the current margin (BL-205)', async () => {
+    const handle = createApi({ ctx: ctx(), jobs: [], settings: store, gh: async () => {} });
+    const put = (body: unknown) =>
+      handle(
+        new Request('http://x/settings/automation', { method: 'PUT', body: JSON.stringify(body) }),
+      );
+    const s = clone(DEFAULT_SETTINGS);
+    s.margin = { bufferPct: 5, days: 3 };
+    expect((await put(s)).status).toBe(200);
+    const older = clone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+    older.margin = undefined;
+    (older.masters as Record<string, boolean>).logins = false;
+    expect((await put(JSON.parse(JSON.stringify(older)))).status).toBe(200);
+    expect(store.current().settings.margin).toEqual({ bufferPct: 5, days: 3 });
+    expect(store.current().settings.masters.logins).toBe(false);
+  });
+
   it('answers 503 without a store', async () => {
     const handle = createApi({ ctx: ctx(), jobs: [] });
     expect((await handle(new Request('http://x/settings/automation'))).status).toBe(503);
@@ -478,5 +495,40 @@ describe('capital per broker account (owner, 2026-10-29)', () => {
       finvasia: 900_000,
       angelone: 800_000,
     });
+  });
+});
+
+describe('the margin block (BL-205, owner 2026-11-04)', () => {
+  it('settings saved before the field read as a 10% buffer over 6 days', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { margin?: unknown };
+    old.margin = undefined;
+    const filled = withDefaults(JSON.parse(JSON.stringify(old)));
+    expect(filled.margin).toEqual({ bufferPct: 10, days: 6 });
+  });
+
+  it('a save must give whole numbers in range and no other field', () => {
+    for (const [field, bad] of [
+      ['bufferPct', -1],
+      ['bufferPct', 51],
+      ['bufferPct', 5.5],
+      ['days', 0],
+      ['days', 31],
+      ['days', '6'],
+    ] as const) {
+      const s = clone(DEFAULT_SETTINGS) as unknown as { margin: Record<string, unknown> };
+      s.margin[field] = bad;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain(`margin.${field}`);
+    }
+    const extra = clone(DEFAULT_SETTINGS) as unknown as { margin: Record<string, unknown> };
+    extra.margin.lots = 4;
+    const refused = validate(extra);
+    expect('errors' in refused && refused.errors.join()).toContain('unknown margin field: lots');
+    const missing = { ...clone(DEFAULT_SETTINGS), margin: undefined } as unknown;
+    expect('errors' in validate(missing)).toBe(true);
+    const ok = clone(DEFAULT_SETTINGS);
+    ok.margin = { bufferPct: 5, days: 10 };
+    const checked = validate(ok);
+    expect('settings' in checked && checked.settings.margin).toEqual({ bufferPct: 5, days: 10 });
   });
 });

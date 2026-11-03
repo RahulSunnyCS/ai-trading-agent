@@ -61,6 +61,7 @@ const SETTINGS: AutomationSettings = {
   },
   pause: { until: null },
   capital: { finvasia: 850_000, angelone: 850_000 },
+  margin: { bufferPct: 10, days: 6 },
 };
 
 const view = (
@@ -181,6 +182,7 @@ describe('multiplier, add-on and pause', () => {
     const old = JSON.parse(JSON.stringify(SETTINGS)) as Record<string, unknown>;
     delete old.pause;
     delete old.capital;
+    delete old.margin;
     for (const row of Object.values(old.rows as Record<string, Record<string, unknown>>)) {
       row.multiplier = undefined;
       row.addon = undefined;
@@ -255,10 +257,24 @@ describe('AutomationSettingsCard', () => {
     });
   });
 
+  it('saves the margin check’s buffer and look-back', async () => {
+    const fetchMock = stub((body) => ok(view(body, 1)));
+    render(<AutomationSettingsCard />);
+    fireEvent.change(await screen.findByLabelText(/^Buffer/), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText(/^Days of each type/), { target: { value: '10' } });
+    expect(await screen.findByText('Margin buffer: 10% → 5%')).toBeTruthy();
+    expect(screen.getByText('Margin look-back: 6 → 10 days of a type')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).margin).toEqual({ bufferPct: 5, days: 10 });
+  });
+
   it('works against a scheduler that does not send the new fields yet', async () => {
     const old = JSON.parse(JSON.stringify(SETTINGS)) as Record<string, unknown>;
     delete old.pause;
     delete old.capital;
+    delete old.margin;
     for (const row of Object.values(old.rows as Record<string, Record<string, unknown>>)) {
       row.multiplier = undefined;
       row.addon = undefined;
@@ -268,10 +284,11 @@ describe('AutomationSettingsCard', () => {
       vi.fn(async () => ok(view(old as unknown as AutomationSettings))),
     );
     render(<AutomationSettingsCard />);
-    // four multipliers, the MTM SL of the one Quantiply row with a list (BL-172 default) and
-    // the two accounts' capital (₹8.5 lakh each by default)
-    expect(await screen.findAllByRole('spinbutton')).toHaveLength(7);
+    // four multipliers, the MTM SL of the one Quantiply row with a list (BL-172 default), the
+    // two accounts' capital (₹8.5 lakh each by default) and the margin check's two (10%, 6 days)
+    expect(await screen.findAllByRole('spinbutton')).toHaveLength(9);
     expect((screen.getByLabelText(/^Shoonya/) as HTMLInputElement).value).toBe('850000');
+    expect((screen.getByLabelText(/^Buffer/) as HTMLInputElement).value).toBe('10');
     expect(screen.queryByRole('button', { name: /Skip next session/ })).toBeNull();
     expect(screen.queryByText(/unsaved change/)).toBeNull();
   });

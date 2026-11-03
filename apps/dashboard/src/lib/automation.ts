@@ -30,6 +30,14 @@ export const CAPITAL_MIN = 10_000;
 export const CAPITAL_MAX = 100_000_000;
 export const DEFAULT_CAPITAL = 850_000;
 
+/** The evening message's margin block (BL-205): its buffer (percent) and how many days of each
+ * day type it looks back over. Same ranges and defaults as the scheduler's. */
+export const MARGIN_BUFFER_MIN = 0;
+export const MARGIN_BUFFER_MAX = 50;
+export const MARGIN_DAYS_MIN = 1;
+export const MARGIN_DAYS_MAX = 30;
+export const DEFAULT_MARGIN: Margin = { bufferPct: 10, days: 6 };
+
 /** The Quantiply clientwise MTM SL a row may ask for (BL-172): whole rupees in this range. */
 export const MTM_SL_MIN = 500;
 export const MTM_SL_MAX = 100_000;
@@ -69,12 +77,19 @@ export interface Masters {
   deploy: boolean;
 }
 
+export interface Margin {
+  bufferPct: number;
+  days: number;
+}
+
 export interface AutomationSettings {
   masters: Masters;
   rows: Record<RowKey, Row>;
   pause: Pause;
   /** rupees in each broker account, for the evening result message's capital lines */
   capital: Record<Broker, number>;
+  /** the evening result message's margin block (BL-205) */
+  margin: Margin;
 }
 
 export interface SettingsVersion {
@@ -96,7 +111,8 @@ export interface AutomationView {
 /**
  * Settings from a scheduler that predates the multiplier, add-on and pause have none of them:
  * 1, yes and no pause, what the jobs did; before BL-183 no Dir ×2 (off); before 2026-10-29 no
- * capital (₹8.5 lakh an account). Applied to everything read, so the page never meets a
+ * capital (₹8.5 lakh an account); before BL-205 no margin block settings (a 10% buffer over 6
+ * days). Applied to everything read, so the page never meets a
  * missing field.
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
@@ -115,7 +131,19 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
   const capital = Object.fromEntries(
     BROKERS.map(({ key }) => [key, settings.capital?.[key] ?? DEFAULT_CAPITAL]),
   ) as Record<Broker, number>;
-  return { ...settings, rows, pause: { until: settings.pause?.until ?? null }, capital };
+  const margin = {
+    bufferPct: settings.margin?.bufferPct ?? DEFAULT_MARGIN.bufferPct,
+    days: settings.margin?.days ?? DEFAULT_MARGIN.days,
+  };
+  return { ...settings, rows, pause: { until: settings.pause?.until ?? null }, capital, margin };
+}
+
+/** `settings` with the margin block's buffer or look-back changed. */
+export function withMargin(
+  settings: AutomationSettings,
+  change: Partial<Margin>,
+): AutomationSettings {
+  return { ...settings, margin: { ...settings.margin, ...change } };
 }
 
 /** `settings` with one account's capital changed. */
@@ -226,6 +254,10 @@ export function describeChanges(before: AutomationSettings, after: AutomationSet
         `${label} capital: ${formatInr(before.capital[key])} → ${formatInr(after.capital[key])}`,
       );
   }
+  if (before.margin.bufferPct !== after.margin.bufferPct)
+    lines.push(`Margin buffer: ${before.margin.bufferPct}% → ${after.margin.bufferPct}%`);
+  if (before.margin.days !== after.margin.days)
+    lines.push(`Margin look-back: ${before.margin.days} → ${after.margin.days} days of a type`);
   if (before.pause.until !== after.pause.until) {
     lines.push(
       `Pause: ${before.pause.until ? `until ${before.pause.until}` : 'none'} → ${after.pause.until ? `until ${after.pause.until}` : 'none'}`,

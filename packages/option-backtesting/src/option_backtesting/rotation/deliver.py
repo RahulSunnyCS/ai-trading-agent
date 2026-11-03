@@ -27,7 +27,17 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import journal, live_compare, messages, month, result, slippage, store, tomorrow
+from . import (
+    journal,
+    live_compare,
+    margin_lines,
+    messages,
+    month,
+    result,
+    slippage,
+    store,
+    tomorrow,
+)
 from . import pick as pick_mod
 from .journal import AlreadyRecorded
 from .pick import PickError, PickResult
@@ -37,6 +47,9 @@ IST = ZoneInfo("Asia/Kolkata")
 T1_DEADLINE = time(9, 16, 50)
 #: ... and never longer than this after Adaptive's entry is written
 T1_MAX_WAIT_S = 20.0
+
+#: room for a message: Telegram's 4,096 characters less the notifier's own margin
+MESSAGE_LIMIT = 4000
 
 Echo = Callable[[str], None]
 #: (text, severity, chat_id or None for the owner's chat) -> delivered
@@ -531,6 +544,18 @@ def _send_result_locked(
             boost=boost,
             month=messages.month_lines(day, *paper, capital=capital),
         )
+        # BL-205: whether tomorrow's lots fit each account's margin, the owner's copy only; one
+        # line per account when the whole block would pass Telegram's limit (it is cut at the end)
+        block = (
+            margin_lines.owner_lines(day, {"core": next_adaptive, "t1": next_t1}, root, echo)
+            if owner_needed
+            else None
+        )
+        if block:
+            whole = f"{private}\n\n" + "\n".join(block)
+            if len(whole) > MESSAGE_LIMIT:
+                whole = f"{private}\n\n" + "\n".join(margin_lines.compact(block))
+            private = whole
         echo(private)
         if not telegram:
             return 0

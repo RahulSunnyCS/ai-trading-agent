@@ -10,6 +10,7 @@ import {
   realGh,
   syncGithub,
   validate,
+  withDefaults,
 } from './automation.js';
 import { rowAlive } from './history.js';
 import { JOBS, type Job, maxRunMinutes } from './jobs.js';
@@ -240,6 +241,11 @@ export function createApi({
       body = await req.json();
     } catch {
       return fail(400, 'body must be JSON');
+    }
+    // BL-205: a dashboard built before the margin block (the hosted one follows `release`) sends
+    // no `margin`; it keeps the current one rather than being refused or reset.
+    if (body && typeof body === 'object' && !Array.isArray(body) && !('margin' in body)) {
+      body = { ...body, margin: withDefaults(settings.current().settings).margin };
     }
     const checked = validate(body);
     if ('errors' in checked)

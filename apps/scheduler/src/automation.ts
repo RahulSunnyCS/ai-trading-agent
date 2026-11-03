@@ -20,6 +20,8 @@ import { jobPath } from './env.js';
  * - A pause (BL-140 Phase 4): no uploads or deploys for any session up to and including a day.
  * - The capital in each broker account (owner, 2026-10-29), for the evening result message: a
  *   list's line uses the capital of the accounts that upload it, and the total is their sum.
+ * - The margin block of the evening result message (BL-205, owner 2026-11-04): the buffer on the
+ *   per-lot requirement and how many days of each day type it looks back over.
  *
  * Every Save is a new version in the scheduler's SQLite (`automation_settings`); nothing is
  * ever updated in place, so the page can show the history. The current version is also
@@ -46,6 +48,14 @@ export const CAPITAL_MIN = 10_000;
 export const CAPITAL_MAX = 100_000_000;
 /** The capital each account reads as when its settings predate the field (owner, 2026-10-29). */
 export const DEFAULT_CAPITAL = 850_000;
+
+/** The margin block's buffer (percent) and look-back (days of a type): whole numbers in range. */
+export const MARGIN_BUFFER_MIN = 0;
+export const MARGIN_BUFFER_MAX = 50;
+export const MARGIN_DAYS_MIN = 1;
+export const MARGIN_DAYS_MAX = 30;
+/** What the margin block reads when the settings predate it (owner, 2026-11-04). */
+export const DEFAULT_MARGIN: Margin = { bufferPct: 10, days: 6 };
 
 /** The Quantiply clientwise MTM SL a row may ask for (BL-172): whole rupees in this range. */
 export const MTM_SL_MIN = 500;
@@ -88,12 +98,22 @@ export interface Masters {
   deploy: boolean;
 }
 
+/** The evening message's margin block (BL-205). */
+export interface Margin {
+  /** percent added to the per-lot requirement */
+  bufferPct: number;
+  /** how many of the last days of each day type the per-lot figure looks back over */
+  days: number;
+}
+
 export interface AutomationSettings {
   masters: Masters;
   rows: Record<RowKey, Row>;
   pause: Pause;
   /** rupees in each broker account (the evening result message's capital lines) */
   capital: Record<Broker, number>;
+  /** the evening result message's margin block (BL-205) */
+  margin: Margin;
 }
 
 export interface Version {
@@ -155,6 +175,7 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
   },
   pause: { until: null },
   capital: { finvasia: DEFAULT_CAPITAL, angelone: DEFAULT_CAPITAL },
+  margin: { ...DEFAULT_MARGIN },
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -169,7 +190,8 @@ function isRealDay(value: string): boolean {
 /**
  * Settings saved before Phase 4 have no multiplier, add-on or pause: they mean 1, yes and none,
  * exactly what the jobs did; settings before BL-183 have no `dirBoost`: off; settings before
- * 2026-10-29 have no `capital`: ₹8.5 lakh an account. Anything present is kept as it is (and
+ * 2026-10-29 have no `capital`: ₹8.5 lakh an account; settings before BL-205 have no `margin`:
+ * a 10% buffer over 6 days. Anything present is kept as it is (and
  * validated on a Save).
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
@@ -177,6 +199,7 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
     rows: Record<string, Partial<Row>>;
     pause?: Partial<Pause>;
     capital?: Partial<Record<Broker, number>>;
+    margin?: Partial<Margin>;
   };
   return {
     ...settings,
@@ -196,6 +219,10 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
     capital: Object.fromEntries(
       BROKERS.map((b) => [b, partial.capital?.[b] ?? DEFAULT_CAPITAL]),
     ) as Record<Broker, number>,
+    margin: {
+      bufferPct: partial.margin?.bufferPct ?? DEFAULT_MARGIN.bufferPct,
+      days: partial.margin?.days ?? DEFAULT_MARGIN.days,
+    },
   };
 }
 
@@ -206,7 +233,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
     !!v && typeof v === 'object' && !Array.isArray(v);
   if (!obj(value)) return { errors: ['settings must be an object'] };
   const extra = Object.keys(value).filter(
-    (k) => !['masters', 'rows', 'pause', 'capital'].includes(k),
+    (k) => !['masters', 'rows', 'pause', 'capital', 'margin'].includes(k),
   );
   if (extra.length) errors.push(`unknown keys: ${extra.join(', ')}`);
 
@@ -291,6 +318,22 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         errors.push(`capital.${b} must be whole rupees from ${CAPITAL_MIN} to ${CAPITAL_MAX}`);
     }
   }
+  const margin = value.margin;
+  if (!obj(margin)) errors.push('margin must be an object');
+  else {
+    for (const k of Object.keys(margin))
+      if (!['bufferPct', 'days'].includes(k)) errors.push(`unknown margin field: ${k}`);
+    const whole = (n: unknown, lo: number, hi: number) =>
+      typeof n === 'number' && Number.isInteger(n) && n >= lo && n <= hi;
+    if (!whole(margin.bufferPct, MARGIN_BUFFER_MIN, MARGIN_BUFFER_MAX))
+      errors.push(
+        `margin.bufferPct must be a whole percent from ${MARGIN_BUFFER_MIN} to ${MARGIN_BUFFER_MAX}`,
+      );
+    if (!whole(margin.days, MARGIN_DAYS_MIN, MARGIN_DAYS_MAX))
+      errors.push(
+        `margin.days must be a whole number from ${MARGIN_DAYS_MIN} to ${MARGIN_DAYS_MAX}`,
+      );
+  }
   if (errors.length) return { errors };
   const v = value as unknown as AutomationSettings;
   // Rebuild in a fixed key order, so equal settings always serialise the same.
@@ -316,6 +359,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
       ) as Record<RowKey, Row>,
       pause: { until: v.pause.until },
       capital: Object.fromEntries(BROKERS.map((b) => [b, v.capital[b]])) as Record<Broker, number>,
+      margin: { bufferPct: v.margin.bufferPct, days: v.margin.days },
     },
   };
 }
