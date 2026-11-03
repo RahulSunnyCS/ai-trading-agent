@@ -311,13 +311,6 @@ export const livePage = {
       })
       .filter({ has: page.getByRole('button', { name: 'Cancel', exact: true }) })
       .last(),
-  /** A broker's row in that sheet: the element holding its checkbox and its "<Broker> - <name>". */
-  brokerRow: (sheet: Locator, label: string): Locator =>
-    sheet
-      .locator('div')
-      .filter({ has: sheet.page().locator('input[type=checkbox][readonly]') })
-      .filter({ hasText: new RegExp(`^${label} - `) })
-      .last(),
   /** "Activate" with nothing ticked, "Activate on n Brokers" once n are (2026-11-03). */
   brokerSheetActivate: (sheet: Locator): Locator =>
     sheet.getByRole('button', { name: /^Activate( on \d+ Brokers?)?$/ }),

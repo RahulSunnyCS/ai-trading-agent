@@ -206,6 +206,7 @@ async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Pr
   await tickBrokers(sheet, brokers);
   if (secondsUntil(pick.entry) < ACTIVATE_LEAD_SECONDS) {
     await sheet.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
     throw new TooLate('TOO LATE: its entry minute came while choosing brokers, not activated');
   }
   const go = livePage.brokerSheetActivate(sheet);
@@ -226,7 +227,12 @@ async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Pr
       `the broker sheet's Activate opened something not yet seen, not confirmed: ${text}. ${await deployedState(page, name, before)}`,
     );
   }
-  const after = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
+  // /live may lag the sheet: read it back up to three times before calling it a failure
+  let after = before;
+  for (let i = 0; i < 3 && after !== before + brokers.length; i++) {
+    if (i) await page.waitForTimeout(3_000);
+    after = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
+  }
   if (after !== before + brokers.length)
     throw new Error(
       `/live shows ${after} Deployed after Activate (was ${before}), expected ${before + brokers.length}: check it`,
