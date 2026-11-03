@@ -292,3 +292,15 @@ All six answered by the owner on 2026-11-03 (Log). Kept here as asked:
   so Stage 1 is about **3 hours on three workers**, not 7. Window: 2024-10-09 → 2026-11-02 (503
   sessions each index; fit half 247). Stage 1 queued for the night of 2026-11-03 on three
   workers; nothing scored yet.
+- 2026-11-03 — **Scorer and regression anchor** (before the Stage 1 run, same day).
+  `research/bl202/score.py`: every gating and ranking figure from ONE half of the window (split at
+  `grid.FIT_TO`), rebuilt from the day × cell series; the runner now stores beside the net series
+  the day-stop flags, winning and losing trade sums and charges (`series/<cohort>.aux.npz`) so
+  profit factor, the day-stop rate and the entry rate exist per half. The bootstrap draws one
+  index matrix a half (5-day circular blocks, 2,000 resamples, seed 20261103), shared by every
+  cell, so the lower bound of (cell − template) is the paired one rule (2) wants. `--half test`
+  refuses to run without a committed `--only` finalist list. 25 tests pass. **Regression anchor
+  holds:** the four templates BL-104's archive has (NIFTY and SENSEX 09:17 and 10:17; 12:17 and
+  14:17 were not in that grid) re-run at 0 % slippage over BL-104's 488 days give its net, worst
+  day and trade count to the rupee (`results/regression0/`). Smoke at 1 %, fit half: the NIFTY
+  09:17 template +₹40 a lot-day with a lower bound of −₹90 (whole window −₹85).

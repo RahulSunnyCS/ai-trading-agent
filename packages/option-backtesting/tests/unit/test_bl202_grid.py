@@ -179,6 +179,12 @@ def test_signature_is_the_days_run_not_the_to_flag(tmp_path: Path) -> None:
     result = {
         "rows": [{"cohort": "B_N_0917", "label": "a", "net_inr": 1.0}],
         "matrix": np.zeros((2, 1), dtype=np.float32),
+        "aux": {
+            "stopped": np.zeros((2, 1), dtype=np.uint8),
+            "win_sum": np.zeros((2, 1), dtype=np.float32),
+            "loss_sum": np.zeros((2, 1), dtype=np.float32),
+            "charges": np.zeros((2, 1), dtype=np.float32),
+        },
         "labels": ["a"],
         "days": [d.isoformat() for d in days],
         "skipped": {},
@@ -186,5 +192,106 @@ def test_signature_is_the_days_run_not_the_to_flag(tmp_path: Path) -> None:
     }
     runner.write_part(tmp_path, "B_N_0917", result)
     assert runner.part_matches(tmp_path, "B_N_0917", sig)
+    assert set(np.load(tmp_path / "series" / "B_N_0917.aux.npz").files) == set(result["aux"])
     assert not runner.part_matches(tmp_path, "B_N_0917", {**sig, "slippage": 0.0})
     assert not runner.part_matches(tmp_path, "B_S_0917", sig)
+
+
+# --- the scorer: the half split, the bootstrap, the drawdown and the gates -------------------
+
+
+def _load_scorer():
+    path = GRID_PY.with_name("score.py")
+    spec = importlib.util.spec_from_file_location("bl202_score", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules["bl202_score"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_half_split_is_at_fit_to() -> None:
+    import numpy as np
+
+    score = _load_scorer()
+    days = np.array(["2025-10-07", "2025-10-08", "2025-10-09"], dtype="datetime64[D]")
+    assert score.half_mask(days, "fit").tolist() == [True, True, False]
+    assert score.half_mask(days, "test").tolist() == [False, False, True]
+    assert score.half_mask(days, "all").all()
+
+
+def test_drawdown_and_ulcer_match_the_runner() -> None:
+    import numpy as np
+
+    score, runner = _load_scorer(), _load_runner()
+    rng = np.random.default_rng(1)
+    net = rng.normal(-20, 800, size=(120, 7))
+    dd, ulcer = score.drawdown_stats(net)
+    for j in range(net.shape[1]):
+        values = net[:, j].tolist()
+        assert dd[j] == pytest.approx(runner.max_drawdown(values)[0])
+        assert ulcer[j] == pytest.approx(runner.ulcer_index(values))
+
+
+def test_bootstrap_is_paired_seeded_and_bounded() -> None:
+    import numpy as np
+
+    score = _load_scorer()
+    n = 247
+    counts = score.block_starts(n)
+    assert counts.shape == (score.BOOTSTRAP["resamples"], n)
+    # Every resample draws ceil(n / block) blocks of `block` days.
+    blocks = -(-n // score.BOOTSTRAP["block"])
+    assert np.all(counts.sum(axis=1) == blocks * score.BOOTSTRAP["block"])
+    assert np.array_equal(counts, score.block_starts(n))  # the seed makes it reproducible
+    rng = np.random.default_rng(2)
+    net = rng.normal(50, 1000, size=(n, 3))
+    net[:, 2] = 7.0  # a constant series has a lower bound equal to itself
+    means = score.bootstrap_means(net, counts)
+    lb = score.lower_bound(means)
+    assert lb[2] == pytest.approx(7.0)
+    assert (lb[:2] < net[:, :2].mean(axis=0)).all()
+    # Paired: the lower bound of a difference is the bound of the same resamples' differences.
+    diff = score.lower_bound(means - means[:, [2]])
+    assert diff[2] == pytest.approx(0.0)
+    assert diff[0] == pytest.approx(lb[0] - 7.0)
+
+
+def test_gates_are_the_registered_ones() -> None:
+    score = _load_scorer()
+    good = {
+        "n_days": 240,
+        "sessions": 247,
+        "entry_hit_rate": 0.5,
+        "net_inr": 1.0,
+        "profit_factor": 1.2,
+        "stop_frequency": 0.3,
+        "worst5_inr": -8000.0,
+    }
+    assert score.failed_gates(good) == []
+    assert score.failed_gates({**good, "n_days": 200}) == ["coverage"]
+    assert score.failed_gates({**good, "entry_hit_rate": 0.39}) == ["entry_hit_rate"]
+    assert score.failed_gates({**good, "net_inr": 0.0}) == ["net"]
+    assert score.failed_gates({**good, "profit_factor": 1.04}) == ["profit_factor"]
+    assert score.failed_gates({**good, "stop_frequency": 0.61}) == ["stop_frequency"]
+    assert score.failed_gates({**good, "worst5_inr": -15001.0}) == ["worst5"]
+    assert score.failed_gates({**good, "stop_frequency": 0.6, "worst5_inr": -15000.0}) == []
+
+
+def test_neighbours_follow_the_chains() -> None:
+    score = _load_scorer()
+    params = grid.cells("N", "09:17", with_template=False)[0].params
+    assert params["trail"] is None
+    keys = score.neighbour_keys(params)
+    trails = {dict(k)["trail"] for k in keys if dict(k)["trail"] != params["trail"]}
+    # None sits on both chains: next to [1,1]pts and next to [20,10]%.
+    assert trails == {("pts", 1, 1), ("pct", 20, 10)}
+    pts3 = score.neighbour_keys({**params, "trail": ("pts", 3, 1)})
+    assert {dict(k)["trail"] for k in pts3 if dict(k)["trail"] != ("pts", 3, 1)} == {("pts", 1, 1)}
+
+
+def test_test_half_needs_a_finalist_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    score = _load_scorer()
+    monkeypatch.setattr(sys, "argv", ["score.py", "--tag", "nothing", "--half", "test"])
+    with pytest.raises(SystemExit, match="finalists"):
+        score.main()

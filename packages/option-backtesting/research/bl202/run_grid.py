@@ -3,8 +3,10 @@
 A job is one cohort (index, slot): its template is loaded once, every cell is built in memory
 (`grid.build`; strategy YAMLs are never written), and each day is loaded ONCE and run through
 every cell. The worker returns one summary row per cell and the cell x day matrix of daily net
-after slippage and charges; the parent writes the matrix (`series/<cohort>.npy` + `.json`) BEFORE
-the checkpoint part (`parts/<cohort>.csv`), so a part on disk always has its series. A job whose
+after slippage and charges (plus, in `series/<cohort>.aux.npz`, the day x cell day-stop flags,
+winning and losing trade sums and charges, so `score.py` can gate the fit and test halves apart);
+the parent writes the series (`series/<cohort>.npy`, `.aux.npz`, `.json`) BEFORE the checkpoint
+part (`parts/<cohort>.csv`), so a part on disk always has its series. A job whose
 part exists with the same signature is skipped, which makes the run resumable. At the end the
 parts are concatenated into `B_summary.csv`.
 
@@ -166,9 +168,16 @@ class Stats:
         self.mtm_stop_days = 0
         self.exit_counts = dict.fromkeys(EXIT_REASONS, 0)
         self.outlay_sum = self.outlay_peak = 0.0  # long premium paid per entry day
+        # Per-day series beside the net: what the scorer needs to gate each half on its own
+        # (backlog/BL-202 Phase 0: the gates are judged on the fit half, the test half apart).
+        self.day_stopped: list[bool] = []
+        self.day_win: list[float] = []  # winning trades' net that day
+        self.day_loss: list[float] = []  # losing trades' net that day (<= 0)
+        self.day_charges: list[float] = []
 
     def add(self, result: DayResult) -> None:
         charges = charges_today = outlay = 0.0
+        win = loss = 0.0
         seen: set[str] = set()
         if result.trades:
             self.entry_days += 1
@@ -183,9 +192,11 @@ class Stats:
             if net > 0:
                 self.n_win += 1
                 self.sum_win += net
+                win += net
             elif net < 0:
                 self.n_loss += 1
                 self.sum_loss += net
+                loss += net
             if trade.leg_id == "ce":
                 self.ce_entries += 1
                 self.ce_net += net
@@ -203,7 +214,12 @@ class Stats:
                 self.exit_counts[trade.exit_reason] += 1
             if trade.position == "buy":
                 outlay += trade.entry_price * trade.qty
-        self.mtm_stop_days += "overall sl" in (result.stopped_by or "").lower()
+        stopped = "overall sl" in (result.stopped_by or "").lower()
+        self.mtm_stop_days += stopped
+        self.day_stopped.append(stopped)
+        self.day_win.append(win)
+        self.day_loss.append(loss)
+        self.day_charges.append(charges)
         self.gross_sum += result.gross
         self.positive_gross += max(0.0, result.gross)
         self.charges_sum += charges
@@ -337,10 +353,17 @@ def run_cohort(
         row.update(stat.finish())
         rows.append(row)
     matrix = np.array([s.values for s in stats], dtype=np.float32).T  # days x cells
+    aux = {
+        "stopped": np.array([s.day_stopped for s in stats], dtype=np.uint8).T,
+        "win_sum": np.array([s.day_win for s in stats], dtype=np.float32).T,
+        "loss_sum": np.array([s.day_loss for s in stats], dtype=np.float32).T,
+        "charges": np.array([s.day_charges for s in stats], dtype=np.float32).T,
+    }
     seconds = time.monotonic() - started
     return {
         "rows": rows,
         "matrix": matrix,
+        "aux": aux,
         "labels": [c.label for c in cells],
         "days": [d.isoformat() for d in used],
         "skipped": {**skipped, **{f"cell:{k}": v for k, v in invalid.items()}},
@@ -405,6 +428,7 @@ def write_part(out_dir: Path, name: str, result: dict[str, Any]) -> None:
     series_dir.mkdir(parents=True, exist_ok=True)
     parts_dir.mkdir(parents=True, exist_ok=True)
     np.save(series_dir / f"{name}.npy", result["matrix"])
+    np.savez(series_dir / f"{name}.aux.npz", **result["aux"])
     (series_dir / f"{name}.json").write_text(
         json.dumps(
             {
