@@ -250,9 +250,8 @@ def days(root: Path, start: date | None = None, end: date | None = None) -> list
             warning_peak = max(peaks) if peaks else None
             has_peak = broker == PEAK_BROKER
             peak = max(upfront, warning_peak or 0) if has_peak else None
-            mine = (
-                (captured or {}).get(broker) if _trades_here(book, day, broker, account) else None
-            )
+            here = _trades_here(book, day, broker, account, statements[day])
+            mine = (captured or {}).get(broker) if here else None
             lots = mine["lots"] if mine else None
             collateral = split_collateral(line)
             available = float(total.get("available") or 0)
@@ -281,9 +280,12 @@ def days(root: Path, start: date | None = None, end: date | None = None) -> list
     return rows
 
 
-def _trades_here(book: store.Book, day: date, broker: str, account: str) -> bool:
+def _trades_here(
+    book: store.Book, day: date, broker: str, account: str, statements: list[dict]
+) -> bool:
     """Whether the capture's lots for `broker` are this account's: the account with the broker's
-    contract note that day, or the broker's only account in the store."""
+    contract note that day; without one (a note not in yet), the broker's account with the most
+    margin available that day, the one that trades."""
     noted = [
         ln["account"]
         for ln in book.fno_lines(day)
@@ -291,8 +293,9 @@ def _trades_here(book: store.Book, day: date, broker: str, account: str) -> bool
     ]
     if noted:
         return account in noted
-    known = [a for a in book.accounts((broker,))]
-    return len(known) <= 1
+    mine = [s for s in statements if s.get("broker") == broker]
+    biggest = max(mine, key=lambda s: (s.get("total") or {}).get("available") or 0, default=None)
+    return biggest is not None and biggest.get("account") == account
 
 
 def table(rows: list[dict], n: int = DEFAULT_DAYS, broker: str = PEAK_BROKER) -> dict:
@@ -319,11 +322,12 @@ def report(
     root: Path, start: date | None = None, end: date | None = None, n: int = DEFAULT_DAYS
 ) -> dict:
     """What `obt realised margin` and GET /legwise/contract-notes/margin show."""
-    rows = days(root, start, end)
+    every = days(root, None, end)  # the table looks back past `start`; read the store once
+    rows = [r for r in every if start is None or r["day"] >= start.isoformat()]
     book = store.load_cached(root)
     return {
         "days": rows,
-        "table": table(days(root, None, end), n),
+        "table": table(every, n),
         "interest": interest_rate(book, end),
         "as_of": datetime.now().isoformat(timespec="seconds"),
     }

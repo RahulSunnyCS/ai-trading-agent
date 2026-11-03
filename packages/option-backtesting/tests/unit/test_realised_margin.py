@@ -287,3 +287,40 @@ def test_the_margin_route(tmp_path, monkeypatch):
     assert body["days"][0]["account"] == "angelone/R1"
     assert set(body["table"]) == set(margin.DAY_TYPES)
     assert client.get("/legwise/contract-notes/margin?days=0").status_code == 422
+
+
+def test_without_a_note_the_lots_go_to_the_brokers_biggest_account(tmp_path):
+    d = NORMAL
+    _jsonl(
+        tmp_path / "contract-notes" / "margin" / f"{d}.jsonl",
+        [
+            _statement(d, "finvasia", "SMALL", funds=1000, available=1000),
+            _statement(d, "finvasia", "BIG", funds=1000, available=900000),
+        ],
+    )
+    _capture(
+        tmp_path,
+        d,
+        [
+            {
+                "broker": "finvasia",
+                "variant": "N_x_0917",
+                "source": "tool",
+                "traded": True,
+                "multiplier": 3,
+                "fills": [],
+            }
+        ],
+    )
+    lots = {r["account"]: r["lots"] for r in margin.days(tmp_path)}
+    assert lots == {"finvasia/SMALL": None, "finvasia/BIG": 3}
+
+
+def test_report_lists_the_asked_days_and_tables_everything_before(tmp_path):
+    for d in ("2026-10-27", NORMAL):
+        _jsonl(
+            tmp_path / "contract-notes" / "margin" / f"{d}.jsonl",
+            [_statement(d, "angelone", "R1", funds=1, available=10, upfront=5)],
+        )
+    out = margin.report(tmp_path, date.fromisoformat(NORMAL))
+    assert [r["day"] for r in out["days"]] == [NORMAL]
