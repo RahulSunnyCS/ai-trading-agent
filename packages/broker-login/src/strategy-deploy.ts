@@ -3,10 +3,13 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
-import { type Page, chromium } from 'playwright';
+import { type Locator, type Page, chromium } from 'playwright';
 import { BASE_URL } from './algotest.js';
 import {
   type Automation,
+  type Book,
+  type Broker,
+  algotestDeployBrokers,
   algotestMultiplierRefusal,
   describeSource,
   readAutomation,
@@ -15,9 +18,11 @@ import {
 import { normalizePhone, readTelegramConfig } from './config.js';
 import {
   ACTIVATE_LEAD_SECONDS,
+  BROKER_LABELS,
   type LiveState,
   type Pick,
   SETUP_PENDING,
+  checkBrokerSheet,
   istMinutes,
   nothingOnAlgotest,
   parseLive,
@@ -48,8 +53,9 @@ import { visibleWithin } from './wait.js';
  * Only a recorded export for today (`obt rotation algotest-export`, source "recorded") is accepted.
  * Each pick is set up with AlgoTest's defaults as seen on 2026-10-19 (docs/algotest-execution.md §7:
  * multiplier 1, NRML legs, no execution day ticked, so the deploy is for today only), then
- * activated. What "Activate" asks has not been seen yet: if anything appears after the click that
- * this script does not recognise, it stops, screenshots and alerts, and never clicks it.
+ * activated: "Activate" opens the broker sheet (BL-197, seen 2026-11-03), where every broker whose
+ * AlgoTest row uploads the book is ticked, one instance each. If anything else appears, it stops,
+ * screenshots and alerts, and never clicks it.
  */
 
 const VIEWPORT = { width: 1440, height: 900 };
@@ -133,7 +139,47 @@ async function setupSheet(page: Page, pick: Pick): Promise<void> {
   await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
 }
 
-async function deployOne(page: Page, pick: Pick): Promise<string> {
+/** What /live shows for `name` after a stop, so nobody deploys it twice by hand. */
+async function deployedState(page: Page, name: string, before: number): Promise<string> {
+  const now = await readLive(page)
+    .then((s) => s.rows.find((r) => r.name === name)?.deployed)
+    .catch(() => undefined);
+  return now === undefined
+    ? '/live could not be read: check it before deploying this by hand, it may be live already'
+    : now > before
+      ? `/live shows ${now} Deployed (was ${before}): it IS deployed, do not deploy it again by hand`
+      : `/live shows ${now} Deployed (was ${before}): not deployed`;
+}
+
+/**
+ * Tick exactly the wanted brokers in the open broker sheet (BL-197). Each row's checkbox is
+ * read-only and the row takes the click; every box is read back, so a click that missed stops.
+ */
+async function tickBrokers(sheet: Locator, brokers: readonly Broker[]): Promise<void> {
+  const check = checkBrokerSheet(await sheet.innerText(), brokers);
+  if (check.missing.length) throw new Error(`broker sheet lists no ${check.missing.join(', ')}`);
+  if (check.notLoggedIn.length)
+    throw new Error(`${check.notLoggedIn.join(', ')} not LOGGED IN on the broker sheet`);
+  const wanted = new Set(brokers.map((b) => BROKER_LABELS[b] ?? b));
+  const boxes = sheet.locator('input[type=checkbox][readonly]');
+  for (let i = 0; i < (await boxes.count()); i++) {
+    const box = boxes.nth(i);
+    const row = box.locator('xpath=..');
+    const label = (await row.innerText()).trim();
+    const want = [...wanted].some((w) => label.startsWith(`${w} - `));
+    const checked = () => box.evaluate((e) => (e as HTMLInputElement).checked);
+    if ((await checked()) !== want) await row.click();
+    if ((await checked()) !== want)
+      throw new Error(`could not ${want ? 'tick' : 'untick'} "${label}" on the broker sheet`);
+  }
+  const ticked = await boxes.evaluateAll(
+    (els) => els.filter((e) => (e as HTMLInputElement).checked).length,
+  );
+  if (ticked !== wanted.size)
+    throw new Error(`${ticked} broker(s) ticked on the broker sheet, expected ${wanted.size}`);
+}
+
+async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Promise<string> {
   const { name } = pick;
   await setupSheet(page, pick);
 
@@ -145,27 +191,54 @@ async function deployOne(page: Page, pick: Pick): Promise<string> {
   await livePage.row(page, name).click();
   await livePage.activate(page).click();
 
-  // Anything that pops up now (a broker choice, a confirmation) has never been seen: stop.
+  // BL-197: Activate opens the broker sheet (seen 2026-11-03). Anything else is unknown: stop.
+  const sheet = livePage.brokerSheet(page, name);
+  if (!(await visibleWithin(sheet, 8_000))) {
+    const popup = livePage.popup(page).first();
+    const raw = (await visibleWithin(popup, 1_000))
+      ? await popup.innerText({ timeout: 1_000 }).catch(() => '(text not readable)')
+      : '(nothing opened)';
+    const text = raw.replace(/\s+/g, ' ').slice(0, 200);
+    throw new Error(
+      `Activate did not open the broker sheet: ${text}. ${await deployedState(page, name, before)}`,
+    );
+  }
+  await tickBrokers(sheet, brokers);
+  if (secondsUntil(pick.entry) < ACTIVATE_LEAD_SECONDS) {
+    await sheet.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
+    throw new TooLate('TOO LATE: its entry minute came while choosing brokers, not activated');
+  }
+  const go = livePage.brokerSheetActivate(sheet);
+  const label = (await go.innerText()).trim();
+  if (label !== `Activate on ${brokers.length} Broker${brokers.length === 1 ? '' : 's'}`)
+    throw new Error(
+      `the broker sheet's button reads "${label}", expected ${brokers.length} broker(s)`,
+    );
+  await go.click();
+  await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
+
+  // Nothing opened after the sheet on 2026-11-03: anything that does now is unknown, never clicked.
   const popup = livePage.popup(page).first();
-  if (await visibleWithin(popup, 4_000)) {
-    // the popup may already be gone again: never wait the page default for its text
+  if (await visibleWithin(popup, 3_000)) {
     const raw = await popup.innerText({ timeout: 1_000 }).catch(() => '(text not readable)');
     const text = raw.replace(/\s+/g, ' ').slice(0, 200);
-    // Activate may already have deployed it: say what /live shows, so nobody deploys it twice
-    const now = await readLive(page)
-      .then((s) => s.rows.find((r) => r.name === name)?.deployed)
-      .catch(() => undefined);
-    const state =
-      now === undefined
-        ? '/live could not be read: check it before deploying this by hand, it may be live already'
-        : now > before
-          ? `/live shows ${now} Deployed (was ${before}): it IS deployed, do not deploy it again by hand`
-          : `/live shows ${now} Deployed (was ${before}): not deployed`;
-    throw new Error(`Activate opened something not yet seen, not confirmed: ${text}. ${state}`);
+    throw new Error(
+      `the broker sheet's Activate opened something not yet seen, not confirmed: ${text}. ${await deployedState(page, name, before)}`,
+    );
   }
-  const after = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
-  if (after <= before) throw new Error('not shown as deployed after Activate');
-  return `deployed (${after} Deployed)`;
+  // /live may lag the sheet: read it back up to three times before calling it a failure
+  let after = before;
+  for (let i = 0; i < 3 && after !== before + brokers.length; i++) {
+    if (i) await page.waitForTimeout(3_000);
+    after = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
+  }
+  if (after !== before + brokers.length)
+    throw new Error(
+      `/live shows ${after} Deployed after Activate (was ${before}), expected ${before + brokers.length}: check it`,
+    );
+  const on = brokers.map((b) => BROKER_LABELS[b] ?? b).join(' + ');
+  return `deployed on ${on} (${after} Deployed)`;
 }
 
 async function main(): Promise<number> {
@@ -284,6 +357,16 @@ async function main(): Promise<number> {
       return 0;
     }
   }
+  // BL-197: one instance per AlgoTest row that uploads this book, ticked on the broker sheet
+  const brokers: Broker[] = automation
+    ? algotestDeployBrokers(automation, manifest.book as Book)
+    : [];
+  if (values.apply && !values.setup && !values.check && !brokers.length) {
+    console.error(
+      `no AlgoTest row uploads the ${manifest.book.toUpperCase()} list: no broker to deploy to`,
+    );
+    return 1;
+  }
   const picks: Pick[] = [];
   for (const s of manifest.strategies) {
     const doc = JSON.parse(await readFile(join(resolve(dir), s.file), 'utf8'));
@@ -345,7 +428,10 @@ async function main(): Promise<number> {
       const p = planDeploy(picks, live, istMinutes());
       if (p.refused) lines.push(`refused: ${p.refused}`);
       if (p.already.length) lines.push(`already deployed: ${p.already.join(', ')}`);
-      if (p.deploy.length) lines.push(`deploy: ${p.deploy.map((d) => d.name).join(', ')}`);
+      if (p.deploy.length)
+        lines.push(
+          `deploy: ${p.deploy.map((d) => d.name).join(', ')} on ${brokers.map((b) => BROKER_LABELS[b] ?? b).join(' + ') || '(no broker)'}`,
+        );
       if (p.tooLate.length) lines.push(`TOO LATE, not deployed: ${p.tooLate.join(', ')}`);
       if (p.missing.length) lines.push(`NOT IN ALGOTEST, not deployed: ${p.missing.join(', ')}`);
       if (p.noSlot.length) lines.push(`NO FREE SLOT, not deployed: ${p.noSlot.join(', ')}`);
@@ -355,7 +441,7 @@ async function main(): Promise<number> {
         const ledger = join(resolve(dir), '..', '..', 'deploy-ledger.jsonl');
         for (const pick of p.deploy) {
           try {
-            const verdict = await deployOne(page, pick);
+            const verdict = await deployOne(page, pick, brokers);
             lines.push(`✅ ${pick.name}: ${verdict}`);
             await appendFile(
               ledger,

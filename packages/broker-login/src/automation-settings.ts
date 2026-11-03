@@ -197,6 +197,17 @@ export function uploadBooks(a: Automation, platform: Platform, broker?: Broker):
 }
 
 /**
+ * BL-197: the brokers a book is deployed to on AlgoTest, one instance each: every AlgoTest row
+ * that uploads the book (AlgoTest is one account; its broker sheet asks which brokers to use).
+ */
+export function algotestDeployBrokers(a: Automation, book: Book): Broker[] {
+  return BROKERS.filter((b) => {
+    const row = effectiveRow(a, 'algotest', b);
+    return row.upload && row.list === book;
+  });
+}
+
+/**
  * Whether the tool may ENABLE (deploy) a Quantiply account's algos, and which list they come
  * from: the deploy master switch, and the account's row uploading a list (an account the tool
  * puts nothing into has nothing of the tool's to enable). `why` says what held it back.

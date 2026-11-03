@@ -45,6 +45,10 @@ combination ③; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26�
 - Then: the deployer activates the evening list (the export for today, `source: preview`), in the
   `quantiply` job group right behind `broker-login`; the 09:16 run and the 09:18 top-up stop deploying
   or uploading for AlgoTest (the evening list trades).
+- Seen 2026-11-03: Activate opens a "Select Broker for <name>" sheet listing both brokers (LOGGED IN), nothing
+  ticked; its button reads "Activate on n Brokers"; nothing to confirm after it; one RUNNING card per broker.
+  The deployer now ticks every broker whose AlgoTest row uploads the list and checks the count (first step of
+  this phase, used by the 09:16 job until the after-login run exists).
 - **Done when:** one morning activated by the tool, read back on /live, with the owner watching.
 
 ## Log
@@ -52,3 +56,7 @@ combination ③; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26�
 - 2026-11-02 — created from the owner's request; decisions recorded above. Phase 1 built and run on
   the 2026-11-03 picks (all three "Ready to deploy", Candle Close). For 2026-11-03 the owner activates by
   hand; the 09:16 auto-deploy should be off (Automated deployment) so it does not act on a 09:16 change.
+- 2026-11-03 — the owner activated `T1 · N_p80_0947` by hand on both brokers (Angel One + Finvasia, the
+  owner's choice: both AlgoTest rows upload T1) while Claude read the broker sheet. The owner then asked the
+  tool to do the other two: the deployer learned the broker sheet (probed live: both ticked, "Activate on 2
+  Brokers", Cancel), and the 09:16 `algotest-deploy` activates them, Automated deployment on.

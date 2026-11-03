@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   type LiveState,
   cardShows,
+  checkBrokerSheet,
   istMinutes,
   minutesOf,
   nothingOnAlgotest,
@@ -447,4 +448,34 @@ test('planSetup sets up every uploaded pick in entry order, never a deployed one
   assert.deepEqual(p.missing, ['T1 · N_dir_1017']);
   // the night page has no broker logged in: setting up does not need one
   assert.equal(live.brokersLoggedIn, 0);
+});
+
+// The broker sheet "Activate" opened on 2026-11-03 (innerText, the owner's session).
+const BROKER_SHEET = `Select Broker for T1 · N_p80_0947
+
+Edit Entry/Exit Timings
+0 / 2 selected
+Angel One - Rahul
+LOGGED IN
+Finvasia - Shiny
+LOGGED IN
+Cancel
+Activate`;
+
+test('broker sheet: every wanted broker listed and logged in (BL-197)', () => {
+  assert.deepEqual(checkBrokerSheet(BROKER_SHEET, ['finvasia', 'angelone']), {
+    missing: [],
+    notLoggedIn: [],
+  });
+  assert.deepEqual(checkBrokerSheet(BROKER_SHEET, ['finvasia']), { missing: [], notLoggedIn: [] });
+  const out = BROKER_SHEET.replace('Finvasia - Shiny\nLOGGED IN', 'Finvasia - Shiny\nLOGIN');
+  assert.deepEqual(checkBrokerSheet(out, ['finvasia', 'angelone']), {
+    missing: [],
+    notLoggedIn: ['Finvasia'],
+  });
+  const gone = BROKER_SHEET.replace('Angel One - Rahul\nLOGGED IN\n', '');
+  assert.deepEqual(checkBrokerSheet(gone, ['angelone']), {
+    missing: ['Angel One'],
+    notLoggedIn: [],
+  });
 });
