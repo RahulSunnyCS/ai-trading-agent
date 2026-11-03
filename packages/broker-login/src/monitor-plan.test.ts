@@ -656,6 +656,25 @@ test('BL-205: the evening plan gives the need: lots × per-lot + buffer, no seco
     },
   ]);
   assert.match(withBuy.text, /need ~₹4,45,000 for 2 picks \(2 lots × ₹2,00,000 a lot \+10%\)/);
+  // Shoonya under the strict 50:50 rule: ₹8 L free but ₹2 L cash, so ₹4 L usable
+  const capped = marginMessage('2026-11-04', [
+    {
+      account: 'Finvasia',
+      uses: ['AlgoTest T1'],
+      picks: [pick('w1', 1), pick('w2', 1)],
+      free: 800000,
+      source: 's',
+      planned: { ...planned, cashCap: 400000 },
+    },
+  ]);
+  assert.match(capped.text, /free ₹8,00,000 \(₹4,00,000 usable under 50:50\), need ~₹4,40,000/);
+  assert.match(capped.text, /SHORT by ₹40,000/);
+  assert.deepEqual(
+    parseMarginPlan({ ...doc, accounts: { finvasia: { perLot: 1, cash: 5 } } }, '2026-11-04')?.cash,
+    {
+      finvasia: 5,
+    },
+  );
   assert.match(m.text, /Need: last evening's per-lot figure/);
 });
 

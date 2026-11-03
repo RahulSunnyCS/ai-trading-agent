@@ -298,7 +298,8 @@ week, until disabled.
   AlgoTest's broker login; not today's = not read), Angel One = SmartAPI `getRMS` `net`. BL-205 Phase 4: when last
   evening's result message saved `TRADING_DATA_ROOT/rotation/margin-plan/<day>.json` (`parseMarginPlan`), the need
   is today's lots (each pick's largest leg lots) × its per-lot figure (the most a lot needed on recent days of
-  the day's type, from the margin statements) + its buffer, and enough is ok (no second 20% cushion); the
+  the day's type, from the margin statements) + its buffer, and enough is ok (no second 20% cushion; Shoonya's
+  free capped at twice last evening's cash, the strict 50:50 rule of the evening block); the
   margin.csv estimate stays the fallback. The free figures read go into the state (`margin.free`) so the next
   evening's block can set Shoonya's 09:05 AlgoTest figure beside its own.
 - **Deploy** (`checkAlgoTest`, `checkQuantiply`): per BL-140 row that uploads. AlgoTest: each pick deployed once

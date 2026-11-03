@@ -601,6 +601,8 @@ export interface MarginPlan {
   bufferPct: number;
   /** the per-lot requirement for each broker account the block covered */
   perLot: Partial<Record<string, number>>;
+  /** each account's cash half last evening (funds, pledged SGBs and liquid ETFs), for 50:50 */
+  cash: Partial<Record<string, number>>;
 }
 
 /** The plan file for `day`, or null when it is not one (wrong day, no per-lot figure). */
@@ -609,15 +611,17 @@ export function parseMarginPlan(json: unknown, day: string): MarginPlan | null {
     day?: unknown;
     type?: unknown;
     bufferPct?: unknown;
-    accounts?: Record<string, { perLot?: unknown }>;
+    accounts?: Record<string, { perLot?: unknown; cash?: unknown }>;
   };
   if (!doc || doc.day !== day || typeof doc.bufferPct !== 'number') return null;
   const perLot: Record<string, number> = {};
+  const cash: Record<string, number> = {};
   for (const [broker, a] of Object.entries(doc.accounts ?? {})) {
     if (typeof a?.perLot === 'number' && a.perLot > 0) perLot[broker] = a.perLot;
+    if (typeof a?.cash === 'number') cash[broker] = a.cash;
   }
   if (!Object.keys(perLot).length) return null;
-  return { day, type: String(doc.type ?? ''), bufferPct: doc.bufferPct, perLot };
+  return { day, type: String(doc.type ?? ''), bufferPct: doc.bufferPct, perLot, cash };
 }
 
 /** A broker's per-lot figure from the plan: its own, else any account's (they share one table). */
@@ -647,8 +651,9 @@ export interface AccountMargin {
   source: string;
   /** a list whose picks for today could not be read: the need is then unknown */
   picksMissing?: boolean;
-  /** BL-205: the evening plan's per-lot figure and buffer, used for the need when present */
-  planned?: { perLot: number; bufferPct: number; type: string };
+  /** BL-205: the evening plan's per-lot figure and buffer, used for the need when present;
+   * `cashCap` (Shoonya, the strict 50:50 rule): at most twice last evening's cash is usable */
+  planned?: { perLot: number; bufferPct: number; type: string; cashCap?: number };
 }
 
 const MARK: Record<MarginVerdict, string> = { ok: '✅', tight: '⚠️', short: '❌', unknown: '❔' };
@@ -672,10 +677,14 @@ export function marginMessage(
       : a.picks.reduce((s, p) => s + p.inr, 0);
     if (!plan) estimated = true;
     const unest = (plan ? bought : a.picks).filter((p) => p.unestimated).map((p) => p.name);
+    const usable =
+      a.free !== null && plan?.cashCap !== undefined
+        ? Math.max(0, Math.min(a.free, plan.cashCap))
+        : a.free;
     const judged: MarginVerdict = plan
-      ? a.free === null
+      ? usable === null
         ? 'unknown'
-        : a.free >= need
+        : usable >= need
           ? 'ok'
           : 'short'
       : marginVerdict(a.free, need);
@@ -683,7 +692,11 @@ export function marginMessage(
     const v: MarginVerdict =
       judged === 'short' ? 'short' : a.picksMissing || unest.length ? 'unknown' : judged;
     if (v !== 'ok') ok = false;
-    const free = a.free === null ? 'free not read' : `free ${inr(a.free)}`;
+    const capped =
+      usable !== null && a.free !== null && usable < a.free
+        ? ` (${inr(usable)} usable under 50:50)`
+        : '';
+    const free = a.free === null ? 'free not read' : `free ${inr(a.free)}${capped}`;
     const count = `${a.picks.length} pick${a.picks.length === 1 ? '' : 's'}`;
     const basis = plan
       ? `${lots} lot${lots === 1 ? '' : 's'} × ${inr(plan.perLot)} a lot +${plan.bufferPct}%`
@@ -697,7 +710,7 @@ export function marginMessage(
           : `need ~${inr(need)} for ${count}`;
     const tail =
       v === 'short'
-        ? ` — SHORT by ${inr(need - (a.free ?? 0))}`
+        ? ` — SHORT by ${inr(need - (usable ?? 0))}`
         : v === 'tight'
           ? ' — under a 20% cushion'
           : '';

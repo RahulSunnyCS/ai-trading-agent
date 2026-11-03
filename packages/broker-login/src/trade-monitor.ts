@@ -877,7 +877,14 @@ class Monitor {
       }
       const perLot = planPerLot(plan, broker);
       if (plan && perLot !== null) {
-        account.planned = { perLot, bufferPct: plan.bufferPct, type: plan.type };
+        const cash = plan.cash[broker];
+        account.planned = {
+          perLot,
+          bufferPct: plan.bufferPct,
+          type: plan.type,
+          // Shoonya is held to the 50:50 rule strictly, as in the evening block
+          ...(broker === 'finvasia' && cash !== undefined ? { cashCap: 2 * cash } : {}),
+        };
       }
       accounts.push(account);
       free[broker] = account.free;
