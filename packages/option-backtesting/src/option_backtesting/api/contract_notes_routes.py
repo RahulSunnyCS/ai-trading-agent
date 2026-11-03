@@ -9,6 +9,8 @@ figure. One route writes: `PUT /inputs/{day}`, the owner's Algos and Capital for
     GET /legwise/contract-notes/day/{day}                    one session in full
     GET /legwise/contract-notes/money?from=&to=              ledger events
     GET /legwise/contract-notes/momentum?from=&to=           the Zerodha notes
+    GET /legwise/contract-notes/margin?from=&to=&days=       BL-205: margin per account and day,
+                                                             the per-lot table by day type
     PUT /legwise/contract-notes/inputs/{day}                 {algos?, capital_total?, capital?}
 
 Errors come back as `{"error": ...}`, as in the rotation routes.
@@ -167,6 +169,17 @@ def get_momentum(
     from ..realised import views
 
     return _read("momentum", views.momentum, from_, to)
+
+
+@router.get("/margin")
+def get_margin(
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None),
+    days: int = Query(default=6, ge=1, le=60),
+) -> Any:
+    from ..realised import margin
+
+    return _read("margin", margin.report, from_, to, n=days)
 
 
 @router.get("/day/{day}")
