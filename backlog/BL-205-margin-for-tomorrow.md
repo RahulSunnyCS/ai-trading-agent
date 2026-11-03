@@ -252,3 +252,9 @@ the reading predates today's close.
   ₹2 L short of half the need (about ₹58 a day of interest). Not built: the first fortnight's
   comparison with Shoonya's morning AlgoTest figure (the 09:05 monitor does not store what it
   reads); Phase 4 adds that.
+- 2026-11-04 — Phase 4 built (the owner asked for every phase): the block saves tomorrow's lots,
+  per-lot figure and buffer to `rotation/margin-plan/<day>.json`; the 09:05 check
+  (`MARGIN_CHECK`, still off) takes its need from it with today's lots and judges enough as ok
+  (the buffer is the cushion), margin.csv stays its fallback, and it stores the free figures it
+  reads, which the next evening's block shows for Shoonya beside last evening's figure (the
+  first-fortnight comparison of the owner's answer 2). Nothing switched on.

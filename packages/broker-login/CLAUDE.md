@@ -295,7 +295,12 @@ week, until disabled.
   target x the lot size (`lotSize`), and "not estimated" for a leg bought by strike; every pick at once, no hedge
   benefit; ok with a 20% cushion. Picks from the exports of the rows that upload (`latest-<book>.json`), per
   broker account across both platforms. Free: Finvasia = AlgoTest `GET /brokers` `margin.available` (as of
-  AlgoTest's broker login; not today's = not read), Angel One = SmartAPI `getRMS` `net`.
+  AlgoTest's broker login; not today's = not read), Angel One = SmartAPI `getRMS` `net`. BL-205 Phase 4: when last
+  evening's result message saved `TRADING_DATA_ROOT/rotation/margin-plan/<day>.json` (`parseMarginPlan`), the need
+  is today's lots (each pick's largest leg lots) × its per-lot figure (the most a lot needed on recent days of
+  the day's type, from the margin statements) + its buffer, and enough is ok (no second 20% cushion); the
+  margin.csv estimate stays the fallback. The free figures read go into the state (`margin.free`) so the next
+  evening's block can set Shoonya's 09:05 AlgoTest figure beside its own.
 - **Deploy** (`checkAlgoTest`, `checkQuantiply`): per BL-140 row that uploads. AlgoTest: each pick deployed once
   per row that holds it, on that row's broker where /live's card names it (`parseDeployedOn`), multiplier 1 from
   `GET /executable-strategies` (no weekday filter; a pick it does not list is said); Quantiply: enabled once for

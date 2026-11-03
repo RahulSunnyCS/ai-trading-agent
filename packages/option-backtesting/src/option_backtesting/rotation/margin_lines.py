@@ -14,12 +14,18 @@ account that a Settings › Automation row uploads a list to, whether tomorrow's
   cash. Angel One's verdict is on the total, and a line says how far its cash is from half of what
   tomorrow needs and what the collateral interest on the gap costs a day.
 
-Read-only. `owner_lines` never raises: a failure leaves the block out of the message, never the
-message out."""
+Phase 4: the block also saves tomorrow's figures to `rotation/margin-plan/<day>.json`, which the
+09:05 margin check (`packages/broker-login`, BL-143) reads for its need, and it compares Shoonya's
+free margin as AlgoTest showed it at 09:05 (`monitor/<day>.json`) with last evening's figure.
+
+`owner_lines` never raises: a failure leaves the block out of the message, never the message
+out."""
 
 from __future__ import annotations
 
+import json
 import math
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
@@ -28,7 +34,7 @@ from pathlib import Path
 from ..realised import margin as rmargin
 from ..realised import store as rstore
 from . import automation_settings as auto
-from . import live_compare, live_lots, messages
+from . import live_compare, live_lots, messages, store
 
 PLATFORM_NAMES = {"algotest": "AlgoTest", "quantiply": "Quantiply"}
 LIST_NAMES = {"core": "Adaptive", "t1": "T1"}
@@ -209,6 +215,53 @@ def assess(
     return kind, out, rate
 
 
+def plan_path(day: date, root: Path) -> Path:
+    return store.rotation_dir(root) / "margin-plan" / f"{day.isoformat()}.json"
+
+
+def save_plan(nxt: date, kind: str, verdicts: list[Verdict], buffer_pct: int, root: Path) -> None:
+    """Tomorrow's figures for the 09:05 margin check and the next evening's comparison (atomic)."""
+    path = plan_path(nxt, root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc = {
+        "day": nxt.isoformat(),
+        "type": kind,
+        "bufferPct": buffer_pct,
+        "accounts": {
+            v.broker: {
+                "lots": v.lots,
+                "perLot": v.per_lot,
+                "needs": v.needs,
+                "free": v.free,
+                "cash": v.cash,
+                "usable": v.usable,
+            }
+            for v in verdicts
+        },
+    }
+    tmp = path.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(doc, indent=1))
+    tmp.replace(path)
+
+
+def morning_check(today: date, root: Path) -> list[str]:
+    """Shoonya's free margin as the 09:05 check read it from AlgoTest today, beside last evening's
+    figure for today; nothing when either is missing (the check is off, or no plan was saved)."""
+    try:
+        state = json.loads((root / "monitor" / f"{today.isoformat()}.json").read_text())
+        plan = json.loads(plan_path(today, root).read_text())
+    except (OSError, ValueError):
+        return []
+    seen = ((state.get("margin") or {}).get("free") or {}).get("finvasia")
+    expected = ((plan.get("accounts") or {}).get("finvasia") or {}).get("free")
+    if not isinstance(seen, (int, float)) or not isinstance(expected, (int, float)):
+        return []
+    return [
+        f"Shoonya at 09:05 today: AlgoTest showed {messages.lakhs(seen)} free "
+        f"(last evening's figure {messages.lakhs(expected)})"
+    ]
+
+
 def _short(day: str) -> str:
     """'2026-11-02' -> '2 Nov'."""
     d = date.fromisoformat(day)
@@ -291,7 +344,13 @@ def owner_lines(
             return None  # nothing uploads, or no margin statement has been read yet
         cfg = auto.margin(settings)
         kind, verdicts, rate = assess(today, nxt, accounts, root, cfg["bufferPct"], cfg["days"])
-        return render(nxt, kind, verdicts, rate, cfg["bufferPct"])
+        try:
+            save_plan(nxt, kind, verdicts, cfg["bufferPct"], root)
+        except OSError as error:
+            echo(f"margin plan not saved: {error}")
+        lines = render(nxt, kind, verdicts, rate, cfg["bufferPct"])
+        extra = morning_check(today, root)
+        return lines[:-1] + extra + lines[-1:]
     except Exception as error:  # noqa: BLE001 - the block must never hold the message back
         echo(f"margin block skipped: {type(error).__name__}: {error}")
         return None

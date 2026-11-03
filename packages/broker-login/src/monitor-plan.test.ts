@@ -49,9 +49,11 @@ import {
   parseDayWiseListed,
   parseDeployedOn,
   parseMarginCsv,
+  parseMarginPlan,
   parseRupees,
   pauseNote,
   pickNeed,
+  planPerLot,
   pnlFromSocketFrame,
   quantiplyReading,
   readMtmCardsInPage,
@@ -534,6 +536,7 @@ test('margin need: half a straddle per sold leg-lot; a bought leg by premium x l
     inr: 210000,
     borrowed: ['SENSEX'],
     unestimated: false,
+    lots: 2, // its legs' largest
   });
   const byPremium = legsFromQuantiply({
     configurations: {
@@ -591,6 +594,54 @@ test('margin verdict and message: a 20% cushion, short, unknown, not estimated',
   assert.match(m.text, /SENSEX estimated with NIFTY/);
   assert.match(m.text, /❔ Angel One .*need not known/);
   assert.match(m.text, /❔ X .*buy: bought by strike, premium not estimated/);
+});
+
+test('BL-205: the evening plan gives the need: lots × per-lot + buffer, no second cushion', () => {
+  const doc = {
+    day: '2026-11-04',
+    type: 'normal',
+    bufferPct: 10,
+    accounts: { angelone: { perLot: 200000 }, finvasia: { perLot: null } },
+  };
+  const plan = parseMarginPlan(doc, '2026-11-04');
+  assert.ok(plan);
+  assert.equal(parseMarginPlan(doc, '2026-11-05'), null); // another day's plan
+  assert.equal(parseMarginPlan({ ...doc, accounts: {} }, '2026-11-04'), null);
+  assert.equal(planPerLot(plan, 'angelone'), 200000);
+  assert.equal(planPerLot(plan, 'finvasia'), 200000); // borrows the shared table's figure
+  const pick = (name: string, lots: number) => ({
+    name,
+    inr: 1,
+    borrowed: ['SENSEX'],
+    unestimated: true,
+    lots,
+  });
+  const planned = { perLot: 200000, bufferPct: 10, type: 'normal' };
+  const m = marginMessage('2026-11-04', [
+    {
+      account: 'Angel One',
+      uses: ['AlgoTest T1'],
+      picks: [pick('dir', 2), pick('w1', 1)],
+      free: 700000, // needs 3 × ₹2,00,000 + 10% = ₹6,60,000: enough, though under 20% more
+      source: 's',
+      planned,
+    },
+    {
+      account: 'Finvasia',
+      uses: ['AlgoTest T1'],
+      picks: [pick('w1', 1), pick('w2', 1), pick('dir', 1)],
+      free: 600000,
+      source: 's',
+      planned,
+    },
+  ]);
+  assert.match(
+    m.text,
+    /✅ Angel One .*need ~₹6,60,000 for 2 picks \(3 lots × ₹2,00,000 a lot \+10%\)/,
+  );
+  assert.match(m.text, /❌ Finvasia .*SHORT by ₹60,000/);
+  assert.doesNotMatch(m.text, /estimated with NIFTY|not estimated|Estimate: half/);
+  assert.match(m.text, /Need: last evening's per-lot figure/);
 });
 
 test('AlgoTest deploy check: per BL-140 row and broker, multiplier, missing, extra, the owner’s own', () => {
