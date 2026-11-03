@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — Buy is the one Adaptive family the owner has no evidence for after slippage; the pick rule still takes it on the ranking's word |
-| **Status** | Planned (Phase 0 written 2026-11-03; nothing run) |
+| **Status** | Ready (Phase 0 written and its open questions answered by the owner 2026-11-03; nothing run) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-03 |
@@ -233,8 +233,9 @@ no pick rule: a change to the live Buy rule is a separate item that cites this o
 - **Buy is a few big days.** A 244-session fit half holds perhaps 20 days that carry a cell; a
   lower-bound ranking and the plateau rule limit the damage, but a finalist may still be three
   days. The worst-five-days gate and the "≤ 60 % from one bucket" flag are there for that.
-- **82k cells at 1 % slippage is 2–3 nights of CPU.** The runner is resumable; the Mac's cores are
-  shared with the morning jobs (08:00–09:30 is kept free) and any Momentum re-run.
+- **82k cells at 1 % slippage is about 7 hours on three workers** (BL-104 ran at 1.86 ms per
+  cell-day with two). The runner is resumable; the Mac's cores are shared with the morning jobs
+  (08:00–09:30 is kept free) and any Momentum re-run.
 - **Slippage at 1 % may be harsher than real fills** on a ₹50 option (a tick is ₹0.05, the spread
   often ₹0.10–0.30 either side: about 0.2–0.6 %). That is why 0.5 % is reported beside it; but
   the pass rules are at 1 %, the owner's choice, so the verdict errs on the cautious side.
@@ -242,6 +243,8 @@ no pick rule: a change to the live Buy rule is a separate item that cites this o
   (BL-113). Its lines are advisory on the fit half and real only on the test half.
 
 ## Open questions
+
+All six answered by the owner on 2026-11-03 (Log). Kept here as asked:
 
 1. **1 % or 0.5 % as the scoring slippage?** The owner's display figure is 0.5 %; the owner asked
    for 1 % on 2026-11-03. Written at 1 % with 0.5 % beside it. Confirm.
@@ -263,3 +266,16 @@ no pick rule: a change to the live Buy rule is a separate item that cites this o
   over 438 days at 1 % slippage; the best two Buys every day): no cut-off and no "every day" rule
   is positive after 1 % slippage and brokerage. Phase 0 written; nothing run. Open questions
   for the owner above.
+- 2026-11-03 — **owner's answers** (asked in chat, before any run): (1) score at **1 %**
+  slippage, 0.5 % beside; (2) **fit 2024-10-09 → 2025-10-08, test after**, as written; (3) grid
+  values **as written** (₹30/50/75/100, SENSEX ₹90/150/225/300; "no day stop" kept); (4)
+  asked whether the run could be shortened without losing quality, then chose the **full grid,
+  four slots, ~82k cells**, over a screened design (BL-104's 5,541 Buy cells positive at 0 %
+  re-run at 1 % at all seven slots, the new values stepped around each cohort's top 20; ~10k
+  cells). Run at night on **three workers**, about 7 hours (the item's earlier "2–3 nights" was
+  wrong: BL-104 ran at 1.86 ms per cell-day). Recorded for the record, not acted on: in BL-104's
+  Buy archive the cells above ₹100 a day at 0 % slippage used the option's own premium as the
+  range source 94 % of the time, the ₹30 / ₹90 premium 1 % of the time, and ATM / OTM1 strikes
+  (dropped from this grid) more often than any premium value; NIFTY held 75 of those 1,452
+  cells, SENSEX 1,377. Adding ATM and OTM1 back as strike values would be a one-line change to
+  `grid.py` before the SHA is recorded, and is the owner's call. Status Ready.
