@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   DEFAULT_AUTOMATION,
+  algotestDeployBrokers,
   algotestMultiplierRefusal,
   describeSource,
   effectiveRow,
@@ -197,5 +198,23 @@ describe('MTM SL per Quantiply row (BL-172)', () => {
       write(s);
       assert.throws(() => readAutomation(file), /mtmSl/);
     }
+  });
+});
+
+describe('the brokers an AlgoTest deploy is ticked on (BL-197)', () => {
+  it('every AlgoTest row that uploads the book, and none when the uploads switch is off', () => {
+    const a = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as typeof DEFAULT_AUTOMATION;
+    assert.deepEqual(algotestDeployBrokers(a, 't1'), ['finvasia']);
+    a.rows['algotest.angelone'] = { ...a.rows['algotest.finvasia'] };
+    assert.deepEqual(algotestDeployBrokers(a, 't1'), ['finvasia', 'angelone']);
+    assert.deepEqual(algotestDeployBrokers(a, 'core'), []);
+    a.rows['algotest.angelone'].list = 'core';
+    assert.deepEqual(algotestDeployBrokers(a, 'core'), ['angelone']);
+    // a Quantiply row never puts a broker on AlgoTest's sheet
+    a.rows['quantiply.finvasia'].list = 'core';
+    a.rows['quantiply.finvasia'].upload = true;
+    assert.deepEqual(algotestDeployBrokers(a, 'core'), ['angelone']);
+    a.masters.uploads = false;
+    assert.deepEqual(algotestDeployBrokers(a, 't1'), []);
   });
 });

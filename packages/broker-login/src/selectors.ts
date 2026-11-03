@@ -262,7 +262,7 @@ export const strategyPage = {
  * BL-138: Algo Trade (/live). VERIFIED 2026-10-19 from the owner's session: the Activation rows
  * (select a row by its name, then "Setup Execution" / "Edit Execution" and "Activate"), and the
  * "Edit execution for <name>" sheet (Quantity Multiplier, per-leg NRML/MIS selects, Weekdays/DTE
- * day boxes, "Setup Execution Settings"). What "Activate" opens is NOT yet seen.
+ * day boxes, "Setup Execution Settings"). "Activate" opens the broker sheet below (2026-11-03).
  */
 export const livePage = {
   // "n/6 Strategy Deployed" until late October 2026; "Deployed Strategies" on 2026-11-02
@@ -295,6 +295,32 @@ export const livePage = {
       .filter({ hasText: new RegExp(`^${choice}$`) })
       .first(),
   executionTime: (sheet: Locator): Locator => sheet.locator('input[type=time]').first(),
+  /**
+   * What "Activate" opens (seen 2026-11-03, owner's session): a bottom sheet "Select Broker for
+   * <name>" listing every broker connected to AlgoTest, each row a read-only checkbox (the row
+   * takes the click), its name ("Finvasia - Shiny") and a LOGGED IN badge, a "n / m selected"
+   * select-all, "Edit Entry/Exit Timings" (left alone), and Cancel / Activate, which reads
+   * "Activate on n Brokers" once n are ticked. It deploys one instance per ticked broker: a RUNNING
+   * card each, the row's "n Deployed" up by n.
+   */
+  brokerSheet: (page: Page, name: string): Locator =>
+    page
+      .locator('div')
+      .filter({
+        has: page.getByText(`Select Broker for ${name}`, { exact: true }),
+      })
+      .filter({ has: page.getByRole('button', { name: 'Cancel', exact: true }) })
+      .last(),
+  /** A broker's row in that sheet: the element holding its checkbox and its "<Broker> - <name>". */
+  brokerRow: (sheet: Locator, label: string): Locator =>
+    sheet
+      .locator('div')
+      .filter({ has: sheet.page().locator('input[type=checkbox][readonly]') })
+      .filter({ hasText: new RegExp(`^${label} - `) })
+      .last(),
+  /** "Activate" with nothing ticked, "Activate on n Brokers" once n are (2026-11-03). */
+  brokerSheetActivate: (sheet: Locator): Locator =>
+    sheet.getByRole('button', { name: /^Activate( on \d+ Brokers?)?$/ }),
   /** Anything that may open after "Activate": a dialog or a bottom sheet. */
   popup: (page: Page): Locator =>
     page

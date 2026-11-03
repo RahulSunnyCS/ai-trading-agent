@@ -260,8 +260,17 @@ with the broker's alias), its figure a `p.tabular-nums` coloured `text-green-500
 when < 0 (a loading-dots element while it computes). Read live 2026-10-20 16:13 IST: `₹ 0`, green. The header also shows "Available Margin" and "Margin Blocked (approx)".
 
 The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia) left the days unticked, and the
-row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"
-asks (broker or account choice, a confirmation), and what stopping a deploy before its entry looks like.
+row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what stopping a
+deploy before its entry looks like.
+
+**What "Activate" opens (BL-197, the owner's session, 2026-11-03 08:2x, two brokers logged in).** A bottom sheet
+"Select Broker for <name>": "Edit Entry/Exit Timings" (left alone), a select-all checkbox with "n / m selected",
+then one row per broker connected to AlgoTest ("Angel One - Rahul", "Finvasia - Shiny"), each with a read-only
+checkbox (the row takes the click) and a LOGGED IN badge, and Cancel / Activate. The button reads "Activate" with
+nothing ticked and "Activate on n Brokers" once n are. Pressing it closed the sheet with nothing further to confirm:
+one RUNNING card per broker ("T1 · N_p80_0947 (1)", "entry in hh:mm:ss", "Cancel Deployment"), and the row's
+"n Deployed" up by the number of brokers. The deployer ticks exactly the brokers whose AlgoTest row in
+Settings › Automation uploads the list, checks the button names that many, and reads the count back.
 
 **Square off, stop, list (BL-143 Phase 4; read from the /live page's public JavaScript, 2026-10-20).** The page's
 chunks (`algotest.in/_next/static/chunks/*.js`, fetched with curl, no login) hold the `/execution` client the

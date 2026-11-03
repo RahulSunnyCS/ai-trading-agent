@@ -100,6 +100,38 @@ export function planDeploy(picks: Pick[], live: LiveState, now: number): DeployP
   return out;
 }
 
+/** How a broker is named on AlgoTest's broker sheet: "<label> - <account holder>". */
+export const BROKER_LABELS: Record<string, string> = {
+  finvasia: 'Finvasia',
+  angelone: 'Angel One',
+};
+
+export interface BrokerSheetCheck {
+  /** wanted brokers the sheet does not list */
+  missing: string[];
+  /** wanted brokers listed but not LOGGED IN */
+  notLoggedIn: string[];
+}
+
+/**
+ * BL-197: the broker sheet "Activate" opens, read from its text (each broker's line, then its
+ * badge on the next line): is every wanted broker listed and logged in?
+ */
+export function checkBrokerSheet(text: string, wanted: readonly string[]): BrokerSheetCheck {
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const out: BrokerSheetCheck = { missing: [], notLoggedIn: [] };
+  for (const broker of wanted) {
+    const label = BROKER_LABELS[broker] ?? broker;
+    const at = lines.findIndex((l) => l.startsWith(`${label} - `));
+    if (at < 0) out.missing.push(label);
+    else if (lines[at + 1] !== 'LOGGED IN') out.notLoggedIn.push(label);
+  }
+  return out;
+}
+
 /** Status of an Activation row whose execution has not been set up yet. */
 export const SETUP_PENDING = 'Setup Pending';
 
