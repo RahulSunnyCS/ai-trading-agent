@@ -1,0 +1,78 @@
+"""`/legwise/rotation/live-board`: the Rotation page's Live board card (BL-203). The figures are
+`rotation/live_board.py`'s; nothing here computes one.
+
+    GET  /legwise/rotation/live-board          today's snapshot (else the newest), whether a
+                                               refresh is running, the last error, the loop's
+                                               next refresh
+    POST /legwise/rotation/live-board/refresh  refresh now. With the 5-minute loop running it is
+                                               asked (202 {"status": "requested"}), so no second
+                                               login is made; else ONE guarded Angel One login runs
+                                               the refresh in a background thread (202
+                                               {"status": "started"}), 409 while the login guard's
+                                               lock is held, 429 (+ Retry-After) in its cool-down
+                                               or a hold after a refused login
+
+Nothing returned is a token, PIN or key. Errors are `{"error": ...}`, as in `angel_routes.py`.
+"""
+
+from __future__ import annotations
+
+import sys
+import threading
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+
+from ..angelone import check
+from ..rotation import live_board
+
+router = APIRouter(prefix="/legwise/rotation/live-board")
+
+
+@router.get("")
+def get_board() -> dict:
+    return live_board.read_board()
+
+
+def _run(pending: check.Pending) -> None:
+    """The background refresh: the login, then the refresh under the same lock."""
+    try:
+        result, session, _ = pending.attempt()
+        if session is None:
+            live_board.record_error(f"Angel One login failed: {result.message}")
+            return
+        live_board.refresh(session, by="button", log=lambda _m: None)
+    except Exception as error:  # noqa: BLE001 - recorded by refresh(); nothing above a thread
+        print(f"live board refresh failed: {type(error).__name__}: {error}", file=sys.stderr)
+    finally:
+        pending.release()
+
+
+@router.post("/refresh", response_model=None)
+def post_refresh() -> JSONResponse:
+    if live_board.loop_status()["running"]:
+        live_board.request_refresh()
+        return JSONResponse(status_code=202, content={"status": "requested"})
+    try:
+        pending = check.begin("live-board")
+    except check.CheckRefused as refused:
+        if refused.kind in ("cooldown", "held"):
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": str(refused),
+                    "kind": refused.kind,
+                    "retry_after_s": refused.retry_after_s,
+                },
+                headers={"Retry-After": str(refused.retry_after_s)},
+            )
+        return JSONResponse(status_code=409, content={"error": str(refused), "kind": refused.kind})
+    except (OSError, RuntimeError) as error:  # the data root is not mounted or not writable
+        return JSONResponse(
+            status_code=503, content={"error": f"the refresh could not be started: {error}"}
+        )
+    live_board.mark_refreshing(by="button")
+    threading.Thread(target=_run, args=(pending,), name="live-board", daemon=True).start()
+    return JSONResponse(
+        status_code=202, content={"status": "started", "started_at": pending.started_at}
+    )

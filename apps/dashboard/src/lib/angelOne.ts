@@ -18,7 +18,7 @@ export type AngelCheckReason =
   | 'unavailable'
   | 'error';
 
-export type AngelSource = 'manual' | 'scheduled' | 'collector' | 'margin';
+export type AngelSource = 'manual' | 'scheduled' | 'collector' | 'margin' | 'live-board';
 
 export interface AngelCheck {
   /** When the attempt started (IST, ISO 8601). */
@@ -84,6 +84,7 @@ export const SOURCE_LABEL: Record<AngelSource, string> = {
   scheduled: '08:00 check',
   collector: 'Evening collection',
   margin: '09:05 margin check',
+  'live-board': 'Live board',
 };
 
 export type AngelCardState = 'unknown' | 'not_configured' | 'untested' | 'working' | 'failed';
@@ -151,7 +152,10 @@ export function testButton(opts: {
   const holdUntil = status.hold ? Date.parse(status.hold.until) : Number.NaN;
   const kind: TestButtonKind = !status.configured
     ? 'not_configured'
-    : testing || (status.running && status.running_source !== 'collector')
+    : testing ||
+        (status.running &&
+          status.running_source !== 'collector' &&
+          status.running_source !== 'live-board')
       ? 'testing'
       : status.running
         ? 'collecting'

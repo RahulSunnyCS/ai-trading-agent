@@ -86,6 +86,7 @@ import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
 import { RotationExplain } from './RotationExplain';
+import { RotationLiveBoard } from './RotationLiveBoard';
 import { RotationLiveVsPaper } from './RotationLiveVsPaper';
 import { RotationLotPlans } from './RotationLotPlans';
 import { RotationPulse } from './RotationPulse';
@@ -624,6 +625,7 @@ export function RotationPanel() {
               {hero()}
             </>
           )}
+          <RotationLiveBoard />
           {ovData ? (
             <Card>
               <CardHeader
