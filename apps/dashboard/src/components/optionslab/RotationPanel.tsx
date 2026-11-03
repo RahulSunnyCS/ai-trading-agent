@@ -182,10 +182,17 @@ export function RotationPanel() {
   // BL-095: the forward sessions replayed under the portfolio stop. Only an answer for this
   // setting is laid over the read-out; the verdict, the intervals and the random baskets always
   // stay on the registered basis (the pre-registered test does not move with a typed level).
+  // Every book on the page is read over the same sessions, from Adaptive Tuned's first scored day
+  // (owner, 2026-10-30): Classic and the Fixed base are read again from it. Classic's registered
+  // read-out (`s`: the verdict, the Day N of 60 chip) keeps its own first day.
+  const alignFrom = tuned.data?.first_day ?? undefined;
+  const aligned = useRotationSummary(alignFrom ? { ...ONE_LOT, from: alignFrom } : ONE_LOT);
+  const a = aligned.data;
+
   const book = useRotationPortfolioDays('recorded', {}, portfolio, ONE_LOT);
   const bookNow = bookFor(book.data, portfolio);
-  const shown_s = useMemo(() => (s ? overlaySummary(s, bookNow) : s), [s, bookNow]);
-  const stopped = shown_s !== s;
+  const shown_s = useMemo(() => (a ? overlaySummary(a, bookNow) : a), [a, bookNow]);
+  const stopped = shown_s !== a;
 
   // Adaptive Tuned (the T1 track): its own read-out and its own stop, on its row only.
   const t = tuned.data;
@@ -197,10 +204,10 @@ export function RotationPanel() {
   // only; the comparisons with the base always use the base without a stop).
   const baseBookRes = useRotationPortfolioDays('recorded', {}, baseStop, BASE_BOOK);
   const baseBookNow = bookFor(baseBookRes.data, baseStop);
-  const baseShown = useMemo(() => (s ? overlayBase(s, baseBookNow) : s), [s, baseBookNow]);
+  const baseShown = useMemo(() => (a ? overlayBase(a, baseBookNow) : a), [a, baseBookNow]);
 
   // What each stop changed, over that book's own scored days.
-  const classicDays = useMemo(() => (s?.days ?? []).map((d) => d.day), [s]);
+  const classicDays = useMemo(() => (a?.days ?? []).map((d) => d.day), [a]);
   const tunedDays = useMemo(() => (t?.days ?? []).map((d) => d.day), [t]);
   const classicEffect = useMemo(
     () => stopEffect(bookNow, 'C', classicDays),
@@ -243,7 +250,7 @@ export function RotationPanel() {
           : null;
     const books: BookLine[] = [
       {
-        row: listBook('C', shown_s ?? null, s, benchmark),
+        row: listBook('C', shown_s ?? null, a ?? null, benchmark),
         name: ADAPTIVE_CARD.classic.name,
         note: ADAPTIVE_CARD.classic.note,
         focus: view === 'core',
@@ -256,7 +263,7 @@ export function RotationPanel() {
           status: stopStatus(
             stopNote({
               setting: portfolio,
-              scoredDays: s.n_days,
+              scoredDays: a?.n_days ?? 0,
               stopped,
               error: book.error,
               skipped: unmatched(bookNow),
@@ -305,12 +312,12 @@ export function RotationPanel() {
           status: stopStatus(
             stopNote({
               setting: baseStop,
-              scoredDays: s.n_days,
-              stopped: baseShown !== s,
+              scoredDays: a?.n_days ?? 0,
+              stopped: baseShown !== a,
               error: baseBookRes.error,
               skipped: unmatched(baseBookNow, ['BASE']),
             }),
-            baseShown !== s,
+            baseShown !== a,
             baseBookRes.error,
           ),
         },
@@ -321,6 +328,7 @@ export function RotationPanel() {
   }, [
     view,
     s,
+    a,
     t,
     shown_s,
     tunedShown,
@@ -400,12 +408,14 @@ export function RotationPanel() {
    * scored days: the Fixed base is drawn over Classic's sessions). */
   const hero = () => {
     if (!s) return null;
+    const from = a?.first_day ? ` from ${formatDay(a.first_day)}` : '';
     if (view === 'base') {
+      if (!a) return <SkeletonRows rows={4} />;
       return (
         <Card>
           <CardHeader
             title={`Cumulative gross, ${BASE_CARD.name}`}
-            description={`${s.n_days} scored forward sessions (Adaptive Classic's), ${lotsWord(s.settings?.lots_per_strategy)} per strategy, 3 strategies a day, no ranking.${slipText}${baseShown !== s ? ' With its portfolio stop applied.' : ''}`}
+            description={`${a.n_days} scored forward sessions${from} (Adaptive Classic's), ${lotsWord(a.settings?.lots_per_strategy)} per strategy, 3 strategies a day, no ranking.${slipText}${baseShown !== a ? ' With its portfolio stop applied.' : ''}`}
           />
           <RotationHero
             points={basePoints}
@@ -463,6 +473,7 @@ export function RotationPanel() {
         </Card>
       );
     }
+    if (!a) return <SkeletonRows rows={4} />;
     return (
       <Card>
         <CardHeader
@@ -471,7 +482,7 @@ export function RotationPanel() {
               ? 'Cumulative gross by list'
               : `Cumulative gross, ${ADAPTIVE_CARD.classic.name} and the fixed base`
           }
-          description={`${s.n_days} scored forward sessions, ${lotsWord(s.settings?.lots_per_strategy)} per strategy.${slipText}${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
+          description={`${a.n_days} scored forward sessions${from}, ${lotsWord(a.settings?.lots_per_strategy)} per strategy.${slipText}${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
         />
         <RotationHero
           points={points}
@@ -481,7 +492,7 @@ export function RotationPanel() {
           showBase={showBase}
           onToggleBase={() => setShowBase((v) => !v)}
         />
-        {leftOut(s)}
+        {leftOut(a)}
       </Card>
     );
   };
@@ -610,12 +621,12 @@ export function RotationPanel() {
                 footer={
                   verdictFor ? (
                     <>
-                      {view === 'core' ? null : (
-                        <p className="mb-2 text-xs text-muted">
-                          {ADAPTIVE_CARD.classic.name}'s registered read-out;{' '}
-                          {ADAPTIVE_CARD.tuned.name}'s figures are in its row above.
-                        </p>
-                      )}
+                      <p className="mb-2 text-xs text-muted">
+                        {ADAPTIVE_CARD.classic.name}'s registered read-out
+                        {s.first_day ? `, from ${formatDay(s.first_day)}` : ''} (the pre-registered
+                        test); the rows above all run
+                        {a?.first_day ? ` from ${formatDay(a.first_day)}` : ' over the same days'}.
+                      </p>
                       <RotationVerdict verdict={verdictFor} plain />
                     </>
                   ) : null
