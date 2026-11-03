@@ -328,8 +328,14 @@ def build(
             )
         for symbol, shares in _lots_now(blocks, events.get(group["group_id"], [])).items():
             held_now[symbol] += shares
+        # A share the owner booked to a lot by hand (`mbt lots assign`) is a lot's now, no
+        # longer one in no lot: the bookings come off the fills no lot claims.
+        booked: dict[str, float] = defaultdict(float)
+        for event in events.get(group["group_id"], []):
+            if event.get("kind") in CORRECTIONS:
+                booked[event["symbol"]] += float(event["delta"])
         for symbol, shares in _outside_net(group.get("outside_lots") or [], paper_start).items():
-            outside_now[symbol] += shares
+            outside_now[symbol] += max(0.0, shares - max(0.0, booked[symbol]))
         _add_outside(blocks, group.get("outside_lots") or [], paper_start)
         blocks = [
             b for b in blocks if (not start or b["week"] >= start) and (not end or b["week"] <= end)

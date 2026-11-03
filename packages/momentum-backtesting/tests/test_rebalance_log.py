@@ -382,6 +382,24 @@ def test_shares_bought_outside_any_lot_count_in_the_kite_check():
     short = check({"ECHO": 3})
     assert short["differences"] == [{"symbol": "ECHO", "kite": 3, "lots": 1, "outside": 1.0}]
 
+    # once the owner books that share to a lot, it is the lot's, not counted twice
+    assign = {
+        "sleeve_id": "b",
+        "symbol": "ECHO",
+        "delta": 1,
+        "at": "2026-11-03T09:00",
+        "kind": "assigned",
+    }
+    booked = rl.build(
+        groups,
+        {"g": [assign]},
+        paper_start=START,
+        notes_through="2026-11-10",
+        lots_per_group={"g": 4},
+        kite={"synced_at": "x", "cash": 1.0, "holdings": {"ECHO": 2}},
+    )["kite_check"]
+    assert booked["matches"] is True and booked["not_in_lots"] == []
+
 
 def test_the_kite_sync_route_reads_kite_whatever_the_holdings_source(monkeypatch):
     from fastapi.testclient import TestClient
