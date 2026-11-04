@@ -269,6 +269,8 @@ export const livePage = {
   header: (page: Page): Locator =>
     page.getByText(/^(\d+\/\d+ Strategy Deployed|Deployed Strategies)$/).first(),
   anyRowCount: (page: Page): Locator => page.getByText(/^\d+ Deployed$/).first(),
+  /** "Broker Login n/m", loaded after the header (2026-11-03 read before it showed: "0/0") */
+  brokerCount: (page: Page): Locator => page.getByText(/Broker Login\s*\d+\s*\/\s*\d+/).first(),
   row: (page: Page, name: string): Locator => page.getByText(name, { exact: true }).first(),
   setupExecution: (page: Page): Locator =>
     page.getByRole('button', { name: /^(Setup|Edit) Execution$/ }).first(),

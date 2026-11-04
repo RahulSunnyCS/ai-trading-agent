@@ -996,3 +996,16 @@ test('the margin counts a row’s multiplier: every leg’s lots times it', () =
   ]);
   assert.equal(legs[0]?.lots, 1); // the export's own legs are never changed
 });
+
+test('AlgoTest: a broker count the page did not show is said as unread, not as logged out', () => {
+  const text = liveText('2/2', '', row('T1 · A', 1)).replace('Broker Login 2/2\n', '');
+  const c = checkAlgoTest(
+    'AlgoTest T1',
+    [{ broker: 'finvasia', picks: ['T1 · A'] }],
+    parseLive(text),
+    new Map([['T1 · A', 1]]),
+    [],
+  );
+  assert.ok(c.problems.some((p) => /could not read the broker count/.test(p)));
+  assert.ok(!c.problems.some((p) => /no broker logged in/.test(p)));
+});

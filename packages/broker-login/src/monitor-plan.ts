@@ -1,4 +1,4 @@
-import type { LiveState } from './deploy-plan.js';
+import { type LiveState, brokerRefusal } from './deploy-plan.js';
 import { NAME_PREFIXES } from './strategy-plan.js';
 
 /**
@@ -836,11 +836,8 @@ export function checkAlgoTest(
     extra: [],
     notes: [],
   };
-  if (live.brokersLoggedIn < 1) {
-    out.problems.push(
-      `no broker logged in on AlgoTest (Broker Login ${live.brokersLoggedIn}/${live.brokersTotal})`,
-    );
-  }
+  const brokers = brokerRefusal(live);
+  if (brokers) out.problems.push(brokers);
   const liveRows = new Map(live.rows.map((r) => [r.name, r]));
   const brokerUnread = new Set<string>();
   const multUnread: string[] = [];

@@ -84,10 +84,16 @@ function entryOf(doc: unknown): number {
   return p.Hour * 60 + p.Minute;
 }
 
-async function readLive(page: Page): Promise<LiveState> {
+async function readLive(page: Page, opts: { brokers?: boolean } = {}): Promise<LiveState> {
   await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
   await livePage.header(page).waitFor({ timeout: 30_000 });
   await livePage.anyRowCount(page).waitFor({ timeout: 30_000 });
+  // the broker count renders after the rows; not shown in time = unread (planDeploy refuses)
+  if (opts.brokers)
+    await livePage
+      .brokerCount(page)
+      .waitFor({ timeout: 20_000 })
+      .catch(() => undefined);
   return parseLive(await page.evaluate(() => document.body.innerText));
 }
 
@@ -392,7 +398,8 @@ async function main(): Promise<number> {
 
   try {
     await algotestLoginLocked(page, { phone: normalizePhone(phone), password }, 'strategy-deploy');
-    const live = await readLive(page);
+    // setting up needs no broker; the deploy and the 15:35 check read the count
+    const live = await readLive(page, { brokers: !values.setup });
     if (values.setup) {
       const p = planSetup(picks, live);
       if (p.deployed.length) lines.push(`already deployed, left alone: ${p.deployed.join(', ')}`);
@@ -426,7 +433,12 @@ async function main(): Promise<number> {
       } else lines.push('no tool strategy repeats tomorrow');
     } else {
       const p = planDeploy(picks, live, istMinutes());
-      if (p.refused) lines.push(`refused: ${p.refused}`);
+      if (p.refused) {
+        lines.push(`refused: ${p.refused}`);
+        // what /live showed, for the next look (2026-11-03's "0/0" left nothing behind)
+        await safeScreenshot(page, 'deploy-refused');
+        await dumpHtml(page, 'deploy-refused');
+      }
       if (p.already.length) lines.push(`already deployed: ${p.already.join(', ')}`);
       if (p.deploy.length)
         lines.push(

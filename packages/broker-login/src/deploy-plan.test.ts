@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   type LiveState,
+  brokerRefusal,
   cardShows,
   checkBrokerSheet,
   istMinutes,
@@ -478,4 +479,32 @@ test('broker sheet: every wanted broker listed and logged in (BL-197)', () => {
     missing: ['Angel One'],
     notLoggedIn: [],
   });
+});
+
+// 2026-11-03 09:16: both brokers logged in at 08:17, yet the deployer read no "Broker Login n/m"
+// and refused as "0/0". A count the page did not show is unread, never "logged out".
+test('the broker count is read when split over lines or spaced', () => {
+  for (const shown of ['Broker Login\n2/2', 'Broker Login 2 / 2', 'Broker Login2/2']) {
+    const live = parseLive(PAGE_NOV.replace('Broker Login 0/2', shown));
+    assert.equal(live.brokersLoggedIn, 2, shown);
+    assert.equal(live.brokersTotal, 2, shown);
+  }
+});
+
+test('a broker count missing from /live is unread: the deploy refuses as such, not as logged out', () => {
+  const live = parseLive(PAGE_NOV.replace('Broker Login 0/2\n', ''));
+  assert.equal(live.brokersLoggedIn, null);
+  assert.equal(live.brokersTotal, null);
+  const p = planDeploy(novPicks, live, minutesOf('09:16'));
+  assert.match(p.refused ?? '', /could not read the broker count/);
+  assert.doesNotMatch(p.refused ?? '', /0\/0|no broker logged in/);
+  assert.deepEqual(p.deploy, []);
+  assert.equal(
+    brokerRefusal(parseLive(PAGE_NOV)),
+    'no broker logged in on AlgoTest (Broker Login 0/2)',
+  );
+  assert.equal(
+    brokerRefusal(parseLive(PAGE_NOV.replace('Broker Login 0/2', 'Broker Login 2/2'))),
+    null,
+  );
 });
