@@ -384,7 +384,7 @@ def _t1_standing(day: date, t1, root: Path | None, echo: Echo):
     if t1 is None:
         return None
     try:
-        return standing.t1(day, root, today=t1)
+        return standing.t1(day, root, today=t1, keep=True)
     except Exception as error:  # noqa: BLE001
         echo(f"T1 drawdown line skipped: {type(error).__name__}: {error}")
         return None

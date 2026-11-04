@@ -161,3 +161,33 @@ def test_a_failure_leaves_the_line_out_never_the_message(tmp_path, monkeypatch):
     monkeypatch.setattr(standing, "t1", broken)
     code, sent = _evening(root, monkeypatch, date(2026, 11, 2))
     assert code == 0 and "🧪 Tuned Adaptive" in sent[None] and "drawdown" not in sent[None]
+
+
+def test_the_ladder_names_the_depth_each_share_of_days_reached():
+    drawdowns = [float(x) for x in range(100)]  # 0 .. 99, one day each
+    assert standing.ladder(drawdowns) == ((25, 75.0), (10, 90.0), (5, 95.0))
+    assert standing.ladder([0.0, 0.0, 500.0]) == ((25, 500.0), (10, 500.0), (5, 500.0))
+    assert standing.ladder([]) == ()
+    s = standing.measure(_series(1000, -400, 800, -600, -500))
+    assert s.ladder == ((25, 600.0), (10, 1100.0), (5, 1100.0))
+    assert (
+        messages.standing_lines(s)[4] == "   25% of days −₹600 or deeper · 10% −₹1,100 · 5% −₹1,100"
+    )
+
+
+def test_keep_writes_the_daily_series(tmp_path):
+    import csv
+
+    root = tmp_path / "TradingData"
+    _day(root, date(2026, 10, 19), 500.0)
+    _day(root, date(2026, 10, 20), -800.0)
+    s = standing.t1(date(2026, 10, 20), root, slip=0, earlier={}, keep=True)
+    with standing.series_path(root).open() as f:
+        rows = list(csv.DictReader(f))
+    assert [(r["day"], r["net"], r["total"], r["high"], r["drawdown"]) for r in rows] == [
+        ("2026-10-19", "500.00", "500.00", "500.00", "0.00"),
+        ("2026-10-20", "-800.00", "-300.00", "500.00", "800.00"),
+    ]
+    assert rows[0]["picks"] == " ".join(T1)
+    assert s.drawdown == 800
+    assert not list(standing.series_path(root).parent.glob("*.tmp"))

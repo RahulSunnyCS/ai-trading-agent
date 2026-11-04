@@ -173,6 +173,33 @@ def track_readout(
     typer.echo(render(build(track)))
 
 
+@rotation_app.command("standing")
+def standing_cmd(
+    day: str | None = typer.Option(None, "--day", help="YYYY-MM-DD; default the newest T1 entry."),
+    no_save: bool = typer.Option(False, "--no-save", help="Print only; do not rewrite the file."),
+) -> None:
+    """T1's drawdown now against the last two years, as the 16:00 message says it, and its daily
+    series (net, running total and high, drawdown, picks) written to rotation/track_t1/standing.csv
+    (owner, 2026-11-04). Paper, one lot per strategy, the message's slippage."""
+    from . import journal, messages, standing, store
+
+    if day:
+        d = _day(day)
+    else:
+        entries = journal.read(store.journal_path(None, standing.TRACK))
+        if not entries:
+            typer.echo("no T1 journal entry yet")
+            raise typer.Exit(2)
+        d = date.fromisoformat(entries[-1]["day"])
+    s = standing.t1(d, keep=not no_save)
+    if s is None:
+        typer.echo(f"{d}: T1's results for the day are not all stored yet")
+        raise typer.Exit(2)
+    typer.echo("\n".join(messages.standing_lines(s)))
+    if not no_save:
+        typer.echo(f"series: {standing.series_path()}")
+
+
 @rotation_app.command("lot-plans")
 def lot_plans_cmd(
     book: str = typer.Option("core", "--book", help="core (live Adaptive) or t1 (the T1 track)."),

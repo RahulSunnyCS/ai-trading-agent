@@ -356,6 +356,15 @@ def _slip(pct: float | None) -> str:
     return f" and {pct:g}% slippage" if pct else ""
 
 
+def _ladder_line(steps) -> str:
+    """`   25% of days −₹4,012 or deeper · 10% −₹9,100 · 5% −₹13,200`."""
+    parts = [
+        f"{p}% of days {rupees(-v)} or deeper" if i == 0 else f"{p}% {rupees(-v)}"
+        for i, (p, v) in enumerate(steps)
+    ]
+    return "   " + " · ".join(parts)
+
+
 def standing_lines(s) -> list[str]:
     """T1's drawdown now against its own past (`standing.Standing`; owner, 2026-11-04), after the
     month so far: how deep, from which high, and on what share of the window's days it was at
@@ -385,6 +394,7 @@ def standing_lines(s) -> list[str]:
         + ("" if s.window_full else ", all the data there is")
         + ")",
         f"   below a high on {water}% · {deepest}",
+        *([_ladder_line(s.ladder)] if s.ladder else []),
         f"   {basis}",
     ]
 

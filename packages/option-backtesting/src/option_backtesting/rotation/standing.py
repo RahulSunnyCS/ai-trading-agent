@@ -16,7 +16,10 @@ it was at least that deep. Descriptive and in-sample before the journal began; n
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import csv
+import math
+import os
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -27,6 +30,9 @@ from . import journal, result, slippage, store
 WINDOW_DAYS = 730
 TRACK = "t1"
 LIST_KEY = "C"
+#: the shares of days the ladder names: "25% of days were at least ₹X below a high"
+LADDER = (25, 10, 5)
+COLUMNS = ["day", "net", "total", "high", "drawdown", "picks"]
 
 
 @dataclass(frozen=True)
@@ -54,6 +60,25 @@ class Standing:
     slippage_pct: float | None
     #: the series reaches back the whole window (False while the stored data is younger)
     window_full: bool = False
+    #: ((share %, drawdown), ...): on that share of the window's days the drawdown was at least it
+    ladder: tuple[tuple[int, float], ...] = ()
+    #: one row per day counted: day, net, running total, running high, drawdown (`COLUMNS`)
+    rows: list[dict] = field(default_factory=list, repr=False, compare=False)
+
+
+def ladder(
+    drawdowns: list[float], shares: tuple[int, ...] = LADDER
+) -> tuple[tuple[int, float], ...]:
+    """For each share p: the deepest drawdown that at least p % of the days reached (0 = a day at a
+    high is among them)."""
+    if not drawdowns:
+        return ()
+    deepest_first = sorted(drawdowns, reverse=True)
+    out = []
+    for p in shares:
+        k = max(1, math.ceil(len(deepest_first) * p / 100))  # at least p % of the days
+        out.append((p, deepest_first[k - 1]))
+    return tuple(out)
 
 
 def measure(
@@ -71,12 +96,14 @@ def measure(
     high_day: date | None = None
     drawdowns: list[float] = []
     deepest, deepest_day = 0.0, None
+    rows = []
     for d, value in series:
         total += value
         if total >= peak:
             peak, high_day = total, d
         dd = peak - total
         drawdowns.append(dd)
+        rows.append({"day": d, "net": value, "total": total, "high": peak, "drawdown": dd})
         if dd > deepest:
             deepest, deepest_day = dd, d
     now = drawdowns[-1]
@@ -95,7 +122,35 @@ def measure(
         slippage_pct=slippage_pct,
         # a week's slack: the window's first calendar days may be a weekend or a holiday
         window_full=window_start is not None and series[0][0] <= window_start + timedelta(days=7),
+        ladder=ladder(drawdowns),
+        rows=rows,
     )
+
+
+def series_path(root: Path | None = None) -> Path:
+    """Where the evening job keeps T1's daily series (rewritten whole each evening)."""
+    return store.track_dir(TRACK, root) / "standing.csv"
+
+
+def save(s: Standing, root: Path | None = None, picks: dict[date, list[str]] | None = None) -> Path:
+    """Write the series behind `s` to `series_path` (atomic). A re-derivation, not a record: the
+    file is rebuilt from the stored results every time, so a repaired day changes it."""
+    path = series_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f".{os.getpid()}.tmp")
+    with tmp.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=COLUMNS)
+        w.writeheader()
+        for r in s.rows:
+            w.writerow(
+                {
+                    "day": r["day"].isoformat(),
+                    **{k: f"{r[k]:.2f}" for k in ("net", "total", "high", "drawdown")},
+                    "picks": " ".join((picks or {}).get(r["day"]) or []),
+                }
+            )
+    tmp.replace(path)
+    return path
 
 
 def _earlier_picks(root: Path, start: date, until: date) -> dict[date, list[str] | None]:
@@ -121,10 +176,12 @@ def t1(
     today: result.DailyResult | None = None,
     slip: float | None = None,
     earlier: dict[date, list[str] | None] | None = None,
+    keep: bool = False,
 ) -> Standing | None:
     """T1's standing on `day` (None with no day counted). `today` is the day's result when the
     caller has it (its slipped figure is the message's own); `earlier` ({day: names}) stands in
-    for the re-derivation of the days before the journal (tests)."""
+    for the re-derivation of the days before the journal (tests); `keep` also writes the series to
+    `series_path`."""
     root = root or data_dir()
     slip = slippage.SLIPPAGE_PCT if slip is None else slip
     start = day - timedelta(days=WINDOW_DAYS)
@@ -141,6 +198,8 @@ def t1(
     for d, e in entries.items():
         block = (e.get("lists") or {}).get(LIST_KEY) or {}
         picks[d] = [*block.get("core", []), *(block.get("buy") or [])] or None
+    if today is not None:
+        picks.setdefault(today.day, [n for rows in today.strategies.values() for n, _ in rows])
     series: list[tuple[date, float]] = []
     left_out = 0
     nets: dict[str, dict[date, float]] = {}
@@ -165,4 +224,7 @@ def t1(
             series.append((d, result.REPORT_LOTS * sum(values)))
     if not series or series[-1][0] != day:
         return None  # today not counted: no line rather than yesterday's standing as today's
-    return measure(series, left_out, recorded_from, slip or None, start)
+    out = measure(series, left_out, recorded_from, slip or None, start)
+    if keep and out is not None:
+        save(out, root, picks)
+    return out

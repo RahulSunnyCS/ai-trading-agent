@@ -294,7 +294,11 @@ Otherwise:
   costs and the message's slippage, `store.read_net` under `store.slipped`), journal days as recorded and earlier ones
   re-derived with `daylog.reconstruction`, a day missing a pick's result left out; `measure` gives the drawdown from
   the running high (peak starting at zero), the share of days at least that deep, the share under water and the
-  deepest (`messages.standing_lines`). Only when T1's day is in; a failure drops the lines, never the message.
+  deepest, plus `ladder`: the depth at least 25 / 10 / 5 % of the days reached (`LADDER`, rounded up so the share is
+  never overstated) (`messages.standing_lines`). Only when T1's day is in; a failure drops the lines, never the message.
+  `keep=True` (the 16:00 job, and `obt rotation standing` unless `--no-save`) rewrites the series whole to
+  `rotation/track_t1/standing.csv` (`series_path`; day, net, total, high, drawdown, picks; atomic): a re-derivation from
+  the stored results, not a record, so a repaired day changes it.
   Slippage (owner, 2026-10-30): `rotation/slip_store.py` keeps a 0.5% slippage copy beside every results file
   (`store.slip_path`, `<folder>/slip-0.5/`), written by `rotation update`, the base's scoring and `obt rotation
   slippage-fill`. `store.slipped(pct)` (a context variable; the API's `slippage` parameter sets it per request in
