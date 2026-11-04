@@ -63,6 +63,8 @@
  *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/drift    — what a list has held, by family, index, strike method and
  *                                                 start band, against its own past. requireAccess
+ *  GET  /api/backtest/legwise/rotation/candles — one book's daily candles on its running total under
+ *                                                 the book stop, each pick's result, the random-basket share.
  *  GET  /api/backtest/legwise/rotation/lot-plans — As picked, Dir Boost and Duo for one book's Adaptive
  *                                                 picks, forward from 2026-10-19 (BL-135). requireAccess
  *  GET  /api/backtest/legwise/rotation/live    — the days' live results beside the paper ones: running
@@ -956,6 +958,44 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation lot plans ---
+
+  // --- rotation candles --- the Rotation page's daily candle card (rotation/candles.py): one
+  // book's candles on its running total from the replayed minute path under the book stop, each
+  // pick's result and the share of random baskets beaten. A cold request answers 202 "warming".
+  fastify.get(
+    '/api/backtest/legwise/rotation/candles',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            book: { type: 'string', enum: ['t1', 'core', 'base'] },
+            from: { type: 'string', pattern: PF_DAY },
+            to: { type: 'string', pattern: PF_DAY },
+            lots: { type: 'string', pattern: '^([1-9]|10)$' },
+            stop: { type: 'string', pattern: PF_STOP },
+            slippage: { type: 'string', enum: ['0', '0.5'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      const keys = ['book', 'from', 'to', 'lots', 'slippage'];
+      // `stop=` (empty) means no stop and must reach the API as such; a missing stop is the default
+      const stop =
+        typeof q.stop === 'string'
+          ? `${upstreamQuery(q, keys) ? '&' : '?'}stop=${encodeURIComponent(q.stop)}`
+          : '';
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/candles${upstreamQuery(q, keys)}${stop}`,
+      );
+    },
+  );
+  // --- end rotation candles ---
 
   // --- rotation plan --- the Today page's baskets: each Adaptive book's latest and tentative
   // picks with their settings and upload state per account (rotation/plan.py, read-only). No
