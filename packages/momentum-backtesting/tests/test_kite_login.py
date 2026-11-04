@@ -146,3 +146,38 @@ def test_the_second_code_is_not_failed_by_the_first_ones_message():
     with pytest.raises(kite_login.KiteLoginError) as refused:
         kite_login._wait_for(FakePage(["Invalid TOTP"]), lambda: False, {}, wait_s=5)
     assert refused.value.kind == "totp"
+
+
+class GonePage:
+    """A page Kite has left for the app's redirect: every query throws, as Playwright's do."""
+
+    def eval_on_selector_all(self, selector, script):
+        raise RuntimeError("Execution context was destroyed, most likely because of a navigation")
+
+    def locator(self, selector):
+        raise RuntimeError("Execution context was destroyed, most likely because of a navigation")
+
+    def wait_for_timeout(self, ms):
+        pass
+
+
+def test_the_wait_ends_on_the_token_even_while_the_page_is_leaving():
+    """Kite submits a full code itself and redirects: the token arrives while the form's checks
+    throw, and that is success, not a failure."""
+    captured = {}
+    calls = []
+
+    def done():
+        calls.append(1)
+        if len(calls) == 2:
+            captured["token"] = "RT"
+        raise RuntimeError("Execution context was destroyed")
+
+    kite_login._wait_for(GonePage(), done, captured, wait_s=5)
+    assert captured == {"token": "RT"}
+    assert kite_login._page_message(GonePage()) == ""
+
+
+def test_a_gone_login_button_is_not_a_failure():
+    kite_login._submit_unless_gone(GonePage(), {})  # the wait after it decides
+    kite_login._submit_unless_gone(GonePage(), {"token": "RT"})

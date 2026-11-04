@@ -10,7 +10,9 @@ stops at a captcha or any check it does not recognise instead of trying to pass 
 
 Flow: Kite Connect's login URL for this app (`kite.login_url`) -> user ID and password -> the
 external TOTP code -> Kite redirects to the app's registered redirect URL with `request_token`.
-That redirect is intercepted, never loaded, so the URL can be the hosted dashboard's. The token is
+The token is read off that redirect as the browser follows it (Playwright never routes a redirected
+request, so it cannot be intercepted: the callback host then sees a login state it does not know and
+answers 400 before it touches the token, which is harmless, as is an unreachable host). The token is
 exchanged and stored exactly as a manual login does (`finish_login`, shared with the API callback).
 
 Safety: a refused user ID or password is never retried, and it holds every later run until one of
@@ -142,11 +144,15 @@ def _next_window_code(secret: str) -> str:
 
 
 def _page_message(page) -> str:
-    """Kite's visible error or notice text on the login form ('' when none)."""
-    texts = page.eval_on_selector_all(
-        ".error, .su-message, .su-alert, [class*='error'], [role='alert']",
-        "els => els.filter(e => e.offsetParent !== null).map(e => e.innerText.trim())",
-    )
+    """Kite's visible error or notice text on the login form ('' when none, or while the page is
+    on its way somewhere else: Kite's redirect after the code)."""
+    try:
+        texts = page.eval_on_selector_all(
+            ".error, .su-message, .su-alert, [class*='error'], [role='alert']",
+            "els => els.filter(e => e.offsetParent !== null).map(e => e.innerText.trim())",
+        )
+    except Exception:  # noqa: BLE001 - Playwright: the page navigated under the query
+        return ""
     return " ".join(t for t in texts if t)[:300]
 
 
@@ -181,21 +187,18 @@ def browser_login(creds: dict[str, str], *, headed: bool = False, wait_s: float 
     url = kite.login_url(state)
     captured: dict[str, str] = {}
 
-    def on_redirect(route) -> None:
-        token = request_token_from(route.request.url, state)
+    def on_request(request) -> None:
+        # Kite's redirect to the app, seen as the browser follows it (a route would not fire).
+        token = request_token_from(request.url, state)
         if token:
             captured["token"] = token
-            route.fulfill(status=200, content_type="text/plain", body="ok")
-        else:
-            route.continue_()
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=not headed)
         try:
             context = browser.new_context()
-            # Kite's redirect to the app is answered here, never loaded.
-            context.route(lambda u: "request_token=" in u, on_redirect)
             page = context.new_page()
+            page.on("request", on_request)
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=45_000)
                 _stop_on_human_check(page)
@@ -247,8 +250,14 @@ def _wait_for(page, done, captured: dict, wait_s: float, stale: str = "") -> Non
     `stale` is a message already answered (the first code's refusal), not a new one."""
     deadline = time.monotonic() + wait_s
     while time.monotonic() < deadline:
-        if captured.get("token") or done():
+        if captured.get("token"):
             return
+        try:
+            if done():
+                return
+        except Exception:  # noqa: BLE001 - the page navigated under the check: look again
+            page.wait_for_timeout(500)
+            continue
         message = _page_message(page)
         if message and message != stale:
             kind = classify(message)
@@ -257,6 +266,20 @@ def _wait_for(page, done, captured: dict, wait_s: float, stale: str = "") -> Non
         page.wait_for_timeout(500)
     message = _page_message(page)
     raise KiteLoginError(f"Kite: {message}" if message else "timed out", classify(message))
+
+
+def _submit_unless_gone(page, captured: dict) -> None:
+    """Click Login under the code if the form is still there. Kite submits a full code by itself
+    and then leaves for the app's redirect, so the button may be gone or going: that is not a
+    failure (the wait after this decides), and a click must never wait on it."""
+    if captured.get("token"):
+        return
+    try:
+        submit = page.locator("button[type=submit]:visible")
+        if submit.count():
+            submit.first.click(timeout=3_000)
+    except Exception:  # noqa: BLE001 - the page navigated: Kite took the code
+        pass
 
 
 def _enter_totp(page, secret: str, captured: dict, wait_s: float) -> None:
@@ -269,9 +292,7 @@ def _enter_totp(page, secret: str, captured: dict, wait_s: float) -> None:
     for attempt in (1, 2):
         code = _fresh_code(secret) if attempt == 1 else _next_window_code(secret)
         field.fill(code)
-        submit = page.locator("button[type=submit]:visible")
-        if submit.count():
-            submit.first.click()  # Kite usually submits a full code by itself
+        _submit_unless_gone(page, captured)
         try:
             _wait_for(page, lambda: False, captured, wait_s, stale)
         except KiteLoginError as error:
