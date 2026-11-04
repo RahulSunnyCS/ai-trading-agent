@@ -581,9 +581,9 @@ const BASE_JOBS: Job[] = [
     // 08:11 in the quantiply group: it starts when the 08:02 `broker-login` (which waits for
     // AlgoTest's 08:16 broker window, so about 08:20) and the 08:10 Quantiply switch-on have
     // ended. Never retried: a second attempt could activate what the first already did; the run
-    // alerts instead. Caught up all session (the picks keep their entry times; a pick whose
-    // entry has come is reported, not activated), like the login it follows. Replaced the 09:16
-    // `algotest-deploy` and the 09:18 `algotest-topup` (2026-11-04).
+    // alerts instead. Caught up until about 12:40 (a pick whose entry has come is reported,
+    // never activated; the last entry, the 12:17 add-on, has come by then, so a later wake could
+    // only alert). Replaced the 09:16 `algotest-deploy` and the 09:18 `algotest-topup` (2026-11-04).
     schedule: { at: '08:11', on: tradingDays, label: 'trading days 08:11' },
     steps: [
       ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--morning', '--apply'],
@@ -592,7 +592,7 @@ const BASE_JOBS: Job[] = [
     timeoutMinutes: 10,
     retries: 0,
     retryDelayMinutes: 0,
-    catchUpHours: 7,
+    catchUpHours: 4.5,
     group: 'quantiply',
     fixHint:
       "First read each strategy's Deployed count on algotest.in/live (the alert says what it showed): one already deployed must not be activated again. Activate only the rest by hand (Activate, tick both brokers); then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --morning  (dry run)",

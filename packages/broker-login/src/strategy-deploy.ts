@@ -333,11 +333,12 @@ async function main(): Promise<number> {
       return 1;
     }
   } else if (values.morning) {
-    // the evening export (`--next`, source "preview") is today's list; a recorded one for today
-    // (a hand export after 09:16) names the same strategies where they are on /live
-    if (manifest.day !== today) {
+    // Only the evening export (`--next`, source "preview") for today: a recorded export for today
+    // is a hand export after 09:16, and activating it (a catch-up after sleep) would trade the 09:16
+    // list, which the owner's rule says not to.
+    if (manifest.day !== today || manifest.source !== 'preview') {
       console.error(
-        `the export is ${manifest.source} for ${manifest.day}, not today (${today}): nothing to activate; did last evening's algotest-evening run?`,
+        `the export is ${manifest.source} for ${manifest.day}: --morning activates only last evening's export (preview, for today ${today}); nothing activated${manifest.day !== today ? "; did last evening's algotest-evening run?" : ''}`,
       );
       return 1;
     }
@@ -394,10 +395,14 @@ async function main(): Promise<number> {
   }
   // BL-197 Phase 2: the add-on follows the settings as they are now, not as the evening export
   // read them (2026-11-04: switched off at 18:47, after the 16:40 export had set it up)
+  const addonWanted =
+    values.morning && automation && algotestAddon(automation, manifest.book as Book);
   const morning =
     values.morning && automation
-      ? morningPicks(manifest.strategies, algotestAddon(automation, manifest.book as Book))
+      ? morningPicks(manifest.strategies, addonWanted === true)
       : { kept: manifest.strategies, leftOut: [] as string[] };
+  // ... and the other way round: an add-on switched on after the evening export is not in AlgoTest
+  const addonMissing = addonWanted === true && !manifest.strategies.some((s) => s.addon);
   const picks: Pick[] = [];
   for (const s of morning.kept) {
     const doc = JSON.parse(await readFile(join(resolve(dir), s.file), 'utf8'));
@@ -469,6 +474,10 @@ async function main(): Promise<number> {
         );
         if (morning.leftOut.length)
           lines.push(`add-on left out (Settings › Automation): ${morning.leftOut.join(', ')}`);
+        if (addonMissing)
+          lines.push(
+            "add-on on in Settings › Automation but not in last evening's list (it was off at the 16:40 export): upload and activate it by hand if it should trade today",
+          );
       }
       const p = planDeploy(picks, live, istMinutes());
       if (p.refused) {

@@ -50,10 +50,12 @@ combination â‘¢; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26â
   The deployer now ticks every broker whose AlgoTest row uploads the list and checks the count (first step of
   this phase, used by the 09:16 job until the after-login run exists).
 - Built 2026-11-04 (PR pending): `strategy-deploy.ts --morning` activates the export `latest-t1.json` points at
-  (the evening's `--next` export for today) through `planDeploy` and the proven broker-sheet path; the add-on
+  (the evening's `--next` export for today; a recorded export is refused, so a catch-up never trades the
+  09:16 list) through `planDeploy` and the proven broker-sheet path; the add-on
   follows the settings as read at 08:11 (`algotestAddon`, `morningPicks`: on 2026-11-04 the owner switched it
-  off at 18:47, after the 16:40 export had set it up). Scheduler job `algotest-activate` (08:11, `quantiply`
-  group, so after the login; no retries; caught up all session) replaces `algotest-deploy` (09:16) and
+  off at 18:47, after the 16:40 export had set it up; the other way round, an add-on switched on overnight is
+  not in AlgoTest, and the message says to upload it by hand). Scheduler job `algotest-activate` (08:11, `quantiply`
+  group, so after the login; no retries; caught up until about 12:40, the last entry) replaces `algotest-deploy` (09:16) and
   `algotest-topup` (09:18), which are gone: nothing re-exports today's AlgoTest folder after 09:16, so the
   trade monitor's 09:25 deploy check (`DEPLOY_CHECK=on`) compares /live with the evening list (said in its
   note) under the same add-on rule. The stop hold, the pause and the monitor's job list follow the new id.

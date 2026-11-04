@@ -223,7 +223,7 @@ week, until disabled.
   name, so it was run once, supervised.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) activates strategies on /live. `--morning` (BL-197 Phase 2,
   scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: the export `--latest t1`
-  points at (the 16:40 run's `--next` export, source `preview`, for today), every strategy not yet deployed, through
+  points at (the 16:40 run's `--next` export, source `preview`, for today; any other export is refused, so a catch-up never trades the 09:16 list), every strategy not yet deployed, through
   `planDeploy` like the old 09:16 run; the Buy add-on is left out when no AlgoTest row has it on now (`morningPicks`,
   `algotestAddon`: the settings are read again in the morning, since the export read them the evening before). The
   evening list is what trades on AlgoTest (owner, 2026-11-02); the 09:16 `algotest-deploy` and 09:18

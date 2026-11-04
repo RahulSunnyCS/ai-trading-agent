@@ -940,12 +940,12 @@ class Monitor {
             missing.push(`no ${r.book} picks exported for today (latest ${p.day})`);
             continue;
           }
-          // BL-197 Phase 2: on AlgoTest the evening list is the list that trades (the morning
-          // activation deploys it; the 09:16 pick changes nothing there), so the check reads it
-          // as such, with the add-on as the settings say now.
-          if (p.source !== 'recorded') {
+          // BL-197 Phase 2: on AlgoTest the evening list (the preview export) is the list that
+          // trades (the 08:11 activation deploys it; the 09:16 pick changes nothing there), so
+          // that is the expected export and needs no note; anything else is a hand export.
+          if (p.source !== 'preview') {
             notes.push(
-              `checked against last evening's ${r.book.toUpperCase()} list, the list that trades on AlgoTest (BL-197)`,
+              `checked against a ${p.source} export, not last evening's ${r.book.toUpperCase()} list (the 08:11 activation reads the evening's preview export, BL-197)`,
             );
           }
           const m = morningPicks(p.picks, algotestAddon(this.automation, r.book));
