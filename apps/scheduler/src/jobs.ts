@@ -562,8 +562,8 @@ const BASE_JOBS: Job[] = [
         '--apply',
         '--allow-delete',
       ],
-      // BL-197: Setup Execution for the T1 picks just uploaded (re-saving a set-up sheet is safe)
-      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--setup', '--apply'],
+      // BL-197: Setup Execution for every list's picks just uploaded (re-saving a set-up sheet is safe)
+      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--from-settings', '--setup', '--apply'],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 15,
@@ -577,7 +577,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-activate',
     description:
-      "Activate last evening's T1 list on AlgoTest's /live right after the morning login (BL-197 Phase 2): each strategy the 16:40 run uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose Settings › Automation row uploads T1, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading T1",
+      "Activate last evening's list on AlgoTest's /live right after the morning login (BL-197 Phase 2): every list an AlgoTest row in Settings › Automation uploads (Tuned, Classic or both, each from its own export), each strategy the 16:40 run uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose row uploads that list, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading a list",
     // 08:11 in the quantiply group: it starts when the 08:02 `broker-login` (which waits for
     // AlgoTest's 08:16 broker window, so about 08:20) and the 08:10 Quantiply switch-on have
     // ended. Never retried: a second attempt could activate what the first already did; the run
@@ -586,7 +586,13 @@ const BASE_JOBS: Job[] = [
     // only alert). Replaced the 09:16 `algotest-deploy` and the 09:18 `algotest-topup` (2026-11-04).
     schedule: { at: '08:11', on: tradingDays, label: 'trading days 08:11' },
     steps: [
-      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--morning', '--apply'],
+      [
+        'node_modules/.bin/tsx',
+        'src/strategy-deploy.ts',
+        '--from-settings',
+        '--morning',
+        '--apply',
+      ],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
@@ -600,9 +606,9 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-deploy-check',
     description:
-      'At 15:35, alert if any strategy the tool activates on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on; no AlgoTest login when no AlgoTest row uploads the T1 list and the tool deployed nothing today',
+      'At 15:35, alert if any strategy the tool activates on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on; no AlgoTest login when no AlgoTest row uploads a list and the tool deployed nothing today',
     schedule: { at: '15:35', on: tradingDays, label: 'trading days 15:35' },
-    steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--check']],
+    steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--from-settings', '--check']],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 5,
     retries: 1,

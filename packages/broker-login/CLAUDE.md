@@ -222,7 +222,7 @@ week, until disabled.
   adds it once from the listing (ledger only); it cannot tell a tool upload from the owner's copy of the same
   name, so it was run once, supervised.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) activates strategies on /live. `--morning` (BL-197 Phase 2,
-  scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: the export `--latest t1`
+  scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: with `--from-settings` (the three jobs) every book an AlgoTest row uploads, each from its `latest-<book>.json`, one login each, a book with no export reported and failed under `--apply`; or the export `--latest <book>`
   points at (the 16:40 run's `--next` export, source `preview`, for today; any other export is refused, so a catch-up never trades the 09:16 list), every strategy not yet deployed, through
   `planDeploy` like the old 09:16 run; the Buy add-on is left out when no AlgoTest row has it on now (`morningPicks`,
   `algotestAddon`: the settings are read again in the morning, since the export read them the evening before). The

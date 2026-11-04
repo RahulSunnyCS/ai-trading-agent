@@ -46,6 +46,9 @@ import { visibleWithin } from './wait.js';
  * ready but OFF: `--apply` needs `ALGOTEST_DEPLOY=on`; without it the run logs in, reads /live and
  * prints what it would deploy. The owner may never switch it on (2026-10-19).
  *
+ *   tsx src/strategy-deploy.ts --from-settings --morning [--apply]  every book an AlgoTest row
+ *       uploads (Settings › Automation), each from its latest-<book>.json, one login each; the
+ *       scheduler's jobs use this so a row switched to another list is never left out (2026-11-05)
  *   tsx src/strategy-deploy.ts --latest t1 --morning [--apply]  BL-197 Phase 2: right after the
  *       08:02 login (scheduler `algotest-activate`, 08:11), activate last evening's list: the export
  *       the 16:40 run uploaded and set up, for today. The evening list is what trades on AlgoTest;
@@ -256,18 +259,31 @@ async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Pr
   return `deployed on ${on} (${after} Deployed)`;
 }
 
+interface Values {
+  dir?: string | undefined;
+  latest?: string | undefined;
+  /** every book an AlgoTest row in Settings › Automation uploads, each from its `latest-<book>.json` */
+  'from-settings': boolean;
+  apply: boolean;
+  check: boolean;
+  setup: boolean;
+  morning: boolean;
+  headed: boolean;
+}
+
 async function main(): Promise<number> {
-  const { values } = parseArgs({
+  const values = parseArgs({
     options: {
       dir: { type: 'string' },
       latest: { type: 'string' },
+      'from-settings': { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
       setup: { type: 'boolean', default: false },
       morning: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
-  });
+  }).values as Values;
   if (existsSync('.env')) process.loadEnvFile('.env');
   if ([values.setup, values.check, values.morning].filter(Boolean).length > 1) {
     console.error('--setup, --check and --morning do not go together');
@@ -309,20 +325,73 @@ async function main(): Promise<number> {
       return 0;
     }
   }
-  let dir = values.dir;
-  if (!dir && values.latest) {
-    const root = process.env.TRADING_DATA_ROOT?.trim();
-    if (!root) {
-      console.error('--latest needs TRADING_DATA_ROOT');
-      return 1;
+  const dirs = await exportDirs(values, automation);
+  if (dirs === null) return 64;
+  if (dirs.length === 0) {
+    console.log('no AlgoTest row in Settings › Automation uploads a list: nothing to do');
+    return 0;
+  }
+  let worst = 0;
+  for (const dir of dirs) {
+    if (dir.missing) {
+      // a row uploads this book but no export exists: the evening job did not run for it
+      console.error(
+        `${dir.book.toUpperCase()}: no export (${dir.pointer}); did the evening job run?`,
+      );
+      if (values.apply) worst = Math.max(worst, 1);
+      continue;
     }
-    const pointer = join(root, 'rotation', 'algotest', `latest-${values.latest}.json`);
-    dir = (JSON.parse(await readFile(pointer, 'utf8')) as { dir: string }).dir;
+    worst = Math.max(worst, await runDir(dir.dir, values, automation));
   }
-  if (!dir) {
-    console.error('usage: --dir <export folder> | --latest <book> [--apply | --check | --setup]');
-    return 64;
+  return worst;
+}
+
+type ExportDir =
+  | { book: string; dir: string; missing: false }
+  | { book: string; dir?: undefined; pointer: string; missing: true };
+
+/** The export folders to run: `--dir`, `--latest <book>`, or every book the settings upload. */
+async function exportDirs(
+  values: Values,
+  automation: Automation | null,
+): Promise<ExportDir[] | null> {
+  if (values.dir) return [{ book: '', dir: values.dir, missing: false }];
+  const books = values['from-settings']
+    ? automation
+      ? (uploadBooks(automation, 'algotest') as string[])
+      : []
+    : values.latest
+      ? [values.latest]
+      : [];
+  if (!values['from-settings'] && !books.length) {
+    console.error(
+      'usage: --dir <export folder> | --latest <book> | --from-settings [--apply | --check | --setup | --morning]',
+    );
+    return null;
   }
+  const root = process.env.TRADING_DATA_ROOT?.trim();
+  if (!root) {
+    console.error('--latest / --from-settings need TRADING_DATA_ROOT');
+    return null;
+  }
+  const out: ExportDir[] = [];
+  for (const book of books) {
+    const pointer = join(root, 'rotation', 'algotest', `latest-${book}.json`);
+    if (!existsSync(pointer)) {
+      out.push({ book, pointer, missing: true });
+      continue;
+    }
+    out.push({
+      book,
+      dir: (JSON.parse(await readFile(pointer, 'utf8')) as { dir: string }).dir,
+      missing: false,
+    });
+  }
+  return out;
+}
+
+/** One export folder: set up, check, activate or deploy its picks (one AlgoTest login each). */
+async function runDir(dir: string, values: Values, automation: Automation | null): Promise<number> {
   const manifest = JSON.parse(
     await readFile(join(resolve(dir), 'manifest.json'), 'utf8'),
   ) as Manifest;
@@ -371,8 +440,10 @@ async function main(): Promise<number> {
     );
     if (nothing) {
       console.log(`${nothing} (${describeSource(automation)}); AlgoTest not logged in`);
-      // An AlgoTest row uploading another list is deployed by no job: say so, never silently.
-      const other = values.apply ? uploads.filter((b) => b !== manifest.book) : [];
+      // An AlgoTest row uploading another list is deployed by no job: say so, never silently
+      // (under --from-settings every uploaded book gets its own run, so there is no "other").
+      const other =
+        values.apply && !values['from-settings'] ? uploads.filter((b) => b !== manifest.book) : [];
       if (other.length) {
         await sendText(
           readTelegramConfig(),
