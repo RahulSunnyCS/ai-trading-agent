@@ -4,6 +4,7 @@ redirect it accepts, Kite's messages classified. The browser is faked: no networ
 import json
 
 import pytest
+from playwright.sync_api import Error as PlaywrightError
 from typer.testing import CliRunner
 
 from momentum_backtesting import cli, kite, kite_login
@@ -122,6 +123,8 @@ def test_the_cli_writes_the_outcome_and_exits_1_on_a_failure(monkeypatch, env):
 class FakePage:
     """Just enough of a Playwright page for `_wait_for`: the visible message, polled."""
 
+    url = "https://kite.zerodha.com/connect/login?api_key=k&sess_id=s"
+
     def __init__(self, messages):
         self.messages = list(messages)
 
@@ -146,3 +149,88 @@ def test_the_second_code_is_not_failed_by_the_first_ones_message():
     with pytest.raises(kite_login.KiteLoginError) as refused:
         kite_login._wait_for(FakePage(["Invalid TOTP"]), lambda: False, {}, wait_s=5)
     assert refused.value.kind == "totp"
+
+
+class GonePage:
+    """A page Kite has left for the app's redirect: every DOM query throws, as Playwright's do,
+    and `url` is wherever it went."""
+
+    def __init__(self, url="https://kite.zerodha.com/connect/login?api_key=k&sess_id=s"):
+        self.url = url
+
+    def eval_on_selector_all(self, selector, script):
+        raise PlaywrightError("Execution context was destroyed")
+
+    def locator(self, selector):
+        raise PlaywrightError("Execution context was destroyed")
+
+    def wait_for_timeout(self, ms):
+        pass
+
+
+def test_the_wait_ends_on_the_token_even_while_the_page_is_leaving():
+    """Kite submits a full code itself and redirects: the token arrives while the form's checks
+    throw, and that is success, not a failure."""
+    captured = {}
+    calls = []
+
+    def done():
+        calls.append(1)
+        if len(calls) == 2:
+            captured["token"] = "RT"
+        raise PlaywrightError("Execution context was destroyed")
+
+    kite_login._wait_for(GonePage(), done, captured, wait_s=5)
+    assert captured == {"token": "RT"}
+
+
+def test_a_redirect_without_a_token_is_named_at_once():
+    page = GonePage("http://127.0.0.1:8765/api/kite/callback?status=cancelled&state=S1")
+    with pytest.raises(kite_login.KiteLoginError, match="api/kite/callback status=cancelled"):
+        kite_login._wait_for(page, lambda: False, {}, wait_s=5)
+    assert kite_login._left_kite("https://kite.zerodha.com/connect/finish?api_key=k") == ""
+
+
+def test_a_real_bug_in_the_poll_is_not_retried_until_the_deadline():
+    def broken():
+        raise AttributeError("a bug, not a navigation")
+
+    with pytest.raises(AttributeError):
+        kite_login._wait_for(GonePage(), broken, {}, wait_s=5)
+
+
+def test_a_gone_login_button_is_not_a_failure_and_a_stuck_one_is_named():
+    assert kite_login._submit_unless_gone(GonePage(), {"token": "RT"}) == ""
+    left = GonePage("http://127.0.0.1:8765/api/kite/callback?status=success&request_token=RT")
+    assert kite_login._submit_unless_gone(left, {}) == ""
+    note = kite_login._submit_unless_gone(GonePage(), {})  # still on Kite, the click failed
+    assert note.startswith("Login click: Error: Execution context was destroyed")
+    with pytest.raises(kite_login.KiteLoginError, match=r"timed out \(Login click: Error"):
+        kite_login._wait_for(GonePage(), lambda: False, {}, wait_s=0.01, note=note)
+
+
+class WatchedPage:
+    def __init__(self):
+        self.handlers = {}
+
+    def on(self, event, handler):
+        self.handlers[event] = handler
+
+
+class FakeRequest:
+    def __init__(self, url):
+        self.url = url
+
+
+def test_the_token_is_read_off_the_redirected_request():
+    """The fix itself: the handler sits on the page's `request` event (a route never fires for a
+    redirected request) and takes only this login's successful redirect."""
+    page, captured = WatchedPage(), {}
+    kite_login._watch_for_token(page, "S1", captured)
+    handler = page.handlers["request"]
+    cb = "http://127.0.0.1:8765/api/kite/callback?action=login&type=login"
+    handler(FakeRequest("https://kite.zerodha.com/connect/finish?api_key=k&sess_id=s"))
+    handler(FakeRequest(f"{cb}&status=success&request_token=OTHER&state=S2"))
+    assert captured == {}
+    handler(FakeRequest(f"{cb}&status=success&request_token=RT&state=S1"))
+    assert captured == {"token": "RT"}
