@@ -28,6 +28,20 @@ export interface CandleDay {
   /** share (0-1) of random same-size baskets from the pool the day beat; null when not drawn */
   beat: number | null;
   pool: number;
+  /** the running high (from zero) minus the close, rupees */
+  drawdown: number;
+  /** each account's live result per lot for this list (the 15:40 capture); empty when none */
+  live: CandleLive[];
+}
+
+export interface CandleLive {
+  platform: string;
+  broker: string;
+  /** live after costs, per lot, summed over the account's variants that day */
+  live: number;
+  /** paper for the same variants, per lot */
+  paper: number;
+  variants: number;
 }
 
 export interface RotationCandlesResponse {
@@ -41,5 +55,9 @@ export interface RotationCandlesResponse {
   draws: number;
   days: CandleDay[];
   left_out: { day: string; reason: string }[];
+  /** the drawdown at least `share` % of the window's days reached */
+  ladder: { share: number; drawdown: number }[];
+  /** days with a live capture */
+  live_days: number;
   totals: { pnl: number; days: number; max_drawdown: number; drawdown_now: number };
 }

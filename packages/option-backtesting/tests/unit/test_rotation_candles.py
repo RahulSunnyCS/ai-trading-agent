@@ -154,3 +154,50 @@ def test_the_route(world, monkeypatch):
     routes._cache.clear()
     cold = client.get("/legwise/rotation/candles?book=base&from=2026-10-19&to=2026-10-20")
     assert cold.status_code == 202 and cold.json() == {"status": "warming"}
+
+
+def test_each_day_carries_its_drawdown_and_the_window_its_ladder(world):
+    r = candles.build("t1", world, D1, D2, stop=None, use_default_stop=False)
+    assert [d["drawdown"] for d in r["days"]] == [0, 7000]
+    assert candles.ladder([float(x) for x in range(100)]) == [
+        {"share": 25, "drawdown": 75.0},
+        {"share": 10, "drawdown": 90.0},
+        {"share": 5, "drawdown": 95.0},
+    ]
+    # five days: 25 % is two days, rounded up, so the share is never overstated
+    assert candles.ladder([0.0, 0.0, 100.0, 600.0, 1100.0])[0] == {"share": 25, "drawdown": 600.0}
+    assert r["ladder"][0]["share"] == 25 and candles.ladder([]) == []
+
+
+def test_random_baskets_are_cut_at_the_same_stop():
+    pool = [-9000.0, -8000.0, 500.0, 600.0]
+    # one-strategy baskets: without a stop the -8,500 day beats the -9,000 strategy only
+    assert candles.beat_share(-8500, pool, 1, "s", draws=4000) == pytest.approx(0.25, abs=0.05)
+    # cut at a 7,000 stop the two losers end at -7,000, above the day: it beats nothing
+    assert candles.beat_share(-8500, pool, 1, "s", draws=4000, stop=7000) == 0
+
+
+def test_live_results_come_per_account_for_the_books_list(world, monkeypatch):
+    from option_backtesting.rotation import live_compare
+
+    group = {"platform": "algotest", "broker": "angelone", "live": -5153.05, "paper": -7141.75}
+    monkeypatch.setattr(
+        live_compare,
+        "compare_range",
+        lambda start, end, root: {
+            "days": [
+                {
+                    "day": "2026-10-20",
+                    "groups": [
+                        {**group, "book": "t1", "variants": 2},
+                        {**group, "book": "core", "variants": 3},
+                    ],
+                }
+            ]
+        },
+    )
+    r = candles.build("t1", world, D1, D2)
+    assert r["days"][0]["live"] == []
+    assert r["days"][1]["live"] == [{**group, "variants": 2}]
+    assert r["live_days"] == 1
+    assert candles.live_by_day(world, "base", D1, D2) == {}

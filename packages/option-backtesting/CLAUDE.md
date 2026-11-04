@@ -434,8 +434,12 @@ Otherwise:
   under the book stop (`DEFAULT_STOP`, times `lots`); open = the running total before the day, high / low = open +
   the best / worst of the stopped path (0 included), close = open + the day's result; each member's `at_stop` with
   `labels.label`; `beat` = the share of `DRAWS` (2,000) random same-size baskets from the book's pool (Core-298, + T1's
-  variants for T1), seeded per book and day, whose one-lot sum was below the book's result / `lots` (the baskets carry
-  no stop). A day the replay cannot run is `left_out` with its reason. Cold: 202 through `rotation/warm.py`.
+  variants for T1), seeded per book and day, whose one-lot sum was below the book's result / `lots` (the baskets
+  are cut at the stop when they ended below it, which flatters them, never the book). Each day also has its
+  `drawdown` (running high from zero minus the close) and `live` (`live_by_day`: `live_compare.compare_range`'s groups for
+  the list, per platform + broker, per lot); the response has `ladder` (the depth at least 25 / 10 / 5 % of the days
+  reached, rounded up) and `live_days`. A day the replay cannot run is `left_out` with its reason. Cold: 202 through
+  `rotation/warm.py`.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
   read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s

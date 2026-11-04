@@ -21,12 +21,23 @@ day's picks are the core picks and any Buy add-on. Each day is labelled `recorde
 was below the book's own (its day result divided by `lots`, after its stop; the random baskets
 carry no stop). Seeded per book and day, so the same request gives the same share.
 
+The random baskets are judged under the same book stop, as far as the stored day results allow: a
+basket whose day ended below the stop is cut at it (its path must have crossed it); one that dipped
+below and recovered keeps its close, which flatters the random baskets, never the book.
+
+Each day also carries its **drawdown** (the running high, starting at zero, minus the close) and,
+for the Adaptive books, the **live** result per lot of every account the 15:40 capture read for
+that list (`live_compare`, per platform + broker: the account's own variants, live after costs and
+the paper for the same variants). The response's `ladder` names the drawdown at least 25 / 10 / 5 %
+of the window's days reached.
+
 A day that cannot be replayed (no collected data, a pick with no result) is listed under
 `left_out` with the reason and never counted as zero.
 """
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -43,6 +54,8 @@ WINDOW_DAYS = 730
 DRAWS = 2000
 LIST_KEY = "C"
 MAX_LOTS = 10
+#: the shares of days the drawdown ladder names
+LADDER = (25, 10, 5)
 
 
 class CandlesError(ValueError):
@@ -117,14 +130,58 @@ def _pick(member: dict) -> dict:
 
 
 def beat_share(
-    value: float, pool: list[float], k: int, seed: str, draws: int = DRAWS
+    value: float,
+    pool: list[float],
+    k: int,
+    seed: str,
+    draws: int = DRAWS,
+    stop: float | None = None,
 ) -> float | None:
-    """The share of `draws` random `k`-strategy baskets from `pool` whose sum was below `value`."""
+    """The share of `draws` random `k`-strategy baskets from `pool` whose sum was below `value`.
+    With `stop` (rupees, one lot a strategy) a basket that ended below it is cut at it."""
     if k <= 0 or len(pool) < k:
         return None
     rng = random.Random(seed)
-    below = sum(1 for _ in range(draws) if sum(rng.sample(pool, k)) < value)
+    floor = -stop if stop is not None else None
+    below = 0
+    for _ in range(draws):
+        basket = sum(rng.sample(pool, k))
+        if floor is not None and basket < floor:
+            basket = floor
+        below += basket < value
     return below / draws
+
+
+def ladder(drawdowns: list[float], shares: tuple[int, ...] = LADDER) -> list[dict]:
+    """For each share p: the deepest drawdown at least p % of the days reached (rounded up, so the
+    share is never overstated)."""
+    if not drawdowns:
+        return []
+    deepest_first = sorted(drawdowns, reverse=True)
+    out = []
+    for p in shares:
+        k = max(1, math.ceil(len(deepest_first) * p / 100))
+        out.append({"share": p, "drawdown": round(deepest_first[k - 1], 2)})
+    return out
+
+
+def live_by_day(root: Path, book: str, start: date, end: date) -> dict[date, list[dict]]:
+    """{day: [{platform, broker, live, paper, variants}]} per lot for the list's accounts, from the
+    15:40 capture (`live_compare`); empty for the base and before the capture began."""
+    if book == "base":
+        return {}
+    from . import live_compare
+
+    out: dict[date, list[dict]] = {}
+    for day in live_compare.compare_range(start, end, root).get("days", []):
+        rows = [
+            {k: g[k] for k in ("platform", "broker", "live", "paper", "variants")}
+            for g in day.get("groups", [])
+            if (g.get("book") or "") == book
+        ]
+        if rows:
+            out[date.fromisoformat(day["day"])] = rows
+    return out
 
 
 def build(
@@ -152,8 +209,13 @@ def build(
     days = picks_by_day(root, book, start, end)
     pool_names = _pool(book)
     nets = {n: store.read_net(n, root) for n in pool_names}
+    try:
+        live = live_by_day(root, book, start, end)
+    except (OSError, ValueError, KeyError):
+        live = {}  # the capture cannot be read: the candles stand without the live dots
     out_days: list[dict] = []
     left_out: list[dict] = []
+    drawdowns: list[float] = []
     total = peak = 0.0
     deepest = 0.0
     for d in sorted(days):
@@ -172,9 +234,10 @@ def build(
         total += day_pnl
         peak = max(peak, total)
         deepest = max(deepest, peak - total)
+        drawdowns.append(peak - total)
         pool = [nets[n][d] for n in pool_names if d in nets[n]]
         size = sum(per for _, per in picked.names)
-        beat = beat_share(day_pnl / lots, pool, size, f"{book}:{d.isoformat()}")
+        beat = beat_share(day_pnl / lots, pool, size, f"{book}:{d.isoformat()}", stop=stop)
         out_days.append(
             {
                 "day": d.isoformat(),
@@ -188,6 +251,8 @@ def build(
                 "picks": [_pick(m) for m in b.members],
                 "beat": None if beat is None else round(beat, 4),
                 "pool": len(pool),
+                "drawdown": round(peak - total, 2),
+                "live": live.get(d, []),
             }
         )
     return {
@@ -200,6 +265,8 @@ def build(
         "draws": DRAWS,
         "days": out_days,
         "left_out": left_out,
+        "ladder": ladder(drawdowns),
+        "live_days": sum(1 for d in out_days if d["live"]),
         "totals": {
             "pnl": round(total, 2),
             "days": len(out_days),
