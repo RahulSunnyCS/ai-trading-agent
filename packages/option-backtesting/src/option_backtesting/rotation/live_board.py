@@ -815,15 +815,18 @@ def refresh(
     log: Log = print,
     client_factory=None,
     master_loader: Callable[[], list[dict]] | None = None,
+    books: list[BookPicks] | None = None,
 ) -> dict | None:
     """One refresh with a live Angel One `session`, written to the day's snapshot. The caller holds
-    the login guard's lock. Returns the snapshot, or None when no picks are recorded yet. Raises
-    AngelCredentialsError when the session is rejected (the caller logs in again)."""
+    the login guard's lock. Returns the snapshot, or None when no picks are recorded yet (`books`
+    is the day's picks when the caller has read them already, so the journals are not read
+    twice). Raises AngelCredentialsError when the session is rejected (the caller logs in again)."""
     from ..angelone.auth import AngelCredentialsError
 
     root = root or data_dir()
     day = day or now_ist().date()
-    books = todays_picks(day, root)
+    if books is None:
+        books = todays_picks(day, root)
     started = now_ist()
     _update_state(root, refreshing=True, started_at=_iso(started), by=by)
     try:
