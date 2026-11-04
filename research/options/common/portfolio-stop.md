@@ -1,6 +1,6 @@
 # Options: portfolio stop
 
-**Status:** Tested · **Last updated:** 2026-11-02
+**Status:** Tested · **Last updated:** 2026-11-04
 
 ## What it is
 
@@ -33,6 +33,7 @@ most 10% lower than with no stop.
 | BL-131 | ₹6k, 7k, 8k, 9k, 10k, 12k on each 3-lot book: Core-298 and T1 Adaptive (one lot per pick) | 2025-01-10 → 2026-10-16 (428 days) and the last year, gross, minute replay | **No level clearly changes the result** (24 cells, one interval above zero, chance-level; Core point estimates ≥ 0, T1 at ₹6k–7k < 0); ₹9k+ never binds on Core; trims the worst day (T1 −13.8k → ~−9k), maximum drawdown mostly unchanged | [BL-131][bl131] |
 | BL-132 | Stop = the 85 / 90 / 93 / 95th percentile of each 3-lot book's day low, set on 2025-01 → 2025-10, checked on the next year | Core-298 and T1 Adaptive, gross, minute replay | Levels ₹6.5k–9.5k; in the calmer test year hit 2–10 points less often than targeted (none "holds"); protective at P90–95, no clear money effect. Whole-period (in-sample) P95 ≈ ₹8,500, P90 ≈ ₹7,000 for both books | [BL-132][bl132] |
 | BL-194 | ₹9k–16k, ₹18k, ₹20k, none on T1's Dir ×2 (4-lot) days, against ₹9k + the Dir's stop (₹12–13k) | T1 Adaptive with the expiry rule and SL150% cap, 2025-01-10 → 2026-10-30 (437 days, 218 4-lot), net of brokerage, minute replay | **No level beats ₹9k + the Dir's stop**; ₹9k −₹51 a day [−129, +15] (−₹104 [−232, −1] on the last year), ₹11k −₹47 [−91, −7] on the last year; ₹14k+ change 2 days, gain only from one the rule stopped, and deepen the worst day; the rule fires on 1 % of 4-lot days | [BL-194][bl194] |
+| BL-208 | On top of today's stop: trail 3:2 (continuous and ₹2k per ₹3k), lock at ₹0 after +₹5k, both; neighbours trail 1:1 / 3:1, lock 3k / 8k → 0, 5k → 2.5k | T1 Adaptive, Dir ×2 book (Shoonya) and 3-lot book (Angel One), 2025-01-10 → 2026-11-04 (440 days), net of brokerage, minute replay | **No owner arm clearly helps**: the trails are about neutral (+₹12 to +₹45 a day; the stepped trail clears zero on the 3-lot book only with the prompting day in) and trim the worst days a little; the break-even lock costs ₹58–163 a day | [BL-208][bl208] |
 
 ## What we know
 
@@ -49,6 +50,10 @@ most 10% lower than with no stop.
 - On a 4-lot (Dir ×2) T1 day the picks' own stops keep most days shallow (lowest MTM: median −₹2.5k, 1 % of
   days below −₹13.3k, the worst −₹17.6k), so ₹9k + the Dir's stop acts as a disaster stop; a level at the 3-lot ₹9,000
   closes days that recover ([BL-194][bl194]).
+- A profit lock closes days that recover. T1's book reaches +₹5,000 at some minute on 37–47 % of days and only about
+  1 in 15 of those ends below ₹0, so locking at break-even after +₹5k gave up more than it saved (Dir ×2: 27 days
+  −₹132k against 11 days +₹74k). A trail behind the day's best (3:2) moves money little either way and takes a little
+  off the worst days; it is the cheaper form of the same protection ([BL-208][bl208]).
 - All exploratory: same years already seen, owner override, no hold-out.
 
 ## Not yet tested
@@ -56,6 +61,7 @@ most 10% lower than with no stop.
 - A portfolio stop on the forward journal's unseen days (BL-095 keeps the registered read-out on its
   no-stop basis).
 - BL-095's trailing modes against the owner's AlgoTest screen (its open question 1).
+- A trail with live slippage and tick-level peaks (BL-208 used minute closes and fills at the level, its favourable case).
 
 ## Related
 
@@ -74,3 +80,4 @@ most 10% lower than with no stop.
 [bl194]: ../../../backlog/BL-194-t1-book-stop-dir2.md
 [bl131]: ../../../backlog/BL-131-book-daily-stop.md
 [bl132]: ../../../backlog/BL-132-mtm-stop-from-day-lows.md
+[bl208]: ../../../backlog/BL-208-t1-book-trail-and-lock.md
