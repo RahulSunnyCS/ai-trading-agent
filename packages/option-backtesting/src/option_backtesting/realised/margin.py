@@ -93,8 +93,10 @@ def _dec(value) -> Decimal:
 def split_collateral(line: dict, rules: tuple[CashRule, ...] | None = None) -> dict:
     """{'cash', 'non_cash', 'cash_holdings'} of one statement line, rupees (floats at the edge)."""
     total = line.get("total") or {}
-    cash_held = [h for h in line.get("holdings") or [] if is_cash(h, rules)]
-    other = [h for h in line.get("holdings") or [] if not is_cash(h, rules)]
+    cash_held: list[dict] = []
+    other: list[dict] = []
+    for h in line.get("holdings") or []:
+        (cash_held if is_cash(h, rules) else other).append(h)
     cash = _dec(total.get("funds")) + sum((_dec(h.get("value")) for h in cash_held), Decimal(0))
     non_cash = sum((_dec(h.get("value")) for h in other), Decimal(0))
     return {

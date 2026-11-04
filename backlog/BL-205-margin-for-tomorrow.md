@@ -106,8 +106,9 @@ the reading predates today's close.
   and project docs (`packages/contract-notes/CLAUDE.md` store table, `technical.md`).
   The collateral table is stored with each statement (scrip, ISIN, quantity, rate, haircut,
   value after haircut) and each scrip is tagged cash-equivalent or not from a small list in
-  `reference/` (owner, 2026-11-04: cash, pledged liquid ETFs such as Liquidbees, pledged
-  sovereign gold bonds; plus G-secs and T-bills, which the exchange treats the same way), so
+  `reference/` (owner, 2026-11-04: cash and pledged liquid ETFs such as Liquidbees; pledged
+  sovereign gold bonds and G-secs do NOT count, struck the same afternoon after Shoonya refused a
+  leg for the cash half, see the Log), so
   the cash component = funds + cash-equivalent collateral is a stored figure, not a guess at
   message time. A pledged scrip the list does not name is non-cash.
 - **Done when:** the backfill stores one line per statement e-mail since Sep for both accounts,
@@ -181,11 +182,11 @@ the reading predates today's close.
    expiry type?
 4. Which days count: the last N same-type days (N = 6?) or everything since 21 Oct?
 5. Should the block also go into the 09:00 morning summary (the statements have arrived by then)?
-6. ~~Which of the pledged scrips count as cash equivalents?~~ Answered (owner, 2026-11-04): any
-   cash, pledged liquid ETFs (Liquidbees) and pledged sovereign gold bonds. Finvasia's 2 Nov
-   funds of ₹1.05 L against ₹12.5 L of collateral, with 4–7 lots traded on 29 and 30 Oct, fits
-   that: the pledged Liquidbees and SGBs carry the cash half. Phase 1 confirms it from the
-   scrip list.
+6. ~~Which of the pledged scrips count as cash equivalents?~~ Answered (owner, 2026-11-04): cash
+   and pledged liquid ETFs (Liquidbees) only. Pledged sovereign gold bonds were counted at first
+   and struck the same afternoon: Shoonya refused one of three legs for the cash half with ₹3.7 L
+   of SGBs pledged (Log). Open: Finvasia ran 4–7 lots on 29 and 30 Oct with ₹0.6–1.1 L of funds,
+   which this rule does not explain.
 7. Angel One's cash shortfall (₹3.2 L on 2 Nov, ₹2,000 a month in interest): is the block's job
    to say the cost, or also to say how much cash to move in to clear it?
 
