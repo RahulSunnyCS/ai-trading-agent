@@ -4,10 +4,16 @@ Read-only.
 
 `expected_picks` re-runs the 09:16 ranking on the stored results with the market's last close
 standing in for the opening VIX, under the expiring-index rule (BL-122) for that session, for the
-live list or for a parallel track's universe. Since BL-125 the message shows only those picks. The
-chance of each pick, the likely changes, and the win-rate and mean tables (`build`, `Tomorrow`,
-`conditions`: a historical frequency, not a forecast, most of it re-scored in-sample) are no longer
-sent; the helpers are kept, tested, for the dashboard or a later message."""
+live list or for a parallel track's universe. `next_session_picks` takes that session's days to
+expiry from the listed contracts (`live.listed_dte_labels`, the calendar only as its fallback), as
+the 09:16 job does: the reference calendar knows only each index's weekday, so in the week before a
+holiday-moved expiry it put the evening's list one DTE bucket away from the morning's pick
+(2026-11-04: NIFTY's 10 Nov expiry moved to Mon 9 Nov, 3 weekdays off, not 4).
+
+Since BL-125 the message shows only those picks. The chance of each pick, the likely changes, and
+the win-rate and mean tables (`build`, `Tomorrow`, `conditions`: a historical frequency, not a
+forecast, most of it re-scored in-sample) are no longer sent; the helpers are kept, tested, for
+the dashboard or a later message."""
 
 from __future__ import annotations
 
@@ -290,6 +296,8 @@ class NextPicks:
     expiry_only: str | None
     #: {'NIFTY': '2', 'SENSEX': '4'}: weekdays to each index's expiry on that session
     dte: dict[str, str] | None = None
+    #: where those came from: `master` (the listed contracts) or `calendar` (the fallback)
+    dte_source: str | None = None
 
 
 def next_session_picks(
@@ -297,13 +305,14 @@ def next_session_picks(
 ) -> NextPicks | None:
     """Adaptive's expected picks for the session after `today` (`track`: that parallel track's
     universe), from the stored results; None when they cannot be worked out. The same ranking,
-    VIX stand-in and expiry rule as the 09:16 job, via `expected_picks`."""
+    VIX stand-in, expiry rule and days-to-expiry source (the listed contracts) as the 09:16 job,
+    via `expected_picks`."""
     from ..fyers.daily import data_dir
-    from .live import calendar_dte_labels
+    from .live import listed_dte_labels
 
     root = root or data_dir()
     nxt = next_session(today)
-    labels = calendar_dte_labels(nxt)
+    labels, dte_source = listed_dte_labels(nxt)
     expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], today, track)
     if expected is None:
         return None
@@ -317,4 +326,5 @@ def next_session_picks(
         (expected.next_best or {}).get(key),
         expected.expiry_only,
         {"NIFTY": labels["dte_n"], "SENSEX": labels["dte_s"]},
+        dte_source,
     )
