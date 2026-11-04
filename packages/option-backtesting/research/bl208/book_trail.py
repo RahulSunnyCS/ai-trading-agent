@@ -151,7 +151,7 @@ def run(root: Path) -> tuple[dict[str, dict], list[str], int]:
                     lots = dict.fromkeys(core, 1)
                     s = BASE_STOP
                 members = [portfolio.Member(m, n, paths[m]) for m, n in lots.items()]
-                brokerage = sum(2 * trades[m][d] * BROKERAGE * lots[m] for m in core)
+                brokerage = sum(2 * trades[m][d] * BROKERAGE for m in core)  # per order, as BL-194
                 combined = portfolio.apply_book(members, None).combined
                 arms = {}
                 for name, level in ARMS.items():
@@ -193,12 +193,9 @@ def summarise(rows: dict[str, dict]) -> dict:
             sub = [r["books"][book] for k, r in sorted(rows.items())
                    if k >= lo.isoformat() and not (drop and k == PROMPT_DAY)]  # fmt: skip
             base = np.array([r["arms"]["base"]["net"] for r in sub])
-            final = (
-                base  # base net (after brokerage); the context uses the base path's high and end
-            )
             ctx = {}
             for t in (3000, 5000, 8000):
-                hit = [(r, f) for r, f in zip(sub, final, strict=True) if r["high"] >= t]
+                hit = [(r, f) for r, f in zip(sub, base, strict=True) if r["high"] >= t]
                 ctx[f"reach_{t}"] = {"days": len(hit), "share": len(hit) / len(sub),
                                      "end_below_0": sum(f < 0 for _, f in hit),
                                      "end_below_-5000": sum(f < -5000 for _, f in hit)}  # fmt: skip

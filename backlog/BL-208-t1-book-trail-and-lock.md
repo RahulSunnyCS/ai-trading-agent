@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 on AlgoTest in both accounts and is weighing a change to the book stop |
-| **Status** | Done — informative: the 3:2 trail is about neutral (+₹12 to +₹45 a day, every interval but one includes zero) and trims the worst days a little; the lock at ₹0 after +₹5,000 costs ₹58–163 a day, because the book dips back to ₹0 and recovers far more often than it collapses |
+| **Status** | Done — informative: the 3:2 trail is about neutral (+₹12 to +₹45 a day, only the stepped trail on the 3-lot book clears zero, narrowly and only with the prompting day in) and trims the worst days a little; the lock at ₹0 after +₹5,000 costs ₹58–163 a day, because the book dips back to ₹0 and recovers far more often than it collapses |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-04 |
@@ -84,15 +84,15 @@ What each idea would have done to T1's book against today's stop. Nothing live c
   | Dir ×2 | 205 of 440 (47 %) | 14 | 7 |
   | 3 lots | 164 of 440 (37 %) | 11 | 6 |
 
-  **Dir ×2 book** (base +₹1,895 a day all days, +₹2,042 last year):
+  **Dir ×2 book** (base +₹1,967 a day all days, +₹2,112 last year):
 
-  | Arm | All days: change [90 %], early days, given up / saved | Last year: change [90 %] | Max drawdown all days (base −33,784) |
+  | Arm | All days: change [90 %], early days, given up / saved | Last year: change [90 %] | Max drawdown all days (base −32,648) |
   |---|---|---|---|
-  | trail 3:2 | +16 [−47, +82], 26 d, −₹30.8k / +₹38.0k | +33 [−49, +112] | −29,339 |
-  | trail 3:2 stepped | +24 [−15, +66], 18 d, −₹15.0k / +₹25.4k | +23 [−38, +79] | −33,904 |
-  | lock 5k→0 | −133 [−296, +19], 38 d, −₹132.3k / +₹73.8k | −94 [−274, +97] | −33,214 |
-  | both | −153 [−322, +9], 54 d, −₹148.9k / +₹81.8k | −110 [−291, +90] | −31,343 |
-  | trail 1:1 · 3:1 | −70 [−221, +58] · +15 [−13, +42] | −32 · **+36 [+11, +66]** | −35,493 · −31,810 |
+  | trail 3:2 | +16 [−47, +82], 26 d, −₹30.8k / +₹38.0k | +33 [−49, +112] | −28,773 |
+  | trail 3:2 stepped | +24 [−15, +66], 18 d, −₹15.0k / +₹25.4k | +23 [−38, +79] | −31,921 |
+  | lock 5k→0 | −133 [−296, +19], 38 d, −₹132.3k / +₹73.8k | −94 [−274, +97] | −32,648 |
+  | both | −153 [−322, +9], 54 d, −₹148.9k / +₹81.8k | −110 [−291, +90] | −30,635 |
+  | trail 1:1 · 3:1 | −70 [−221, +58] · +15 [−13, +42] | −32 · **+36 [+11, +66]** | −34,927 · −31,244 |
   | lock 3k→0 · 8k→0 · 5k→2.5k | −224 · **−92 [−192, −6]** · −115 | −200 · **−78 [−161, −19]** · −165 | |
 
   **3-lot book** (base +₹1,628 a day all days, +₹1,669 last year):
@@ -110,15 +110,15 @@ What each idea would have done to T1's book against today's stop. Nothing live c
   year); the lock 5k→0 on the Dir ×2 book to **−163 [−316, −17]** and "both" to **−183 [−342, −30]**, below zero.
 
   2026-11-04 itself (paper, minute closes): the Dir ×2 book peaked at +₹7,831 at a minute close and fell to −₹13,090,
-  closed by the ₹13,000 stop at 12:25 (net −₹13,845); the 3-lot book peaked at +₹4,535 and closed at the ₹9,000
-  stop at 12:25 (−₹9,498). Together that is about +₹12.4k to −₹22.1k, the owner's two accounts. Under trail 3:2 they
-  close at −₹8,774 and −₹6,622; under lock 5k→0 at −₹808 and −₹9,498 (the 3-lot book never reached +₹5,000).
+  closed by the ₹13,000 stop at 12:25 (net −₹13,562); the 3-lot book peaked at +₹4,535 and closed at the ₹9,000
+  stop at 12:25 (−₹9,498). Summed, that is up to +₹12.4k and down to −₹22.1k, close to the owner's two accounts (the two peaks need not fall on the same minute, so the combined high was at most that). Under trail 3:2 they
+  close at −₹8,491 and −₹6,622; under lock 5k→0 at −₹525 and −₹9,498 (the 3-lot book never reached +₹5,000).
 
   **Read under the rule:** one owner arm passes, narrowly: the stepped 3:2 trail (₹2,000 per ₹3,000) on the 3-lot book,
   +₹25 and +₹39 a day with both intervals just above zero. It is not counted as a finding: both lower bounds are +₹1
   and +₹3, it is one pass in eight owner tests, it fails on the Dir ×2 book, and without the day that prompted the idea
   both intervals include zero. The continuous 3:2 trail passes nowhere. The trails are about neutral on money and
-  protective at the edges (Dir ×2 trail 3:2: drawdown −33.8k → −29.3k, worst 5 % −11.1k → −10.5k; 3-lot: worst day
+  protective at the edges (Dir ×2 trail 3:2: drawdown −32.6k → −28.8k, worst 5 % −11.0k → −10.4k; 3-lot: worst day
   −12.1k → −10.2k); the replay is their favourable case (minute closes understate the peak, fills at the level).
   **The lock at ₹0 after +₹5,000 costs money in every window and both books** (−₹58 to −₹163 a day; on the Dir ×2
   book below zero over all days once today is left out): of the 205 Dir ×2 days that reach +₹5k only 14 end below ₹0, so a break-even lock mostly
@@ -126,3 +126,7 @@ What each idea would have done to T1's book against today's stop. Nothing live c
   its interval is below zero in both windows on the Dir ×2 book; a looser trail, 3:1, is the one arm above zero on the last year in
   both books (descriptive only, not adoptable from this item). Weaknesses: in-sample, no slippage, minute closes, 9
   arms on the same days.
+- 2026-11-04 — **Corrected after review** (PR #420). Brokerage was multiplied by lots; Phase 0 registered BL-194's
+  per-order charge (a 2-lot order is one order). Re-run: every change vs base, interval and count is as before; the Dir
+  ×2 book's levels rise by the doubled Dir's brokerage on 4-lot days (base +₹1,895 → +₹1,967 a day, drawdown −33,784 →
+  −32,648) and the figures above are the re-run's. The 3-lot book is unchanged. The reading stands.
