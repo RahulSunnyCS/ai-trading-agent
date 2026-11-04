@@ -330,6 +330,7 @@ export interface MomentumSavedRun {
 
 /** Why a saved strategy's result moved (BL-052, `saved_identity.explain`). */
 export type ResultChangeLabel =
+  | 'data_extended'
   | 'data_revised'
   | 'intended'
   | 'check'

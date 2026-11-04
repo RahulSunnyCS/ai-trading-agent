@@ -425,7 +425,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     term: 'Result moved',
     group: 'Momentum',
     short:
-      'The same settings gave a different result. Each run records its data and code versions, so the move is labelled Data revised, Intended change, Check (possibly a bug), Not reproducible (a bug) or Unknown (saved before versions were recorded).',
+      'The same settings gave a different result. Each run records its data and code versions, so the move is labelled Data extended (only later weeks added), Data revised, Intended change, Check (possibly a bug), Not reproducible (a bug) or Unknown (saved before versions were recorded).',
   },
   {
     id: 'headline',

@@ -41,10 +41,11 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("012_momentum_orders",),
             ("013_momentum_kite",),
             ("014_momentum_lots",),
+            ("015_result_change_data_extended",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 14
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 15
 
 
 # The orders tables as the first draft of BL-051 Phase 3 created them, applied to the owner's live
@@ -184,6 +185,33 @@ def test_013_keeps_every_orders_row_and_accepts_kite(root):
         con.execute(f"INSERT INTO momentum_cash VALUES ('rahul', '{at}', 'kite', 25000)")
         with pytest.raises(Exception, match="CHECK"):
             con.execute("UPDATE momentum_owner_settings SET holdings_source = 'broker'")
+
+
+def test_015_keeps_every_result_change_and_accepts_data_extended(root):
+    """015 rebuilds momentum_result_changes to widen its label CHECK. A catalog at 014 with a
+    reviewed change keeps it, then takes a 'data_extended' row and still refuses an unknown one."""
+    old_ddl = dict(_migrations())["011_momentum_result_changes"]
+    insert = (
+        "INSERT INTO momentum_result_changes (change_id, dataset, version_id, anchor_run_id, "
+        "prev_run_id, run_id, label, kpis_before, kpis_after, reviewed_by) "
+        "VALUES (?, 'broad', 'v', 'a', 'p', 'r', ?, '{}', '{}', ?)"
+    )
+    with connect(root, views=()) as con:  # a current catalog, rewound to 011's table
+        con.execute("DROP TABLE momentum_result_changes")
+        con.execute(old_ddl)
+        con.execute(
+            "DELETE FROM schema_migrations WHERE version = '015_result_change_data_extended'"
+        )
+        con.execute(insert, ["c1", "check", "rahul"])
+        with pytest.raises(Exception, match="CHECK"):
+            con.execute(insert, ["c2", "data_extended", None])
+    with connect(root, views=()) as con:
+        assert con.execute(
+            "SELECT change_id, label, reviewed_by FROM momentum_result_changes"
+        ).fetchall() == [("c1", "check", "rahul")]
+        con.execute(insert, ["c2", "data_extended", None])
+        with pytest.raises(Exception, match="CHECK"):
+            con.execute(insert, ["c3", "bogus", None])
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):

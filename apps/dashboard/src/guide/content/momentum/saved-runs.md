@@ -56,13 +56,16 @@ strategies, most pressing first, each with a link to where you act:
 ## Why a result moved
 
 Every run records three things: its settings, the version of the data and the version of the
-code. When the same settings give a different result, they say why:
+code. The code counts as changed only when the Momentum code itself changed (its own and the
+research database's, or a locked dependency); a commit to another part of the repo does not. When
+the same settings give a different result, they say why:
 
 | Label | Means |
 |---|---|
-| Data revised | Same code, new data: prices or corporate actions were revised. Names what changed. |
+| Data extended | Same code, newer data: later weeks were added (a new Friday) and every earlier week is unchanged. |
+| Data revised | Same code, new data, and an earlier week moved: prices or corporate actions were revised. Names what changed. |
 | Intended change | The code changed, with an accepted change to this dataset's frozen test results in between. |
-| Check | The code changed with no accepted change for this dataset, or code and data both changed. Possibly a bug. |
+| Check | The Momentum code changed with no accepted change for this dataset, or code and data both changed. Possibly a bug. |
 | Not reproducible | Same settings, code and data, different result: a bug. Sent to Telegram for a favourite. |
 | Unknown | Saved before runs recorded their code and data. |
 

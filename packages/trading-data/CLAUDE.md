@@ -36,7 +36,8 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `010_ref_rates.sql`: `ref_rates`, the RBI repo rate from each policy decision date
     (`rates.csv`), the risk-free rate for implied volatility (`ReferenceData.risk_free_rate`)
   - `011_momentum_result_changes.sql`: `momentum_result_changes`, why each saved Momentum
-    strategy's result moved (BL-052)
+    strategy's result moved (BL-052); `015_result_change_data_extended.sql` rebuilds it to
+    allow the `data_extended` label (a result that only added later weeks)
   - `012_momentum_orders.sql`: `momentum_holdings`, `momentum_holding_rules`,
     `momentum_owner_settings`, `momentum_orders` — Momentum's "Your orders" (BL-051 Phase 3).
     Shipped first as `011_momentum_orders`, so it is idempotent (see Migrations below)
