@@ -224,7 +224,10 @@ week, until disabled.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) deploys the day's recorded picks on /live. `--apply`
   and `--check` need `ALGOTEST_DEPLOY=on`. "Activate" opens the broker sheet (BL-197): it ticks every broker
   whose AlgoTest row uploads the list (`algotestDeployBrokers`, `checkBrokerSheet`), presses "Activate on n
-  Brokers" and expects "n Deployed" up by n; it stops at anything else that opens.
+  Brokers" and expects "n Deployed" up by n; it stops at anything else that opens. It waits for /live's
+  "Broker Login n/m" (rendered after the rows; also read split over lines); a count the page does not show is
+  unread (`brokersLoggedIn: null`, `brokerRefusal`), refused as such, never as "0/0", and every refusal saves a
+  `deploy-refused` screenshot and HTML (2026-11-03).
   `--setup` (BL-197, the last step of `algotest-evening`) sets up the next session's picks instead: each
   sheet checked (multiplier 1, NRML, no day ticked, execution time = entry) and saved with Trade monitoring
   on Candle Close; it deploys nothing, so it needs `ALGOTEST_UPLOAD=on`, not `ALGOTEST_DEPLOY`.
