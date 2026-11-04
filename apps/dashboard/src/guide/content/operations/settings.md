@@ -49,10 +49,17 @@ Three master switches, then one block per platform and broker.
 - **Dir ×2 on non-expiry days** (off by default): on a day neither NIFTY nor SENSEX expires, the picked Dir is uploaded at **2 lots** with its MTM SL doubled (₹3,000 → ₹6,000 on Quantiply, which takes the rupee figure as written; AlgoTest doubles it itself), so the list trades 4 lots. On an expiry day, and on a day no Dir is picked, every pick stays at 1 lot. The research behind it: the Dir was the best home for a 4th lot, and on expiry days 3 lots of the expiring index did better than any 4-lot mix.
   - **Quantiply:** on those days the 08:10 run raises the clientwise MTM SL above by the Dir's own stop (₹8,000 → ₹11,000 for Adaptive Classic, ₹9,000 → ₹12,000 for Adaptive Tuned), and sets it back on other days. The 09:21 top-up only ever raises it, for a Dir the 09:16 pick brought.
   - **AlgoTest:** the saved strategy carries the 2 lots and keeps the 1-lot overall MTM SL (₹3,000), because AlgoTest scales the overall stop by the leg lots itself (so it applies ₹6,000). The uploader reads it back, and you deploy it as usual. The tool sets no AlgoTest book stop.
-  - One export serves every account that uploads a list on a platform, so the Dir is doubled only while **every** such account has this on; when they disagree it stays at 1 lot and the export says so.
+  - One export serves every account that uploads a list on a platform, so the Dir is doubled only while **every** such account has this on; when they disagree it stays at 1 lot and the export says so. The T1 split below is the exception: there each AlgoTest account gets its own copies, so a Dir ×2 on one account only works.
   - The 09:16 and evening messages say the day's lots (`🔢 4 lots · Dir ×2`) and the 16:00 result adds what those lots made. Margin: 4 lots is about ₹8.1–8.3 lakh on a normal day (Angel One, 28 Oct); the 09:05 margin check still uses its older ₹1.4 lakh figure.
 
 A warning badge on a block means its master switch holds it back.
+
+**Split T1 across the AlgoTest accounts** (off by default). With both AlgoTest rows uploading Adaptive Tuned, the accounts no longer each trade every pick. On a day of one Dir and two Widesl the Dir trades on each account, and the two Widesl go one per account at **2 lots**. On a three-Widesl day the third trades on each and the other two go one per account. A 2-lot leg is one order, so the pair costs half the brokerage (about ₹130 a day in the replay). Every pick trades the same lots across the two accounts, and each account the same number of lots, as without the split.
+
+- Shoonya takes the Widesl with a re-entry, since a re-entry is more orders and Shoonya's are cheaper; with none or both, the higher-ranked one. The Buy add-on, when on, goes to Shoonya. A Dir ×2 extra lot stays on the account whose row has Dir ×2 on.
+- The evening export uploads every copy either way needs: the split copies (a 2-lot copy is named `T1 · <strategy> · ×2`) and the 1-lot copies an account needs to trade all of T1 alone when the other is not logged in. Its manifest says which account trades which.
+- **Not yet:** the 08:11 activation and the 15:35 check stop on a split list and say so on Telegram, with each account's copies; activate them by hand, each on its own account only. The 09:25 deploy check and the 09:05 margin check do not read the split yet.
+- On but with only one AlgoTest row uploading T1, it changes nothing.
 
 **Capital.** Below the blocks, the money in each broker account: **Angel One** and **Shoonya**, in whole rupees (₹8.5 lakh each until you change them). The page shows their total. They feed the month-so-far lines of the 16:00 result message on Telegram, from November 2026:
 

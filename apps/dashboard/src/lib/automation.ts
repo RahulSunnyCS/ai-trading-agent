@@ -90,6 +90,8 @@ export interface AutomationSettings {
   capital: Record<Broker, number>;
   /** the evening result message's margin block (BL-205) */
   margin: Margin;
+  /** BL-209: T1 split across the two AlgoTest accounts (effective while both upload T1) */
+  splitT1: boolean;
 }
 
 export interface SettingsVersion {
@@ -112,7 +114,7 @@ export interface AutomationView {
  * Settings from a scheduler that predates the multiplier, add-on and pause have none of them:
  * 1, yes and no pause, what the jobs did; before BL-183 no Dir ×2 (off); before 2026-10-29 no
  * capital (₹8.5 lakh an account); before BL-205 no margin block settings (a 10% buffer over 6
- * days). Applied to everything read, so the page never meets a
+ * days); before BL-209 no T1 split (off). Applied to everything read, so the page never meets a
  * missing field.
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
@@ -135,7 +137,29 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
     bufferPct: settings.margin?.bufferPct ?? DEFAULT_MARGIN.bufferPct,
     days: settings.margin?.days ?? DEFAULT_MARGIN.days,
   };
-  return { ...settings, rows, pause: { until: settings.pause?.until ?? null }, capital, margin };
+  return {
+    ...settings,
+    rows,
+    pause: { until: settings.pause?.until ?? null },
+    capital,
+    margin,
+    splitT1: settings.splitT1 ?? false,
+  };
+}
+
+/**
+ * BL-209: whether the T1 split changes the export: the switch on, uploads on and both AlgoTest
+ * rows uploading T1 (the Python export's `split_t1`).
+ */
+export function splitApplies(settings: AutomationSettings): boolean {
+  return (
+    settings.splitT1 &&
+    settings.masters.uploads &&
+    BROKERS.every(({ key }) => {
+      const row = settings.rows[`algotest.${key}` as RowKey];
+      return row.upload && row.list === 't1';
+    })
+  );
 }
 
 /** `settings` with the margin block's buffer or look-back changed. */
@@ -258,6 +282,10 @@ export function describeChanges(before: AutomationSettings, after: AutomationSet
     lines.push(`Margin buffer: ${before.margin.bufferPct}% → ${after.margin.bufferPct}%`);
   if (before.margin.days !== after.margin.days)
     lines.push(`Margin look-back: ${before.margin.days} → ${after.margin.days} days of a type`);
+  if (before.splitT1 !== after.splitT1)
+    lines.push(
+      `T1 split across the AlgoTest accounts: ${onOff(before.splitT1)} → ${onOff(after.splitT1)}`,
+    );
   if (before.pause.until !== after.pause.until) {
     lines.push(
       `Pause: ${before.pause.until ? `until ${before.pause.until}` : 'none'} → ${after.pause.until ? `until ${after.pause.until}` : 'none'}`,

@@ -30,6 +30,11 @@ export interface Manifest {
   book: string;
   source: string;
   strategies: ManifestEntry[];
+  /** BL-209: set on a T1 export split across the two AlgoTest accounts */
+  split?: string;
+  /** BL-209: {broker: [names]} under the split, and each account's list trading alone */
+  accounts?: Record<string, string[]>;
+  alone?: Record<string, string[]>;
 }
 
 export interface LedgerRow {

@@ -10,6 +10,7 @@ import {
   describeChanges,
   githubOutcome,
   heldByMaster,
+  splitApplies,
   withDefaults,
   withMaster,
   withPause,
@@ -62,6 +63,7 @@ const SETTINGS: AutomationSettings = {
   pause: { until: null },
   capital: { finvasia: 850_000, angelone: 850_000 },
   margin: { bufferPct: 10, days: 6 },
+  splitT1: false,
 };
 
 const view = (
@@ -117,6 +119,20 @@ describe('automation helpers', () => {
       dirBoost: false,
       mtmSl: null,
     });
+  });
+
+  it('the T1 split applies only with both AlgoTest rows uploading T1 (BL-209)', () => {
+    const both = withRow({ ...SETTINGS, splitT1: true }, 'algotest.angelone', {
+      list: 't1',
+      upload: true,
+    });
+    expect(splitApplies(both)).toBe(true);
+    expect(splitApplies({ ...both, splitT1: false })).toBe(false);
+    expect(splitApplies({ ...SETTINGS, splitT1: true })).toBe(false);
+    expect(splitApplies(withMaster(both, 'uploads', false))).toBe(false);
+    const old = { ...SETTINGS } as Partial<AutomationSettings>;
+    delete old.splitT1;
+    expect(withDefaults(old as AutomationSettings).splitT1).toBe(false);
   });
 
   it('says when a master switch holds a row back', () => {
@@ -268,6 +284,23 @@ describe('AutomationSettingsCard', () => {
     await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
     const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
     expect(JSON.parse(String(put?.[1]?.body)).margin).toEqual({ bufferPct: 5, days: 10 });
+  });
+
+  it('saves the T1 split switch (BL-209) and says when it changes nothing', async () => {
+    const fetchMock = stub((body) => ok(view(body, 1)));
+    render(<AutomationSettingsCard />);
+    const toggle = await screen.findByLabelText('Split T1 across the AlgoTest accounts');
+    expect(screen.getByText('Off: each AlgoTest account trades every T1 pick.')).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(await screen.findByText('T1 split across the AlgoTest accounts: off → on')).toBeTruthy();
+    // Angel One's AlgoTest row does not upload T1 in the fixture
+    expect(
+      screen.getByText('On, but it changes nothing until both AlgoTest rows upload T1.'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).splitT1).toBe(true);
   });
 
   it('works against a scheduler that does not send the new fields yet', async () => {

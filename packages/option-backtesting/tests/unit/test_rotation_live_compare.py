@@ -582,3 +582,42 @@ def test_a_dir_the_export_doubled_is_two_lots_not_slippage(root):
     assert by[T1[2]].lots == 1.0
     assert live_compare.export_lots("algotest", DAY, "t1", root) == {T1[0]: 2}
     assert live_compare.export_lots("quantiply", DAY, "t1", root) == {}
+
+
+def test_a_split_copy_counts_the_lots_in_its_name(root):
+    """BL-209: a split export holds the Dir at 1 and 2 lots; each copy's own `lots` counts, never
+    the manifest's by variant."""
+    folder = store.rotation_dir(root) / "algotest" / DAY.isoformat() / "t1"
+    folder.mkdir(parents=True)
+    (folder / "manifest.json").write_text(
+        json.dumps(
+            {
+                "day": DAY.isoformat(),
+                "book": "t1",
+                "source": "preview",
+                "split": "BL-209",
+                "strategies": [
+                    {"variant": T1[0], "name": f"T1 · {T1[0]}", "lots": 1, "file": "a"},
+                    {"variant": T1[0], "name": f"T1 · {T1[0]} · ×2", "lots": 2, "file": "b"},
+                ],
+            }
+        )
+    )
+    two = _line(
+        "T1 · N_ditm1-t1s36_0947 · ×2",
+        5590.0,
+        fills=[_fill("2026-10-19 09:46:59", 100, qty=130)],
+        pid="2",
+    )
+    two["variant"], two["lots"] = T1[0], 2
+    one = _line(
+        "T1 · N_ditm1-t1s36_0947",
+        2795.0,
+        broker="angelone",
+        fills=[_fill("2026-10-19 09:46:59", 100)],
+    )
+    _capture(root, [_section("algotest", "all"), two, one])
+    by = {(x.broker, x.variant): x for x in live_compare.compare(DAY, root).compared}
+    assert by[("finvasia", T1[0])].lots == 2.0
+    assert by[("angelone", T1[0])].lots == 1.0
+    assert live_compare.export_lots("algotest", DAY, "t1", root) == {}

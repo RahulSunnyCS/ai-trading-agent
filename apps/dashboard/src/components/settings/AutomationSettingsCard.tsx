@@ -27,6 +27,7 @@ import {
   describeChanges,
   githubOutcome,
   heldByMaster,
+  splitApplies,
   totalCapital,
   withCapital,
   withMargin,
@@ -281,6 +282,22 @@ export function AutomationSettingsCard() {
                 </div>
               );
             })}
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-4" aria-label="T1 split">
+            <SettingSwitch
+              label="Split T1 across the AlgoTest accounts"
+              description={
+                splitApplies(draft)
+                  ? 'The odd pick trades on each account; the like pair goes one per account at 2 lots (a re-entry one on Shoonya, as does the Buy add-on). The evening export uploads every copy; the 08:11 activation does not handle a split list yet: activate each copy on its own account by hand.'
+                  : draft.splitT1
+                    ? 'On, but it changes nothing until both AlgoTest rows upload T1.'
+                    : 'Off: each AlgoTest account trades every T1 pick.'
+              }
+              checked={draft.splitT1}
+              disabled={saving}
+              onChange={(splitT1) => setDraft({ ...draft, splitT1 })}
+            />
           </section>
 
           <section className="space-y-3 border-t border-border pt-4" aria-label="Capital">

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money every trading day: about ₹134 a day more after brokerage on the owner's two live T1 accounts (exploratory replay), the same lots and margin per account, built mostly from pieces that already run |
-| **Status** | In progress (Phase 1) |
+| **Status** | In progress (Phase 2 built; Phase 3 next) |
 | **Type** | feature (with an exploratory replay behind it) |
 | **Area** | options / broker-login / scheduler / dashboard |
 | **Created** | 2026-11-04 |
@@ -102,8 +102,9 @@ broker the plan did not give it.
     - The Buy add-on, when on, goes to Shoonya only.
   - Settings › Automation: one switch, "Split T1 across the AlgoTest accounts" (default off).
     The lead account is Shoonya (`account_split.LEAD`), not a setting. Written by
-    `apps/scheduler/src/automation.ts`, read by `automation-settings.ts` and
-    `rotation/automation_settings.py`. Refused with a reason when two AlgoTest rows do not both upload T1.
+    `apps/scheduler/src/automation.ts`, read by `rotation/automation_settings.py` (`split_t1`);
+    the TypeScript jobs read the export's manifest, not the switch. Saved freely; it changes the
+    export only while both AlgoTest rows upload T1, and the page says so.
   - Move the replay onto the module, so the research script and the live rule are one function.
     Re-run it and record the figures in the Log.
   - Guide page for Settings › Automation.
@@ -238,3 +239,15 @@ broker-level MTM SL today, on either account, with or without the split.
   more brokerage (re-entries fire only after a stop) and cost ₹5 a day in the book stops, which is
   noise (re-entry minus pick order −₹3 a day, 90 % −₹22 to +₹10). Kept as the owner's rule: its
   brokerage saving is certain, its stop effect is not.
+- 2026-11-05 — Phase 1 done: the `splitT1` switch in Settings › Automation (scheduler validation, an
+  older dashboard keeps the current value, the card with its note, Guide), `split_t1` in the Python
+  reader. Phase 2 built: `algotest-export --from-settings` writes the split copies and each
+  account's trade-alone copies, `· ×N` names and `<variant>-xN.algtst` files, the manifest's
+  `split`, `accounts` and `alone`; `live-capture` records a copy's `lots` from its name and
+  `live-compare` counts it. `strategy-deploy.ts --morning` / `--check` refuse a split manifest
+  (Telegram on the morning run) until Phase 3. Dry runs from the live settings v10 with the switch
+  on: 4 Nov (normal day) six copies, Shoonya `S_ditm1-t1s44_0917 ×2 · N_wide-t1s8_0947 ×2`, Angel
+  One `S_ditm1-t1s44_0917 · S_p320_0947 ×2`, as the replay; 5 Nov (SENSEX expiry) five copies.
+  Not verified: a supervised evening upload and setup of the copies, and whether set-up copies
+  count toward /live's 6-strategy limit (six on a normal day, seven with the add-on). The 09:25
+  deploy check and the 09:05 margin check (both off) do not read the split yet (Phases 3 and 4).

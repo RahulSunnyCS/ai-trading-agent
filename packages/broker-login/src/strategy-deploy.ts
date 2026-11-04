@@ -348,6 +348,19 @@ async function main(): Promise<number> {
     );
     return 1;
   }
+  // BL-209: a split export puts each copy on one account; activating or checking it here would tick
+  // every uploading broker for every copy (the ×2 copies on both accounts). Until Phase 3 builds
+  // the per-account activation, it is activated by hand. The evening setup is unaffected.
+  if (manifest.split && !values.setup) {
+    const accounts = Object.entries(manifest.accounts ?? {})
+      .map(([b, names]) => `${b}: ${names.join(', ')}`)
+      .join('; ');
+    const text = `⚠️ AlgoTest ${manifest.book.toUpperCase()} for ${manifest.day} is split across the accounts (BL-209): the tool does not ${values.check ? 'check' : 'activate'} a split list yet; ${values.check ? 'check' : 'activate'} by hand on /live, each copy on its own account only: ${accounts}`;
+    console.error(text);
+    if (values.morning && values.apply)
+      await sendText(readTelegramConfig(), text, 'broker.algotest').catch(() => undefined);
+    return 1;
+  }
   // BL-140: no login at all when the settings give AlgoTest nothing of the tool's to deploy or check.
   if (
     values.setup &&
