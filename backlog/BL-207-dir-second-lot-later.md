@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's T1 accounts trade the picked Dir at 2 lots on every non-expiry day (BL-183); if a spaced second lot does as well with a smaller worst day, it is a one-line change to what is uploaded |
-| **Status** | In progress — Phase 0 registered, the run follows |
+| **Status** | Done — informative: no spaced second lot beats Dir ×2; every arm earns ₹260–785 a day less, wins 34–43 % of days, and neither the drawdown nor the worst day is reliably smaller (see Log) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-04 |
@@ -118,3 +118,35 @@ worth a BL-183-style toggle.
 ## Log
 
 - 2026-11-04 — Created; Phase 0 registered before any run (the owner's question, the arms chosen here).
+- 2026-11-04 — **Run as registered** (`research/bl207/dir_spacing.py`; `dir_spacing_2026-11-04.json`). 439 T1 days
+  reconstructed (2025-01-10 → 2026-11-02, the newest stored day): 186 one-index expiry days, 1 other (2026-09-30), 33
+  three-Widesl days, **219 normal days with a Dir pick**, all kept, none skipped. The D was `S_ditm1-t1s44_0917` on 24
+  days, `N_ditm1-t1s36_0932` / `_0947` on 12 each, then later slots; the +60 arms miss 3 days (D after 14:17). Anchor:
+  N4 reproduces BL-204's N4 net on all 218 shared normal-with-Dir days to the paisa. Net per day after brokerage; "vs
+  N4" = arm − Dir ×2 (90 % interval, 5-day blocks); "win" = share of days the arm beats N4.
+
+  **Primary reading (book stop, 0 % slippage), all 219 days:**
+
+  | Arm | Net/day | Max DD | Worst day | Loss days | vs N4 | Win | vs even |
+  |---|---:|---:|---:|---:|---|---:|---|
+  | N4 (Dir ×2, live) | +1,576 | −42,829 | −13,941 | 35 % | — | — | +294 [+91, +502] |
+  | B4 (even spread) | +1,282 | −50,014 | −12,573 | 34 % | −294 [−502, −91] | 47 % | — |
+  | same+30 | +1,317 | −58,868 | −13,699 | 37 % | −259 [−538, +12] | 38 % | +35 [−207, +277] |
+  | same+60 | +1,209 | −53,542 | −13,751 | 38 % | −371 [−694, −51] | 40 % | −71 [−320, +179] |
+  | rank+30 | +1,195 | −36,546 | −12,924 | 36 % | −381 [−734, −46] | 43 % | −88 [−356, +165] |
+  | rank+60 | +1,016 | −36,555 | −12,550 | 37 % | −564 [−905, −241] | 43 % | −264 [−520, +5] |
+  | rank-any (control) | +1,269 | −49,617 | −13,000 | 37 % | −307 [−611, −36] | 39 % | −13 [−264, +221] |
+
+  Last year (120 days): N4 +2,378/day, DD −27,281; same+30 −440 [−770, −126], same+60 −576 [−990, −190], rank+30
+  −642 [−1,094, −213], rank+60 −785 [−1,212, −392], rank-any −533 [−908, −200]; every arm's drawdown as deep or deeper
+  (−25k to −32k) and the worst day within ₹1k of N4's. Fit half (91 days, 2025-01-10 → 2025-10-08): every arm within
+  ±₹200 of N4, all intervals include zero; test half (128 days): every arm below zero (−428 to −831). **Second reading
+  (no book stop, 0.5 % slippage):** the same order, every arm below zero over all 219 days (same+30 −321 [−607, −49],
+  rank+30 −425 [−799, −76], rank+60 −599 [−952, −257]) and in the last year.
+
+  **Verdict: no evidence** for every arm, by the registered reading. The hypothesis held on net (a later lot has less
+  decay to collect; the ranked later Dir did no better than the same setting) and failed on risk: the spaced lots
+  did not make the worst day or the drawdown smaller, because the Dir's bad days are trend days that hit a later
+  entry too (the control, the best other Dir at any slot, loses as much as the spaced ones, so the loss is "a
+  different Dir", not "a later Dir"). The edge of Dir ×2 over the even spread (+₹294 [+91, +502]) sits where BL-133
+  found it. Nothing to adopt; Dir ×2 at the pick's slot stays. In-sample, descriptive.
