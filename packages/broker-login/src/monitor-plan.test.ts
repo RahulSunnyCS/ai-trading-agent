@@ -158,18 +158,18 @@ const tomorrow = (hhmm: string) => ist('2026-10-22', hhmm).toISOString();
 test("waiting for the platforms' jobs (A): running, due, queued, done, not today", () => {
   const now = ist('2026-10-21', '09:25');
   const views: SchedulerJobView[] = [
-    // the top-up's retry is still running
+    // the activation's catch-up (the Mac slept through 08:11) is still running
     {
-      id: 'algotest-topup',
-      nextRun: tomorrow('09:18'),
+      id: 'algotest-activate',
+      nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('09:18'), ended_at: null },
-      previousSlot: slot('09:18'),
+      previousSlot: slot('08:11'),
       previousSlotRun: { ended_at: null },
     },
     // ended
     {
-      id: 'algotest-deploy',
-      nextRun: tomorrow('09:16'),
+      id: 'algotest-deploy-check',
+      nextRun: tomorrow('15:35'),
       lastRun: { started_at: slot('09:16'), ended_at: slot('09:17') },
       previousSlot: slot('09:16'),
       previousSlotRun: { ended_at: slot('09:17') },
@@ -184,7 +184,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     },
   ];
   assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now), {
-    blocking: ['algotest-topup is running (since 09:18)'],
+    blocking: ['algotest-activate is running (since 09:18)'],
     pastCap: [],
   });
   assert.deepEqual(decided(views, PLATFORM_JOBS.quantiply, now), {
@@ -205,10 +205,10 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     blocking: [],
     pastCap: [],
   });
-  // a slot about to come blocks (a --now run at 09:12, the 09:16 deploy) ...
+  // a slot about to come blocks (a --now run at 09:12, an activation catch-up due 09:16) ...
   const later: SchedulerJobView[] = [
     {
-      id: 'algotest-deploy',
+      id: 'algotest-activate',
       nextRun: slot('09:16'),
       lastRun: null,
       previousSlot: '2026-10-20T03:46:00.000Z',
@@ -216,7 +216,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     },
   ];
   assert.deepEqual(decided(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:12')), {
-    blocking: ['algotest-deploy runs at 09:16'],
+    blocking: ['algotest-activate runs at 09:16'],
     pastCap: [],
   });
   // ... one further ahead does not (the 09:05 margin login, 11 minutes before it)
@@ -243,11 +243,11 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
   // a hand `jobs run` at 13:00 (no slot today's row: a manual run) blocks too
   const manual: SchedulerJobView[] = [
     {
-      id: 'algotest-topup',
-      nextRun: tomorrow('09:18'),
+      id: 'algotest-activate',
+      nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('13:00'), ended_at: null },
-      previousSlot: slot('09:18'),
-      previousSlotRun: { ended_at: slot('09:20') },
+      previousSlot: slot('08:11'),
+      previousSlotRun: { ended_at: slot('08:20') },
     },
   ];
   assert.equal(
@@ -321,10 +321,10 @@ test('a "running" row older than its longest run is one nothing closed: ignored 
   const noon = ist('2026-10-21', '12:00');
   const open = (maxRunMinutes?: number): SchedulerJobView[] => [
     {
-      id: 'algotest-topup',
-      nextRun: tomorrow('09:18'),
+      id: 'algotest-activate',
+      nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('09:30'), ended_at: null },
-      previousSlot: slot('09:18'),
+      previousSlot: slot('08:11'),
       previousSlotRun: { started_at: slot('09:30'), ended_at: null },
       maxRunMinutes,
     },
@@ -346,7 +346,7 @@ test('a "running" row older than its longest run is one nothing closed: ignored 
     previousSlotRun: v.previousSlotRun && { ...v.previousSlotRun, alive: true },
   }));
   assert.deepEqual(decided(alive, PLATFORM_JOBS.algotest, noon).blocking, [
-    'algotest-topup is running (since 09:30)',
+    'algotest-activate is running (since 09:30)',
   ]);
   // ... and one it reports not alive is judged by its age
   const dead = alive.map((v) => ({

@@ -20,8 +20,7 @@ import { join } from 'node:path';
  */
 export const STOP_HELD_JOBS: readonly string[] = [
   'algotest-evening',
-  'algotest-topup',
-  'algotest-deploy',
+  'algotest-activate',
   'quantiply-evening',
   'quantiply-topup',
   'quantiply-deploy',

@@ -49,6 +49,16 @@ combination â‘¢; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26â
   ticked; its button reads "Activate on n Brokers"; nothing to confirm after it; one RUNNING card per broker.
   The deployer now ticks every broker whose AlgoTest row uploads the list and checks the count (first step of
   this phase, used by the 09:16 job until the after-login run exists).
+- Built 2026-11-04 (PR pending): `strategy-deploy.ts --morning` activates the export `latest-t1.json` points at
+  (the evening's `--next` export for today; a recorded export is refused, so a catch-up never trades the
+  09:16 list) through `planDeploy` and the proven broker-sheet path; the add-on
+  follows the settings as read at 08:11 (`algotestAddon`, `morningPicks`: on 2026-11-04 the owner switched it
+  off at 18:47, after the 16:40 export had set it up; the other way round, an add-on switched on overnight is
+  not in AlgoTest, and the message says to upload it by hand). Scheduler job `algotest-activate` (08:11, `quantiply`
+  group, so after the login; no retries; caught up until about 12:40, the last entry) replaces `algotest-deploy` (09:16) and
+  `algotest-topup` (09:18), which are gone: nothing re-exports today's AlgoTest folder after 09:16, so the
+  trade monitor's 09:25 deploy check (`DEPLOY_CHECK=on`) compares /live with the evening list (said in its
+  note) under the same add-on rule. The stop hold, the pause and the monitor's job list follow the new id.
 - **Done when:** one morning activated by the tool, read back on /live, with the owner watching.
 
 ## Log
@@ -60,3 +70,9 @@ combination â‘¢; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26â
   owner's choice: both AlgoTest rows upload T1) while Claude read the broker sheet. The owner then asked the
   tool to do the other two: the deployer learned the broker sheet (probed live: both ticked, "Activate on 2
   Brokers", Cancel), and the 09:16 `algotest-deploy` activates them, Automated deployment on.
+- 2026-11-04 â€” the owner activated by hand again (two evening strategies seen deployed at 09:16; the tool's
+  ledger has no deploy). The 09:16 pick had changed (N_wide_0917 out, S_p320_0947 and a 12:17 add-on in): the
+  09:16 run exited 1 on the new SENSEX pick, the 09:18 top-up uploaded it, and the add-on the evening had set
+  up was off in settings v10 (18:47 the day before). Phase 2 built the same day (above): the after-login
+  activation, the two 09:16 jobs retired, the 09:25 check on the evening list. First live morning: the next
+  trading day, owner watching; the owner activates by hand if no Telegram message has come by 08:30.

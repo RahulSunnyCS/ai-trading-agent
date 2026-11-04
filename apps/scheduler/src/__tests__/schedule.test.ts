@@ -194,7 +194,8 @@ describe('Angel One login check', () => {
     // BL-001 Phase 4: + momentum-history
     // phone login: + fyers-login-reminder, fyers-login-recheck, kite-login-reminder-monday
     // BL-203: + rotation-live-board
-    expect(JOBS).toHaveLength(50);
+    // BL-197 Phase 2: + algotest-activate, - algotest-deploy, - algotest-topup
+    expect(JOBS).toHaveLength(49);
   });
 });
 
