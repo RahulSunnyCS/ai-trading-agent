@@ -6,7 +6,10 @@
                                                next refresh
     POST /legwise/rotation/live-board/refresh  refresh now. With the 5-minute loop running it is
                                                asked (202 {"status": "requested"}), so no second
-                                               login is made; else ONE guarded Angel One login runs
+                                               login is made; before the day's picks are recorded
+                                               (the 09:16 entry) nothing is read and no login is
+                                               made (202 {"status": "no_picks"}, the card's note
+                                               says so); else ONE guarded Angel One login runs
                                                the refresh in a background thread (202
                                                {"status": "started"}), 409 while the login guard's
                                                lock is held, 429 (+ Retry-After) in its cool-down
@@ -56,6 +59,13 @@ def post_refresh() -> JSONResponse:
     if live_board.loop_status()["running"]:
         live_board.request_refresh()
         return JSONResponse(status_code=202, content={"status": "requested"})
+    # Picks first, login second (as the loop's Board.refresh does): a Refresh pressed before the
+    # 09:16 entry would otherwise spend an Angel One login on nothing, counting toward the day's
+    # logins and able to collide with the 08:15 AlgoTest broker login (2026-11-04).
+    day = live_board.now_ist().date()
+    if not live_board.todays_picks(day):
+        live_board.note_no_picks(day)
+        return JSONResponse(status_code=202, content={"status": "no_picks", "day": day.isoformat()})
     try:
         pending = check.begin("live-board")
     except check.CheckRefused as refused:

@@ -13,6 +13,8 @@ the [Live vs paper](guide:optionslab/rotation-live) card measures that gap after
 - **Every 5 minutes**, from 09:18 to 15:31 on trading days, by the scheduler's `rotation-live-board` job.
 - **When you press Refresh.** With the 5-minute job running, it refreshes within a few seconds.
   Otherwise the dashboard logs in to Angel One once and refreshes itself, which takes about a minute.
+  Before the day's picks are recorded at 09:16 there is nothing to read, so the card only says so
+  and no Angel One login is made.
 - The card checks for new figures every minute, and every few seconds while a refresh runs.
 
 The header says how fresh the prices are ("Prices to 15:15") and when the next refresh is due.
