@@ -68,9 +68,16 @@ def dte_text(dte: dict | None) -> str:
     return " · ".join(parts)
 
 
-def _with_dte(head: str, dte: dict | None) -> str:
+CALENDAR_DTE = "calendar DTE"
+
+
+def _with_dte(head: str, dte: dict | None, source: str | None = None) -> str:
+    """`source` is the evening list's `NextPicks.dte_source`: `calendar` marks a heading whose
+    days to expiry are the reference calendar's because the listed contracts could not be read,
+    so a list that disagrees with the next morning's pick is explained (2026-11-04)."""
     text = dte_text(dte)
-    return f"{head} · {text}" if text else head
+    head = f"{head} · {text}" if text else head
+    return f"{head} · {CALENDAR_DTE}" if source == "calendar" else head
 
 
 def change_line(day: date | str, previous: dict | None, core, buy) -> str:
@@ -432,7 +439,11 @@ def render_result(
         lines.append("")
         if tomorrow_adaptive is not None:
             lines += _next_lines(
-                _with_dte("🎯 Adaptive", tomorrow_adaptive.dte),
+                _with_dte(
+                    "🎯 Adaptive",
+                    tomorrow_adaptive.dte,
+                    getattr(tomorrow_adaptive, "dte_source", None),
+                ),
                 tomorrow_adaptive,
                 boost.get("adaptive", False),
             )
