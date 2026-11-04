@@ -223,8 +223,9 @@ describe('BL-143: the trade monitor job', () => {
       if (!job) throw new Error(`no ${id}`);
       return { minutes: maxRunMinutes(job), steps: job.steps.length };
     };
-    // the morning activation (BL-197 Phase 2): one step, one attempt, plus its group's wait
-    expect(at('algotest-activate')).toEqual({ minutes: 10 + 10, steps: 1 });
+    // the morning activation (BL-197 Phase 2): the catch-up and the activation, one attempt, plus
+    // its group's wait
+    expect(at('algotest-activate')).toEqual({ minutes: 30 * 2 + 30, steps: 2 });
     expect(at('quantiply-topup')).toEqual({ minutes: 10 * 2 * 2 + 2 + 10, steps: 2 });
     // one step, one attempt, plus the group's wait
     expect(at('quantiply-deploy-topup')).toEqual({ minutes: 10 + 10, steps: 1 });

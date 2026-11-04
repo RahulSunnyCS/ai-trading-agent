@@ -577,7 +577,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-activate',
     description:
-      "Activate last evening's list on AlgoTest's /live right after the morning login (BL-197 Phase 2): every list an AlgoTest row in Settings › Automation uploads (Tuned, Classic or both, each from its own export), each strategy the 16:40 run uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose row uploads that list, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading a list",
+      "Activate last evening's list on AlgoTest's /live right after the morning login (BL-197 Phase 2): every list an AlgoTest row in Settings › Automation uploads (Tuned, Classic or both, each from its own export; a list switched in after 16:40 is exported, uploaded and set up first), each strategy the 16:40 run (or that catch-up) uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose row uploads that list, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading a list",
     // 08:11 in the quantiply group: it starts when the 08:02 `broker-login` (which waits for
     // AlgoTest's 08:16 broker window, so about 08:20) and the 08:10 Quantiply switch-on have
     // ended. Never retried: a second attempt could activate what the first already did; the run
@@ -586,6 +586,15 @@ const BASE_JOBS: Job[] = [
     // only alert). Replaced the 09:16 `algotest-deploy` and the 09:18 `algotest-topup` (2026-11-04).
     schedule: { at: '08:11', on: tradingDays, label: 'trading days 08:11' },
     steps: [
+      // 2026-11-05: a row switched after 16:40 to a list no row had then has no export or upload.
+      // Catch it up first: export only the missing lists (exit 3 when none, which ends the chain at
+      // once, so a normal morning adds no AlgoTest login), upload them (top-up never deletes) and
+      // set them up. Never fails the job: the activation below reports any list still missing.
+      [
+        'bash',
+        '-c',
+        'uv run --directory ../option-backtesting obt rotation algotest-export --from-settings --preview --only-missing && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode topup --apply && node_modules/.bin/tsx src/strategy-deploy.ts --from-settings --setup --apply; exit 0',
+      ],
       [
         'node_modules/.bin/tsx',
         'src/strategy-deploy.ts',
@@ -595,7 +604,7 @@ const BASE_JOBS: Job[] = [
       ],
     ],
     cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
+    timeoutMinutes: 30, // the catch-up may upload and set up a list first
     retries: 0,
     retryDelayMinutes: 0,
     catchUpHours: 4.5,
