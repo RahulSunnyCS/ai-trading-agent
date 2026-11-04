@@ -365,12 +365,27 @@ def _ladder_line(steps) -> str:
     return "   " + " · ".join(parts)
 
 
-def standing_lines(s) -> list[str]:
-    """T1's drawdown now against its own past (`standing.Standing`; owner, 2026-11-04), after the
-    month so far: how deep, from which high, and on what share of the window's days it was at
-    least that deep; one line at a new high. Paper, one lot per strategy, the message's slippage."""
+def standing_lines(s, detail: bool = False) -> list[str]:
+    """T1's drawdown now against its own past (`standing.Standing`; owner, 2026-11-04): two lines in
+    the 16:00 message, how deep it is from which high and what share of the last two years' days
+    were as bad or worse. `detail` (`obt rotation standing`) adds the share under water, the
+    deepest, the 25 / 10 / 5 % ladder and the basis."""
     if s is None:
         return []
+    since = f"since {s.first_day.day} {s.first_day.strftime('%b %Y')}"
+    if not s.window_full:
+        since += ", all the data there is"
+    if s.drawdown < 0.5:
+        lines = [f"📈 Tuned Adaptive at a new high today ({since})"]
+    else:
+        high = f"its high on {day_text(s.high_day)}" if s.high_day else "the start"
+        share = round(100 * s.at_least / s.days)
+        lines = [
+            f"📉 Tuned Adaptive drawdown {rupees(-s.drawdown)} from {high}",
+            f"   In the last 2 years, {share}% of days were as bad or worse ({since})",
+        ]
+    if not detail:
+        return lines
     basis = "paper, 1 lot per strategy"
     if s.slippage_pct:
         basis += f", {s.slippage_pct:g}% slippage"
@@ -378,25 +393,14 @@ def standing_lines(s) -> list[str]:
         basis += f"; picks before {day_text(s.recorded_from)} re-derived"
     if s.left_out:
         basis += f"; {s.left_out} day{'s' if s.left_out != 1 else ''} without results left out"
-    if s.drawdown < 0.5:
-        return ["📈 Tuned Adaptive at a new high today", f"   {basis}"]
-    high = f"its high on {day_text(s.high_day)}" if s.high_day else "the start"
-    share = round(100 * s.at_least / s.days)
-    water = round(100 * s.under_water / s.days)
     deepest = f"deepest {rupees(-s.deepest)}"
     if s.deepest_day is not None:
         deepest += f" ({s.deepest_day.strftime('%b %Y')})"
-    since = f"{s.first_day.day} {s.first_day.strftime('%b %Y')}"
-    return [
-        f"📉 Tuned Adaptive drawdown {rupees(-s.drawdown)} from {high}",
-        f"   in the last 2 years: this deep or deeper on {share}% of days",
-        f"   ({s.days} trading days since {since}"
-        + ("" if s.window_full else ", all the data there is")
-        + ")",
-        f"   below a high on {water}% · {deepest}",
-        *([_ladder_line(s.ladder)] if s.ladder else []),
-        f"   {basis}",
-    ]
+    water = round(100 * s.under_water / s.days)
+    lines += [f"   {s.days} trading days · below a high on {water}% · {deepest}"]
+    if s.ladder:
+        lines.append(_ladder_line(s.ladder))
+    return [*lines, f"   {basis}"]
 
 
 def month_lines(

@@ -195,7 +195,7 @@ def standing_cmd(
     if s is None:
         typer.echo(f"{d}: T1's results for the day are not all stored yet")
         raise typer.Exit(2)
-    typer.echo("\n".join(messages.standing_lines(s)))
+    typer.echo("\n".join(messages.standing_lines(s, detail=True)))
     if not no_save:
         typer.echo(f"series: {standing.series_path()}")
 

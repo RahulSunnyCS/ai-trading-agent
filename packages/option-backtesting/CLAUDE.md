@@ -295,7 +295,8 @@ Otherwise:
   re-derived with `daylog.reconstruction`, a day missing a pick's result left out; `measure` gives the drawdown from
   the running high (peak starting at zero), the share of days at least that deep, the share under water and the
   deepest, plus `ladder`: the depth at least 25 / 10 / 5 % of the days reached (`LADDER`, rounded up so the share is
-  never overstated) (`messages.standing_lines`). Only when T1's day is in; a failure drops the lines, never the message.
+  never overstated). The message shows two lines (`messages.standing_lines`: the drawdown and its high, the share of
+  days as bad or worse); `detail=True` (the CLI) adds the rest. Only when T1's day is in; a failure drops the lines, never the message.
   `keep=True` (the 16:00 job, and `obt rotation standing` unless `--no-save`) rewrites the series whole to
   `rotation/track_t1/standing.csv` (`series_path`; day, net, total, high, drawdown, picks; atomic): a re-derivation from
   the stored results, not a record, so a repaired day changes it.

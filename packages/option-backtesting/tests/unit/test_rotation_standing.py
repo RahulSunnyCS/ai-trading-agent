@@ -107,17 +107,23 @@ def test_the_lines():
     )
     assert messages.standing_lines(s) == [
         "📉 Tuned Adaptive drawdown −₹21,504 from its high on Mon 26 Oct",
-        "   in the last 2 years: this deep or deeper on 3% of days",
-        "   (440 trading days since 10 Jan 2025, all the data there is)",
-        "   below a high on 66% · deepest −₹32,386 (Oct 2026)",
+        "   In the last 2 years, 3% of days were as bad or worse (since 10 Jan 2025, all the data"
+        " there is)",
+    ]
+    assert messages.standing_lines(s, detail=True)[2:] == [
+        "   440 trading days · below a high on 66% · deepest −₹32,386 (Oct 2026)",
         "   paper, 1 lot per strategy, 0.5% slippage; picks before Mon 19 Oct re-derived",
     ]
+    full = standing.Standing(**{**s.__dict__, "window_full": True})
+    assert messages.standing_lines(full)[1].endswith("(since 10 Jan 2025)")
     gaps = standing.Standing(**{**s.__dict__, "left_out": 2})
-    assert messages.standing_lines(gaps)[-1].endswith("re-derived; 2 days without results left out")
-    full = standing.Standing(**{**s.__dict__, "window_full": True, "days": 500})
-    assert messages.standing_lines(full)[2] == "   (500 trading days since 10 Jan 2025)"
+    assert messages.standing_lines(gaps, detail=True)[-1].endswith(
+        "re-derived; 2 days without results left out"
+    )
     top = standing.Standing(**{**s.__dict__, "drawdown": 0.0, "at_least": 0})
-    assert messages.standing_lines(top)[0] == "📈 Tuned Adaptive at a new high today"
+    assert messages.standing_lines(top) == [
+        "📈 Tuned Adaptive at a new high today (since 10 Jan 2025, all the data there is)"
+    ]
     assert messages.standing_lines(None) == []
 
 
@@ -171,7 +177,8 @@ def test_the_ladder_names_the_depth_each_share_of_days_reached():
     s = standing.measure(_series(1000, -400, 800, -600, -500))
     assert s.ladder == ((25, 600.0), (10, 1100.0), (5, 1100.0))
     assert (
-        messages.standing_lines(s)[4] == "   25% of days −₹600 or deeper · 10% −₹1,100 · 5% −₹1,100"
+        messages.standing_lines(s, detail=True)[3]
+        == "   25% of days −₹600 or deeper · 10% −₹1,100 · 5% −₹1,100"
     )
 
 
