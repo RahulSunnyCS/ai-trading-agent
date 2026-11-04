@@ -20,7 +20,7 @@ export const CANDLE_PERIODS: { value: CandlePeriod; label: string; days: number 
   { value: '1m', label: '1 month', days: 22 },
   { value: '3m', label: '3 months', days: 66 },
   { value: '1y', label: '1 year', days: 250 },
-  { value: 'all', label: '2 years', days: null },
+  { value: 'all', label: 'All', days: null },
 ];
 
 export const CANDLE_LOTS = [1, 2, 3, 4] as const;

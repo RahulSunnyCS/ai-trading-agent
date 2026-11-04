@@ -253,7 +253,7 @@ export function RotationCandles() {
             <span>
               Drawdown now{' '}
               <span className="metric text-foreground">{formatInr(-data.totals.drawdown_now)}</span>{' '}
-              · deepest {formatInr(-data.totals.max_drawdown)} over two years
+              · deepest {formatInr(-data.totals.max_drawdown)} since {formatDay(data.days[0]?.day)}
             </span>
           </div>
           <Chart days={shown} />
@@ -261,8 +261,10 @@ export function RotationCandles() {
             Paper, {data.lots} lot{data.lots > 1 ? 's' : ''} per strategy
             {data.slippage_pct ? `, ${data.slippage_pct}% slippage on every fill` : ', no slippage'}
             , before charges. The random baskets are {formatNumber(data.draws, 0)} draws a day of
-            the same number of strategies from the book's ranked pool, without a stop. Picks before
-            the journal began are re-derived by the ranking.
+            the same number of strategies from the book's ranked pool, without a stop.
+            {data.book === 'base'
+              ? ' The base holds the same three strategies every day.'
+              : ' Picks before the journal began are re-derived by the ranking.'}
             {data.left_out.length
               ? ` ${data.left_out.length} day${data.left_out.length > 1 ? 's' : ''} could not be replayed and ${data.left_out.length > 1 ? 'are' : 'is'} left out.`
               : ''}

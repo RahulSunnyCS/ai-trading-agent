@@ -59,13 +59,14 @@ The screen is one page, in the order you read it:
   paper on each recorded day. Below it, *Drawdowns and selection
   drift* opens the risk review for the list.
 - **Day by day** — one candle a day for Adaptive Tuned, Adaptive Classic or the fixed base, laid
-  on the running total of the last two years. A candle opens at the total before the day; its wick
+  on the running total of the last two years (the stored history starts in October 2024, and the
+  ranking's first pick in January 2025). A candle opens at the total before the day; its wick
   runs to the best and worst points of the day's minute-by-minute P&L; its body closes at the day's
   result, cut where the book's own stop would have cut it (₹9,000 for Tuned, ₹8,000 for Classic and
   the base, per lot of the book). Hover a day for each strategy's result with its settings, when the
   book stop fired, and the share of 2,000 random baskets of the same number of strategies, drawn
   from the book's ranked pool without a stop, that the day beat. Switch the period (1 month to 2
-  years) and the lots per strategy (1 to 4; the stop widens with the lots). Paper figures, at the
+  years, as far back as the stored history goes) and the lots per strategy (1 to 4; the stop widens with the lots). Paper figures, at the
   page's slippage, before charges; picks before the journal began are re-derived by the ranking.
   The first time it opens it replays every day, which takes about a minute.
 - **Live vs paper** — what AlgoTest and Quantiply actually made on each captured day against the

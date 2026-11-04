@@ -12,6 +12,7 @@ the page asks again. Errors are `{"error": ...}`.
 
 from __future__ import annotations
 
+import math
 import threading
 import time
 from datetime import date
@@ -57,6 +58,8 @@ def get_candles(
         stop_inr = None if stop in (None, "") else float(stop)
     except ValueError as error:
         return _error(422, str(error))
+    if stop_inr is not None and not math.isfinite(stop_inr):
+        return _error(422, "stop must be a number of rupees")
     if book not in candles.BOOKS:
         return _error(422, f"book must be one of {', '.join(candles.BOOKS)}")
     if not 1 <= lots <= candles.MAX_LOTS:
@@ -87,5 +90,8 @@ def get_candles(
     if not done:
         return JSONResponse(status_code=202, content={"status": "warming"})
     with _lock:
-        _cache[key] = (time.monotonic(), value)
+        stamp = time.monotonic()
+        for old in [k for k, (at, _) in _cache.items() if stamp - at >= CACHE_SECONDS]:
+            del _cache[old]  # keep only fresh answers: a long-running API asks many windows
+        _cache[key] = (stamp, value)
     return value

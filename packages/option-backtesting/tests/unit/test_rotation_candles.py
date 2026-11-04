@@ -149,6 +149,7 @@ def test_the_route(world, monkeypatch):
     assert client.get("/legwise/rotation/candles?book=ref").status_code == 422
     assert client.get("/legwise/rotation/candles?lots=0").status_code == 422
     assert client.get("/legwise/rotation/candles?from=19-10-2026").status_code == 422
+    assert client.get("/legwise/rotation/candles?stop=nan").status_code == 422
     monkeypatch.setattr(warm, "run_within", lambda key, fn, wait=None: (False, None))
     routes._cache.clear()
     cold = client.get("/legwise/rotation/candles?book=base&from=2026-10-19&to=2026-10-20")
