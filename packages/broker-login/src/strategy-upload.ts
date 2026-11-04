@@ -42,6 +42,7 @@ import { visibleWithin } from './wait.js';
  * website (AlgoTest support OK'd automating one's own account, 2026-10-19). Never deploys.
  *
  *   tsx src/strategy-upload.ts --dir <export folder> --mode evening|topup [--apply] [--allow-delete]
+ *   (topup takes today's recorded picks or last evening's list for today, and never deletes)
  *
  * `--dir` is a folder written by `obt rotation algotest-export` (manifest.json + one .algtst per
  * pick). Without `--apply` it logs in, reads what AlgoTest has and prints the plan, changing
@@ -323,10 +324,13 @@ async function main(): Promise<number> {
   for (const exportDir of exportDirs) {
     const dir = resolve(exportDir);
     const m = await readJson<Manifest>(join(dir, 'manifest.json'));
+    // Top-up takes today's recorded picks, or last evening's list for today (BL-197 Phase 2: the
+    // evening list is what AlgoTest trades; 2026-11-05, a row switched to another list after the
+    // 16:40 run needs that list uploaded before the morning activation). It never deletes.
     const fits =
       mode === 'evening'
         ? m.source === 'preview' && m.day > today
-        : m.source === 'recorded' && m.day === today;
+        : m.day === today && (m.source === 'recorded' || m.source === 'preview');
     if (!fits) {
       // With several lists from the settings, one not ready yet must not hold the others back.
       if (values['from-settings'] && exportDirs.length > 1) {
