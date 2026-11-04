@@ -11,11 +11,15 @@ voladj and blend scores never read them). A config the request model refuses (a 
 
 **Why it moved.** Every run stores three fingerprints: the settings hash, the data version
 (`api.input_version()`, broken into the catalog tables, the stock lake files and the input files)
-and the code commit (`forward_journal.code_commit()`). `explain()` labels a changed result from
-them, most suspicious last:
+and the code commit (`forward_journal.code_commit()`). That commit is the whole repo's HEAD, so two
+clean commits count as the same code when nothing a result is made of differs between them
+(`RESULT_CODE`: both packages' code and the locked dependencies); a commit to another package is
+not a code change. `explain()` labels a changed result from them, most suspicious last:
 
-- `data_revised`: same clean code, different data. Names what changed and the first week the
-  two curves differ.
+- `data_extended`: same code, different data, and the new curve is the old one with later weeks
+  added (a new Friday): every week the two share is identical.
+- `data_revised`: same code, different data, some earlier week moved. Names what changed and the
+  first week the two curves differ.
 - `intended`: the code changed, the data did not, and an accepted golden change of the SAME
   dataset lies between the two commits (tests/golden/CHANGELOG.md, read through git). An
   accepted change to another dataset explains nothing.
@@ -38,7 +42,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-LABELS = ("data_revised", "intended", "check", "not_reproducible", "unknown")
+LABELS = ("data_extended", "data_revised", "intended", "check", "not_reproducible", "unknown")
 #: Labels that need a person to look: counted on the Saved runs tab until marked reviewed.
 NEEDS_REVIEW = frozenset({"check", "not_reproducible"})
 
@@ -281,6 +285,19 @@ def same_result(a: dict[str, Any], b: dict[str, Any]) -> bool:
     return all(_close(kpis_a.get(k), kpis_b.get(k)) for k in keys)
 
 
+def extends(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """Whether `b`'s curve is `a`'s with later weeks added: all of `a`'s weeks, in order, at the
+    same values, and at least one week more."""
+    old_dates, new_dates = list(a.get("dates") or []), list(b.get("dates") or [])
+    n = len(old_dates)
+    if not n or len(new_dates) <= n or new_dates[:n] != old_dates:
+        return False
+    old_curve, new_curve = a.get("strategy") or [], b.get("strategy") or []
+    if len(old_curve) != n or len(new_curve) != len(new_dates):
+        return False
+    return all(map(_close, old_curve, new_curve[:n]))
+
+
 def first_difference(a: dict[str, Any], b: dict[str, Any]) -> str | None:
     """The first week at which the two curves disagree (or one has a week the other lacks)."""
     left = dict(zip(a.get("dates") or [], a.get("strategy") or [], strict=False))
@@ -314,6 +331,28 @@ def _git(*args: str) -> str | None:
 
 
 _COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
+#: What a Momentum result is made of, relative to this package: the paths
+#: `forward_journal.code_commit()` checks for uncommitted changes, plus the locked dependencies.
+RESULT_CODE = ("src", "../trading-data/src", "uv.lock")
+
+
+def same_result_code(before: str, after: str) -> bool:
+    """Whether nothing in `RESULT_CODE` differs between two commits (`git diff --quiet`). False
+    when git cannot tell (a commit this checkout lacks, no git). Refuses anything that is not a
+    plain hex commit id before it reaches git's arguments, as `accepted_golden_change` does."""
+    if not (_COMMIT.match(before or "") and _COMMIT.match(after or "")):
+        return False
+    try:
+        done = subprocess.run(
+            ["git", "diff", "--quiet", before, after, "--", *RESULT_CODE],
+            cwd=_PACKAGE,
+            capture_output=True,
+            timeout=20,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return done.returncode == 0  # 1 = they differ, anything else = git could not tell
 
 
 def accepted_golden_change(before: str, after: str, dataset: str) -> str | None:
@@ -357,8 +396,16 @@ def explain(dataset: str, before: dict[str, Any], after: dict[str, Any]) -> dict
     same_data = old.get("data") == new.get("data")
     detail["changed"] = [] if same_data else changed_parts(old, new)
     old_code, new_code = old.get("code"), new.get("code")
-    if _clean(old_code) and old_code == new_code:
-        return {"label": "not_reproducible" if same_data else "data_revised", **detail}
+    same_code = (
+        _clean(old_code)
+        and _clean(new_code)
+        and (old_code == new_code or same_result_code(old_code, new_code))
+    )
+    if same_code:
+        if same_data:
+            return {"label": "not_reproducible", **detail}
+        label = "data_extended" if extends(before, after) else "data_revised"
+        return {"label": label, **detail}
     if same_data and _clean(old_code) and _clean(new_code):
         reason = accepted_golden_change(old_code, new_code, dataset)
         if reason is not None:

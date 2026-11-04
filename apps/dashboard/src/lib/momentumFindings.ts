@@ -157,11 +157,13 @@ export function savedFindings(
     const before = moved.change.kpis_before?.cagr;
     const after = moved.change.kpis_after?.cagr;
     const why =
-      moved.change.label === 'data_revised'
-        ? 'the data was revised in between'
-        : moved.change.label === 'intended'
-          ? 'an accepted code change explains it'
-          : 'it was saved before runs recorded their code and data, so the cause is unknown';
+      moved.change.label === 'data_extended'
+        ? 'later weeks were added and every earlier week is unchanged'
+        : moved.change.label === 'data_revised'
+          ? 'the data was revised in between'
+          : moved.change.label === 'intended'
+            ? 'an accepted code change explains it'
+            : 'it was saved before runs recorded their code and data, so the cause is unknown';
     findings.push({
       id: 'moved',
       tone: 'info',
