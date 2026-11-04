@@ -11,12 +11,13 @@ import {
   type Automation,
   type Book,
   type Broker,
+  algotestAddon,
   effectiveRow,
   pausedFor,
   readAutomation,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
-import { istMinutes, parseLive } from './deploy-plan.js';
+import { istMinutes, morningPicks, parseLive } from './deploy-plan.js';
 import { describe } from './diagnose.js';
 import {
   LockBusy,
@@ -338,9 +339,9 @@ class Monitor {
     const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as {
       day: string;
       source: string;
-      strategies: { name: string; file: string }[];
+      strategies: { name: string; file: string; addon?: boolean }[];
     };
-    const picks: { name: string; legs: LegNeed[]; lots: number[] }[] = [];
+    const picks: { name: string; legs: LegNeed[]; lots: number[]; addon: boolean }[] = [];
     for (const s of manifest.strategies) {
       const doc = JSON.parse(await readFile(join(dir, s.file), 'utf8'));
       const legs = platform === 'algotest' ? legsFromAlgtst(doc) : legsFromQuantiply(doc);
@@ -348,6 +349,7 @@ class Monitor {
         name: s.name,
         legs,
         lots: platform === 'quantiply' ? legLots(doc) : legs.map((l) => l.lots),
+        addon: Boolean(s.addon),
       });
     }
     return { day: manifest.day, source: manifest.source, picks };
@@ -938,14 +940,20 @@ class Monitor {
             missing.push(`no ${r.book} picks exported for today (latest ${p.day})`);
             continue;
           }
+          // BL-197 Phase 2: on AlgoTest the evening list is the list that trades (the morning
+          // activation deploys it; the 09:16 pick changes nothing there), so the check reads it
+          // as such, with the add-on as the settings say now.
           if (p.source !== 'recorded') {
             notes.push(
-              `checked against last evening's expected ${r.book} picks (no recorded export yet)`,
+              `checked against last evening's ${r.book.toUpperCase()} list, the list that trades on AlgoTest (BL-197)`,
             );
           }
+          const m = morningPicks(p.picks, algotestAddon(this.automation, r.book));
+          if (m.leftOut.length)
+            notes.push(`add-on left out (Settings › Automation): ${m.leftOut.join(', ')}`);
           rows.push({
             broker: r.broker,
-            picks: p.picks.map((x) => x.name),
+            picks: m.kept.map((x) => x.name),
             multiplier: r.multiplier,
           });
         }

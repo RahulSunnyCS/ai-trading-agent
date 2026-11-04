@@ -163,8 +163,8 @@ export function mergeLogins<K extends string>(
 /**
  * The two windows the scheduler's platform jobs log in in. Inside one, a job may be "due" or about
  * to run; after its end (the cap) only a run that is actually in progress still blocks.
- * Morning: algotest-topup's three attempts (09:18, 10 min each, 2 min apart) end by 09:52 at worst,
- * quantiply-topup's two and the queued quantiply-deploy-topup by 09:51. Evening: the 15:35 / 15:40
+ * Morning: quantiply-topup's two attempts and the queued quantiply-deploy-topup end by 09:51; the
+ * 08:11 AlgoTest activation (BL-197 Phase 2) is long over, unless a catch-up after sleep runs it. Evening: the 15:35 / 15:40
  * deploy check and disable, the 15:40 / 15:55 live-results capture (BL-141), the 16:40 / 16:45
  * uploads and the 16:55 enable.
  */
@@ -194,8 +194,9 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
   algotest: [
     // BL-172: the morning login runs on the Mac and logs in to both platforms
     { id: 'broker-login', window: 'morning' },
-    { id: 'algotest-deploy', window: 'morning' },
-    { id: 'algotest-topup', window: 'morning' },
+    // BL-197 Phase 2: the 08:11 activation of the evening list (the 09:16 deploy and the 09:18
+    // top-up were retired with it)
+    { id: 'algotest-activate', window: 'morning' },
     { id: 'algotest-deploy-check', window: 'evening' },
     { id: 'algotest-evening', window: 'evening' },
     // BL-141: the 15:40 capture and its 15:55 retry log in to both platforms

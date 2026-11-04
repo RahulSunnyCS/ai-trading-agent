@@ -208,6 +208,19 @@ export function algotestDeployBrokers(a: Automation, book: Book): Broker[] {
 }
 
 /**
+ * BL-197 Phase 2: does the Buy add-on belong in a book's AlgoTest list? The same rule as the
+ * export's (`obt rotation algotest-export --from-settings`): yes while any AlgoTest row that
+ * uploads the book has it on. Read again in the morning, so a switch flipped after the evening
+ * export still decides what is activated and checked.
+ */
+export function algotestAddon(a: Automation, book: Book): boolean {
+  return BROKERS.some((b) => {
+    const row = effectiveRow(a, 'algotest', b);
+    return row.upload && row.list === book && row.addon;
+  });
+}
+
+/**
  * Whether the tool may ENABLE (deploy) a Quantiply account's algos, and which list they come
  * from: the deploy master switch, and the account's row uploading a list (an account the tool
  * puts nothing into has nothing of the tool's to enable). `why` says what held it back.

@@ -128,7 +128,7 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
   - `QUANTIPLY_BROKERS` listing `finvasia` logs Quantiply · Shoonya in after the AlgoTest logins
     (`runQuantiplyShoonyaIsolated`, one attempt, its own report line counted in the verdict, never the
     exit code).
-- **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on and an AlgoTest row
+- **Deploy:** `strategy-deploy.ts --apply` (with or without `--morning`) also needs the deploy master switch on and an AlgoTest row
   uploading the export's book; without such a row `--apply` and `--check` stop before logging in
   (`nothingOnAlgotest`; the check still runs when `deploy-ledger.jsonl` has a row from today);
   `quantiply-deploy.ts --mode enable --apply` needs it and the account's row uploading a list
@@ -221,8 +221,15 @@ week, until disabled.
   it in place ("Update" keeps its id); rename it to keep it. Uploads before 2026-10-20 had no id: `--record-ids`
   adds it once from the listing (ledger only); it cannot tell a tool upload from the owner's copy of the same
   name, so it was run once, supervised.
-- `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) deploys the day's recorded picks on /live. `--apply`
-  and `--check` need `ALGOTEST_DEPLOY=on`. "Activate" opens the broker sheet (BL-197): it ticks every broker
+- `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) activates strategies on /live. `--morning` (BL-197 Phase 2,
+  scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: the export `--latest t1`
+  points at (the 16:40 run's `--next` export, source `preview`, for today), every strategy not yet deployed, through
+  `planDeploy` like the old 09:16 run; the Buy add-on is left out when no AlgoTest row has it on now (`morningPicks`,
+  `algotestAddon`: the settings are read again in the morning, since the export read them the evening before). The
+  evening list is what trades on AlgoTest (owner, 2026-11-02); the 09:16 `algotest-deploy` and 09:18
+  `algotest-topup` jobs were retired on 2026-11-04, so nothing re-exports today's AlgoTest folder after 09:16 and the
+  09:25 deploy check reads the evening list too. Without `--morning` it deploys today's recorded picks (by hand).
+  `--apply` and `--check` need `ALGOTEST_DEPLOY=on`. "Activate" opens the broker sheet (BL-197): it ticks every broker
   whose AlgoTest row uploads the list (`algotestDeployBrokers`, `checkBrokerSheet`), presses "Activate on n
   Brokers" and expects "n Deployed" up by n; it stops at anything else that opens. It waits for /live's
   "Broker Login n/m" (rendered after the rows; also read split over lines); a count the page does not show is
@@ -243,11 +250,11 @@ week, until disabled.
 09:04-15:30, under `caffeinate -i`, restarted after a scheduler or laptop restart until 15:25):
 
 - **Timeline and switches** (`.env`, each off until `on`): `MARGIN_CHECK` 09:05-09:10; then **no login and no
-  open session 09:10-09:25** (the 09:16 deploy and the 09:18-09:21 top-ups log in; neither platform is known to
+  open session 09:10-09:25** (the 09:18-09:21 Quantiply top-ups log in; neither platform is known to
   keep two sessions per user), checked at every login (after the lock wait) and every use of an open session;
   `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. Before every login, at any
-  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-deploy`,
-  `algotest-topup`, `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
+  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-activate`,
+  `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
   `quantiply-deploy-topup`, `quantiply-disable`, `quantiply-evening`, `quantiply-deploy`; both: BL-141's
   `live-capture` and `live-capture-retry`), and again under the
   login lock right before the login (`jobsStillToEnd`, then `jobsWait`). A run of one of them in progress today

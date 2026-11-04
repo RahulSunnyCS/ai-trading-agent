@@ -9,6 +9,7 @@ import {
   type Automation,
   type Book,
   type Broker,
+  algotestAddon,
   algotestDeployBrokers,
   algotestMultiplierRefusal,
   describeSource,
@@ -24,6 +25,7 @@ import {
   SETUP_PENDING,
   checkBrokerSheet,
   istMinutes,
+  morningPicks,
   nothingOnAlgotest,
   parseLive,
   planDeploy,
@@ -44,13 +46,20 @@ import { visibleWithin } from './wait.js';
  * ready but OFF: `--apply` needs `ALGOTEST_DEPLOY=on`; without it the run logs in, reads /live and
  * prints what it would deploy. The owner may never switch it on (2026-10-19).
  *
- *   tsx src/strategy-deploy.ts --latest t1 [--apply]       deploy (after the 09:16 pick)
+ *   tsx src/strategy-deploy.ts --latest t1 --morning [--apply]  BL-197 Phase 2: right after the
+ *       08:02 login (scheduler `algotest-activate`, 08:11), activate last evening's list: the export
+ *       the 16:40 run uploaded and set up, for today. The evening list is what trades on AlgoTest;
+ *       the 09:16 pick changes nothing there (owner, 2026-11-02). The Buy add-on is left out when no
+ *       AlgoTest row has it on now (`algotestAddon`, read again in the morning)
+ *   tsx src/strategy-deploy.ts --latest t1 [--apply]       deploy today's recorded picks (by hand;
+ *       the 09:16 job was retired by BL-197 Phase 2)
  *   tsx src/strategy-deploy.ts --latest t1 --check          15:35: anything left repeating or running
  *   tsx src/strategy-deploy.ts --latest t1 --setup [--apply]  BL-197: each evening, after the upload,
  *       Setup Execution for the next session's picks (Trade monitoring on Candle Close); deploys
  *       nothing, so it needs ALGOTEST_UPLOAD=on rather than ALGOTEST_DEPLOY
  *
- * Only a recorded export for today (`obt rotation algotest-export`, source "recorded") is accepted.
+ * Without --morning only a recorded export for today (`obt rotation algotest-export`, source
+ * "recorded") is accepted; --morning takes any export for today (the evening's is "preview").
  * Each pick is set up with AlgoTest's defaults as seen on 2026-10-19 (docs/algotest-execution.md §7:
  * multiplier 1, NRML legs, no execution day ticked, so the deploy is for today only), then
  * activated: "Activate" opens the broker sheet (BL-197, seen 2026-11-03), where every broker whose
@@ -255,12 +264,13 @@ async function main(): Promise<number> {
       apply: { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
       setup: { type: 'boolean', default: false },
+      morning: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
   });
   if (existsSync('.env')) process.loadEnvFile('.env');
-  if (values.setup && values.check) {
-    console.error('--setup and --check do not go together');
+  if ([values.setup, values.check, values.morning].filter(Boolean).length > 1) {
+    console.error('--setup, --check and --morning do not go together');
     return 64;
   }
   // BL-197: Setup Execution deploys nothing; it belongs to the upload and its switch
@@ -322,6 +332,15 @@ async function main(): Promise<number> {
       console.error(`the export is for ${manifest.day}, a past session: nothing to set up`);
       return 1;
     }
+  } else if (values.morning) {
+    // the evening export (`--next`, source "preview") is today's list; a recorded one for today
+    // (a hand export after 09:16) names the same strategies where they are on /live
+    if (manifest.day !== today) {
+      console.error(
+        `the export is ${manifest.source} for ${manifest.day}, not today (${today}): nothing to activate; did last evening's algotest-evening run?`,
+      );
+      return 1;
+    }
   } else if (!values.check && (manifest.source !== 'recorded' || manifest.day !== today)) {
     console.error(
       `the export is ${manifest.source} for ${manifest.day}, not today's recorded picks`,
@@ -356,7 +375,7 @@ async function main(): Promise<number> {
       if (other.length) {
         await sendText(
           readTelegramConfig(),
-          `⚠️ AlgoTest: Settings › Automation uploads the ${other.map((b) => b.toUpperCase()).join(', ')} list, but the 09:16 deploy handles ${manifest.book.toUpperCase()} only: deploy those by hand on /live`,
+          `⚠️ AlgoTest: Settings › Automation uploads the ${other.map((b) => b.toUpperCase()).join(', ')} list, but the ${values.morning ? 'morning activation' : '09:16 deploy'} handles ${manifest.book.toUpperCase()} only: deploy those by hand on /live`,
           'broker.algotest',
         ).catch(() => undefined);
       }
@@ -373,8 +392,14 @@ async function main(): Promise<number> {
     );
     return 1;
   }
+  // BL-197 Phase 2: the add-on follows the settings as they are now, not as the evening export
+  // read them (2026-11-04: switched off at 18:47, after the 16:40 export had set it up)
+  const morning =
+    values.morning && automation
+      ? morningPicks(manifest.strategies, algotestAddon(automation, manifest.book as Book))
+      : { kept: manifest.strategies, leftOut: [] as string[] };
   const picks: Pick[] = [];
-  for (const s of manifest.strategies) {
+  for (const s of morning.kept) {
     const doc = JSON.parse(await readFile(join(resolve(dir), s.file), 'utf8'));
     picks.push({ name: s.name, entry: entryOf(doc) });
   }
@@ -386,7 +411,13 @@ async function main(): Promise<number> {
     return 1;
   }
   registerSecret(password);
-  const what = values.setup ? `setup for ${manifest.day}` : values.check ? '15:35 check' : 'deploy';
+  const what = values.setup
+    ? `setup for ${manifest.day}`
+    : values.check
+      ? '15:35 check'
+      : values.morning
+        ? 'morning activation'
+        : 'deploy';
   const label = `AlgoTest ${manifest.book.toUpperCase()} ${what}${values.setup ? '' : ` ${today}`}`;
   const browser = await chromium.launch({ headless: !values.headed });
   const page = await (
@@ -432,6 +463,13 @@ async function main(): Promise<number> {
         lines.push(`repeat days ticked (would trade again): ${again.join(', ')}`);
       } else lines.push('no tool strategy repeats tomorrow');
     } else {
+      if (values.morning) {
+        lines.push(
+          `last evening's list (${manifest.source} export for ${manifest.day}): ${manifest.strategies.map((s) => s.name).join(', ') || 'nothing'}`,
+        );
+        if (morning.leftOut.length)
+          lines.push(`add-on left out (Settings › Automation): ${morning.leftOut.join(', ')}`);
+      }
       const p = planDeploy(picks, live, istMinutes());
       if (p.refused) {
         lines.push(`refused: ${p.refused}`);

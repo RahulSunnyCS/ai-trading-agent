@@ -184,7 +184,7 @@ describe('stop button: two taps', () => {
     expect(h.applies).toEqual([]);
     const confirm = h.sent.at(-1);
     expect(confirm?.text).toContain('PLAN: square off Core · A');
-    expect(confirm?.text).toContain('algotest-deploy');
+    expect(confirm?.text).toContain('algotest-activate');
     expect(confirm?.buttons).toEqual([
       { label: 'Yes, stop and square off', data: 'stop:go:n1' },
       { label: 'Cancel', data: 'stop:no:n1' },
@@ -415,11 +415,11 @@ describe('stop hold: no job that could upload, deploy or enable runs while it is
     expect(holdFile(root)).toBe(join(root, 'stop', 'HOLD.json'));
     const env = { TRADING_DATA_ROOT: root, SCHEDULER_STATE_DIR: join(root, 'state') };
     expect(stateHoldFile(env)).toBe(join(root, 'state', 'stop-hold.json'));
-    expect(heldReason('algotest-deploy', env)).toBeNull();
+    expect(heldReason('algotest-activate', env)).toBeNull();
     mkdirSync(join(root, 'stop'));
     writeFileSync(holdFile(root), 'not json');
     expect(readHold(env)?.by).toBe('unreadable hold file'); // still holds
-    expect(heldReason('algotest-deploy', env)).toContain('held');
+    expect(heldReason('algotest-activate', env)).toContain('held');
     expect(heldReason('quantiply-disable', env)).toBeNull();
   });
 

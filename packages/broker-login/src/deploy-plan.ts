@@ -165,6 +165,29 @@ export function planSetup(picks: Pick[], live: LiveState): SetupPlan {
   return out;
 }
 
+export interface MorningPicks<T> {
+  kept: T[];
+  /** the Buy add-on picks left out because no AlgoTest row has the add-on on */
+  leftOut: string[];
+}
+
+/**
+ * BL-197 Phase 2: the evening list as the morning activates and checks it. The evening export
+ * carried the add-on if the settings then said so; the morning reads the settings again, so an
+ * add-on switched off overnight is left in AlgoTest unactivated (and said), never traded.
+ */
+export function morningPicks<T extends { name: string; addon?: boolean }>(
+  entries: readonly T[],
+  addonOn: boolean,
+): MorningPicks<T> {
+  const out: MorningPicks<T> = { kept: [], leftOut: [] };
+  for (const e of entries) {
+    if (e.addon && !addonOn) out.leftOut.push(e.name);
+    else out.kept.push(e);
+  }
+  return out;
+}
+
 /** Tool strategies that would run again on a later day (a ticked execution day). */
 export function repeating(live: LiveState): string[] {
   return live.rows

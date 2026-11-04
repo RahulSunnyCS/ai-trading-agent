@@ -7,6 +7,7 @@ import {
   checkBrokerSheet,
   istMinutes,
   minutesOf,
+  morningPicks,
   nothingOnAlgotest,
   parseCards,
   parseLive,
@@ -507,4 +508,21 @@ test('a broker count missing from /live is unread: the deploy refuses as such, n
     brokerRefusal(parseLive(PAGE_NOV.replace('Broker Login 0/2', 'Broker Login 2/2'))),
     null,
   );
+});
+
+test('morningPicks leaves the add-on out when the settings turned it off after the evening export (BL-197)', () => {
+  const entries = [
+    { name: 'T1 · N_wide_0917', addon: false },
+    { name: 'T1 · N_buy-t1s47_1047 · add-on', addon: true },
+    { name: 'T1 · S_ditm1-t1s44_0917' }, // an older manifest without the field
+  ];
+  const off = morningPicks(entries, false);
+  assert.deepEqual(
+    off.kept.map((e) => e.name),
+    ['T1 · N_wide_0917', 'T1 · S_ditm1-t1s44_0917'],
+  );
+  assert.deepEqual(off.leftOut, ['T1 · N_buy-t1s47_1047 · add-on']);
+  const on = morningPicks(entries, true);
+  assert.equal(on.kept.length, 3);
+  assert.deepEqual(on.leftOut, []);
 });
