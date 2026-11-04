@@ -289,7 +289,12 @@ Otherwise:
   net and days won over the month's journal days (`result.calculate`; an unscored day left out, never zero; a Dir ×2
   list's as-traded total by `result.as_traded`) in both copies, and the account's real month (`realised.views.days`'
   `profit`, up to the day before, the notes arriving at 00:00) in the owner's only; a failure drops those lines, never
-  the message.
+  the message. `rotation/standing.py` (owner, 2026-11-04) adds, after the month and in both copies, T1's drawdown
+  now against the last `WINDOW_DAYS` (730) days: the message's own series (list C, one lot per strategy, net after
+  costs and the message's slippage, `store.read_net` under `store.slipped`), journal days as recorded and earlier ones
+  re-derived with `daylog.reconstruction`, a day missing a pick's result left out; `measure` gives the drawdown from
+  the running high (peak starting at zero), the share of days at least that deep, the share under water and the
+  deepest (`messages.standing_lines`). Only when T1's day is in; a failure drops the lines, never the message.
   Slippage (owner, 2026-10-30): `rotation/slip_store.py` keeps a 0.5% slippage copy beside every results file
   (`store.slip_path`, `<folder>/slip-0.5/`), written by `rotation update`, the base's scoring and `obt rotation
   slippage-fill`. `store.slipped(pct)` (a context variable; the API's `slippage` parameter sets it per request in

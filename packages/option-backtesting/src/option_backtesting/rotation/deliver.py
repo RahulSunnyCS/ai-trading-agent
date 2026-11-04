@@ -35,6 +35,7 @@ from . import (
     month,
     result,
     slippage,
+    standing,
     store,
     tomorrow,
 )
@@ -377,6 +378,18 @@ def _month_so_far(day: date, adaptive, t1, boost: dict[str, bool], root: Path | 
     return tuple(paper), real
 
 
+def _t1_standing(day: date, t1, root: Path | None, echo: Echo):
+    """T1's drawdown against the last two years (`standing.t1`), only when its day is in; a failure
+    leaves the line out, never the result."""
+    if t1 is None:
+        return None
+    try:
+        return standing.t1(day, root, today=t1)
+    except Exception as error:  # noqa: BLE001
+        echo(f"T1 drawdown line skipped: {type(error).__name__}: {error}")
+        return None
+
+
 def _tomorrow_adaptive(today: date, root: Path | None, echo: Echo):
     """Adaptive's expected picks for the next session, or None: a failure here never stops the
     result going out."""
@@ -527,6 +540,7 @@ def _send_result_locked(
         t1_day = t1 if kind == "ready" else None
         paper, real = _month_so_far(day, adaptive, t1_day, boost, root, echo)
         capital = message_capital()
+        standing_part = messages.standing_lines(_t1_standing(day, t1_day, root, echo))
         private = result.render(
             adaptive,
             t1_part,
@@ -534,7 +548,7 @@ def _send_result_locked(
             next_t1,
             live,
             boost=boost,
-            month=messages.month_lines(day, *paper, real, capital),
+            month=[*messages.month_lines(day, *paper, real, capital), *standing_part],
         )
         group = result.render(
             adaptive,
@@ -542,7 +556,7 @@ def _send_result_locked(
             next_adaptive,
             next_t1,
             boost=boost,
-            month=messages.month_lines(day, *paper, capital=capital),
+            month=[*messages.month_lines(day, *paper, capital=capital), *standing_part],
         )
         # BL-205: whether tomorrow's lots fit each account's margin, the owner's copy only; one
         # line per account when the whole block would pass Telegram's limit (it is cut at the end)
