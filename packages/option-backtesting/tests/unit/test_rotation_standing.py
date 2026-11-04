@@ -108,6 +108,8 @@ def test_the_lines():
         "   below a high on 66% · deepest −₹32,386 (Oct 2026)",
         "   paper, 1 lot per strategy, 0.5% slippage; picks before Mon 19 Oct re-derived",
     ]
+    gaps = standing.Standing(**{**s.__dict__, "left_out": 2})
+    assert messages.standing_lines(gaps)[-1].endswith("re-derived; 2 days without results left out")
     top = standing.Standing(**{**s.__dict__, "drawdown": 0.0, "at_least": 0})
     assert messages.standing_lines(top)[0] == "📈 Tuned Adaptive at a new high today"
     assert messages.standing_lines(None) == []

@@ -367,6 +367,8 @@ def standing_lines(s) -> list[str]:
         basis += f", {s.slippage_pct:g}% slippage"
     if s.recorded_from is not None and s.first_day < s.recorded_from:
         basis += f"; picks before {day_text(s.recorded_from)} re-derived"
+    if s.left_out:
+        basis += f"; {s.left_out} day{'s' if s.left_out != 1 else ''} without results left out"
     if s.drawdown < 0.5:
         return ["📈 Tuned Adaptive at a new high today", f"   {basis}"]
     high = f"its high on {day_text(s.high_day)}" if s.high_day else "the start"
