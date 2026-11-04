@@ -437,6 +437,19 @@ Otherwise:
   down. `book_day` replays the nightly update's own strategy file and lot-sizing date. Reproduces BL-055's totals
   (`research/bl095/reproduce_bl055.py`) and the log's gross with no stop (`research/bl095/check_log_gross.py`). Stores
   nothing and never changes a stored result or the registered read-out.
+- `rotation/candles.py` + `api/rotation_candles_routes.py` — the Rotation page's "Day by day" card (owner, 2026-11-04;
+  `GET /legwise/rotation/candles`), read-only. Per day for `t1` / `core` (list C: the journal's picks, re-derived
+  with `daylog.reconstruction` before it) or `base` (2 × `N_wide_0917` + `N_dir_atm_0924`, every day both are stored,
+  read at 0 % so the day list does not depend on the slippage copy): `portfolio.book_day` at the request's slippage
+  under the book stop (`DEFAULT_STOP`, times `lots`); open = the running total before the day, high / low = open +
+  the best / worst of the stopped path (0 included), close = open + the day's result; each member's `at_stop` with
+  `labels.label`; `beat` = the share of `DRAWS` (2,000) random same-size baskets from the book's pool (Core-298, + T1's
+  variants for T1), seeded per book and day, whose one-lot sum was below the book's result / `lots` (the baskets
+  are cut at the stop when they ended below it, which flatters them, never the book). Each day also has its
+  `drawdown` (running high from zero minus the close) and `live` (`live_by_day`: `live_compare.compare_range`'s groups for
+  the list, per platform + broker, per lot); the response has `ladder` (the depth at least 25 / 10 / 5 % of the days
+  reached, rounded up) and `live_days`. A day the replay cannot run is `left_out` with its reason. Cold: 202 through
+  `rotation/warm.py`.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
   read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s
