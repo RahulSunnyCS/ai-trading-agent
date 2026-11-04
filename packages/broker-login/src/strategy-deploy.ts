@@ -338,13 +338,16 @@ async function main(): Promise<number> {
       console.error(
         `${dir.book.toUpperCase()}: no export (${dir.pointer}); did the evening job run?`,
       );
-      if (values.apply) worst = Math.max(worst, 1);
+      if (values.apply && !values.check) worst = Math.max(worst, 1);
       continue;
     }
     worst = Math.max(worst, await runDir(dir.dir, values, automation));
   }
   return worst;
 }
+
+/** The books the 15:35 check falls back to when the settings name none. */
+const CHECK_FALLBACK = ['t1', 'core'] as const;
 
 type ExportDir =
   | { book: string; dir: string; missing: false }
@@ -356,13 +359,17 @@ async function exportDirs(
   automation: Automation | null,
 ): Promise<ExportDir[] | null> {
   if (values.dir) return [{ book: '', dir: values.dir, missing: false }];
-  const books = values['from-settings']
+  let books = values['from-settings']
     ? automation
       ? (uploadBooks(automation, 'algotest') as string[])
       : []
     : values.latest
       ? [values.latest]
       : [];
+  // The 15:35 check reads every tool strategy on /live whatever list it came from, so it runs once,
+  // and it is the safety net: with no row uploading a list (or settings that cannot be read) it
+  // still runs on whichever export exists, and `nothingOnAlgotest` decides whether to log in.
+  if (values.check && values['from-settings']) books = books.length ? books : [...CHECK_FALLBACK];
   if (!values['from-settings'] && !books.length) {
     console.error(
       'usage: --dir <export folder> | --latest <book> | --from-settings [--apply | --check | --setup | --morning]',
@@ -376,6 +383,7 @@ async function exportDirs(
   }
   const out: ExportDir[] = [];
   for (const book of books) {
+    if (values.check && out.some((d) => !d.missing)) break; // one check run is the whole check
     const pointer = join(root, 'rotation', 'algotest', `latest-${book}.json`);
     if (!existsSync(pointer)) {
       out.push({ book, pointer, missing: true });
