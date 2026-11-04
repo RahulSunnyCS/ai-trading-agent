@@ -601,7 +601,7 @@ export interface MarginPlan {
   bufferPct: number;
   /** the per-lot requirement for each broker account the block covered */
   perLot: Partial<Record<string, number>>;
-  /** each account's cash half last evening (funds, pledged SGBs and liquid ETFs), for 50:50 */
+  /** each account's cash half last evening (funds and pledged liquid ETFs; SGBs are not cash), for 50:50 */
   cash: Partial<Record<string, number>>;
 }
 

@@ -97,7 +97,8 @@ def _statement(day, broker, account, funds, available, upfront=0, holdings=()):
     }
 
 
-SGB = {"isin": "IN0020990001", "name": "SOVEREIGN GOLD BONDS", "value": 200000}
+LIQUID_BEES = {"isin": "INF732E01037", "name": "NIPPON INDIA ETF LIQUID BEES", "value": 200000}
+SGB = {"isin": "IN0020990001", "name": "SOVEREIGN GOLD BONDS", "value": 300000}  # not cash
 
 
 def _store(root: Path, finvasia_cash_only: float = 100000) -> None:
@@ -107,7 +108,14 @@ def _store(root: Path, finvasia_cash_only: float = 100000) -> None:
         cn / "margin" / "2026-10-28.jsonl",
         [
             _statement("2026-10-28", "angelone", "R1", 50000, 900000, upfront=600000),
-            _statement("2026-10-28", "finvasia", "F1", finvasia_cash_only, 1000000, holdings=[SGB]),
+            _statement(
+                "2026-10-28",
+                "finvasia",
+                "F1",
+                finvasia_cash_only,
+                1000000,
+                holdings=[LIQUID_BEES, SGB],
+            ),
         ],
     )
     _jsonl(
@@ -185,7 +193,8 @@ def test_the_block_says_what_fits_and_what_does_not(tmp_path):
     assert "free ₹7 L (15:50 reading)" in text
     assert "✅ fits, ₹0.4 L spare" in text
     assert "cash ₹0.5 L of the ₹3.3 L 50:50 wants: add ₹2.8 L to clear about ₹84 a day" in text
-    # Shoonya: the 28 Oct statement less today's ₹20k; cash ₹0.8 L + SGB ₹2 L = ₹2.8 L, so at
+    # Shoonya: the 28 Oct statement less today's ₹20k; cash ₹0.8 L + Liquid BeES ₹2 L = ₹2.8 L (the
+    # ₹3 L of SGBs are not cash), so at
     # most ₹5.6 L usable under the strict 50:50 rule: short of ₹6.6 L, 2 lots fit
     assert "free ₹9.8 L (28 Oct statement, today −₹20,000)" in text
     assert "cash ₹2.8 L, so ₹5.6 L usable under 50:50" in text

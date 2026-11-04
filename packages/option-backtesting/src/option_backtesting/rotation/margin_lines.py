@@ -10,10 +10,11 @@ account that a Settings › Automation row uploads a list to, whether tomorrow's
   lots, plus the buffer (Settings › Automation, default 10% and 6 days; owner 2026-11-04).
 - **Free**: Angel One's 15:50 reading of its free margin when it was taken after today's close;
   otherwise the account's newest margin statement plus today's P&L from the 15:40 live capture.
-- **50:50**: the exchange wants half the margin used in cash (funds, pledged SGBs and G-secs,
-  liquid ETFs). Shoonya (Finvasia) is held to it strictly: its usable margin is at most twice its
-  cash. Angel One's verdict is on the total, and a line says how far its cash is from half of what
-  tomorrow needs and what the collateral interest on the gap costs a day.
+- **50:50**: the exchange wants half the margin used in cash (funds and pledged liquid ETFs; pledged
+  SGBs and G-secs do not count, owner 2026-11-04). Shoonya (Finvasia) is held to it strictly: its
+  usable margin is at most twice its cash. Angel One's verdict is on the total, and a line says how
+  far its cash is from half of what tomorrow needs and what the collateral interest on the gap costs
+  a day.
 
 Phase 4: the block also saves tomorrow's figures to `rotation/margin-plan/<day>.json`, which the
 09:05 margin check (`packages/broker-login`, BL-143) reads for its need, and it compares Shoonya's

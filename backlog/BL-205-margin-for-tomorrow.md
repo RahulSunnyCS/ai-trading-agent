@@ -226,6 +226,12 @@ the reading predates today's close.
   the PDF kept encrypted); `node run.js --margin-only --from D --to D` backfills. Angel One's
   collateral is all ordinary shares (no Liquid BeES or SGBs), so its cash half is its funds alone;
   Finvasia FA··24 pledges Liquid BeES and SGBs.
+- 2026-11-04 (afternoon) — the cash rule corrected: pledged sovereign gold bonds (and G-secs) do NOT count
+  toward the cash half; only funds and pledged liquid ETFs do (owner: "check only pledged cash"). Shoonya
+  refused one of the day's three T1 legs for the cash half with ₹3.7 L of SGBs pledged, while the saved
+  plan had judged it fine (cash ₹5.2 L with the SGBs, ₹1.55 L without: one lot, not three). The 09:05
+  check was off (`MARGIN_CHECK` unset) and the 3 Nov evening message pre-dated the block, so nothing
+  warned. `realised/cash_collateral.csv` drops the `IN00` row; the block and the 09:05 check follow it.
 - 2026-11-04 — Phase 1 reviewed (six findings, five fixed: a broken margin file no longer stops
   the run, Angel One's collateral is required whenever the table shows securities, one bookmark
   helper, tests, figures rounded here) and backfilled: 167 statements since June. Phase 2 built:

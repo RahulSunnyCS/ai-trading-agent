@@ -1,4 +1,3 @@
 match,value,what
-isin_prefix,IN00,"Government securities: sovereign gold bonds, G-secs, T-bills (owner 2026-11-04: pledged SGBs count as cash)"
-isin,INF732E01037,"Nippon India ETF Liquid BeES (owner 2026-11-04: pledged Liquid BeES counts as cash)"
+isin,INF732E01037,"Nippon India ETF Liquid BeES (owner 2026-11-04: pledged Liquid BeES counts as cash; pledged sovereign gold bonds and G-secs do NOT: Shoonya refused a leg for the cash half on 4 Nov with ₹3.7 L of SGBs pledged)"
 inf_name,LIQUID,"Any mutual fund or ETF (an INF ISIN) whose name says LIQUID: a liquid or overnight fund"

@@ -71,13 +71,15 @@ LISTED_ETF = {"isin": "INF732E01037", "name": "NIPPON LIQUID", "value": 10000}
 SHARE = {"isin": "INE000A01011", "name": "ACME STEEL", "value": 400000}
 
 
-def test_cash_is_funds_plus_sgbs_and_liquid_funds():
+def test_cash_is_funds_plus_liquid_funds_but_not_sgbs():
+    # owner 2026-11-04: Shoonya refused a leg for the cash half with ₹3.7 L of SGBs pledged
     line = _statement(
         NORMAL, "finvasia", "F1", funds=30000, holdings=[SGB, LIQUID, SHARE, LISTED_ETF]
     )
     out = margin.split_collateral(line)
-    assert out["cash"] == 30000 + 100000 + 50000 + 10000
-    assert out["non_cash"] == 400000
+    assert out["cash"] == 30000 + 50000 + 10000
+    assert out["non_cash"] == 400000 + 100000
+    assert margin.is_cash(SGB) is False
     assert margin.is_cash({"isin": "INE000A01011", "name": "LIQUID STEEL"}) is False  # not a fund
 
 
@@ -215,7 +217,8 @@ def test_days_take_the_larger_peak_and_divide_by_the_lots(tmp_path):
     assert angel["cash_short"] == 640000 / 2 - 80000
     finvasia = rows["finvasia"]
     assert finvasia["peak"] is None and finvasia["per_lot"] is None
-    assert finvasia["cash"] == 140000 and finvasia["usable"] == 280000
+    # the pledged SGB is not cash: funds alone carry the 50:50 half
+    assert finvasia["cash"] == 40000 and finvasia["usable"] == 80000
 
 
 def test_the_table_keeps_the_last_n_days_of_each_type():

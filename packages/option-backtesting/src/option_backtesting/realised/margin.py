@@ -6,8 +6,9 @@ e-mails (`ledger/`), and the 15:40 live captures (`rotation/live/<day>.jsonl`) f
 were open together.
 
 - **Available** is the statement's total margin available (F); **cash** is its funds (A) plus the
-  collateral that counts as cash (`cash_collateral.csv`: pledged SGBs and G-secs, liquid ETFs;
-  owner 2026-11-04); the rest of the collateral is **non-cash**. The exchange's 50:50 rule asks
+  collateral that counts as cash (`cash_collateral.csv`: pledged liquid ETFs; pledged SGBs and
+  G-secs do not, owner 2026-11-04 after Shoonya refused a leg for the cash half); the rest of the
+  collateral is **non-cash**. The exchange's 50:50 rule asks
   for at least half the margin used in cash.
 - **Peak** is the most the account needed during the day: Angel One's upfront margin (G, an
   exchange snapshot) or the largest "margin used" in its shortfall warnings that day, whichever is
