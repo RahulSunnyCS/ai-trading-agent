@@ -15,8 +15,10 @@
 The owner (2026-11-04): *"on our directional, check if any target or TSL or lock and TSL or lock
 profit will have impact; make it very wide and try all of the things; or if we are putting two lots,
 one lot can have a target. Today it went up to about ₹2,500 and then came down."* That day T1's
-`S_dir_ITM1` (SL15 % · TSL10 %/5 % · RECOST2 · MTMSL4000, 3 lots live) stood at +₹3,214 a lot at
-10:58 on the Live board and fell back through the afternoon.
+`S_dir_ITM1` (SL15 % · TSL10 %/5 % · RECOST2 · MTMSL4000, 3 lots live) peaked at about +₹3,296 a lot
+around 09:54 on the Live board, still stood at +₹3,214 at 10:58, and closed at −₹3,560 a lot (the close
+is known only after this draft's first commit at 11:02 IST). The day is outside the registered window,
+which ends 2026-11-03.
 
 What the repo already knows (findings pages under `research/options/strategies/directional/`):
 
@@ -38,11 +40,13 @@ What the repo already knows (findings pages under `research/options/strategies/d
   descriptive, one hold-out year; helps only with a 30 % leg stop (₹170 → ₹187 a day), mixed elsewhere.
 - **A lock on a morning-closed Dir ([BL-184][bl184] E2):** the one lead, its own registration; not this item.
 - **Early exits:** 14:55 hurts on every Dir family ([BL-147][bl147]); 15:28 is the best exit after charges.
-- **Not tested anywhere:** a **per-leg target** (buy a sold leg back once it has decayed to X % of its
-  entry premium, `legs[].target`; BL-104's Dir grid had no target axis, only Buy's did); the **scale-out**
-  (two lots, one managed and one plain: BL-183 trades the Dir at two lots on non-expiry days); profit rules
-  on **T1's own Dir settings** (`N_dir-t1s29`: ATM, SL 40 %, RECOST ×2, MTM ₹3,000; `S_ditm1-t1s44`: ITM1,
-  SL 15 %, trail 10/5 %, RECOST ×2, MTM ₹4,000); anything under **slippage**; arm levels above ₹4,000.
+- **Not tested anywhere:** a **per-leg target** (buy a sold leg back once its premium has fallen by X %
+  from its entry, `legs[].target: {percent: X}`: the engine's distance is entry × X %; BL-104's Dir grid had no target axis, only Buy's did); the **scale-out**
+  (two lots, one managed and one plain: BL-183 trades the Dir at two lots on non-expiry days; BL-207 tests
+  the second lot entered later, BL-204 runs the Dir at three lots and more on some days); profit rules on
+  **T1's own Dir settings** (`N_dir-t1s29`: ATM, SL 40 %, RECOST ×2, MTM ₹3,000; `N_ditm1-t1s36`: ITM1, the
+  T1 journal picked it twice; `S_ditm1-t1s44`: ITM1, SL 15 %, trail 10/5 %, RECOST ×2, MTM ₹4,000);
+  anything under **slippage**; arm levels above ₹4,000.
 
 Why the scale-out is largely derivable: a two-lot book of one managed lot and one plain lot earns, per
 lot, the mean of the managed and the plain one-lot results, so BL-105's −₹35 a lot-day at a ₹3,000 target
@@ -78,14 +82,15 @@ logged reason, and both stay here.
   net, drawdown slightly shallower; the scale-out half of the managed lot's effect; the armed-lock
   scale-out the only open question.
 - **Bases.** The Dir settings Adaptive actually picks, at every rotation slot: Core-298's `N_dir`,
-  `N_ditm1`, `S_dir`, `S_ditm1` (25 slots each) and T1's `N_dir-t1s29`, `S_ditm1-t1s44` (24 each),
+  `N_ditm1`, `S_dir`, `S_ditm1` and T1's `N_dir-t1s29`, `N_ditm1-t1s36`, `S_ditm1-t1s44`, 25 slots
+  each (175 bases; T1's pick pool also holds Core's files, and its journal picked Core's `S_dir` once),
   loaded as they are; a cell changes only the axes below, symmetrically on both legs.
 - **Axes (one family, full product per base; the exact cell list and its SHA committed before the
   run, as `research/bl202/grid.py` does).**
 
   | Axis | Values | Engine field |
   |---|---|---|
-  | Per-leg target (% of entry premium bought back) | none, 30, 50, 70 | `legs[].target: {percent}` |
+  | Per-leg target (bought back once the premium has fallen by X % from entry) | none, 30, 50, 70 | `legs[].target: {percent: X}`, `reentry_on_target` unset |
   | Leg trail | as the file, none, [10, 5] %, [15, 10] % | `legs[].trail_sl` (needs the file's stop) |
   | Overall target (₹ a lot) | none, 2,000, 3,000, 4,000, 6,000 | `overall.target_inr` |
   | Lock (arm → floor, ₹ a lot) | none, 2k→1k, 3k→1.5k, 4k→2k, 6k→3k | replayed on the engine's per-minute path (`rotation/portfolio.apply_book`, `lock:A,B`) |
@@ -97,8 +102,14 @@ logged reason, and both stay here.
   The overall stop, re-entry and exit stay the file's. Levels are rupees per lot for one lot; for the
   two-lot rows, per lot of the managed lot.
 - **Window and halves.** 2024-10-09 → 2026-11-03 (the collected days; 504 NIFTY sessions). Fit half
-  through 2025-10-08, test half after it, as BL-202. T1's two bases were chosen on the fit half
-  (BL-104), so for them the test half is the only unseen period.
+  through 2025-10-08, test half after it, as BL-202. T1's three bases were chosen by BL-113 on the fit
+  half.
+- **What the test half has already seen (it is not blind for every axis).** BL-105 scored the overall
+  target, lock and lock-and-trail at ₹2k / 3k / 4k on Core's Dir bases over 2024-10-09 → 2026-10-09;
+  BL-184 E2 replayed locks to 2026-10-27; BL-096's trail hold-out year lies inside the test half. So, as
+  BL-202 words it: a pass on the overall-target, lock, lock-and-trail or leg-trail axes **for Core's bases**
+  is only a candidate for the forward journal, never a finding. Only the per-leg target, the scale-out and
+  the three T1 bases are blind on the test half.
 - **Costs.** The BL-096 charge model (brokerage ₹20 an order, STT, exchange, SEBI, stamp, GST) and
   0.5 % adverse slippage on every fill (the dashboard's and Telegram's paper basis, owner 2026-10-30)
   inside the cell; 0 % and 1 % beside for the finalists only.
@@ -118,7 +129,8 @@ logged reason, and both stay here.
   0 % and 1 % reruns keep the sign. Anything else is killed; a value that passes becomes a T1 setting
   variant proposal in the Log, never an edit of a live file.
 - **Hold-out.** The test half (2025-10-09 → 2026-11-03) is scored once, for every cell at once, after
-  the fit-half tables are in the Log; no cell is chosen on it. There is no second hold-out.
+  the fit-half tables are in the Log; no cell is chosen on it. There is no second hold-out. Within it,
+  only the axes and bases named blind above can give a finding.
 - **Will not run.** Leg stops, strikes, slots, exits, re-entry (done elsewhere); rules on the whole
   basket; a target or lock on the Widesl family; any level not in the table. Running one needs
   `override: <reason>` in the Log.
@@ -148,7 +160,8 @@ logged reason, and both stay here.
   is still worth its one run because the scale-out and the per-leg target are new and the owner trades
   the Dir at two lots now.
 - **Many cells, one hold-out.** The per-axis pooling and the plateau-style "share of bases" rule keep
-  a single lucky cell from passing; the deflated figure is the pooled one, never the best cell.
+  a single lucky cell from passing, but they are not a multiple-testing correction: one is still to be
+  registered (open question 9), and a pooled figure is not a deflated one.
 - **Lock replay on 1-minute closes** overshoots fast days (BL-066, BL-156); the live platforms watch
   ticks, so a lock that passes by a hair is not a finding.
 
@@ -166,11 +179,42 @@ logged reason, and both stay here.
 6. **Run slot:** overnight on the Mac after the 21:00 jobs (BL-202's Stage 1 took three hours on two
    workers; this grid is of the same order), or a quiet weekend.
 
+Questions 7–11 came from the code review of 2026-11-04. Each leaves a choice that could otherwise be made
+after seeing results, so Phase 0 is not complete, and nothing runs, until each has a registered answer.
+The review's proposed answer is beside each.
+
+7. **The scale-out's construction.** A "2 × book stop" cannot be built from one-lot paths that already
+   carry the file's 1× stop; what stop lot B runs under after lot A exits is not said; Context arms B's
+   lock by A's target while the table arms it at a fixed ₹4k; whether the scale-out rows cross the
+   per-leg target and leg-trail axes is not said. *Proposed:* two one-lot strategies, each under the
+   file's own 1× stop, summed (exact, and deployable on AlgoTest / Quantiply as two strategies); B's lock
+   armed at A's exit minute; scale-out rows not crossed with the leg axes; an anchor that "none" on both
+   lots equals 2 × the one-lot result to the rupee.
+8. **The pools.** The pooled series and pool A's drawdown series have no formula, and the journals start
+   2026-10-12 (Core) and 2026-10-19 (T1), so pool B's picks before then are reconstructed, not recorded.
+   *Proposed:* pool A = the mean over bases of each day's paired difference; pool B's earlier picks
+   rebuilt with `pick.load_history` / `pick.score_history` and labelled; each book must pass on its own.
+9. **Which cells are scored and how many tests.** Whether an axis value is scored with the other axes
+   held at none or averaged over them; which combination is proposed if several values pass; the trial
+   count (about 29 axis values and scale-out rows, about 33.6k one-lot cells). *Proposed:* each axis value
+   with the others at none; Holm over the ~29 at a family-wise 10 %; if several pass, only the one with the
+   highest fit-half mean is proposed, chosen before the test half is read.
+10. **The cost of a day cut by a replayed lock.** *Proposed:* positions closed at the cut take the cut
+    minute's close with 0.5 % adverse slippage, trades after the cut are dropped with their charges, and
+    an anchor at 0.5 % against the stored `slip-0.5/` copies.
+11. **Duplicate cells.** "As the file" equals "none" on five bases and "[10, 5]" on two, so cells are
+    counted twice. *Proposed:* deduplicate cells by their resolved settings before the count and the SHA.
+
 ## Log
 
 - 2026-11-04 — created from the owner's ask after the day's Dir path (T1's `S_dir_ITM1` +₹3,214 a lot
   at 10:58, back down by the close); BL-105, BL-096, BL-184 E2 and BL-147 read first and summarised
   above; Phase 0 drafted, nothing run, questions open.
+- 2026-11-04 — code review (PR #416): the base list corrected (three T1 Dir settings, 25 slots each,
+  175 bases), the per-leg target worded as the engine reads it (fallen by X %), the test half no longer
+  called blind for the axes BL-105, BL-184 E2 and BL-096 already scored on Core's bases, the motivating
+  day's close added; the review's remaining gaps (scale-out construction, pools, test count and
+  correction, cut-day costing, duplicate cells) added as open questions 7–11, which gate the run.
 
 [bl096]: BL-096-directional-parameter-sweep.md
 [bl105]: BL-105-dir-trade-management-tests.md
