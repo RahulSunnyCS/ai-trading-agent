@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's T1 accounts trade the picked Dir at 2 lots on every non-expiry day (BL-183); if a spaced second lot does as well with a smaller worst day, it is a one-line change to what is uploaded |
-| **Status** | Done — informative: no spaced second lot beats Dir ×2; every arm earns ₹260–785 a day less, wins 34–43 % of days, and neither the drawdown nor the worst day is reliably smaller (see Log) |
+| **Status** | Done — informative: no spaced second lot beats Dir ×2; over all days every arm earns ₹259–564 a day less (₹440–785 on the last year) and wins 38–43 % of days, and neither the drawdown nor the worst day is reliably smaller (see Log) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-04 |
@@ -16,7 +16,7 @@ Owner (2026-11-04): "So directional, we are taking two at a time, right? ... may
 at least half an hour difference as a first and second, then how would it be?"
 
 What is live (T1, both AlgoTest accounts since 3 Nov): on a day neither index expires the picked Dir
-trades 2 lots at its slot (09:17 on most days) and the two Widesl 1 lot each, under a book stop of
+trades 2 lots at its slot (09:17 on 37 of the 219 days scored) and the two Widesl 1 lot each, under a book stop of
 ₹9,000 plus the Dir's own MTM SL (BL-183, BL-194). Both Dir lots enter at the same minute, carry the
 same stop and leave together.
 
@@ -125,7 +125,8 @@ worth a BL-183-style toggle.
   N4 reproduces BL-204's N4 net on all 218 shared normal-with-Dir days to the paisa. Net per day after brokerage; "vs
   N4" = arm − Dir ×2 (90 % interval, 5-day blocks); "win" = share of days the arm beats N4.
 
-  **Primary reading (book stop, 0 % slippage), all 219 days:**
+  **Primary reading (book stop, 0 % slippage), all 219 days (216 for the +60 arms):** the book stop modelled is
+  Quantiply's; AlgoTest has no book stop, so for the live T1 accounts the no-stop reading below is the closer one.
 
   | Arm | Net/day | Max DD | Worst day | Loss days | vs N4 | Win | vs even |
   |---|---:|---:|---:|---:|---|---:|---|
@@ -138,15 +139,17 @@ worth a BL-183-style toggle.
   | rank-any (control) | +1,269 | −49,617 | −13,000 | 37 % | −307 [−611, −36] | 39 % | −13 [−264, +221] |
 
   Last year (120 days): N4 +2,378/day, DD −27,281; same+30 −440 [−770, −126], same+60 −576 [−990, −190], rank+30
-  −642 [−1,094, −213], rank+60 −785 [−1,212, −392], rank-any −533 [−908, −200]; every arm's drawdown as deep or deeper
-  (−25k to −32k) and the worst day within ₹1k of N4's. Fit half (91 days, 2025-01-10 → 2025-10-08): every arm within
+  −642 [−1,094, −213], rank+60 −785 [−1,212, −392], rank-any −533 [−908, −200]. Drawdown: same+60 (−24,982) and
+  rank-any (−22,842) shallower than N4, the other three deeper (−28.5k to −31.8k). Worst day: rank+30 and rank+60
+  ₹0.5k better than N4's −11,581, the other three ₹0.7k–1.4k worse. Fit half (91 days, 2025-01-10 → 2025-10-08): every arm within
   ±₹200 of N4, all intervals include zero; test half (128 days): every arm below zero (−428 to −831). **Second reading
   (no book stop, 0.5 % slippage):** the same order, every arm below zero over all 219 days (same+30 −321 [−607, −49],
   rank+30 −425 [−799, −76], rank+60 −599 [−952, −257]) and in the last year.
 
   **Verdict: no evidence** for every arm, by the registered reading. The hypothesis held on net (a later lot has less
   decay to collect; the ranked later Dir did no better than the same setting) and failed on risk: the spaced lots
-  did not make the worst day or the drawdown smaller, because the Dir's bad days are trend days that hit a later
-  entry too (the control, the best other Dir at any slot, loses as much as the spaced ones, so the loss is "a
-  different Dir", not "a later Dir"). The edge of Dir ×2 over the even spread (+₹294 [+91, +502]) sits where BL-133
+  did not make the drawdown smaller by the registered 20 % (rank+30 and rank+60 cut it by about 15 %, −36.5k against
+  −42.8k; the others deepened it) nor the worst day by a margin that counts. The control (the best other Dir at any
+  slot) also falls short of N4, so the shortfall is not only the later minute; part of every arm's gap is the fourth
+  strategy's own brokerage, and this run does not split gross from brokerage. The edge of Dir ×2 over the even spread (+₹294 [+91, +502]) sits where BL-133
   found it. Nothing to adopt; Dir ×2 at the pick's slot stays. In-sample, descriptive.
