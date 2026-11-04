@@ -148,7 +148,7 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
   is the safety net and runs whatever `QUANTIPLY_DEPLOY` and the deploy switch say.
 - `broker-login` (BL-172, 08:02) runs the login on the Mac (`packages/broker-login/src/local-login.ts`), in the
   `quantiply` group so the 08:10 `quantiply-deploy` and the 08:11 `algotest-activate` (BL-197 Phase 2: last
-  evening's T1 list activated on AlgoTest /live; it replaced the 09:16 `algotest-deploy` and the 09:18
+  evening's list activated on AlgoTest /live for every list an AlgoTest row uploads, `--from-settings`; it replaced the 09:16 `algotest-deploy` and the 09:18
   `algotest-topup` on 2026-11-04) start after it; `retries: 0` on purpose: a second run would
   resend a refused PIN, and the job hands what failed to GitHub itself. The 09:00 summary reads its
   `<state>/broker-login/<day>.json` first, GitHub's runs only when the Mac did not run or handed parts over.

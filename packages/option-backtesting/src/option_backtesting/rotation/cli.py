@@ -341,6 +341,34 @@ def _morning(picks, book: str, folder):
     return replace(m.picks, dte=picks.dte), extra
 
 
+def _has_export(book: str, day: str | None, next_session: bool, preview: bool) -> bool:
+    """Whether `latest-<book>.json` already points at an existing export of that session's
+    expected picks (`--only-missing`)."""
+    import json
+
+    from . import store
+
+    d = _day(day)
+    if next_session:
+        from .tomorrow import next_session as following
+
+        d, preview = following(d), True
+    if not preview:
+        return False  # recorded picks are always exported afresh
+    pointer = store.rotation_dir() / "algotest" / f"latest-{book}.json"
+    try:
+        record = json.loads(pointer.read_text())
+    except (OSError, ValueError):
+        return False
+    from pathlib import Path
+
+    return (
+        record.get("day") == d.isoformat()
+        and record.get("source") == "preview"
+        and (Path(str(record.get("dir", ""))) / "manifest.json").exists()
+    )
+
+
 def _end_missing(missing: list[str], books: list[str]) -> None:
     """Exit 2 (the scheduler retries) only when no list could be exported. With some exported,
     exit 0 so the uploads run; the uploader refuses a list whose export is stale and says so."""
@@ -393,6 +421,15 @@ def algotest_export(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 jobs)."
     ),
     dir_boost: bool | None = typer.Option(None, "--dir-boost/--no-dir-boost", help=_DIR_BOOST_HELP),
+    only_missing: bool = typer.Option(
+        False,
+        "--only-missing",
+        help=(
+            "Skip a list whose latest export already holds that session's expected picks (the "
+            "16:40 run made it); exit 3 when nothing was missing. The 08:11 catch-up for a row "
+            "switched to another list after 16:40 (2026-11-05)."
+        ),
+    ),
 ) -> None:
     """The day's Adaptive picks as AlgoTest .algtst files plus a zip (BL-137; uploads nothing)."""
     from pathlib import Path
@@ -408,7 +445,11 @@ def algotest_export(
     if from_settings and out and len(books) > 1:
         raise typer.BadParameter("--out takes one list; the settings give several")
     missing = []
+    skipped = []
     for b in books:
+        if only_missing and _has_export(b, day, next_session, preview):
+            skipped.append(b)
+            continue
         picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
         if picks is None:
             missing.append(b)
@@ -429,7 +470,11 @@ def algotest_export(
         if not out:  # the uploader (BL-137) reads the newest default export through this pointer
             ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
         typer.echo(ax.render(picks, exports, zip_path))
-    _end_missing(missing, books)
+    if skipped:
+        typer.echo(f"already exported for the session: {', '.join(skipped)}")
+    if only_missing and len(skipped) == len(books):
+        raise typer.Exit(3)  # nothing was missing: the catch-up's upload and setup are not needed
+    _end_missing(missing, [b for b in books if b not in skipped])
 
 
 @rotation_app.command("quantiply-export")
