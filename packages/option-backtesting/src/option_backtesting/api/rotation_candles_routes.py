@@ -74,9 +74,7 @@ def get_candles(
         return hit[1]
 
     def work() -> dict:
-        return candles.build(
-            book, root, start, end, lots, stop_inr, use_default_stop=not explicit
-        )
+        return candles.build(book, root, start, end, lots, stop_inr, use_default_stop=not explicit)
 
     try:
         done, value = warm.run_within(("candles", *key), work)
