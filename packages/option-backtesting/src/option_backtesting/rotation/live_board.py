@@ -748,6 +748,14 @@ def record_error(message: str, root: Path | None = None) -> None:
     _update_state(root, refreshing=False, last_error=message[:300], last_error_at=_iso(now_ist()))
 
 
+def note_no_picks(day: date, root: Path | None = None) -> None:
+    """A refresh asked before the day's picks are recorded: nothing to read, so nothing is read
+    and no Angel One login is made. Stamps `last_done_at`, which ends the card's spinner."""
+    _update_state(
+        root, refreshing=False, last_error=None, last_note=f"no picks recorded for {day} yet"
+    )
+
+
 def loop_status(root: Path | None = None, now: Callable[[], float] = time.time) -> dict:
     beat = _read_json(board_dir(root) / "loop.json") or {}
     pid = beat.get("pid")
@@ -807,25 +815,23 @@ def refresh(
     log: Log = print,
     client_factory=None,
     master_loader: Callable[[], list[dict]] | None = None,
+    books: list[BookPicks] | None = None,
 ) -> dict | None:
     """One refresh with a live Angel One `session`, written to the day's snapshot. The caller holds
-    the login guard's lock. Returns the snapshot, or None when no picks are recorded yet. Raises
-    AngelCredentialsError when the session is rejected (the caller logs in again)."""
+    the login guard's lock. Returns the snapshot, or None when no picks are recorded yet (`books`
+    is the day's picks when the caller has read them already, so the journals are not read
+    twice). Raises AngelCredentialsError when the session is rejected (the caller logs in again)."""
     from ..angelone.auth import AngelCredentialsError
 
     root = root or data_dir()
     day = day or now_ist().date()
-    books = todays_picks(day, root)
+    if books is None:
+        books = todays_picks(day, root)
     started = now_ist()
     _update_state(root, refreshing=True, started_at=_iso(started), by=by)
     try:
         if not books:
-            _update_state(
-                root,
-                refreshing=False,
-                last_error=None,
-                last_note=f"no picks recorded for {day} yet",
-            )
+            note_no_picks(day, root)
             return None
         settings, _ = read_settings()
         if client_factory is None:
@@ -900,12 +906,7 @@ class Board:
 
         day = now_ist().date()
         if not todays_picks(day, self.root):
-            _update_state(
-                self.root,
-                refreshing=False,
-                last_error=None,
-                last_note=f"no picks recorded for {day} yet",
-            )
+            note_no_picks(day, self.root)
             return None
         for attempt in range(2):
             if self.session is None:

@@ -273,6 +273,7 @@ export function RotationLiveBoard() {
           The refresh was not started: {board.refreshError}
         </p>
       ) : null}
+      {board.refreshNote ? <p className="mb-3 text-xs text-muted">{board.refreshNote}</p> : null}
       {error ? <p className="mb-3 text-xs text-warning">Last refresh failed: {error}</p> : null}
       {board.error && !d ? (
         <StateMessage

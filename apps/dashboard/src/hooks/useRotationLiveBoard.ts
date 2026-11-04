@@ -28,6 +28,8 @@ export function refreshDone(data: LiveBoardResponse | null, askedAt: number): bo
 export function useRotationLiveBoard() {
   const [asking, setAsking] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  /** The server's answer when there was nothing to read (before the 09:16 picks): no login made. */
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
   const [askedAt, setAskedAt] = useState<number | null>(null);
   const [fastPoll, setFastPoll] = useState(false);
   const res = usePolledResource<LiveBoardResponse>(URL, {
@@ -49,10 +51,20 @@ export function useRotationLiveBoard() {
   const refresh = useCallback(async () => {
     setAsking(true);
     setRefreshError(null);
+    setRefreshNote(null);
     const out = await apiPost<LiveBoardRefreshResponse>(`${URL}/refresh`, {});
     setAsking(false);
     if (!out.ok) {
       setRefreshError(out.error);
+      return;
+    }
+    if (out.data.status === 'no_picks') {
+      // Nothing was read and nothing is running: the server finished before answering, so
+      // waiting for a finish stamp after `askedAt` would only keep the spinner and fast poll on.
+      setRefreshNote(
+        `No picks recorded for ${out.data.day ?? 'today'} yet: the board fills after the 09:16 entry. Nothing was read and no Angel One login was made.`,
+      );
+      refetch();
       return;
     }
     setAskedAt(Date.now());
@@ -66,5 +78,6 @@ export function useRotationLiveBoard() {
     refresh,
     refreshing: asking || askedAt !== null || serverRefreshing,
     refreshError,
+    refreshNote,
   };
 }
