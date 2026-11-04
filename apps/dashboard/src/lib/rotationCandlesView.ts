@@ -243,6 +243,16 @@ export function barLines(bar: CandleBar): Tip {
   return bar.days.length === 1 && bar.days[0] ? tipLines(bar.days[0]) : weekLines(bar);
 }
 
+/** The first bar holding a recorded (journal) day: where forward testing begins; null when none. */
+export function forwardFrom(bars: CandleBar[]): CandleBar | null {
+  return bars.find((b) => b.days.some((d) => d.source === 'recorded')) ?? null;
+}
+
+/** How many of the days are recorded picks (forward) rather than re-derived. */
+export function recordedCount(days: CandleDay[]): number {
+  return days.filter((d) => d.source === 'recorded').length;
+}
+
 /** A pick the day replay can open: the rotation variants (not the fixed base's own Dir leg). */
 export function canReplay(name: string): boolean {
   return name !== 'N_dir_atm_0924';

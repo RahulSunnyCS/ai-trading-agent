@@ -68,6 +68,9 @@ The screen is one page, in the order you read it:
     per lot (the 15:40 capture);
   - a **thin line**: the fixed base, started from the same point as the first candle shown, so you
     see the two books over the same days;
+  - a small **▲ forward** mark under the first day with recorded picks (19 Oct 2026 for Tuned):
+    everything before it is re-derived on the history the strategies were tuned on, and only the
+    days from the mark are a forward test;
   - a **drawdown strip** underneath, with dashed lines at the depth a quarter, a tenth and a
     twentieth of the days reached (*25% / 10% / 5% of days*).
 

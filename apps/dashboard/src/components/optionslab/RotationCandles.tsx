@@ -41,7 +41,9 @@ import {
   barLines,
   canReplay,
   cutPeriod,
+  forwardFrom,
   liveTotal,
+  recordedCount,
   toBars,
 } from '../../lib/rotationCandlesView';
 import type { CandleBook, CandleDay, RotationCandlesResponse } from '../../types/rotationCandles';
@@ -188,6 +190,18 @@ function Chart({
         size: 0.6,
       });
     }
+    const forward = forwardFrom(bars);
+    if (forward && bars[0] !== forward) {
+      markers.push({
+        time: forward.time as Time,
+        position: 'belowBar',
+        shape: 'arrowUp',
+        color: t.text,
+        text: 'forward',
+        size: 1,
+      });
+    }
+    markers.sort((a, b) => String(a.time).localeCompare(String(b.time)));
     candles.setMarkers(markers);
     series.current.push(candles);
     // The drawdown strip: below the candles on its own scale, with the ladder's depths.
@@ -460,6 +474,15 @@ export function RotationCandles() {
               <span className="metric text-foreground">{formatInr(-data.totals.drawdown_now)}</span>{' '}
               · deepest {formatInr(-data.totals.max_drawdown)} since {formatDay(data.days[0]?.day)}
             </span>
+            {recordedCount(shown) < shown.length ? (
+              <span>
+                Forward, recorded picks{' '}
+                <span className="metric text-foreground">
+                  {formatNumber(recordedCount(shown), 0)}
+                </span>{' '}
+                of {formatNumber(shown.length, 0)} days; the rest re-derived
+              </span>
+            ) : null}
             {data.live_days ? (
               <span>
                 Live on{' '}
@@ -486,6 +509,7 @@ export function RotationCandles() {
                 Traded live
               </span>
             ) : null}
+            {data.book !== 'base' ? <span>▲ forward testing from there</span> : null}
             <span>Strip: drawdown, with the depth 25 / 10 / 5 % of days reached</span>
           </div>
           <Chart

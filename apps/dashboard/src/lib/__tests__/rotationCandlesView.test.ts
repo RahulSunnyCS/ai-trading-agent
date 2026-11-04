@@ -7,7 +7,9 @@ import {
   canReplay,
   candlesUrl,
   cutPeriod,
+  forwardFrom,
   liveTotal,
+  recordedCount,
   tipLines,
   toBars,
   weekOf,
@@ -115,6 +117,18 @@ describe('rotation candles view', () => {
     expect(lines.head[0]).toMatchObject({ label: 'Week, 2 days', tone: 'neg' });
     expect(lines.head.some((l) => l.label.startsWith('Worst day'))).toBe(true);
     expect(toBars(days, 'day')).toHaveLength(3);
+  });
+
+  it('marks where the recorded picks begin', () => {
+    const days = [
+      day({ day: '2026-10-15', source: 'rederived' }),
+      day({ day: '2026-10-16', source: 'rederived' }),
+      day({ day: '2026-10-19', source: 'recorded' }),
+    ];
+    expect(forwardFrom(toBars(days, 'day'))?.time).toBe('2026-10-19');
+    expect(forwardFrom(toBars(days, 'week'))?.time).toBe('2026-10-19');
+    expect(forwardFrom(toBars(days.slice(0, 2), 'day'))).toBeNull();
+    expect(recordedCount(days)).toBe(1);
   });
 
   it('names accounts and keeps the base Dir out of the replay', () => {
