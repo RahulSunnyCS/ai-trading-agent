@@ -151,7 +151,15 @@ A_ROWS = [("N_p100_1202", -460.0), ("N_ditm1_0917", 1200.0), ("N_wide_1117", 500
 T1_ROWS = [("N_ditm1-t1s36_0947", -280.0), ("N_p150-t1s11_0917", -30.0)]
 
 
-def _next(day=date(2026, 10, 21), core=None, buy=(), options=None, expiry_only=None, dte=None):
+def _next(
+    day=date(2026, 10, 21),
+    core=None,
+    buy=(),
+    options=None,
+    expiry_only=None,
+    dte=None,
+    dte_source=None,
+):
     return tomorrow.NextPicks(
         day,
         day.strftime("%a"),
@@ -160,6 +168,7 @@ def _next(day=date(2026, 10, 21), core=None, buy=(), options=None, expiry_only=N
         options,
         expiry_only,
         dte,
+        dte_source,
     )
 
 
@@ -273,6 +282,19 @@ def test_the_evening_next_day_is_tentative_and_adaptive_says_its_dte():
     assert "➡️ Wed 21 Oct (Tentative)\n\n🎯 Adaptive · NIFTY 2 DTE · SENSEX 4 DTE\n1️⃣" in text
     assert messages.dte_text({"NIFTY": "7+", "SENSEX": "unknown"}) == "NIFTY 7+ DTE"
     assert messages.dte_text(None) == ""
+
+
+def test_the_evening_heading_says_when_its_dte_is_the_calendars():
+    """The listed contracts could not be read, so the list was ranked on the reference calendar,
+    which can be a bucket off in a holiday week (2026-11-04): the heading says so."""
+    text = messages.render_result(
+        date(2026, 10, 20), (1240.0, A_ROWS), None, _next(dte=DTE, dte_source="calendar")
+    )
+    assert "🎯 Adaptive · NIFTY 2 DTE · SENSEX 4 DTE · calendar DTE\n1️⃣" in text
+    listed = messages.render_result(
+        date(2026, 10, 20), (1240.0, A_ROWS), None, _next(dte=DTE, dte_source="master")
+    )
+    assert "calendar" not in listed
 
 
 def _previous(core, day="2026-10-20", sent_on="2026-10-19", buy=()):

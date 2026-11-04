@@ -58,15 +58,7 @@ def test_the_calendar_labels_for_the_next_session_count_weekdays():
 
 
 def test_the_listed_master_labels_count_weekdays(monkeypatch):
-    expiries = {"NIFTY": date(2026, 10, 19), "SENSEX": date(2026, 10, 22)}
-    monkeypatch.setattr(live, "download_master", lambda segment: segment)
-    monkeypatch.setattr(
-        live,
-        "parse_master",
-        lambda raw, names: [
-            SimpleNamespace(expiry=expiries[name], option_type="CE") for name in names
-        ],
-    )
+    _master(monkeypatch, {"NIFTY": date(2026, 10, 19), "SENSEX": date(2026, 10, 22)})
     labels, source = live.listed_dte_labels(date(2026, 10, 16))
     assert source == "master"
     assert labels == {"dte_n": "1", "dte_s": "4"}
@@ -106,12 +98,17 @@ def test_readers_of_journal_entries_use_the_weekday_basis_for_a_legacy_entry():
 
 
 def _master(monkeypatch, expiries):
+    """Fyers' master faked: `expiries` is one date or a list of dates per index. A fresh cache,
+    so what an earlier test read is not reused."""
+    live.listed_labels.cache_clear()
     monkeypatch.setattr(live, "download_master", lambda segment: segment)
     monkeypatch.setattr(
         live,
         "parse_master",
         lambda raw, names: [
-            SimpleNamespace(expiry=expiries[name], option_type="CE") for name in names
+            SimpleNamespace(expiry=expiry, option_type="CE")
+            for name in names
+            for expiry in (expiries[name] if isinstance(expiries[name], list) else [expiries[name]])
         ],
     )
 
@@ -148,6 +145,7 @@ def test_the_evening_list_falls_back_to_the_calendar_when_the_master_cannot_be_r
     def refuse(segment):
         raise OSError("offline")
 
+    live.listed_labels.cache_clear()
     monkeypatch.setattr(live, "download_master", refuse)
     seen = _capture_expected(monkeypatch)
     nxt = tomorrow.next_session_picks(date(2026, 11, 3), tmp_path, track="t1")
@@ -155,3 +153,45 @@ def test_the_evening_list_falls_back_to_the_calendar_when_the_master_cannot_be_r
     assert (seen["dte_n"], seen["dte_s"]) == ("4", "1")
     assert nxt.dte == {"NIFTY": "4", "SENSEX": "1"} and nxt.dte_source == "calendar"
     assert "using the calendar" in capsys.readouterr().err
+
+
+def test_the_evening_of_an_expiry_day_counts_to_the_next_listed_expiry(monkeypatch, tmp_path):
+    """Thu 5 Nov is a SENSEX expiry and its contracts are still in the master at 16:00: the next
+    session's label counts to the 12 Nov expiry (4 weekdays), never 0 for the one just finished."""
+    _master(
+        monkeypatch,
+        {"NIFTY": date(2026, 11, 9), "SENSEX": [date(2026, 11, 5), date(2026, 11, 12)]},
+    )
+    seen = _capture_expected(monkeypatch)
+    nxt = tomorrow.next_session_picks(date(2026, 11, 5), tmp_path)
+    assert nxt is not None and nxt.day == date(2026, 11, 6)
+    assert (seen["dte_n"], seen["dte_s"]) == ("1", "4")
+    assert nxt.dte == {"NIFTY": "1", "SENSEX": "4"} and nxt.dte_source == "master"
+
+
+def test_the_master_is_read_once_per_session_date_in_a_process(monkeypatch, tmp_path):
+    calls = []
+    live.listed_labels.cache_clear()
+    monkeypatch.setattr(live, "download_master", lambda segment: calls.append(segment) or segment)
+    monkeypatch.setattr(
+        live,
+        "parse_master",
+        lambda raw, names: [SimpleNamespace(expiry=date(2026, 11, 9), option_type="CE")],
+    )
+    _capture_expected(monkeypatch)
+    for track in (None, "t1", None):  # the evening asks for both lists; a retry asks again
+        assert tomorrow.next_session_picks(date(2026, 11, 3), tmp_path, track=track) is not None
+    assert calls == ["NSE_FO", "BSE_FO"]
+    # a failed read is not kept: the next call asks again
+    live.listed_labels.cache_clear()
+    attempts = []
+
+    def flaky(segment):
+        attempts.append(segment)
+        if len(attempts) == 1:
+            raise OSError("offline")
+        return segment
+
+    monkeypatch.setattr(live, "download_master", flaky)
+    assert live.listed_dte_labels(date(2026, 11, 4))[1] == "calendar"
+    assert live.listed_dte_labels(date(2026, 11, 4))[1] == "master"

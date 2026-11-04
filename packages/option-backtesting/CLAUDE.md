@@ -318,7 +318,7 @@ Otherwise:
   `rotation/tomorrow.py` supplies the evening message's "tomorrow" part (`--no-tomorrow` drops it; a failure in it never
   blocks the result): `next_session_picks(today, root, track=)` is the 09:16 ranking re-run on the stored results with
   tonight's VIX close standing in for the open, under the BL-122 rule for that session and with that session's days to
-  expiry from the listed contracts (`live.listed_dte_labels`, calendar as fallback; `NextPicks.dte_source` says which;
+  expiry from the listed contracts (`live.listed_dte_labels`, read once per session date in a process, calendar as fallback; `NextPicks.dte_source` says which and the heading then ends `· calendar DTE`;
   2026-11-04: the calendar put a holiday-moved NIFTY expiry one bucket off and the evening's list disagreed with the
   morning's pick), for Core-298 or Core-298 plus a track's variants; the message lists those strategies in full. The old
   history tables, probabilities and likely changes are no longer sent (`build`/`Tomorrow` are kept, tested, unused by
