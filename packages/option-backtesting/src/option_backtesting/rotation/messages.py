@@ -380,7 +380,10 @@ def standing_lines(s) -> list[str]:
     since = f"{s.first_day.day} {s.first_day.strftime('%b %Y')}"
     return [
         f"📉 Tuned Adaptive drawdown {rupees(-s.drawdown)} from {high}",
-        f"   this deep or deeper on {share}% of the last {s.days} days (since {since})",
+        f"   in the last 2 years: this deep or deeper on {share}% of days",
+        f"   ({s.days} trading days since {since}"
+        + ("" if s.window_full else ", all the data there is")
+        + ")",
         f"   below a high on {water}% · {deepest}",
         f"   {basis}",
     ]

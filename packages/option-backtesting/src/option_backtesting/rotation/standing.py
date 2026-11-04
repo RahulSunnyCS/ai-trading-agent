@@ -52,6 +52,8 @@ class Standing:
     #: the first recorded (journal) day; earlier days are re-derived
     recorded_from: date | None
     slippage_pct: float | None
+    #: the series reaches back the whole window (False while the stored data is younger)
+    window_full: bool = False
 
 
 def measure(
@@ -59,6 +61,7 @@ def measure(
     left_out: int = 0,
     recorded_from: date | None = None,
     slippage_pct: float | None = None,
+    window_start: date | None = None,
 ) -> Standing | None:
     """The standing at the series' last day; None for an empty series. `series` is [(day, net)],
     in day order."""
@@ -90,6 +93,8 @@ def measure(
         left_out=left_out,
         recorded_from=recorded_from,
         slippage_pct=slippage_pct,
+        # a week's slack: the window's first calendar days may be a weekend or a holiday
+        window_full=window_start is not None and series[0][0] <= window_start + timedelta(days=7),
     )
 
 
@@ -160,4 +165,4 @@ def t1(
             series.append((d, result.REPORT_LOTS * sum(values)))
     if not series or series[-1][0] != day:
         return None  # today not counted: no line rather than yesterday's standing as today's
-    return measure(series, left_out, recorded_from, slip or None)
+    return measure(series, left_out, recorded_from, slip or None, start)

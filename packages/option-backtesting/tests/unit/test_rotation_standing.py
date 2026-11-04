@@ -79,12 +79,15 @@ def test_no_standing_until_todays_result_is_stored(tmp_path):
 def test_the_window_is_the_last_two_years(tmp_path):
     root = tmp_path / "TradingData"
     old, recent = date(2024, 9, 2), date(2026, 10, 16)  # 2024-09-02 is more than 730 days back
-    for d, v in ((old, 5000.0), (recent, 100.0)):
+    early = date(2024, 10, 21)  # two days after the window opens (730 days back is a Saturday)
+    for d, v in ((old, 5000.0), (early, 0.0), (recent, 100.0)):
         for name, value in zip(T1, [v, 0.0, 0.0], strict=True):
             store.append_result(name, {"day": d.isoformat(), "net": value, "gross": value}, root)
     _day(root, date(2026, 10, 19), -50.0)
     s = standing.t1(date(2026, 10, 19), root, slip=0, earlier={old: T1, recent: T1})
-    assert (s.first_day, s.days, s.drawdown) == (recent, 2, 50)
+    assert (s.first_day, s.days, s.drawdown, s.window_full) == (recent, 2, 50, False)
+    s = standing.t1(date(2026, 10, 19), root, slip=0, earlier={early: T1, recent: T1})
+    assert s.window_full  # the first stored day is within a week of the window's start
 
 
 def test_the_lines():
@@ -104,12 +107,15 @@ def test_the_lines():
     )
     assert messages.standing_lines(s) == [
         "📉 Tuned Adaptive drawdown −₹21,504 from its high on Mon 26 Oct",
-        "   this deep or deeper on 3% of the last 440 days (since 10 Jan 2025)",
+        "   in the last 2 years: this deep or deeper on 3% of days",
+        "   (440 trading days since 10 Jan 2025, all the data there is)",
         "   below a high on 66% · deepest −₹32,386 (Oct 2026)",
         "   paper, 1 lot per strategy, 0.5% slippage; picks before Mon 19 Oct re-derived",
     ]
     gaps = standing.Standing(**{**s.__dict__, "left_out": 2})
     assert messages.standing_lines(gaps)[-1].endswith("re-derived; 2 days without results left out")
+    full = standing.Standing(**{**s.__dict__, "window_full": True, "days": 500})
+    assert messages.standing_lines(full)[2] == "   (500 trading days since 10 Jan 2025)"
     top = standing.Standing(**{**s.__dict__, "drawdown": 0.0, "at_least": 0})
     assert messages.standing_lines(top)[0] == "📈 Tuned Adaptive at a new high today"
     assert messages.standing_lines(None) == []
