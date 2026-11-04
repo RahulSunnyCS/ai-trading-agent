@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money every trading day: about ₹134 a day more after brokerage on the owner's two live T1 accounts (exploratory replay), the same lots and margin per account, built mostly from pieces that already run |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1) |
 | **Type** | feature (with an exploratory replay behind it) |
 | **Area** | options / broker-login / scheduler / dashboard |
 | **Created** | 2026-11-04 |
 | **Depends on** | BL-137 (AlgoTest upload), BL-197 Phase 2 (08:11 morning activation, PR 415), BL-183 (Dir ×2), BL-140 (Settings › Automation), BL-205 (margin block), BL-143 (09:25 deploy check) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.61 |
 
 ## Context
 
@@ -78,8 +78,6 @@ day on which a pick traded on the wrong account or at the wrong lots.
 - Core (Adaptive): no account trades it now (settings v9 / v10).
 - Quantiply. Both Quantiply rows are off; the same split there would need `quantiply-export` and the
   Quantiply deployer, a later phase if the owner moves T1 back.
-- Setting AlgoTest's broker-level MTM SL (each account's book stop) automatically: its own item if
-  wanted. This item only states the per-account stop the split implies.
 - Any change to the ranking, the picks, the lot ladder (BL-204) or the Dir ×2 rule itself.
 - More than two accounts.
 
@@ -96,12 +94,14 @@ broker the plan did not give it.
     the day's core picks and the AlgoTest rows that upload T1. Rules as replayed:
     - The odd pick (the Dir on a 1 Dir + 2 Widesl day; the third Widesl on a 3-Widesl day; the
       Widesl on a 2 Dir + 1 Widesl day) trades 1 lot on each account.
-    - Of the like pair, the first in pick order goes to the first account and the second to the
-      other, each at both accounts' lots (2).
+    - The like pair goes one per account, each at both accounts' lots (2). Shoonya (the lead, ₹5
+      an order) takes the pair member with a re-entry, since a re-entry is more orders; with none
+      or both, the first in pick order (owner, 2026-11-04).
     - The Dir ×2 extra lot stays on the account whose row has Dir ×2 on.
     - Any other shape, or anything but exactly two rows uploading T1, returns today's layout.
-  - Settings › Automation: one switch, "Split T1 across the AlgoTest accounts" (default off), plus
-    which account takes the first of the pair (default Shoonya, as replayed). Written by
+    - The Buy add-on, when on, goes to Shoonya only.
+  - Settings › Automation: one switch, "Split T1 across the AlgoTest accounts" (default off).
+    The lead account is Shoonya (`account_split.LEAD`), not a setting. Written by
     `apps/scheduler/src/automation.ts`, read by `automation-settings.ts` and
     `rotation/automation_settings.py`. Refused with a reason when two AlgoTest rows do not both upload T1.
   - Move the replay onto the module, so the research script and the live rule are one function.
@@ -116,8 +116,10 @@ broker the plan did not give it.
 - **Tasks:**
   - `algotest-export --from-settings` under the switch writes one strategy per distinct
     (variant, lots): `T1 · <variant>` at 1 lot, `T1 · <variant> · ×2` at 2 lots, through
-    `live_lots.scaled(..., overall_per_lot=True)` as Dir ×2 does. On a normal day that is four
-    strategies: the Dir at 1 lot, the Dir at 2 lots on a Dir ×2 day, and each Widesl ×2.
+    `live_lots.scaled(..., overall_per_lot=True)` as Dir ×2 does. On a normal day that is the
+    Dir at 1 lot, the Dir at 2 lots on a Dir ×2 day, and each Widesl ×2. It also keeps today's
+    1-lot copies of the pair and today's Shoonya Dir copy, for the fallback when one account is not
+    logged in (Phase 3). That is up to six saved strategies; only four are activated.
   - The manifest gains `accounts: {finvasia: [names], angelone: [names]}`. That block is the one
     record every later step reads; no step re-derives the split.
   - `strategy-upload.ts` uploads and deletes every strategy in the export as today (ledger by id).
@@ -135,9 +137,9 @@ broker the plan did not give it.
   - `strategy-deploy.ts --morning` reads `accounts`. Each strategy is activated with only its own
     account ticked on the broker sheet (`checkBrokerSheet` with one broker), multiplier still checked
     at 1. A strategy for both accounts (the 1-lot odd pick) keeps today's two-broker activation.
-  - An account not logged in: its strategies are not activated and not moved to the other account.
-    The 08:11 message names them, with that account's lots and the rupee figure of its missing half
-    (open question 2).
+  - An account not logged in by 08:11 (owner, 2026-11-04): treat it as absent. The logged-in
+    account trades all of T1 in today's layout (every pick at its own row's lots, the 1-lot copies),
+    so its margin and stop are what they are without the split. The 08:11 message says so.
   - The 09:25 deploy check (`checkAlgoTest`) and the 15:35 `--check` read `accounts`: each strategy
     on exactly its accounts at multiplier 1.
   - `live-capture` and `live-compare`: map `· ×2` names to their variant at 2 lots, so "copies are
@@ -155,13 +157,31 @@ broker the plan did not give it.
     differ by account.
   - The evening "tomorrow" lines and the 09:16 lines say each account's picks under the switch, for
     example `Shoonya: Dir ATM 1 · Widesl OTM1 ×2`.
-  - The per-account book stop to set on AlgoTest's broker-level SL for the day: ₹9,000 plus the
-    MTM SL of each lot beyond three, from the split's lots. It is shown, not set (out of scope).
+  - The per-account book stop for the day, ₹9,000 plus the MTM SL of each lot beyond three, from
+    the split's lots, in the 16:00 and 08:11 messages (set by Phase 4b).
   - The Trade book's realised figures by source (`obt realised trips`) recognise the `· ×2` names.
   - Guide pages for the screens and messages that change.
 - **Deliverables:** the lines, the margin figures and the attribution under the switch.
 - **Done when:** a fixture day's 16:00 message shows each account's picks, lots, margin need and
   book stop, and the Trade book attributes a `· ×2` fill to T1.
+
+### Phase 4b — Each account's book stop set on AlgoTest
+
+Owner (2026-11-04): "stops also should be automated". Nothing in the repo sets AlgoTest's
+broker-level MTM SL today, on either account, with or without the split.
+
+- **Tasks:**
+  - Find the call: read the /live page's public JavaScript for the broker-level SL save and read
+    calls, as BL-143 Phase 4 did for square-off. Then read the owner's current setting back with
+    the read call only. Record the contract in `docs/algotest-execution.md`. The first write is
+    done with the owner watching.
+  - `broker-login/src/algotest-book-stop.ts`: after the 08:11 activation, set each account's stop
+    from the day's layout (split, fallback or today's), then read it back. A difference is an alert
+    and never a retry loop. Behind its own `.env` switch (`ALGOTEST_BOOK_STOP=on`), off by default.
+  - The same figure in the 08:11 message and the 09:25 check.
+- **Deliverables:** the call documented, the setter and its tests, one supervised morning.
+- **Done when:** both accounts' broker-level stops are set by the tool and read back equal on one
+  supervised morning.
 
 ### Phase 5 — Switch-on and the forward check
 
@@ -178,9 +198,9 @@ broker the plan did not give it.
 
 ## Risks
 
-- **One account fails to log in.** Today that loses a third of each pick. Under the split it loses
-  a whole Widesl ×2, which is lumpier. Phase 3 reports it and never moves strategies, because moving
-  them doubles the other account's margin and stop.
+- **One account fails to log in.** The other then trades all of T1 in today's layout (Phase 3), so
+  only that account's half of each pick is missed, as today. The 1-lot copies must already be
+  uploaded and set up in the evening for this to work at 08:11.
 - **Concentration per account.** Each account's day now rides on two lots of one Widesl, so account
   stops fire more often (59 against 34 in the replay) and the drawdown across both is about ₹2.4k
   deeper. The worst day was no worse in the replay. A day like 28 Jul 2025 costs about ₹3.7k more.
@@ -193,23 +213,28 @@ broker the plan did not give it.
 - **In-sample replay.** The brokerage saving is mechanical, but the stop effect (+₹6 a day) is noise.
   The forward check measures the saving on the contract notes, not the replay.
 
-## Open questions
+## Owner's answers (2026-11-04)
 
-1. Shoonya's Dir ×2: the tool's export keeps the Dir at 1 lot while Angel One's row has Dir ×2 off
-   (BL-183 doubles only when every uploading row has it on). Do you double Shoonya's Dir by hand on
-   /live today? Under the split the extra lot can go to Shoonya alone, so the mixed setting starts to
-   work.
-2. An account not logged in by 08:11: leave its half untraded and alert (planned), or let the other
-   account take it if its margin allows?
-3. Which account takes the first-ranked of the like pair: always Shoonya (as replayed), or alternate
-   by day so neither account always holds the higher-ranked Widesl?
-4. Angel One's brokerage: ₹20 an order, as replayed?
-5. Do you set AlgoTest's broker-level MTM SL on each account by hand each day? If so, under the
-   split the figure per account is the one Phase 4 shows. Should automating it be its own item?
-6. The Buy add-on (off on both rows now): if switched on, which account takes it?
+1. **Shoonya's Dir ×2:** doubled by hand on /live today. Until Phase 2 the tool's export stays at
+   1 lot for both accounts (mixed rows), so a hand double is needed on every non-expiry day with a
+   Dir. Under the split the extra lot goes to Shoonya's copy alone.
+2. **An account not logged in:** treat it as absent; the logged-in account trades all of T1.
+3. **Pair order:** Shoonya first is fine; the pair member with a re-entry goes to Shoonya, as its
+   brokerage is lower.
+4. **Brokerage:** Angel One ₹20 an order, Shoonya ₹5.
+5. **Book stops:** to be automated by the tool (Phase 4b).
+6. **Buy add-on:** if switched on, Shoonya takes it.
 
 ## Log
 
 - 2026-11-04 — created from the owner's two-account idea. Exploratory replay: split +₹134 a day after
   brokerage (90 % +₹96 to +₹173), of which ₹103 Angel One and ₹26 Shoonya brokerage, stops about
   +₹6; script `research/bl209/two_accounts.py`.
+- 2026-11-04 — started. Owner's six answers recorded above; the plan now has the logged-in-account
+  fallback, the re-entry pair member on Shoonya, the add-on on Shoonya and Phase 4b (the book stops
+  set by the tool). Phase 1: `rotation/account_split.py` and its tests; the replay now runs on it.
+  Re-run, 440 days: the split by pick order +₹134 a day against today (90 % +₹96 to +₹173), the
+  re-entry rule +₹131 (+₹92 to +₹171). The re-entry rule moved a pick on 79 days, saved ₹2 a day
+  more brokerage (re-entries fire only after a stop) and cost ₹5 a day in the book stops, which is
+  noise (re-entry minus pick order −₹3 a day, 90 % −₹22 to +₹10). Kept as the owner's rule: its
+  brokerage saving is certain, its stop effect is not.
