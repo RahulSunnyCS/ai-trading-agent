@@ -128,11 +128,12 @@ describe('the GitHub secrets reminder (BL-172 Phase 3)', () => {
 });
 
 describe("Kite's unattended login (owner, 2026-10-28)", () => {
-  it('runs on Fridays and Mondays, only with KITE_AUTO_LOGIN=on', () => {
+  it('runs on every day the job runs, only with KITE_AUTO_LOGIN=on', () => {
     const on = { KITE_AUTO_LOGIN: 'on' };
     assert.equal(kiteDue('2026-10-30', on), true); // a Friday
     assert.equal(kiteDue('2026-11-02', on), true); // a Monday
-    assert.equal(kiteDue('2026-10-28', on), false); // a Wednesday
+    assert.equal(kiteDue('2026-10-28', on), true); // a Wednesday too (owner, 2026-11-06)
+    assert.equal(kiteDue('2026-11-03', { KITE_AUTO_LOGIN: ' ON ' }), true); // a Tuesday
     assert.equal(kiteDue('2026-10-30', {}), false);
     assert.equal(kiteDue('2026-10-30', { KITE_AUTO_LOGIN: 'off' }), false);
   });

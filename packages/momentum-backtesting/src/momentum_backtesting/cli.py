@@ -1970,7 +1970,7 @@ def orders_tentative(
     signal delay of 1 the names are fixed by last Friday's ranks, so the plan the 14:15 run will
     make can be shown the evening before. Writes only tentative_orders.json in the state dir: no
     orders row, no lot booking, no pending lot. A broker that cannot be read (Kite logs in on
-    Fridays and Mondays) is noted and the last snapshot used. Never trades."""
+    every trading day, but a failed login) is noted and the last snapshot used. Never trades."""
     from . import api, holdings_store, holdings_sync, notify
     from .config import load_repo_env
     from .db_read import open_catalog
@@ -2146,7 +2146,7 @@ def kite_auto_login_cmd(
 ) -> None:
     """Log in to Kite unattended (owner, 2026-10-28; off until KITE_AUTO_LOGIN=on): Kite's own
     login page with KITE_USER_ID, KITE_PASSWORD and a code from KITE_TOTP_SECRET. Run by the
-    08:02 morning login on Fridays and trading Mondays. A refused password is never retried and
+    08:02 morning login on every trading day. A refused password is never retried and
     holds later runs until the credentials change. Exit 0 = logged in, already logged in or
     off; 1 = failed."""
     from . import kite_login

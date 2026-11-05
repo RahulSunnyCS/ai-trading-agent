@@ -64,7 +64,7 @@ export interface LoginStatus {
     quantiply: { name: string; status: string } | null;
     quantiplyShoonya: { name: string; status: string } | null;
   } | null;
-  /** Kite's unattended login on Fridays and Mondays (`KITE_AUTO_LOGIN=on`) */
+  /** Kite's unattended login on every trading day (`KITE_AUTO_LOGIN=on`) */
   kite?: { name: string; status: string };
 }
 
