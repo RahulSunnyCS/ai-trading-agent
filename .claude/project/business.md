@@ -24,6 +24,9 @@ only; their own money is their decision.
   `KITE_AUTO_LOGIN=on`), although a Zerodha representative states that automating it is not
   allowed under exchange regulations (https://kite.trade/forum/discussion/comment/19966/). The
   owner accepted the risk to the Kite account; turning the switch off ends it.
+  **"Open in Kite basket"** (owner, 2026-11-06) posts the week's orders to Zerodha's own basket page
+  (Kite Publisher) from the owner's browser; the owner reviews and places them on Kite, signed in. No
+  order goes through the API from this repo.
   AlgoTest strategies run on the owner's own broker accounts.
 - **Offering signals to others (check before doing it):** sharing buy/sell recommendations
   with people outside the owner's own use, especially for a fee, can fall under SEBI's

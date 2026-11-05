@@ -550,6 +550,10 @@ contract, not a shared service).
   portfolio against the same snapshot and writes nothing: no orders row, no lot event, no pending
   lot (`tests/test_lot_orders.py` compares every catalog table and state file before and after).
   The dashboard's Rebalance preview page was retired for it; `/api/rebalance-preview*` remains.
+  Orders on Kite carry `kite_orders` (`api._kite_orders`: one CNC limit order per stock within 0.5 % of the plan's price,
+  sells first, base symbols; Kite's basket page takes no market protection) and `GET /api/orders` the public `kite_api_key`; the dashboard's "Open in Kite basket" form posts
+  them to `kite.zerodha.com/connect/basket` (Kite Publisher), where the owner places them: this package
+  still sends no order.
   `_compute_orders(dry_run=True)` (owner, 2026-11-05) is the same plan, lots included, with nothing written
   to the catalog; `api.tentative_orders` keeps it as `tentative_orders.json` in the state dir and
   `read_tentative(week)` serves it in `GET /api/orders` (`tentative`) while it is for the week asked.
@@ -593,7 +597,9 @@ contract, not a shared service).
   (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite; its
   target is `api._fresh_sleeve_target`, the sleeve's picks split equally as the Rebalance preview's
   first allocation, never the running model's drifted weights: owner, 2026-11-05; the lot row and the
-  message say *fresh picks, equal weights*),
+  message say *fresh picks, equal weights*; `orders.use_leftover`: the cash an equal split leaves buys one
+  share of each skipped name in the target's order, best model rank first, stopping at the first it cannot
+  afford; the target dict is ordered by the engine's final rank in `_fresh_sleeve_target`),
   a due lot with shares rebalances with the free cash left, a lot not due sells only names its
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +

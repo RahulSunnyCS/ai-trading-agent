@@ -17,6 +17,7 @@ import {
 } from '../../../lib/format';
 import { LOT_ORDER_STATUS } from '../../../lib/momentumLots';
 import type {
+  MomentumKiteOrder,
   MomentumOrderPreview,
   MomentumOrderPreviewJob,
   MomentumOrderRow,
@@ -292,6 +293,9 @@ export function YourOrders({
             </>
           }
           lots={tentative.lots ? <LotOrders orders={tentative} /> : null}
+          kite={
+            <KiteBasketButton orders={tentative.kite_orders} apiKey={view.data?.kite_api_key} />
+          }
         />
       ) : !latest ? (
         <p className="px-4 py-4 text-sm text-muted">
@@ -310,6 +314,7 @@ export function YourOrders({
             </>
           }
           lots={latest.lots ? <LotOrders orders={latest} /> : null}
+          kite={<KiteBasketButton orders={latest.kite_orders} apiKey={view.data?.kite_api_key} />}
         />
       )}
       <OrdersSettingsDrawer
@@ -319,6 +324,42 @@ export function YourOrders({
         onChanged={refetch}
       />
     </Card>
+  );
+}
+
+const KITE_BASKET_URL = 'https://kite.zerodha.com/connect/basket';
+
+/**
+ * "Open in Kite basket" (owner, 2026-11-05): posts these orders to Zerodha's own basket page in a
+ * new tab, where you review and place them. Nothing is sent from here and no order is placed by
+ * this app: Kite's page needs your login and your click on Place.
+ */
+function KiteBasketButton({
+  orders,
+  apiKey,
+}: {
+  orders: readonly MomentumKiteOrder[] | undefined;
+  apiKey: string | null | undefined;
+}) {
+  if (!apiKey || !orders?.length) return null;
+  return (
+    <form
+      method="post"
+      action={KITE_BASKET_URL}
+      target="_blank"
+      rel="noopener"
+      className="flex items-center gap-2 px-4 pb-3 pt-2"
+    >
+      <input type="hidden" name="api_key" value={apiKey} />
+      <input type="hidden" name="data" value={JSON.stringify(orders)} />
+      <Button type="submit" size="sm">
+        Open in Kite basket
+      </Button>
+      <span className="text-xs text-muted">
+        {orders.length} order{orders.length === 1 ? '' : 's'} (delivery, limit within 0.5%) · you
+        review and place them on Kite
+      </span>
+    </form>
   );
 }
 
@@ -458,11 +499,13 @@ function PlanBody({
   settings,
   made,
   lots,
+  kite = null,
 }: {
   orders: PlanSource;
   settings: MomentumOrderSettings | null;
   made: ReactNode;
   lots: ReactNode;
+  kite?: ReactNode;
 }) {
   const plan = orders.plan ?? null;
   const trades = plan?.rows.filter((r) => r.quantity > 0).length ?? 0;
@@ -490,6 +533,7 @@ function PlanBody({
         />
       </div>
       {lots}
+      {kite}
       <Table>
         <THead>
           <Th>Order</Th>

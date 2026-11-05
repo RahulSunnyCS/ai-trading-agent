@@ -924,6 +924,19 @@ export type MomentumLotsView =
       } | null;
     };
 
+/** One order as Kite's basket page takes it (`api._kite_orders`): a delivery limit order on NSE. */
+export interface MomentumKiteOrder {
+  variety: string;
+  exchange: string;
+  tradingsymbol: string;
+  transaction_type: 'BUY' | 'SELL';
+  order_type: string;
+  price: number;
+  product: string;
+  validity: string;
+  quantity: number;
+}
+
 /** One set of orders for a week, as `momentum_orders` keeps it. */
 export interface MomentumOrders {
   created_at: string;
@@ -951,6 +964,8 @@ export interface MomentumOrders {
   plan?: MomentumOrderPlan;
   /** Followed lot by lot (BL-142 Phase 3): each lot's status and its own plan. */
   lots?: MomentumLotOrders[];
+  /** The orders for Kite's basket page, when the holdings come from Kite (sells first). */
+  kite_orders?: MomentumKiteOrder[];
   /** What to add to Kite before buying a new lot. */
   deposit_needed?: number;
   lot_size?: number;
@@ -998,6 +1013,8 @@ export interface MomentumOrdersView {
   margin?: { symbols: string[]; prefixes: string[] };
   orders: MomentumOrders[];
   job: MomentumLiveRules['job'];
+  /** The Kite app's public key for the basket form (no secret), null when not configured. */
+  kite_api_key?: string | null;
   /** Friday's orders planned early, when they are for this week; null otherwise. */
   tentative?: MomentumTentativeOrders | null;
   tentative_job?: MomentumLiveRules['job'];
