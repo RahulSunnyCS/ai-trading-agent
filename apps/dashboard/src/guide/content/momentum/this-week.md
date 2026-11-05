@@ -42,8 +42,8 @@ time. Nothing here places an order: you place them in your broker yourself.
   sends one Telegram headed *Friday's orders (tentative)*; This week shows it here, marked
   **Tentative · nothing saved**, until Friday's real orders exist. Nothing is written to the orders
   or the lot ledger, so **Plan Friday's orders** can be pressed on any day of the week; the 14:15
-  run on Friday is the one to place. Kite logs in on Fridays and Mondays, so the Thursday plan
-  usually counts the holdings and cash as last read.
+  run on Friday is the one to place. Kite logs in every trading morning, so the Thursday plan
+  counts the holdings and cash as Thursday's login read them.
 - **Paper portfolio** (the default until money goes in): the model's portfolio at your paper
   capital (₹1,00,000, changeable in **Settings**). **Holdings from Kite** or **from Fyers**: what
   your account holds, read-only, at 14:15 or when you press **Sync**; any holding can be left out

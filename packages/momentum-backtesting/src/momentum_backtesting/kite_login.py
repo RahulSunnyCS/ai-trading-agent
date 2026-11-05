@@ -1,4 +1,4 @@
-"""Kite's unattended login (owner, 2026-10-28): Fridays and trading Mondays, inside the 08:02
+"""Kite's unattended login (owner, 2026-10-28; every trading day from 2026-11-06), inside the 08:02
 morning broker login (`packages/broker-login/src/local-login.ts` runs `mbt kite auto-login`), so
 its result is in the same Telegram report. Off until `KITE_AUTO_LOGIN=on`.
 

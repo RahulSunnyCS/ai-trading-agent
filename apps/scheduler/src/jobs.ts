@@ -251,7 +251,7 @@ const BASE_JOBS: Job[] = [
     // Friday's orders can be shown the evening before. `mbt orders tentative` plans them exactly
     // as the 14:15 run will (lots included) and writes only tentative_orders.json in the state
     // dir: no orders row, no lot booking, no pending lot. One Telegram, headed tentative; This
-    // week shows the plan until Friday's real orders exist. Kite logs in on Fridays and Mondays,
+    // week shows the plan until Friday's real orders exist. Kite logs in with the 08:02 morning login every trading day,
     // so the holdings are usually as last read; the plan says so.
     id: 'momentum-orders-tentative',
     description: "Momentum: Friday's orders planned early (tentative), nothing saved",
