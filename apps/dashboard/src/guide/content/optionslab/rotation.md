@@ -165,6 +165,8 @@ does not move.
 | Max DD / lot | The largest fall of the running total per lot from its peak, the peak starting at zero: the unit the registered rule compares (hover for the basket's drawdown in rupees) |
 | vs base / lot-day | The book's ₹ per lot-day minus the benchmark's, over the same days. Follows *Compare with* |
 | Beats random | Share of 1,000 random baskets of the same shape that the book's cumulative gross is above. Always on the registered basis, without a portfolio stop |
+| Last 60 sessions | The same beats-random share, over the book's last 60 sessions only, to see whether it is losing its edge now. Days the journal recorded at 09:16 count as recorded; earlier days are the 09:16 rule re-derived from the rows before each day (without the expiry-day rule). Adaptive Tuned's settings were tuned on that history, so its re-derived days are in-sample. Hover a figure for the days behind it. The Fixed base is one rule every day, and its random baskets are the same shape as a list's core. A few dozen days move a percentage a lot: read it as a direction, not a verdict |
+| Last 6 months | The same, over the last 6 calendar months of sessions |
 | Portfolio stop | The book's own stop (below) and, once its replay is in, how often it fired |
 
 The Adaptive names are the table's only: the 09:16 and 16:00 Telegram messages and the rest of the page

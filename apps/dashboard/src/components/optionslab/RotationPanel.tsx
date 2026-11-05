@@ -35,6 +35,7 @@ import {
   useRotationOverview,
   useRotationSummary,
 } from '../../hooks/useRotation';
+import { useRotationBeats } from '../../hooks/useRotationBeats';
 import { useRotationPlan } from '../../hooks/useRotationPlan';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
@@ -161,6 +162,9 @@ export function RotationPanel() {
   const overview = useRotationOverview();
   // Each pick's settings and upload state, and the next session's tentative list.
   const planRes = useRotationPlan();
+  const classicBeats = useRotationBeats('core');
+  const tunedBeats = useRotationBeats('t1');
+  const baseBeats = useRotationBeats('base');
   const plan = planRes.data;
   const summary = useRotationSummary(ONE_LOT);
   const tuned = useRotationSummary(TUNED);
@@ -256,6 +260,11 @@ export function RotationPanel() {
         name: ADAPTIVE_CARD.classic.name,
         note: ADAPTIVE_CARD.classic.note,
         focus: view === 'core',
+        beats: {
+          data: classicBeats.data,
+          loading: classicBeats.loading,
+          error: classicBeats.error,
+        },
         stop: {
           setting: portfolio,
           onChange: setPortfolio,
@@ -281,6 +290,11 @@ export function RotationPanel() {
         note: ADAPTIVE_CARD.tuned.note,
         focus: view === 'tuned',
         message: tunedMessage,
+        beats: {
+          data: tunedBeats.data,
+          loading: tunedBeats.loading,
+          error: tunedBeats.error,
+        },
         stop: {
           setting: tunedStop,
           onChange: setTunedStop,
@@ -305,6 +319,11 @@ export function RotationPanel() {
         name: BASE_CARD.name,
         note: BASE_CARD.note,
         focus: view === 'base',
+        beats: {
+          data: baseBeats.data,
+          loading: baseBeats.loading,
+          error: baseBeats.error,
+        },
         stop: {
           setting: baseStop,
           onChange: setBaseStop,
@@ -353,6 +372,15 @@ export function RotationPanel() {
     tunedBookNow,
     baseBookRes.error,
     baseBookNow,
+    classicBeats.data,
+    classicBeats.loading,
+    classicBeats.error,
+    tunedBeats.data,
+    tunedBeats.loading,
+    tunedBeats.error,
+    baseBeats.data,
+    baseBeats.loading,
+    baseBeats.error,
   ]);
 
   const reload = () => {
@@ -360,6 +388,9 @@ export function RotationPanel() {
     overview.refetch();
     summary.refetch();
     tuned.refetch();
+    classicBeats.refetch();
+    tunedBeats.refetch();
+    baseBeats.refetch();
   };
   const toggle = (k: RotationListKey) =>
     setShown((prev) => {

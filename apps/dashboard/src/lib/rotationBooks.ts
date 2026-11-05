@@ -9,6 +9,8 @@
  */
 
 import type { RotationListStats, RotationSummary } from '../types/rotation';
+import type { RotationBeatsResponse } from '../types/rotationBeats';
+import { formatDay } from './format';
 import type { StopEffect } from './rotationPortfolioView';
 import { type RotationBenchmark, benchmarkFigures } from './rotationView';
 
@@ -134,4 +136,39 @@ export function stopSummary(e: StopEffect | null): {
 /** The column header of the gap: what the per-lot-day gap is measured against. */
 export function vsHeader(pick: RotationBenchmark): string {
   return pick === 'random' ? 'vs random median' : pick === 'REF' ? 'vs Baseline' : 'vs base';
+}
+
+export type BeatsFigure =
+  | { kind: 'none' }
+  | { kind: 'loading' }
+  | { kind: 'error'; text: string }
+  | { kind: 'value'; pct: number; title: string };
+
+/** What one Books cell shows for a beats-random window: the share, with the days behind it on
+ * hover; a dash where the book has none (the base) or the window is empty. */
+export function beatsFigure(
+  read: { data: RotationBeatsResponse | null; loading: boolean; error: string | null } | undefined,
+  name: 'sessions60' | 'months6',
+): BeatsFigure {
+  if (!read) return { kind: 'none' };
+  if (read.error && !read.data) return { kind: 'error', text: read.error };
+  if (!read.data) return read.loading ? { kind: 'loading' } : { kind: 'none' };
+  const w = read.data.windows[name];
+  if (!w) return { kind: 'none' };
+  if (read.data.fixed)
+    return {
+      kind: 'value',
+      pct: w.beats_random_pct,
+      title: `${w.days} sessions from ${formatDay(w.from)}: the fixed rule every day`,
+    };
+  const redo = w.days - w.recorded_days;
+  const live =
+    w.recorded_days === 0
+      ? 'all re-derived from the rule'
+      : `${w.recorded_days} recorded live, ${redo} re-derived`;
+  return {
+    kind: 'value',
+    pct: w.beats_random_pct,
+    title: `${w.days} sessions from ${formatDay(w.from)}: ${live}`,
+  };
 }
