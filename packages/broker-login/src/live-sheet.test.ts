@@ -83,6 +83,7 @@ describe('setupSheet', () => {
     const p = await open({ save: 'Update', candle: false, multiplier: '', time: '' });
     await assert.rejects(setupSheet(p, PICK), /not on Candle Close/);
     assert.equal(await saves(p), 0);
+    assert.equal(await p.locator('#sheet').isVisible(), false, 'closed unsaved');
   });
 
   it('a sheet set up before with a day ticked is refused', async (t) => {
@@ -111,6 +112,7 @@ describe('setupSheet', () => {
     const p = await open({ save: 'Setup', candle: false, multiplier: '2', time: '09:32' });
     await assert.rejects(setupSheet(p, PICK), /quantity multiplier is 2/);
     assert.equal(await saves(p), 0);
+    assert.equal(await p.locator('#sheet').isVisible(), false, 'closed unsaved');
   });
 
   it('a first setup still refuses a wrong execution time', async (t) => {
