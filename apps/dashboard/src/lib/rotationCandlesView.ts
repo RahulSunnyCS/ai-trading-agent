@@ -4,7 +4,7 @@
  * open, last close, highest high, lowest low, the days' results summed).
  */
 
-import type { CandleBook, CandleDay, CandleLive } from '../types/rotationCandles';
+import type { CandleBook, CandleDay, CandleLive, CandlePick } from '../types/rotationCandles';
 import { EMPTY, formatDayShort, formatInr, formatPct } from './format';
 
 const BASE = '/api/backtest/legwise';
@@ -161,6 +161,21 @@ export interface Tip {
   foot: TipLine[];
 }
 
+/** The entry time in a variant's id (`N_wide_1117` -> `11:17`), or '' when it has none. */
+export function pickSlot(name: string): string {
+  const m = /_(\d{2})(\d{2})$/.exec(name);
+  return m ? `${m[1]}:${m[2]}` : '';
+}
+
+/**
+ * A pick's title on a line: its label, its entry time and its lots. The label alone drops the
+ * time, so two slots of one strategy (`S_p320_1302` and `S_p320_1317`) would read the same.
+ */
+export function pickTitle(p: CandlePick): string {
+  const slot = pickSlot(p.name);
+  return `${p.label}${slot ? ` ${slot}` : ''}${p.lots > 1 ? ` ×${p.lots}` : ''}`;
+}
+
 /** The hover's lines for one day: the day, its range, each pick, live, the random-basket share. */
 export function tipLines(d: CandleDay): Tip {
   const head: TipLine[] = [
@@ -175,7 +190,7 @@ export function tipLines(d: CandleDay): Tip {
   ];
   if (d.stopped_at) head.push({ label: 'Book stop', value: `hit at ${d.stopped_at}`, tone: 'neg' });
   const picks = d.picks.map((p) => ({
-    label: p.lots > 1 ? `${p.label} ×${p.lots}` : p.label,
+    label: pickTitle(p),
     value: signed(p.pnl),
     tone: tone(p.pnl),
     detail: p.params,
