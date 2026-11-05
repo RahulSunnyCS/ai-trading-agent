@@ -29,9 +29,8 @@ from ..rotation import beats, journal, store, warm
 
 router = APIRouter(prefix="/legwise/rotation/beats")
 
-CACHE_SECONDS = (
-    3600.0  # a cap: the key holds the files' modified times, which change at 09:16 and nightly
-)
+# a cap: the key holds the files' modified times, but the slippage copies land after days.csv
+CACHE_SECONDS = 600.0
 _lock = threading.Lock()
 _cache: dict[tuple, tuple[float, Any]] = {}
 
