@@ -13,8 +13,15 @@ import { Fragment, type ReactNode, useState } from 'react';
 import { cn } from '../../../lib/cn';
 import { EMPTY, formatDay, formatInr, formatPct } from '../../../lib/format';
 import type { PortfolioStopSetting } from '../../../lib/portfolioStop';
-import { type BookRow, stopChanged, stopSummary } from '../../../lib/rotationBooks';
+import {
+  type BeatsFigure,
+  type BookRow,
+  beatsFigure,
+  stopChanged,
+  stopSummary,
+} from '../../../lib/rotationBooks';
 import type { StopEffect } from '../../../lib/rotationPortfolioView';
+import type { RotationBeatsResponse } from '../../../types/rotationBeats';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 import { PortfolioStopButton } from '../PortfolioStopButton';
@@ -42,6 +49,8 @@ export interface BookLine {
   stop: BookStop;
   /** Why the book has no figures yet, or why it could not be read. */
   message?: { text: string; error: boolean } | null;
+  /** The beats-random read over the last 60 sessions and 6 months; absent for the base. */
+  beats?: { data: RotationBeatsResponse | null; loading: boolean; error: string | null };
 }
 
 function money(v: number | null, sign = true) {
@@ -50,6 +59,26 @@ function money(v: number | null, sign = true) {
 
 function tone(v: number | null) {
   return v === null ? 'text-muted' : pnlClass(v);
+}
+
+function BeatsCell({ figure }: { figure: BeatsFigure }) {
+  if (figure.kind === 'value')
+    return (
+      <Td dense align="right" numeric title={figure.title}>
+        {formatPct(figure.pct, 0, { unit: 'percent' })}
+      </Td>
+    );
+  return (
+    <Td
+      dense
+      align="right"
+      numeric
+      className="text-muted"
+      title={figure.kind === 'error' ? figure.text : undefined}
+    >
+      {figure.kind === 'loading' ? '…' : EMPTY}
+    </Td>
+  );
 }
 
 function StopCell({
@@ -150,6 +179,24 @@ export function RotationBooks({
               />
             </span>
           </Th>
+          <Th dense align="right">
+            <span className="inline-flex items-center gap-1">
+              Last 60 days
+              <InfoTooltip
+                label="About the last 60 days"
+                text="The same beats-random share, over the book's last 60 sessions only: is it losing its edge now? Days the journal recorded at 09:16 count as they were; earlier days are the 09:16 rule re-derived from the rows before each day (without the expiry-day rule). For Adaptive Tuned the re-derived days are in-sample, because its settings were tuned on that history. Hover a figure for the days behind it."
+              />
+            </span>
+          </Th>
+          <Th dense align="right">
+            <span className="inline-flex items-center gap-1">
+              Last 6 months
+              <InfoTooltip
+                label="About the last 6 months"
+                text="Beats random over the last 6 calendar months of sessions, on the same basis as the last 60 days."
+              />
+            </span>
+          </Th>
           <Th dense>Portfolio stop</Th>
         </THead>
         <tbody>
@@ -231,13 +278,15 @@ export function RotationBooks({
                       ? EMPTY
                       : formatPct(r.beatsRandom, 0, { unit: 'percent' })}
                   </Td>
+                  <BeatsCell figure={beatsFigure(l.beats, 'sessions60')} />
+                  <BeatsCell figure={beatsFigure(l.beats, 'months6')} />
                   <Td dense>
                     <StopCell stop={l.stop} open={isOpen} onToggle={() => toggle(r.id)} />
                   </Td>
                 </TRow>
                 {isOpen && l.stop.effect ? (
                   <tr className="border-b border-border bg-surface-2/40">
-                    <td colSpan={8} className="px-3 py-2">
+                    <td colSpan={10} className="px-3 py-2">
                       <div className={cn('max-w-xl', !stopChanged(l.stop.effect) && 'opacity-80')}>
                         <StopEffectBlock effect={l.stop.effect} />
                       </div>

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RotationListStats, RotationSummary } from '../../types/rotation';
-import { baseBook, listBook, stopChanged, stopSummary, vsHeader } from '../rotationBooks';
+import type { BeatsWindow, RotationBeatsResponse } from '../../types/rotationBeats';
+import {
+  baseBook,
+  beatsFigure,
+  listBook,
+  stopChanged,
+  stopSummary,
+  vsHeader,
+} from '../rotationBooks';
 import type { StopEffect } from '../rotationPortfolioView';
 
 function stats(over: Partial<RotationListStats> = {}): RotationListStats {
@@ -140,5 +148,76 @@ describe('the stop cell', () => {
   it('names the benchmark in the gap header', () => {
     expect(vsHeader('base')).toBe('vs base');
     expect(vsHeader('random')).toBe('vs random median');
+  });
+});
+
+describe('beatsFigure', () => {
+  const win = (over: Partial<BeatsWindow> = {}): BeatsWindow => ({
+    days: 60,
+    from: '2026-07-31',
+    recorded_days: 13,
+    total: 64390,
+    random_p10: 5782,
+    random_p50: 33499,
+    random_p90: 60209,
+    beats_random_pct: 93.3,
+    ...over,
+  });
+  const read = (windows: Partial<RotationBeatsResponse['windows']>) => ({
+    data: {
+      book: 't1',
+      first_day: '2025-01-10',
+      last_day: '2026-11-05',
+      n_days: 441,
+      recorded_days: 13,
+      fixed: false,
+      windows: {
+        sessions60: null,
+        months6: null,
+        year1: null,
+        years2: null,
+        all: null,
+        recorded: null,
+        ...windows,
+      },
+    } as RotationBeatsResponse,
+    loading: false,
+    error: null,
+  });
+
+  it('shows the share with the days behind it', () => {
+    const f = beatsFigure(read({ sessions60: win() }), 'sessions60');
+    expect(f).toMatchObject({ kind: 'value', pct: 93.3 });
+    expect(f.kind === 'value' && f.title).toContain('60 sessions from');
+    expect(f.kind === 'value' && f.title).toContain('13 recorded live, 47 re-derived');
+  });
+
+  it('says the base is one fixed rule, not recorded or re-derived', () => {
+    const r = read({ months6: win({ recorded_days: 0 }) });
+    const f = beatsFigure({ ...r, data: { ...r.data, fixed: true } }, 'months6');
+    expect(f.kind === 'value' && f.title).toContain('the fixed rule every day');
+  });
+
+  it('says so when every day was re-derived', () => {
+    const f = beatsFigure(read({ months6: win({ recorded_days: 0 }) }), 'months6');
+    expect(f.kind === 'value' && f.title).toContain('all re-derived from the rule');
+  });
+
+  it('is a dash for the base, an empty window or no answer, never a zero', () => {
+    expect(beatsFigure(undefined, 'sessions60')).toEqual({ kind: 'none' });
+    expect(beatsFigure(read({}), 'sessions60')).toEqual({ kind: 'none' });
+    expect(beatsFigure({ data: null, loading: false, error: null }, 'months6')).toEqual({
+      kind: 'none',
+    });
+  });
+
+  it('shows loading and errors without data', () => {
+    expect(beatsFigure({ data: null, loading: true, error: null }, 'months6')).toEqual({
+      kind: 'loading',
+    });
+    expect(beatsFigure({ data: null, loading: false, error: 'boom' }, 'months6')).toEqual({
+      kind: 'error',
+      text: 'boom',
+    });
   });
 });
