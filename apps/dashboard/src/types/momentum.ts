@@ -924,13 +924,14 @@ export type MomentumLotsView =
       } | null;
     };
 
-/** One order as Kite's basket page takes it (`api._kite_orders`): a delivery market order on NSE. */
+/** One order as Kite's basket page takes it (`api._kite_orders`): a delivery limit order on NSE. */
 export interface MomentumKiteOrder {
   variety: string;
   exchange: string;
   tradingsymbol: string;
   transaction_type: 'BUY' | 'SELL';
   order_type: string;
+  price: number;
   product: string;
   validity: string;
   quantity: number;

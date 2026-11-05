@@ -3693,6 +3693,7 @@ def _compute_orders(
                 if r.quantity
             },
             base_of,
+            prices,
         )
     if preview:
         payload["preview"] = True
@@ -3712,22 +3713,42 @@ def _compute_orders(
     return payload
 
 
-def _kite_orders(net: dict[str, float], base_of: dict[str, str]) -> list[dict]:
+#: A basket order's limit sits this far from the price it was planned at: a buy up to 0.5 % above,
+#: a sell down to 0.5 % below, so it fills like a market order in a normal market and refuses a
+#: jump. Kite's basket page takes no market protection (Kite Publisher's forum), so market orders
+#: are not used.
+KITE_LIMIT_BAND = 0.005
+KITE_TICK = 0.05  # a multiple of 0.05 is a valid price for every NSE equity and ETF tick
+
+
+def _kite_limit(price: float, buy: bool) -> float:
+    steps = price * (1 + KITE_LIMIT_BAND if buy else 1 - KITE_LIMIT_BAND) / KITE_TICK
+    ticks = math.ceil(steps - 1e-9) if buy else math.floor(steps + 1e-9)
+    return round(ticks * KITE_TICK, 2)
+
+
+def _kite_orders(
+    net: dict[str, float], base_of: dict[str, str], prices: dict[str, float]
+) -> list[dict]:
     """The orders as Kite's basket takes them (owner, 2026-11-05): one per stock, sells first, a
-    delivery (CNC) market order on NSE under the stock's base symbol. `net` is shares to buy (+) or
-    sell (-) per strategy name. The dashboard's "Open in Kite basket" posts these to Zerodha's own
-    basket page, where the owner reviews and places them; nothing is sent from here."""
+    delivery (CNC) limit order on NSE under the stock's base symbol, priced within `KITE_LIMIT_BAND`
+    of the plan's price (a name with no price is left out: it cannot be given a limit). `net` is
+    shares to buy (+) or sell (-) per strategy name. The dashboard's "Open in Kite basket" posts
+    these to Zerodha's own basket page, where the owner reviews and places them; nothing is sent
+    from here."""
     out = []
     for name, qty in sorted(net.items(), key=lambda kv: (kv[1] > 0, kv[0])):
         shares = int(abs(qty))
-        if shares:
+        price = prices.get(name)
+        if shares and price:
             out.append(
                 {
                     "variety": "regular",
                     "exchange": "NSE",
                     "tradingsymbol": base_of.get(name, name),
                     "transaction_type": "BUY" if qty > 0 else "SELL",
-                    "order_type": "MARKET",
+                    "order_type": "LIMIT",
+                    "price": _kite_limit(float(price), qty > 0),
                     "product": "CNC",
                     "validity": "DAY",
                     "quantity": shares,
@@ -3981,7 +4002,7 @@ def _compute_lot_orders(
             "deposit_needed": planned["deposit_needed"],
             "lot_size": float(settings["lot_size_rs"]),
             "net": net,
-            "kite_orders": _kite_orders(net, base_of),
+            "kite_orders": _kite_orders(net, base_of, prices),
             "ledger": {
                 "booked": reconciled.events,
                 "unexplained": reconciled.unexplained,

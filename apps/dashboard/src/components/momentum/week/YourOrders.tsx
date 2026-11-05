@@ -356,8 +356,8 @@ function KiteBasketButton({
         Open in Kite basket
       </Button>
       <span className="text-xs text-muted">
-        {orders.length} order{orders.length === 1 ? '' : 's'} (delivery, market) · you review and
-        place them on Kite
+        {orders.length} order{orders.length === 1 ? '' : 's'} (delivery, limit within 0.5%) · you
+        review and place them on Kite
       </span>
     </form>
   );

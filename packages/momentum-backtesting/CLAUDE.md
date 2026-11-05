@@ -550,8 +550,8 @@ contract, not a shared service).
   portfolio against the same snapshot and writes nothing: no orders row, no lot event, no pending
   lot (`tests/test_lot_orders.py` compares every catalog table and state file before and after).
   The dashboard's Rebalance preview page was retired for it; `/api/rebalance-preview*` remains.
-  Orders on Kite carry `kite_orders` (`api._kite_orders`: one CNC market order per stock, sells first, base
-  symbols) and `GET /api/orders` the public `kite_api_key`; the dashboard's "Open in Kite basket" form posts
+  Orders on Kite carry `kite_orders` (`api._kite_orders`: one CNC limit order per stock within 0.5 % of the plan's price,
+  sells first, base symbols; Kite's basket page takes no market protection) and `GET /api/orders` the public `kite_api_key`; the dashboard's "Open in Kite basket" form posts
   them to `kite.zerodha.com/connect/basket` (Kite Publisher), where the owner places them: this package
   still sends no order.
   `_compute_orders(dry_run=True)` (owner, 2026-11-05) is the same plan, lots included, with nothing written

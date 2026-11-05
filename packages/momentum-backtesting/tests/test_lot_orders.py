@@ -779,13 +779,32 @@ def test_a_new_lot_spends_its_leftover_on_the_skipped_names_in_rank_order_and_bu
         ("RATEGAIN", "BUY"),
     ]
     assert all(
-        o["product"] == "CNC" and o["exchange"] == "NSE" and o["order_type"] == "MARKET"
+        o["product"] == "CNC" and o["exchange"] == "NSE" and o["order_type"] == "LIMIT"
         for o in kite
     )
+    # a buy's limit is within 0.5 % above the planned price, on a 0.05 tick
+    for o in kite:
+        price = PRICES[o["tradingsymbol"]]
+        assert price <= o["price"] <= price * 1.005 + 0.05
+        assert round(o["price"] / 0.05) * 0.05 == pytest.approx(o["price"])
     assert {o["tradingsymbol"]: o["quantity"] for o in kite} == {
         n: payload["net"][n] for n in ("CUPID", "GRWRHITECH", "RATEGAIN")
     }
-    assert api._kite_orders({"AAA": -3, "BBB": 5, "CCC": 0}, {"AAA": "AAA1"}) == [
-        {**kite[0], "tradingsymbol": "AAA1", "transaction_type": "SELL", "quantity": 3},
-        {**kite[0], "tradingsymbol": "BBB", "transaction_type": "BUY", "quantity": 5},
-    ]
+    prices = {"AAA": 200.0, "BBB": 100.0, "CCC": 50.0}
+    assert api._kite_orders({"AAA": -3, "BBB": 5, "CCC": 0, "DDD": 2}, {"AAA": "AAA1"}, prices) == [
+        {
+            **kite[0],
+            "tradingsymbol": "AAA1",
+            "transaction_type": "SELL",
+            "quantity": 3,
+            "price": 199.0,
+        },
+        {
+            **kite[0],
+            "tradingsymbol": "BBB",
+            "transaction_type": "BUY",
+            "quantity": 5,
+            "price": 100.5,
+        },
+    ]  # DDD has no price: left out
+    assert api._kite_limit(284.94, True) == 286.4 and api._kite_limit(284.94, False) == 283.5

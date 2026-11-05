@@ -39,9 +39,10 @@ time. Nothing here places an order: you place them in your broker yourself.
   Friday's own prices (the price ceiling, circuit limits, cap trims) use the latest prices.
 - **Buy it on Kite.** With the holdings from Kite, the orders block has **Open in Kite basket**: it
   opens Zerodha's own basket page in a new tab with these orders filled in (one per stock, sells
-  first, delivery, market), and **you** review and place them there, signed in to Kite. Nothing is
-  sent from this app and it places no order. Edit a quantity or make an order a limit on Kite's page
-  before you place it; a thinly traded name is better as a limit. Place during market hours: these are
+  first, delivery, **limit** orders priced within 0.5% of the plan's price, which Kite's basket page
+  accepts where it takes no market protection), and **you** review and place them there, signed in
+  to Kite. Nothing is sent from this app and it places no order. Edit a quantity or a price on
+  Kite's page before you place it; an order whose limit the price has left stays open or unfilled. Place during market hours: these are
   regular orders, so outside them Kite refuses them (switch to an after-market order on its page). A
   tentative plan's counts follow the prices when it was made; the 14:15 plan is the one to place.
 - **Leftover cash (new lots).** A new lot first buys its picks in equal weights in whole shares. Cash
