@@ -134,7 +134,7 @@ export interface OrderPreviewChoice {
 
 /** What the plan table needs, from the stored orders or from a preview. */
 type PlanSource = Pick<MomentumOrders, 'kind' | 'reason'> &
-  Partial<Pick<MomentumOrders, 'plan' | 'prices' | 'holdings' | 'lots'>>;
+  Partial<Pick<MomentumOrders, 'plan' | 'prices' | 'holdings' | 'lots' | 'premium_skips'>>;
 
 /**
  * Your orders (BL-051 Phase 3): the headline's trades in whole shares against the paper
@@ -533,6 +533,16 @@ function PlanBody({
         />
       </div>
       {lots}
+      {orders.premium_skips?.length ? (
+        <p className="px-4 py-2 text-xs text-warning">
+          {orders.premium_skips
+            .map(
+              (skip) =>
+                `Not bought, ETF above NAV: ${skip.name} ${formatPct(skip.premium, 1, { sign: true })} (limit ${formatPct(skip.limit, 0)}, premium of ${formatDay(skip.as_of)})`,
+            )
+            .join(' · ')}
+        </p>
+      ) : null}
       {kite}
       <Table>
         <THead>

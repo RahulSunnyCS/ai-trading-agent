@@ -3377,6 +3377,26 @@ def _run_live_rules_check() -> dict:
 # --- Your orders (BL-051 Phase 3) ---------------------------------------------------------------
 
 
+def _premium_skips(week: pd.Timestamp, premiums: pd.DataFrame | None = None) -> dict[str, dict]:
+    """The ETFs a NEW buy is refused for this week (BL-136 Phase 1b, owner 2026-11-06): each name
+    whose latest premium to NAV, dated before `week`, is over its limit (5 % for Nasdaq 100 and
+    Hang Seng, 2 % for the Indian ones; `live_config.toml`), with the premium, the limit and the
+    day it is from. An entry gate only: a name already held is never sold or trimmed for it.
+    `premiums` is `trade_prices.load_premiums()` unless a test passes one."""
+    from . import weekly
+    from .fetch import load_universe
+    from .trade_prices import load_premiums
+
+    settings = weekly.load_live_config()
+    by_name = {i.name: i for i in load_universe()}
+    latest = weekly.latest_premiums(load_premiums() if premiums is None else premiums, week)
+    blocked = weekly.premium_blocked(latest, by_name, settings)
+    return {
+        name: {"premium": latest[name][0], "as_of": latest[name][1], "limit": limit}
+        for name, limit in blocked.items()
+    }
+
+
 def _fresh_sleeve_target(req: BacktestRequest) -> dict[str, float]:
     """A sleeve's target for a lot that holds nothing yet (owner, 2026-11-05): what the model
     buys when it starts from cash this week, its current picks split equally, exactly as the
@@ -3670,6 +3690,11 @@ def _compute_orders(
             "broker_cash": (synced or {}).get("cash"),
         }
     blocked_names = {n for n in set(holdings) | set(target) if base_of.get(n, n) in blocked}
+    skips = _premium_skips(target_week)
+    gated = {n: skips[n] for n in target if n in skips and holdings.get(n, 0) <= 0}
+    if gated:  # the premium gate: an ETF over its limit is no NEW buy; what is held is left alone
+        target = {k: v for k, v in target.items() if k not in gated}
+    payload["premium_skips"] = [{"name": n, **v} for n, v in sorted(gated.items())]
     plan = orders.plan(
         holdings,
         prices,
@@ -3942,6 +3967,25 @@ def _compute_lot_orders(
             info["target"] = {k: float(v) for k, v in target.items() if k not in cash_names}
             info["fresh"] = True
 
+    # The premium gate (owner, 2026-11-06): an ETF over its limit is no NEW buy for a due lot. A
+    # fresh lot spreads its weights equally over what is left; a rebalancing lot just leaves the
+    # name out; one the lot already holds is never touched for its premium.
+    skips = _premium_skips(target_week)
+    premium_skipped: dict[str, dict] = {}
+    for sid, info in sleeves.items():
+        if not skips or not info["due"]:
+            continue
+        held_names = {name_of[sym] for sym in ledger.get(sid, {}) if sym in name_of}
+        gated = [n for n in info["target"] if n in skips and n not in held_names]
+        if not gated:
+            continue
+        kept = {k: v for k, v in info["target"].items() if k not in gated}
+        total = sum(kept.values())
+        if info.get("fresh") and total > 0:
+            kept = {k: v / total for k, v in kept.items()}
+        info["target"] = kept
+        premium_skipped.update({n: skips[n] for n in gated})
+
     lot_inputs = [
         lots.Lot(
             sid,
@@ -4003,6 +4047,7 @@ def _compute_lot_orders(
             "lot_size": float(settings["lot_size_rs"]),
             "net": net,
             "kite_orders": _kite_orders(net, base_of, prices),
+            "premium_skips": [{"name": n, **v} for n, v in sorted(premium_skipped.items())],
             "ledger": {
                 "booked": reconciled.events,
                 "unexplained": reconciled.unexplained,
@@ -4031,6 +4076,13 @@ def _compute_lot_orders(
             payload=payload,
         )
     return payload
+
+
+def _premium_skip_line(skip: dict) -> str:
+    return (
+        f"Not bought, ETF above NAV: {skip['name']} {skip['premium']:+.1%} "
+        f"(limit {skip['limit']:.0%}, premium of {pd.Timestamp(skip['as_of']):%d %b})"
+    )
 
 
 def _lot_orders_message(payload: dict, title: str) -> Notification:
@@ -4071,6 +4123,8 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
                 )
             elif row["action"] in ("SKIP", "HOLD"):
                 lines.append(f"  · not traded: {row['symbol']} ({row['note'] or row['action']})")
+    for skip in payload.get("premium_skips") or []:
+        lines.append(_premium_skip_line(skip))
     if payload["deposit_needed"] > 0:
         lines.append(
             f"Add ₹{payload['deposit_needed']:,.0f} to Kite before you buy "
@@ -4525,6 +4579,8 @@ def _orders_message(payload: dict) -> Notification:
     skipped = [r for r in plan["rows"] if r["action"] in ("SKIP", "HOLD")]
     if skipped:
         lines.append(f"Not traded: {', '.join(r['symbol'] for r in skipped)}")
+    for skip in payload.get("premium_skips") or []:
+        lines.append(_premium_skip_line(skip))
     lines.append(
         f"Sells ₹{plan['sells']:,.0f} · buys ₹{plan['buys']:,.0f} · charges "
         f"₹{plan['charges']:,.0f} · cash after ₹{plan['cash_after']:,.0f}"
