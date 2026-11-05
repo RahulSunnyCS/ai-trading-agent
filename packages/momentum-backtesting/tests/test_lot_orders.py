@@ -733,3 +733,59 @@ def test_a_new_lot_buys_the_sleeves_fresh_picks_equally_not_the_drifted_weights(
     payload = api._compute_orders("scheduled")
     lot1 = {lot["id"]: lot for lot in payload["lots"]}[ids[0]]
     assert lot1["status"] == "rebalance" and lot1["fresh"] is False
+
+
+def test_a_new_lot_spends_its_leftover_on_the_skipped_names_in_rank_order_and_builds_a_kite_basket(
+    client, monkeypatch
+):
+    """Owner, 2026-11-05: a fresh lot's leftover cash buys one share of the names an equal split
+    could not afford, best rank first (the order of the fresh target), and the orders come out as
+    a Kite basket (one delivery market order per stock, sells first, base symbols)."""
+    _friday(monkeypatch, 2026, 10, 23)
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    sig = _signal("2026-10-23", ids, ids[1])
+    sig["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig, "exact", None, ["ranking"]))
+    # best rank first: RATEGAIN, GRWRHITECH, CUPID
+    monkeypatch.setattr(
+        api,
+        "_fresh_sleeve_target",
+        lambda req: {"RATEGAIN": 1 / 3, "GRWRHITECH": 1 / 3, "CUPID": 1 / 3},
+    )
+    _snapshot(LOT1 + OUTSIDE, 4509.3)
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+
+    payload = api._compute_orders("scheduled")
+    lot2 = {lot["id"]: lot for lot in payload["lots"]}[ids[1]]
+    rows = {r["symbol"]: r for r in lot2["plan"]["rows"]}
+    # a third of 50,000 is 16,667: CUPID 49 at 338 (16,562) and RATEGAIN 21 at 790 (16,590);
+    # GRWRHITECH (6,796) buys 2 already at that slice, so nothing was skipped here
+    assert all(rows[n]["quantity"] > 0 for n in ("RATEGAIN", "GRWRHITECH", "CUPID"))
+    kite = payload["kite_orders"]
+    assert [(o["tradingsymbol"], o["transaction_type"]) for o in kite] == [
+        ("CUPID", "BUY"),
+        ("GRWRHITECH", "BUY"),
+        ("RATEGAIN", "BUY"),
+    ]
+    assert all(
+        o["product"] == "CNC" and o["exchange"] == "NSE" and o["order_type"] == "MARKET"
+        for o in kite
+    )
+    assert {o["tradingsymbol"]: o["quantity"] for o in kite} == {
+        n: payload["net"][n] for n in ("CUPID", "GRWRHITECH", "RATEGAIN")
+    }
+    assert api._kite_orders({"AAA": -3, "BBB": 5, "CCC": 0}, {"AAA": "AAA1"}) == [
+        {**kite[0], "tradingsymbol": "AAA1", "transaction_type": "SELL", "quantity": 3},
+        {**kite[0], "tradingsymbol": "BBB", "transaction_type": "BUY", "quantity": 5},
+    ]

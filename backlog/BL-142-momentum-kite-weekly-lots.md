@@ -304,3 +304,10 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   `api._fresh_sleeve_target` for a due lot with no history (the Rebalance preview's first-allocation
   run, persisted prices); a rebalancing lot keeps the sleeve's running target. Found while building
   Friday's tentative orders (Thursday 18:30 job); test in `tests/test_lot_orders.py`.
+- 2026-11-06 — Owner: (1) after a new lot's equal split, the leftover cash buys the skipped names in
+  the model's rank order, one share each, stopping at the first it cannot afford (`orders.use_leftover`);
+  the fresh target is ordered by the engine's final rank. (2) A "buy" button: an **Open in Kite basket**
+  form posting the orders to Zerodha's own basket page (Kite Publisher), where the owner reviews and
+  places them. Chosen over placing orders through the API: the repo places no order (`business.md`),
+  and API orders from a retail account fall under SEBI's algo rules (static IP, registration).
+

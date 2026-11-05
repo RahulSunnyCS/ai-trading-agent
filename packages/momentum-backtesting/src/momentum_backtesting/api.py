@@ -3383,7 +3383,7 @@ def _fresh_sleeve_target(req: BacktestRequest) -> dict[str, float]:
     Rebalance preview's first allocation does, never the weights a model running since `start`
     has drifted to (a name held for a year and down to 0.4 % is no buy for a fresh lot). Decided
     on the newest stored week; with a signal delay of 1 that is the week whose ranks fix the
-    coming Friday's trades."""
+    coming Friday's trades. The dict is ordered best rank first."""
     ranking = _broad_ranking(req)
     week = ranking.prices.index[-1]
     settlement = week + pd.Timedelta(days=7)
@@ -3401,7 +3401,15 @@ def _fresh_sleeve_target(req: BacktestRequest) -> dict[str, float]:
         rebalance.persisted_broad_ranking(ranking),
         _outer_with_sentinel(week, settlement),
     ).result
-    return rebalance.model_holdings(outcome, week)
+    target = rebalance.model_holdings(outcome, week)
+    # Best rank first: the order a new lot's leftover cash buys the names an equal split skipped.
+    ranks = outcome.ranks.loc[week] if week in outcome.ranks.index else pd.Series(dtype=float)
+
+    def rank_key(name: str) -> tuple[bool, float, str]:
+        rank = ranks.get(name)
+        return (pd.isna(rank), 0.0 if pd.isna(rank) else float(rank), name)
+
+    return dict(sorted(target.items(), key=lambda kv: rank_key(kv[0])))
 
 
 def _orders_signal(
@@ -3677,6 +3685,15 @@ def _compute_orders(
             "plan": plan.to_dict(),
         }
     )
+    if settings["holdings_source"] == "kite":
+        payload["kite_orders"] = _kite_orders(
+            {
+                r.symbol: r.quantity if r.action in ("BUY", "ADD") else -r.quantity
+                for r in plan.rows
+                if r.quantity
+            },
+            base_of,
+        )
     if preview:
         payload["preview"] = True
         return payload
@@ -3693,6 +3710,30 @@ def _compute_orders(
             payload=payload,
         )
     return payload
+
+
+def _kite_orders(net: dict[str, float], base_of: dict[str, str]) -> list[dict]:
+    """The orders as Kite's basket takes them (owner, 2026-11-05): one per stock, sells first, a
+    delivery (CNC) market order on NSE under the stock's base symbol. `net` is shares to buy (+) or
+    sell (-) per strategy name. The dashboard's "Open in Kite basket" posts these to Zerodha's own
+    basket page, where the owner reviews and places them; nothing is sent from here."""
+    out = []
+    for name, qty in sorted(net.items(), key=lambda kv: (kv[1] > 0, kv[0])):
+        shares = int(abs(qty))
+        if shares:
+            out.append(
+                {
+                    "variety": "regular",
+                    "exchange": "NSE",
+                    "tradingsymbol": base_of.get(name, name),
+                    "transaction_type": "BUY" if qty > 0 else "SELL",
+                    "order_type": "MARKET",
+                    "product": "CNC",
+                    "validity": "DAY",
+                    "quantity": shares,
+                }
+            )
+    return out
 
 
 def _mark_tentative(payload: dict) -> dict:
@@ -3891,6 +3932,7 @@ def _compute_lot_orders(
             info["target"],
             info["exits"],
             sid in has_history,
+            use_leftover=bool(info.get("fresh")),
         )
         for sid, info in sleeves.items()
     ]
@@ -3938,6 +3980,7 @@ def _compute_lot_orders(
             "deposit_needed": planned["deposit_needed"],
             "lot_size": float(settings["lot_size_rs"]),
             "net": lots.net_by_symbol(planned["plan"]),
+            "kite_orders": _kite_orders(lots.net_by_symbol(planned["plan"]), base_of),
             "ledger": {
                 "booked": reconciled.events,
                 "unexplained": reconciled.unexplained,
@@ -3970,6 +4013,8 @@ def _compute_lot_orders(
 
 def _lot_orders_message(payload: dict, title: str) -> Notification:
     """The 14:15 Telegram message for a group followed lot by lot."""
+    from . import orders
+
     holdings = payload["holdings"]
     how = (
         "Exact (decided by last Friday's ranks)"
@@ -3997,9 +4042,10 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
         for row in (plan or {}).get("rows", []):
             if row["quantity"]:
                 traded = True
+                extra = " · leftover cash" if row.get("note") == orders.LEFTOVER_NOTE else ""
                 lines.append(
                     f"  • {row['action']} {row['symbol']} {row['quantity']} sh "
-                    f"(₹{row['order_value']:,.0f})"
+                    f"(₹{row['order_value']:,.0f}){extra}"
                 )
             elif row["action"] in ("SKIP", "HOLD"):
                 lines.append(f"  · not traded: {row['symbol']} ({row['note'] or row['action']})")
@@ -6152,6 +6198,8 @@ def create_app() -> FastAPI:
             # Friday's orders planned early, when they are for this week (owner, 2026-11-05)
             "tentative": read_tentative(target.isoformat()),
             "tentative_job": TENTATIVE_JOBS.latest(),
+            # the public key of the Kite app, for the "Open in Kite basket" form (no secret)
+            "kite_api_key": os.environ.get("KITE_API_KEY", "").strip() or None,
         }
         try:
             with read_catalog() as con:
