@@ -101,8 +101,9 @@ function TipBody({ bar, tip }: { bar: CandleBar; tip: Tip }) {
       ))}
       {tip.picks.length ? (
         <div className="border-t border-border pt-1">
-          {tip.picks.map((l) => (
-            <Line key={l.label} l={l} />
+          {tip.picks.map((l, i) => (
+            // the same strategy can be picked twice in a day (two lots of the base's Widesl), so the label repeats
+            <Line key={`${i}-${l.label}`} l={l} />
           ))}
         </div>
       ) : null}
@@ -320,8 +321,8 @@ function Pinned({
       </div>
       {one ? (
         <div className="space-y-1">
-          {one.picks.map((p) => (
-            <div key={p.name} className="flex items-center justify-between gap-3">
+          {one.picks.map((p, i) => (
+            <div key={`${i}-${p.name}`} className="flex items-center justify-between gap-3">
               <span className="min-w-0 truncate">
                 <span className="text-foreground">
                   {p.label}
