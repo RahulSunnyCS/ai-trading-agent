@@ -1,0 +1,387 @@
+{
+ "run": "2026-11-05",
+ "scale": 3000.0,
+ "skip_below": 40.0,
+ "list": "C",
+ "books": {
+  "core": {
+   "book": "core",
+   "variants": 298,
+   "research": {
+    "label": "research set",
+    "days": 423,
+    "first": "2025-01-10",
+    "last": "2026-10-09",
+    "confidence": {
+     "mean": 83.4,
+     "min": 50.8,
+     "max": 96.1
+    },
+    "spearman": {
+     "value": 0.0805,
+     "lo": 0.0077,
+     "hi": 0.1521
+    },
+    "tercile_spread": {
+     "value": 741.0,
+     "lo": -44.0,
+     "hi": 1734.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 141,
+      "mean_net": 846.0,
+      "max_c": 82.1
+     },
+     "middle": {
+      "n": 141,
+      "mean_net": 1053.0
+     },
+     "top": {
+      "n": 141,
+      "mean_net": 1587.0,
+      "min_c": 86.5
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": 491577.0,
+     "net_with_skip": 491577.0,
+     "max_drawdown_all": -35456.0,
+     "max_drawdown_with_skip": -35456.0
+    }
+   },
+   "first_half": {
+    "label": "first half",
+    "days": 211,
+    "first": "2025-01-10",
+    "last": "2025-11-19",
+    "confidence": {
+     "mean": 83.1,
+     "min": 55.6,
+     "max": 96.1
+    },
+    "spearman": {
+     "value": 0.0404,
+     "lo": -0.061,
+     "hi": 0.1389
+    },
+    "tercile_spread": {
+     "value": 440.0,
+     "lo": -1002.0,
+     "hi": 1879.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 71,
+      "mean_net": 1198.0,
+      "max_c": 81.6
+     },
+     "middle": {
+      "n": 69,
+      "mean_net": 519.0
+     },
+     "top": {
+      "n": 71,
+      "mean_net": 1638.0,
+      "min_c": 85.6
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": 237104.0,
+     "net_with_skip": 237104.0,
+     "max_drawdown_all": -35456.0,
+     "max_drawdown_with_skip": -35456.0
+    }
+   },
+   "second_half": {
+    "label": "second half",
+    "days": 212,
+    "first": "2025-11-20",
+    "last": "2026-10-09",
+    "confidence": {
+     "mean": 83.6,
+     "min": 50.8,
+     "max": 95.2
+    },
+    "spearman": {
+     "value": 0.1234,
+     "lo": 0.0183,
+     "hi": 0.2286
+    },
+    "tercile_spread": {
+     "value": 1172.0,
+     "lo": 117.0,
+     "hi": 2390.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 71,
+      "mean_net": 345.0,
+      "max_c": 82.3
+     },
+     "middle": {
+      "n": 70,
+      "mean_net": 1747.0
+     },
+     "top": {
+      "n": 71,
+      "mean_net": 1517.0,
+      "min_c": 86.9
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": 254473.0,
+     "net_with_skip": 254473.0,
+     "max_drawdown_all": -31485.0,
+     "max_drawdown_with_skip": -31485.0
+    }
+   },
+   "forward": {
+    "label": "forward (held out)",
+    "days": 18,
+    "first": "2026-10-12",
+    "last": "2026-11-05",
+    "confidence": {
+     "mean": 83.0,
+     "min": 54.0,
+     "max": 93.7
+    },
+    "spearman": {
+     "value": 0.2157,
+     "lo": -0.1829,
+     "hi": 0.4756
+    },
+    "tercile_spread": {
+     "value": 629.0,
+     "lo": -3507.0,
+     "hi": 5317.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 6,
+      "mean_net": 1119.0,
+      "max_c": 82.0
+     },
+     "middle": {
+      "n": 6,
+      "mean_net": -1866.0
+     },
+     "top": {
+      "n": 6,
+      "mean_net": 1748.0,
+      "min_c": 88.2
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": 6003.0,
+     "net_with_skip": 6003.0,
+     "max_drawdown_all": -34648.0,
+     "max_drawdown_with_skip": -34648.0
+    }
+   },
+   "forward_unmatched": [],
+   "verdict": "kill"
+  },
+  "t1": {
+   "book": "t1",
+   "variants": 521,
+   "research": {
+    "label": "research set",
+    "days": 423,
+    "first": "2025-01-10",
+    "last": "2026-10-09",
+    "confidence": {
+     "mean": 86.3,
+     "min": 59.7,
+     "max": 96.9
+    },
+    "spearman": {
+     "value": 0.0657,
+     "lo": -0.0102,
+     "hi": 0.1436
+    },
+    "tercile_spread": {
+     "value": 689.0,
+     "lo": -260.0,
+     "hi": 1687.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 141,
+      "mean_net": 1322.0,
+      "max_c": 84.6
+     },
+     "middle": {
+      "n": 141,
+      "mean_net": 2168.0
+     },
+     "top": {
+      "n": 141,
+      "mean_net": 2011.0,
+      "min_c": 89.5
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": 775753.0,
+     "net_with_skip": 775753.0,
+     "max_drawdown_all": -23300.0,
+     "max_drawdown_with_skip": -23300.0
+    }
+   },
+   "first_half": {
+    "label": "first half",
+    "days": 211,
+    "first": "2025-01-10",
+    "last": "2025-11-19",
+    "confidence": {
+     "mean": 85.9,
+     "min": 62.0,
+     "max": 96.8
+    },
+    "spearman": {
+     "value": 0.0233,
+     "lo": -0.0896,
+     "hi": 0.1357
+    },
+    "tercile_spread": {
+     "value": -544.0,
+     "lo": -1641.0,
+     "hi": 1228.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 72,
+      "mean_net": 1756.0,
+      "max_c": 84.2
+     },
+     "middle": {
+      "n": 68,
+      "mean_net": 1963.0
+     },
+     "top": {
+      "n": 71,
+      "mean_net": 1212.0,
+      "min_c": 89.1
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": 345975.0,
+     "net_with_skip": 345975.0,
+     "max_drawdown_all": -21922.0,
+     "max_drawdown_with_skip": -21922.0
+    }
+   },
+   "second_half": {
+    "label": "second half",
+    "days": 212,
+    "first": "2025-11-20",
+    "last": "2026-10-09",
+    "confidence": {
+     "mean": 86.6,
+     "min": 59.7,
+     "max": 96.9
+    },
+    "spearman": {
+     "value": 0.0893,
+     "lo": -0.0119,
+     "hi": 0.1916
+    },
+    "tercile_spread": {
+     "value": 1387.0,
+     "lo": 190.0,
+     "hi": 2766.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 71,
+      "mean_net": 1210.0,
+      "max_c": 85.3
+     },
+     "middle": {
+      "n": 70,
+      "mean_net": 2278.0
+     },
+     "top": {
+      "n": 71,
+      "mean_net": 2597.0,
+      "min_c": 89.8
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": 429778.0,
+     "net_with_skip": 429778.0,
+     "max_drawdown_all": -23300.0,
+     "max_drawdown_with_skip": -23300.0
+    }
+   },
+   "forward": {
+    "label": "forward (held out)",
+    "days": 13,
+    "first": "2026-10-19",
+    "last": "2026-11-05",
+    "confidence": {
+     "mean": 85.4,
+     "min": 63.3,
+     "max": 94.8
+    },
+    "spearman": {
+     "value": 0.4451,
+     "lo": 0.1186,
+     "hi": 0.7568
+    },
+    "tercile_spread": {
+     "value": 6913.0,
+     "lo": 2497.0,
+     "hi": 9377.0
+    },
+    "terciles": {
+     "bottom": {
+      "n": 5,
+      "mean_net": -3539.0,
+      "max_c": 84.2
+     },
+     "middle": {
+      "n": 3,
+      "mean_net": -504.0
+     },
+     "top": {
+      "n": 5,
+      "mean_net": 3375.0,
+      "min_c": 87.8
+     }
+    },
+    "skip_rule": {
+     "days_skipped": 0,
+     "skipped_days_net": 0.0,
+     "net_all": -2332.0,
+     "net_with_skip": -2332.0,
+     "max_drawdown_all": -16862.0,
+     "max_drawdown_with_skip": -16862.0
+    }
+   },
+   "forward_unmatched": [
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16"
+   ],
+   "verdict": "kill"
+  }
+ },
+ "verdict": "kill"
+}

@@ -48,3 +48,6 @@ bl188/out/
 bl188/variants/
 bl189/out/
 bl190/out/
+
+# BL-210 per-day rows (regenerate with research/bl210/confidence.py; the summary JSON is tracked)
+bl210/*.csv
