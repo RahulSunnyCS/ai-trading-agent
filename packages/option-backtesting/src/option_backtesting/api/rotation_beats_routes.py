@@ -1,4 +1,4 @@
-"""`/legwise/rotation/beats`: the Rotation page's Books table columns "Last 60 days" and "Last 6
+"""`/legwise/rotation/beats`: the Rotation page's Books table columns "Last 60 sessions" and "Last 6
 months" (owner, 2026-11-05). The maths is `rotation/beats.py`; nothing here computes a figure and
 no route writes anything.
 
@@ -25,9 +25,27 @@ from ..rotation import beats, journal, store, warm
 
 router = APIRouter(prefix="/legwise/rotation/beats")
 
-CACHE_SECONDS = 300.0  # the files change once a night and at 09:16
+CACHE_SECONDS = (
+    3600.0  # a cap: the key holds the files' modified times, which change at 09:16 and nightly
+)
 _lock = threading.Lock()
 _cache: dict[tuple, tuple[float, Any]] = {}
+
+
+def _stamp(root: Any) -> tuple:
+    """Modified times of what the answer is built from: the days list (a new result day) and both
+    journals (a new entry)."""
+    out = []
+    for path in (
+        store.days_path(root),
+        store.journal_path(root),
+        store.journal_path(root, "t1"),
+    ):
+        try:
+            out.append(path.stat().st_mtime_ns)
+        except OSError:
+            out.append(0)
+    return tuple(out)
 
 
 def _error(status: int, message: str) -> JSONResponse:
@@ -44,9 +62,10 @@ def get_beats(book: str = Query(default="t1")) -> Any:
         root = data_dir()
     except (RuntimeError, OSError, ValueError) as error:
         return _error(503, f"the data root is not available: {error}")
-    # the day is part of the key: a cached answer never carries over midnight
+    # the day and the journal's and day list's modified times are the key: a cached answer never
+    # carries over midnight or past a new entry or a stored day
     day = beats.today()
-    key = (str(root), book, day, store.reading_slip())
+    key = (str(root), book, day, _stamp(root), store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)

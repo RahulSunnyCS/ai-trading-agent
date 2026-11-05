@@ -59,8 +59,9 @@ def world(monkeypatch):
     rng = np.random.default_rng(3)
     gross = {n: {d: float(rng.normal(0, 100)) for d in days} for n in NAMES}
     monkeypatch.setattr(candles, "_pool", lambda book: list(NAMES))
-    monkeypatch.setattr(beats, "_gross", lambda names, root: gross)
+    monkeypatch.setattr(beats, "_grosses", lambda names, root: gross)
     monkeypatch.setattr(beats, "MIN_POOL", 3)
+    monkeypatch.setattr(beats, "_late_days", lambda root, book: set())
 
     def picks(root, book, start, end):
         out = {}
@@ -110,18 +111,19 @@ def test_windows_report_every_window_and_the_recorded_days(world):
         assert 0 <= w["beats_random_pct"] <= 100 and w["random_p10"] <= w["random_p90"]
 
 
+def test_a_late_journal_entry_is_left_out_as_the_registered_read_out_does(world, monkeypatch):
+    days, _ = world
+    monkeypatch.setattr(beats, "_late_days", lambda root, book: {days[-1]})
+    d = beats.daily(None, "t1", days[0], days[-1], runs=20)
+    assert days[-1] not in d["days"]
+    assert d["left_out"][days[-1].isoformat()] == "recorded after the 09:16 entry"
+
+
 def test_same_answer_twice(world):
     days, _ = world
     a = beats.windows(None, "core", days[-1])
     b = beats.windows(None, "core", days[-1])
     assert a == b
-
-
-def test_rolling_starts_once_a_window_of_days_exists(world):
-    days, _ = world
-    d = beats.daily(None, "t1", days[0], days[-1], runs=30)
-    rows = beats.rolling(d, 60, 10)
-    assert rows[0]["day"] == days[59].isoformat() and rows[-1]["day"] == days[-1].isoformat()
 
 
 def test_the_route(world, monkeypatch, tmp_path):
@@ -145,11 +147,12 @@ def test_the_fixed_base_is_two_wide_and_one_dir_lots_over_its_own_days(monkeypat
     gross = {n: {d: float(rng.normal(0, 100)) for d in days} for n in NAMES}
     dir_leg = {d: float(rng.normal(0, 100)) for d in days}
     monkeypatch.setattr(candles, "_pool", lambda book: list(NAMES))
-    monkeypatch.setattr(beats, "_gross", lambda names, root: gross)
+    monkeypatch.setattr(beats, "_grosses", lambda names, root: gross)
     monkeypatch.setattr(
         beats.base_mod, "read_column", lambda path, column="gross", root=None: dir_leg
     )
     monkeypatch.setattr(beats, "MIN_POOL", 3)
+    monkeypatch.setattr(beats, "_late_days", lambda root, book: set())
     monkeypatch.setattr(
         candles,
         "picks_by_day",

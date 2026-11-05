@@ -16,7 +16,8 @@ re-derived days are in-sample: only the recorded days (from 2026-10-19) are out 
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+import calendar
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -25,7 +26,7 @@ from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import candles
 from .lists import MIN_WIDE_N
-from .readout import N_RUNS, random_day
+from .readout import N_RUNS, _grosses, random_day
 from .variants import is_buy, is_wide
 
 #: name -> sessions, or calendar months (`months`)
@@ -48,8 +49,17 @@ def today() -> date:
     return now_ist().date()
 
 
-def _gross(names: list[str], root: Path) -> dict[str, dict[date, float]]:
-    return {n: base_mod.read_column(candles.store.result_path(n, root), "gross") for n in names}
+def _late_days(root: Path, book: str) -> set[date]:
+    """The journal's days recorded after the first entry of the day (`before_first_entry` false):
+    the registered read-out never scores them, so neither does this."""
+    if book == "base":
+        return set()
+    path = candles.store.journal_path(root, "t1" if book == "t1" else None)
+    return {
+        date.fromisoformat(e["day"])
+        for e in candles.journal.read(path)
+        if not e.get("before_first_entry", False)
+    }
 
 
 def daily(root: Path, book: str, start: date, end: date, runs: int = N_RUNS) -> dict:
@@ -59,7 +69,8 @@ def daily(root: Path, book: str, start: date, end: date, runs: int = N_RUNS) -> 
         raise ValueError(f"book must be one of {', '.join(BOOKS)}")
     names = candles._pool(book)  # noqa: SLF001 - the one definition of a book's pool
     picks = candles.picks_by_day(root, book, start, end)
-    gross = _gross(names, root)
+    late = _late_days(root, book)
+    gross = _grosses(names, root)
     if book == "base":
         # the base's Dir leg is not a variant: its results sit in the base's own file
         gross[base_mod.DIR_NAME] = base_mod.read_column(base_mod._path(root), "gross")  # noqa: SLF001
@@ -71,6 +82,9 @@ def daily(root: Path, book: str, start: date, end: date, runs: int = N_RUNS) -> 
     left_out: dict[str, str] = {}
     for day in sorted(picks):
         p = picks[day]
+        if day in late:  # as the registered read-out: never a late entry
+            left_out[day.isoformat()] = "recorded after the 09:16 entry"
+            continue
         members = [n for n, _lots in p.names]
         lots_of = dict(p.names)
         if any(day not in gross.get(n, {}) for n in members):
@@ -104,11 +118,9 @@ def daily(root: Path, book: str, start: date, end: date, runs: int = N_RUNS) -> 
 
 
 def _months_back(end: date, months: int) -> date:
+    """`end` minus `months` calendar months, the day of the month clamped to the month's end."""
     y, m = divmod(end.year * 12 + end.month - 1 - months, 12)
-    first = date(y, m + 1, 1)
-    # the same day of the month, clamped to the month's last day
-    nxt = date(y + (m + 1) // 12, (m + 1) % 12 + 1, 1)
-    return min(first.replace(day=min(end.day, (nxt - timedelta(days=1)).day)), end)
+    return end.replace(year=y, month=m + 1, day=min(end.day, calendar.monthrange(y, m + 1)[1]))
 
 
 def window_slice(days: list[date], spec: dict) -> slice:
@@ -122,30 +134,21 @@ def window_slice(days: list[date], spec: dict) -> slice:
     return slice(first, len(days))
 
 
-def share(book: np.ndarray, rand: np.ndarray, sl: slice) -> dict | None:
-    if sl.stop - sl.start <= 0:
+def share(book: np.ndarray, rand: np.ndarray, sl: slice | np.ndarray) -> dict | None:
+    """The window's figures; `sl` is a slice or an array of day indexes."""
+    n = len(range(*sl.indices(len(book)))) if isinstance(sl, slice) else len(sl)
+    if n <= 0:
         return None
     total = float(book[sl].sum())
     r = rand[sl].sum(axis=0)
     return {
-        "days": int(sl.stop - sl.start),
+        "days": n,
         "total": total,
         "random_p50": float(np.percentile(r, 50)),
         "random_p10": float(np.percentile(r, 10)),
         "random_p90": float(np.percentile(r, 90)),
         "beats_random_pct": float((r < total).mean() * 100),
     }
-
-
-def rolling(data: dict, window: int = 60, step: int = 5) -> list[dict]:
-    """The window's share at every `step`th session once `window` sessions exist."""
-    out = []
-    days, book, rand = data["days"], data["book"], data["random"]
-    for end in range(window, len(days) + 1, step):
-        s = share(book, rand, slice(end - window, end))
-        if s:
-            out.append({"day": days[end - 1].isoformat(), **s})
-    return out
 
 
 def windows(root: Path | None = None, book: str = "t1", end: date | None = None) -> dict:
@@ -180,19 +183,9 @@ def windows(root: Path | None = None, book: str = "t1", end: date | None = None)
     out["windows"]["all"] = got
     # the days the journal recorded before the open: the only ones no later rule could have seen
     rec = np.array([i for i, s in enumerate(data["source"]) if s == "recorded"], dtype=int)
-    fwd = None
-    if rec.size:
-        total = float(bk[rec].sum())
-        r = rd[rec].sum(axis=0)
-        fwd = {
-            "days": int(rec.size),
-            "from": days[int(rec[0])].isoformat(),
-            "recorded_days": int(rec.size),
-            "total": total,
-            "random_p50": float(np.percentile(r, 50)),
-            "random_p10": float(np.percentile(r, 10)),
-            "random_p90": float(np.percentile(r, 90)),
-            "beats_random_pct": float((r < total).mean() * 100),
-        }
+    fwd = share(bk, rd, rec)
+    if fwd:
+        fwd["from"] = days[int(rec[0])].isoformat()
+        fwd["recorded_days"] = int(rec.size)
     out["windows"]["recorded"] = fwd
     return out

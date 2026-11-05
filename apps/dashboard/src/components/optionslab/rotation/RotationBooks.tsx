@@ -181,9 +181,9 @@ export function RotationBooks({
           </Th>
           <Th dense align="right">
             <span className="inline-flex items-center gap-1">
-              Last 60 days
+              Last 60 sessions
               <InfoTooltip
-                label="About the last 60 days"
+                label="About the last 60 sessions"
                 text="The same beats-random share, over the book's last 60 sessions only: is it losing its edge now? Days the journal recorded at 09:16 count as they were; earlier days are the 09:16 rule re-derived from the rows before each day (without the expiry-day rule). For Adaptive Tuned the re-derived days are in-sample, because its settings were tuned on that history. Hover a figure for the days behind it."
               />
             </span>
