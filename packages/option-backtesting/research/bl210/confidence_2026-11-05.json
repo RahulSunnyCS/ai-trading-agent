@@ -187,6 +187,7 @@
      "max_drawdown_with_skip": -34648.0
     }
    },
+   "forward_unmatched": [],
    "verdict": "kill"
   },
   "t1": {
@@ -329,49 +330,56 @@
    },
    "forward": {
     "label": "forward (held out)",
-    "days": 18,
-    "first": "2026-10-12",
+    "days": 13,
+    "first": "2026-10-19",
     "last": "2026-11-05",
     "confidence": {
-     "mean": 86.1,
+     "mean": 85.4,
      "min": 63.3,
      "max": 94.8
     },
     "spearman": {
-     "value": 0.3664,
-     "lo": -0.0659,
-     "hi": 0.7284
+     "value": 0.4451,
+     "lo": 0.1186,
+     "hi": 0.7568
     },
     "tercile_spread": {
-     "value": 6372.0,
-     "lo": 846.0,
-     "hi": 9585.0
+     "value": 6913.0,
+     "lo": 2497.0,
+     "hi": 9377.0
     },
     "terciles": {
      "bottom": {
-      "n": 6,
-      "mean_net": -1449.0,
-      "max_c": 84.4
+      "n": 5,
+      "mean_net": -3539.0,
+      "max_c": 84.2
      },
      "middle": {
-      "n": 6,
-      "mean_net": 1330.0
+      "n": 3,
+      "mean_net": -504.0
      },
      "top": {
-      "n": 6,
-      "mean_net": 4923.0,
-      "min_c": 89.8
+      "n": 5,
+      "mean_net": 3375.0,
+      "min_c": 87.8
      }
     },
     "skip_rule": {
      "days_skipped": 0,
      "skipped_days_net": 0.0,
-     "net_all": 28825.0,
-     "net_with_skip": 28825.0,
+     "net_all": -2332.0,
+     "net_with_skip": -2332.0,
      "max_drawdown_all": -16862.0,
      "max_drawdown_with_skip": -16862.0
     }
    },
+   "forward_unmatched": [
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16"
+   ],
    "verdict": "kill"
   }
  },

@@ -128,8 +128,10 @@ Committed before any run (2026-11-05).
   | T1 | +0.066 [−0.010, +0.144] | +689 [−260, +1,687] | 1,322 · 2,168 · 2,011 | 60–97, mean 86 |
 
   Halves: Core ρ +0.040 [−0.061, +0.139] then +0.123 [+0.018, +0.229]; T1 +0.023 [−0.090,
-  +0.136] then +0.089 [−0.012, +0.192], its first-half spread −₹544. Forward (18 days, held out):
-  Core ρ +0.216 [−0.183, +0.476], T1 +0.366 [−0.066, +0.728], spread +₹6,372 [+846, +9,585] on T1.
+  +0.136] then +0.089 [−0.012, +0.192], its first-half spread −₹544. Forward (held out; a journal day counts only when the re-derived picks are the recorded ones):
+  Core 18 days, ρ +0.216 [−0.183, +0.476]; T1 13 days (12–16 Oct, before the track went live, do not
+  match its backfilled entries and are left out), ρ +0.445 [+0.119, +0.757], spread +₹6,913 [+2,497,
+  +9,377]: the strongest reading, on 13 days.
   The skip rule (C < 40) fired on no day: C never fell below 50. Reading: a small, consistently
   positive lead that the registered test does not confirm, and a figure whose scale (₹3,000, the
   50 % rupee floor) never reads "bad". Rescaling it is a sweep this item ruled out.

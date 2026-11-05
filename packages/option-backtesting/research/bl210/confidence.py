@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from datetime import date
 from pathlib import Path
 
@@ -75,10 +76,13 @@ def prepare(track: str | None):
     }
 
 
-def picks_for(prep: dict, i: int) -> list[str] | None:
+def picks_for(
+    prep: dict, i: int
+) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, bool | None]:
     """The three core picks list C would record on day i (rows strictly before i, the day's own
-    attributes; a journal day: the entry's recorded attributes), with the expiry-only rule and
-    the SL150 % cap as the day itself decides them."""
+    attributes; a journal day: the entry's recorded attributes and its recorded expiry-only rule,
+    as `rankic.day_row`), with the SL150 % cap as the day itself decides it. The last value says
+    whether a journal day's re-derived picks equal the recorded ones (None: not a journal day)."""
     names = prep["names"]
     day: date = prep["days"][i]
     weekday, band = prep["weekday"][: i + 1].copy(), prep["band"][: i + 1].copy()
@@ -88,29 +92,25 @@ def picks_for(prep: dict, i: int) -> list[str] | None:
         weekday[-1] = entry["weekday"]
         band[-1] = entry["vix_band"]
         lab = entry_labels(entry)
-        dmat[-1] = dte_matrix(
-            np.array([str(lab.get("NIFTY", "unknown"))]),
-            np.array([str(lab.get("SENSEX", "unknown"))]),
-            names,
-        )[0]
+        dte_n, dte_s = str(lab.get("NIFTY", "unknown")), str(lab.get("SENSEX", "unknown"))
+        dmat[-1] = dte_matrix(np.array([dte_n]), np.array([dte_s]), names)[0]
+        rule = entry.get("expiry_only")
+    else:
+        dte_n, dte_s = str(prep["attrs"][day]["dte_n"]), str(prep["attrs"][day]["dte_s"])
+        rule = expiry.rule_index(day, {"dte_n": dte_n, "dte_s": dte_s})
     P = np.vstack([prep["net"][:i], np.zeros((1, len(names)))])  # row i is never read
     assert P.shape[0] == i + 1
     comp = composite(P, weekday, band, dmat, names, LISTS[LIST_KEY], prep["fam"])
     picks = select(comp, names)
-    dte_n = (
-        str(prep["attrs"][day]["dte_n"]) if entry is None else str(entry_labels(entry).get("NIFTY"))
-    )
-    dte_s = (
-        str(prep["attrs"][day]["dte_s"])
-        if entry is None
-        else str(entry_labels(entry).get("SENSEX"))
-    )
-    rule = expiry.rule_index(day, {"dte_n": dte_n, "dte_s": dte_s})
     if rule and LIST_KEY in expiry.RULE_LISTS:
         picks = expiry.filter_picks(comp, names, picks, rule)
     elif sl150_cap.applies(day, dte_n) and LIST_KEY in expiry.RULE_LISTS:
         picks = sl150_cap.cap_picks(comp, names, picks)
-    return list(picks.core), weekday, band, dmat
+    matches = None
+    if entry is not None:
+        rec = ((entry.get("lists") or {}).get(LIST_KEY) or {}).get("core")
+        matches = rec is not None and set(rec) == set(picks.core)
+    return list(picks.core), weekday, band, dmat, matches
 
 
 # ---------------------------------------------------------------------------------------------
@@ -296,15 +296,32 @@ def run_book(book: str, track: str | None) -> dict:
     for i, day in enumerate(days):
         if i < WARMUP or day < FIRST:
             continue
-        core, weekday, band, dmat = picks_for(prep, i)
-        if len(core) == 0:
-            continue
+        core, weekday, band, dmat, matches = picks_for(prep, i)
         conf = confidence(prep, i, core, weekday, band, dmat)
         idx = [prep["names"].index(n) for n in core]
         net = float(prep["net"][i, idx].sum())  # read AFTER C(D): the day's own result
-        rows.append({"day": day.isoformat(), "picks": core, "net": round(net, 0), **conf})
+        rows.append(
+            {
+                "day": day.isoformat(),
+                "picks": core,
+                "net": round(net, 0),
+                "matches_entry": matches,
+                **conf,
+            }
+        )
     research = [r for r in rows if date.fromisoformat(r["day"]) < FORWARD_FROM]
-    forward = [r for r in rows if date.fromisoformat(r["day"]) >= FORWARD_FROM]
+    # a forward day counts only when the re-derived picks are the ones the journal recorded; any
+    # other journal day (results repaired since, a late entry) is listed, never a forward observation
+    forward = [
+        r
+        for r in rows
+        if date.fromisoformat(r["day"]) >= FORWARD_FROM and r["matches_entry"] is True
+    ]
+    unmatched = [
+        r["day"]
+        for r in rows
+        if date.fromisoformat(r["day"]) >= FORWARD_FROM and r["matches_entry"] is not True
+    ]
     half = len(research) // 2
     out = {
         "book": book,
@@ -315,6 +332,7 @@ def run_book(book: str, track: str | None) -> dict:
         "forward": describe(forward, "forward (held out)")
         if len(forward) >= 2 * BLOCK
         else {"label": "forward (held out)", "days": len(forward)},
+        "forward_unmatched": unmatched,
     }
     out["verdict"] = verdict(out["research"])
     return out, rows
@@ -334,6 +352,7 @@ def main() -> None:
                     "picks",
                     "confidence",
                     "net",
+                    "matches_entry",
                     *(f"{k}_{m}" for k in CRITERIA for m in ("win", "rupee", "days")),
                 ]
             )
@@ -344,6 +363,7 @@ def main() -> None:
                         " ".join(r["picks"]),
                         r["confidence"],
                         r["net"],
+                        r["matches_entry"],
                         *(
                             r.get(k, {}).get(m, "")
                             for k in CRITERIA
@@ -352,6 +372,10 @@ def main() -> None:
                     ]
                 )
         print(f"\n== {book} ({result['variants']} variants) -> {result['verdict'].upper()}")
+        if result["forward_unmatched"]:
+            print(
+                f"  forward days whose re-derived picks differ from the journal (not counted): {', '.join(result['forward_unmatched'])}"
+            )
         for part in ("research", "first_half", "second_half", "forward"):
             d = result[part]
             if "spearman" not in d or d["days"] == 0:
@@ -381,7 +405,17 @@ def main() -> None:
         else "inconclusive"
     )
     report["verdict"] = overall
-    (HERE / f"confidence_{today}.json").write_text(json.dumps(report, indent=1))
+
+    def _no_nan(x):
+        if isinstance(x, float) and math.isnan(x):
+            return None
+        if isinstance(x, dict):
+            return {k: _no_nan(v) for k, v in x.items()}
+        if isinstance(x, list):
+            return [_no_nan(v) for v in x]
+        return x
+
+    (HERE / f"confidence_{today}.json").write_text(json.dumps(_no_nan(report), indent=1))
     print(f"\nVERDICT: {overall.upper()}  -> {HERE / f'confidence_{today}.json'}")
 
 

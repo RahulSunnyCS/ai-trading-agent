@@ -28,7 +28,8 @@ None. Not shown, not traded on.
 ## What we know
 
 - **The sign is consistently positive but small.** ρ is +0.02 to +0.12 on every half of both
-  books and +0.22 / +0.37 on the 18 forward days (intervals wide). The bottom tercile of C earned
+  books and +0.22 (Core, 18 days) / +0.45 [+0.12, +0.76] (T1, 13 days: its five journal days before the
+  track went live do not match the re-derived picks and are left out) on the forward days. The bottom tercile of C earned
   ₹846 (Core) and ₹1,322 (T1) a day against ₹1,587 and ₹2,011 for the top tercile. A lead, not a
   finding: the intervals include zero, and the second half carries it (Core first half ρ +0.04
   [−0.06, +0.14], T1 first half spread −₹544).
