@@ -54,7 +54,9 @@ def test_variant_c_adds_a_fallback() -> None:
 def test_variant_d_uses_running_low_and_adaptive_threshold() -> None:
     loaded = load_strategy(STRATEGIES_DIR / "D_adaptive_trailing.yaml")
     assert all(ladder.when.ref.at == "running_low" for ladder in loaded.strategy.ladders)
-    assert all(ladder.when.ref.plus.feature == "spike_thr_5d" for ladder in loaded.strategy.ladders)
+    assert all(
+        ladder.when.ref.plus.feature == "spike_thr_5d" for ladder in loaded.strategy.ladders
+    )
     assert loaded.features["spike_thr_5d"].lag == 1
 
 

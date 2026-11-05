@@ -58,13 +58,7 @@ class TestPresets:
         r = client.get("/presets")
         assert r.status_code == 200
         names = {p["name"] for p in r.json()}
-        assert names == {
-            "A_flat",
-            "B_pyramid",
-            "C_pyramid_fallback",
-            "D_adaptive_trailing",
-            "or_breakout",
-        }
+        assert names == {"A_flat", "B_pyramid", "C_pyramid_fallback", "D_adaptive_trailing", "or_breakout"}
 
     def test_get_preset_returns_yaml_content(self, client: TestClient) -> None:
         r = client.get("/presets/A_flat")
@@ -136,7 +130,9 @@ class TestCoverage:
 class TestRuns:
     def test_run_against_empty_cache_is_404(self, client: TestClient) -> None:
         yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
-        r = client.post("/runs", json={"yaml": yaml_text, "from": "2026-08-17", "to": "2026-09-04"})
+        r = client.post(
+            "/runs", json={"yaml": yaml_text, "from": "2026-08-17", "to": "2026-09-04"}
+        )
         assert r.status_code == 404
 
     def test_invalid_strategy_run_is_422(self, client: TestClient) -> None:
@@ -160,11 +156,11 @@ class TestRuns:
         assert body["margin"]["peak_lots"] == 4
         assert body["margin"]["margin_per_lot_inr"] == 140000
         assert body["margin"]["peak_margin_inr"] == 560000
-        assert body["margin"]["return_on_peak_margin"] == pytest.approx(body["net_inr"] / 560000)
+        assert body["margin"]["return_on_peak_margin"] == pytest.approx(
+            body["net_inr"] / 560000
+        )
 
-    def test_bootstrap_flag_populates_the_bootstrap_field(
-        self, real_cache_client: TestClient
-    ) -> None:
+    def test_bootstrap_flag_populates_the_bootstrap_field(self, real_cache_client: TestClient) -> None:
         yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
         r = real_cache_client.post(
             "/runs",

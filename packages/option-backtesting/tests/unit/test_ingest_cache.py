@@ -21,244 +21,41 @@ from option_backtesting.data.raw import raw_path, write_raw
 # Verbatim AlgoTest response: NIFTY OPT ATM CE, 15m, FIXED 09:17, 2026-09-04.
 REAL_NIFTY_ATM_CE_0904 = {
     "candles": [
-        {
-            "datetime": "2026-09-04T09:30:00",
-            "open": 101.7,
-            "high": 110.6,
-            "low": 101.7,
-            "close": 104.65,
-            "volume": 19432010.0,
-        },
-        {
-            "datetime": "2026-09-04T09:45:00",
-            "open": 104.55,
-            "high": 107.55,
-            "low": 100.0,
-            "close": 105.65,
-            "volume": 12308140.0,
-        },
-        {
-            "datetime": "2026-09-04T10:00:00",
-            "open": 105.55,
-            "high": 124.2,
-            "low": 105.5,
-            "close": 120.35,
-            "volume": 24662430.0,
-        },
-        {
-            "datetime": "2026-09-04T10:15:00",
-            "open": 120.9,
-            "high": 128.4,
-            "low": 110.9,
-            "close": 113.5,
-            "volume": 15360085.0,
-        },
-        {
-            "datetime": "2026-09-04T10:30:00",
-            "open": 113.5,
-            "high": 127.95,
-            "low": 110.05,
-            "close": 127.95,
-            "volume": 14937390.0,
-        },
-        {
-            "datetime": "2026-09-04T10:45:00",
-            "open": 127.8,
-            "high": 132.9,
-            "low": 121.3,
-            "close": 124.9,
-            "volume": 12814620.0,
-        },
-        {
-            "datetime": "2026-09-04T11:00:00",
-            "open": 125.0,
-            "high": 130.0,
-            "low": 124.05,
-            "close": 128.75,
-            "volume": 6228105.0,
-        },
-        {
-            "datetime": "2026-09-04T11:15:00",
-            "open": 128.75,
-            "high": 131.35,
-            "low": 122.0,
-            "close": 122.0,
-            "volume": 8324225.0,
-        },
-        {
-            "datetime": "2026-09-04T11:30:00",
-            "open": 122.75,
-            "high": 132.3,
-            "low": 119.8,
-            "close": 129.45,
-            "volume": 10589800.0,
-        },
-        {
-            "datetime": "2026-09-04T11:45:00",
-            "open": 129.2,
-            "high": 146.0,
-            "low": 129.15,
-            "close": 133.9,
-            "volume": 12193545.0,
-        },
-        {
-            "datetime": "2026-09-04T12:00:00",
-            "open": 134.55,
-            "high": 141.2,
-            "low": 133.4,
-            "close": 134.35,
-            "volume": 4820010.0,
-        },
-        {
-            "datetime": "2026-09-04T12:15:00",
-            "open": 134.0,
-            "high": 134.0,
-            "low": 115.2,
-            "close": 117.25,
-            "volume": 9467900.0,
-        },
-        {
-            "datetime": "2026-09-04T12:30:00",
-            "open": 116.65,
-            "high": 117.65,
-            "low": 103.95,
-            "close": 109.5,
-            "volume": 11619400.0,
-        },
-        {
-            "datetime": "2026-09-04T12:45:00",
-            "open": 109.75,
-            "high": 110.35,
-            "low": 103.3,
-            "close": 104.3,
-            "volume": 6312410.0,
-        },
-        {
-            "datetime": "2026-09-04T13:00:00",
-            "open": 104.05,
-            "high": 109.8,
-            "low": 96.85,
-            "close": 103.3,
-            "volume": 11120850.0,
-        },
-        {
-            "datetime": "2026-09-04T13:15:00",
-            "open": 102.95,
-            "high": 113.85,
-            "low": 102.1,
-            "close": 110.0,
-            "volume": 9818900.0,
-        },
-        {
-            "datetime": "2026-09-04T13:30:00",
-            "open": 110.35,
-            "high": 118.3,
-            "low": 104.5,
-            "close": 106.2,
-            "volume": 13436475.0,
-        },
-        {
-            "datetime": "2026-09-04T13:45:00",
-            "open": 106.15,
-            "high": 108.05,
-            "low": 101.15,
-            "close": 104.65,
-            "volume": 8806980.0,
-        },
-        {
-            "datetime": "2026-09-04T14:00:00",
-            "open": 105.25,
-            "high": 111.45,
-            "low": 101.1,
-            "close": 103.95,
-            "volume": 8991645.0,
-        },
-        {
-            "datetime": "2026-09-04T14:15:00",
-            "open": 103.9,
-            "high": 111.0,
-            "low": 103.7,
-            "close": 109.5,
-            "volume": 5652075.0,
-        },
-        {
-            "datetime": "2026-09-04T14:30:00",
-            "open": 109.75,
-            "high": 118.1,
-            "low": 105.25,
-            "close": 116.2,
-            "volume": 10556000.0,
-        },
-        {
-            "datetime": "2026-09-04T14:45:00",
-            "open": 115.9,
-            "high": 120.0,
-            "low": 99.0,
-            "close": 99.4,
-            "volume": 17424745.0,
-        },
-        {
-            "datetime": "2026-09-04T15:00:00",
-            "open": 100.85,
-            "high": 104.25,
-            "low": 96.55,
-            "close": 102.3,
-            "volume": 10480665.0,
-        },
-        {
-            "datetime": "2026-09-04T15:15:00",
-            "open": 102.0,
-            "high": 106.0,
-            "low": 97.65,
-            "close": 102.9,
-            "volume": 10624965.0,
-        },
-        {
-            "datetime": "2026-09-04T15:30:00",
-            "open": 102.25,
-            "high": 106.0,
-            "low": 84.15,
-            "close": 87.0,
-            "volume": 17514185.0,
-        },
-        {
-            "datetime": "2026-09-04T15:40:00",
-            "open": 87.5,
-            "high": 90.65,
-            "low": 87.15,
-            "close": 89.9,
-            "volume": 4803175.0,
-        },
+        {"datetime": "2026-09-04T09:30:00", "open": 101.7, "high": 110.6, "low": 101.7, "close": 104.65, "volume": 19432010.0},
+        {"datetime": "2026-09-04T09:45:00", "open": 104.55, "high": 107.55, "low": 100.0, "close": 105.65, "volume": 12308140.0},
+        {"datetime": "2026-09-04T10:00:00", "open": 105.55, "high": 124.2, "low": 105.5, "close": 120.35, "volume": 24662430.0},
+        {"datetime": "2026-09-04T10:15:00", "open": 120.9, "high": 128.4, "low": 110.9, "close": 113.5, "volume": 15360085.0},
+        {"datetime": "2026-09-04T10:30:00", "open": 113.5, "high": 127.95, "low": 110.05, "close": 127.95, "volume": 14937390.0},
+        {"datetime": "2026-09-04T10:45:00", "open": 127.8, "high": 132.9, "low": 121.3, "close": 124.9, "volume": 12814620.0},
+        {"datetime": "2026-09-04T11:00:00", "open": 125.0, "high": 130.0, "low": 124.05, "close": 128.75, "volume": 6228105.0},
+        {"datetime": "2026-09-04T11:15:00", "open": 128.75, "high": 131.35, "low": 122.0, "close": 122.0, "volume": 8324225.0},
+        {"datetime": "2026-09-04T11:30:00", "open": 122.75, "high": 132.3, "low": 119.8, "close": 129.45, "volume": 10589800.0},
+        {"datetime": "2026-09-04T11:45:00", "open": 129.2, "high": 146.0, "low": 129.15, "close": 133.9, "volume": 12193545.0},
+        {"datetime": "2026-09-04T12:00:00", "open": 134.55, "high": 141.2, "low": 133.4, "close": 134.35, "volume": 4820010.0},
+        {"datetime": "2026-09-04T12:15:00", "open": 134.0, "high": 134.0, "low": 115.2, "close": 117.25, "volume": 9467900.0},
+        {"datetime": "2026-09-04T12:30:00", "open": 116.65, "high": 117.65, "low": 103.95, "close": 109.5, "volume": 11619400.0},
+        {"datetime": "2026-09-04T12:45:00", "open": 109.75, "high": 110.35, "low": 103.3, "close": 104.3, "volume": 6312410.0},
+        {"datetime": "2026-09-04T13:00:00", "open": 104.05, "high": 109.8, "low": 96.85, "close": 103.3, "volume": 11120850.0},
+        {"datetime": "2026-09-04T13:15:00", "open": 102.95, "high": 113.85, "low": 102.1, "close": 110.0, "volume": 9818900.0},
+        {"datetime": "2026-09-04T13:30:00", "open": 110.35, "high": 118.3, "low": 104.5, "close": 106.2, "volume": 13436475.0},
+        {"datetime": "2026-09-04T13:45:00", "open": 106.15, "high": 108.05, "low": 101.15, "close": 104.65, "volume": 8806980.0},
+        {"datetime": "2026-09-04T14:00:00", "open": 105.25, "high": 111.45, "low": 101.1, "close": 103.95, "volume": 8991645.0},
+        {"datetime": "2026-09-04T14:15:00", "open": 103.9, "high": 111.0, "low": 103.7, "close": 109.5, "volume": 5652075.0},
+        {"datetime": "2026-09-04T14:30:00", "open": 109.75, "high": 118.1, "low": 105.25, "close": 116.2, "volume": 10556000.0},
+        {"datetime": "2026-09-04T14:45:00", "open": 115.9, "high": 120.0, "low": 99.0, "close": 99.4, "volume": 17424745.0},
+        {"datetime": "2026-09-04T15:00:00", "open": 100.85, "high": 104.25, "low": 96.55, "close": 102.3, "volume": 10480665.0},
+        {"datetime": "2026-09-04T15:15:00", "open": 102.0, "high": 106.0, "low": 97.65, "close": 102.9, "volume": 10624965.0},
+        {"datetime": "2026-09-04T15:30:00", "open": 102.25, "high": 106.0, "low": 84.15, "close": 87.0, "volume": 17514185.0},
+        {"datetime": "2026-09-04T15:40:00", "open": 87.5, "high": 90.65, "low": 87.15, "close": 89.9, "volume": 4803175.0},
     ]
 }
 
 # From golden_15_sessions.py's AC["0904"]: (open, [24 closes]).
 GOLDEN_0904_ATM_CE_OPEN = 101.7
 GOLDEN_0904_ATM_CE_CLOSES = [
-    104.65,
-    105.65,
-    120.35,
-    113.5,
-    127.95,
-    124.9,
-    128.75,
-    122.0,
-    129.45,
-    133.9,
-    134.35,
-    117.25,
-    109.5,
-    104.3,
-    103.3,
-    110.0,
-    106.2,
-    104.65,
-    103.95,
-    109.5,
-    116.2,
-    99.4,
-    102.3,
-    102.9,
+    104.65, 105.65, 120.35, 113.5, 127.95, 124.9, 128.75, 122.0, 129.45, 133.9,
+    134.35, 117.25, 109.5, 104.3, 103.3, 110.0, 106.2, 104.65, 103.95, 109.5,
+    116.2, 99.4, 102.3, 102.9,
 ]
 
 
@@ -284,9 +81,7 @@ def test_ingest_writes_parquet_matching_golden_fixture(
     written = write_raw(raw_dir / "algotest", request_for_0904, REAL_NIFTY_ATM_CE_0904)
     assert written == raw_path(raw_dir / "algotest", request_for_0904)
 
-    result = ingest_date(
-        "NIFTY", date(2026, 9, 4), raw_dir=raw_dir / "algotest", cache_dir=cache_dir
-    )
+    result = ingest_date("NIFTY", date(2026, 9, 4), raw_dir=raw_dir / "algotest", cache_dir=cache_dir)
     assert result.bars_written == 26
 
     cache = Cache(cache_dir)
@@ -333,37 +128,17 @@ def test_identical_series_gate_fires_on_the_3_sep_style_collision(tmp_path: Path
 
     reqs = plan_requests("NIFTY", day, day)
     atm_pe_req = next(
-        r
-        for r in reqs
-        if r["raw_key"]["strike_rule"] == "ATM"
-        and r["raw_key"]["leg"] == "PE"
+        r for r in reqs if r["raw_key"]["strike_rule"] == "ATM" and r["raw_key"]["leg"] == "PE"
         and r["timeframe"] == "15m"
     )
     otm1_pe_req = next(
-        r
-        for r in reqs
-        if r["raw_key"]["strike_rule"] == "OTM1"
-        and r["raw_key"]["leg"] == "PE"
+        r for r in reqs if r["raw_key"]["strike_rule"] == "OTM1" and r["raw_key"]["leg"] == "PE"
         and r["timeframe"] == "15m"
     )
     identical_response = {
         "candles": [
-            {
-                "datetime": "2026-09-03T09:30:00",
-                "open": 92.0,
-                "high": 98.05,
-                "low": 82.5,
-                "close": 98.05,
-                "volume": 100.0,
-            },
-            {
-                "datetime": "2026-09-03T09:45:00",
-                "open": 98.05,
-                "high": 85.15,
-                "low": 82.5,
-                "close": 82.5,
-                "volume": 100.0,
-            },
+            {"datetime": "2026-09-03T09:30:00", "open": 92.0, "high": 98.05, "low": 82.5, "close": 98.05, "volume": 100.0},
+            {"datetime": "2026-09-03T09:45:00", "open": 98.05, "high": 85.15, "low": 82.5, "close": 82.5, "volume": 100.0},
         ]
     }
     write_raw(raw_dir / "algotest", atm_pe_req, identical_response)

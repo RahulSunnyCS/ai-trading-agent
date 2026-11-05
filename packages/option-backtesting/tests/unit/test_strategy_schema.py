@@ -118,7 +118,9 @@ class TestCondition:
     def test_value_and_ref_both_set_is_rejected(self) -> None:
         ta: TypeAdapter[Condition] = TypeAdapter(Condition)
         with pytest.raises(pydantic.ValidationError):
-            ta.validate_python({"feature": "x", "op": "==", "value": 1, "ref": {"feature": "y"}})
+            ta.validate_python(
+                {"feature": "x", "op": "==", "value": 1, "ref": {"feature": "y"}}
+            )
 
     def test_neither_value_nor_ref_is_rejected(self) -> None:
         ta: TypeAdapter[Condition] = TypeAdapter(Condition)
@@ -140,12 +142,7 @@ class TestStructuralValidation:
     def test_ladder_after_unknown_id_rejected(self) -> None:
         bad = _strategy(
             ladders=[
-                {
-                    "id": "t1",
-                    "when": {"feature": "x", "op": ">=", "value": 1},
-                    "lots": 1,
-                    "after": "nope",
-                }
+                {"id": "t1", "when": {"feature": "x", "op": ">=", "value": 1}, "lots": 1, "after": "nope"}
             ]
         )
         with pytest.raises(pydantic.ValidationError, match="not a declared ladder id"):

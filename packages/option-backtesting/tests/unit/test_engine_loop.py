@@ -70,9 +70,7 @@ def _ladder(ladder_id: str, threshold: float, after: str | None = None) -> Ladde
     return Ladder(
         id=ladder_id,
         when=FeatureCondition(
-            feature="atm_straddle",
-            op=">=",
-            ref=Ref(feature="atm_straddle", at="entry", plus=threshold),
+            feature="atm_straddle", op=">=", ref=Ref(feature="atm_straddle", at="entry", plus=threshold)
         ),
         lots=1,
         after=after,

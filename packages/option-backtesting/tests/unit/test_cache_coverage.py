@@ -8,38 +8,10 @@ from option_backtesting.data.raw import write_raw
 
 _ATM_CE_CANDLES = {
     "candles": [
-        {
-            "datetime": "2026-09-04T09:30:00",
-            "open": 101.7,
-            "high": 110.6,
-            "low": 101.7,
-            "close": 104.65,
-            "volume": 1.0,
-        },
-        {
-            "datetime": "2026-09-04T09:45:00",
-            "open": 104.55,
-            "high": 107.55,
-            "low": 100.0,
-            "close": 105.65,
-            "volume": 1.0,
-        },
-        {
-            "datetime": "2026-09-04T10:00:00",
-            "open": 105.55,
-            "high": 124.2,
-            "low": 105.5,
-            "close": 120.35,
-            "volume": 1.0,
-        },
-        {
-            "datetime": "2026-09-04T10:15:00",
-            "open": 120.9,
-            "high": 128.4,
-            "low": 110.9,
-            "close": 113.5,
-            "volume": 1.0,
-        },
+        {"datetime": "2026-09-04T09:30:00", "open": 101.7, "high": 110.6, "low": 101.7, "close": 104.65, "volume": 1.0},
+        {"datetime": "2026-09-04T09:45:00", "open": 104.55, "high": 107.55, "low": 100.0, "close": 105.65, "volume": 1.0},
+        {"datetime": "2026-09-04T10:00:00", "open": 105.55, "high": 124.2, "low": 105.5, "close": 120.35, "volume": 1.0},
+        {"datetime": "2026-09-04T10:15:00", "open": 120.9, "high": 128.4, "low": 110.9, "close": 113.5, "volume": 1.0},
     ]
 }
 

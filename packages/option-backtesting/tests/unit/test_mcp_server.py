@@ -319,7 +319,9 @@ class TestProposeStrategy:
         assert "lots: 6" in body["yaml"]
 
     async def test_unknown_preset_is_rejected(self) -> None:
-        result = await _call("propose_strategy", {"base_preset": "does_not_exist", "changes": {}})
+        result = await _call(
+            "propose_strategy", {"base_preset": "does_not_exist", "changes": {}}
+        )
         body = json.loads(result.content[0].text)
         assert body["valid"] is False
         assert body["yaml"] is None

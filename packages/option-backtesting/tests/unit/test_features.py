@@ -36,7 +36,9 @@ class TestLagRequirement:
             parse_feature({"type": "rolling_mean", "source": "straddle_runup", "days": 5})
 
     def test_rolling_mean_with_lag_succeeds(self) -> None:
-        f = parse_feature({"type": "rolling_mean", "source": "straddle_runup", "days": 5, "lag": 1})
+        f = parse_feature(
+            {"type": "rolling_mean", "source": "straddle_runup", "days": 5, "lag": 1}
+        )
         assert f.lag == 1
 
     def test_ewma_without_lag_fails(self) -> None:
@@ -65,11 +67,7 @@ class TestLoadFeatures:
     def test_loads_the_design_handoff_example_block(self) -> None:
         raw = {
             "atm_straddle": {"type": "leg_sum", "legs": ["ATM.CE", "ATM.PE"], "fix_time": "09:17"},
-            "otm1_strangle": {
-                "type": "leg_sum",
-                "legs": ["OTM1.CE", "OTM1.PE"],
-                "fix_time": "09:17",
-            },
+            "otm1_strangle": {"type": "leg_sum", "legs": ["OTM1.CE", "OTM1.PE"], "fix_time": "09:17"},
             "straddle_runup": {"type": "max_runup", "source": "atm_straddle"},
             "spike_thr_5d": {
                 "type": "rolling_mean",
