@@ -316,17 +316,17 @@ def test_every_fill_of_the_week_shows_even_when_no_lot_claims_it():
     )
     blocks = {b["week"]: b for b in out["groups"][0]["blocks"]}
     week1 = blocks["2026-10-16"]
-    extra = [x for x in week1["lines"] if x["status"] == rl.OUTSIDE]
-    assert [(x["symbol"], x["side"], x["shares"]) for x in extra] == [
-        ("ECHO", "buy", 50.0),
-        ("ECHO", "sell", 50.0),
-    ]
+    # ECHO was bought and sold inside the week: netted away (owner, 2026-11-05), no line
+    assert [x["symbol"] for x in week1["lines"]] == ["ALPHA"]
     assert week1["status"] == rl.DONE  # the lot's own orders decide the status
     assert week1["holding_after"] == [{"symbol": "ALPHA", "shares": 33.0}]
-    assert week1["bought"] == 33 * 400 + 50 * 200 and week1["sold"] == 50 * 190
+    assert week1["bought"] == 33 * 400 and week1["sold"] == 0
     week2 = blocks["2026-10-23"]
+    # the lot's DELTA buy and the outside DELTA buy are one line, the lot's status kept
+    delta = next(x for x in week2["lines"] if x["symbol"] == "DELTA")
+    assert (delta["side"], delta["shares"], delta["status"]) == ("buy", 2.0, "done")
+    assert delta["value"] == 7065 + 1000
     assert [(x["symbol"], x["side"]) for x in week2["lines"] if x["status"] == rl.OUTSIDE] == [
-        ("DELTA", "buy"),
         ("INDIA", "sell"),
     ]
     alone = blocks["2026-11-06"]
@@ -417,3 +417,28 @@ def test_the_kite_sync_route_reads_kite_whatever_the_holdings_source(monkeypatch
 
     monkeypatch.setattr(holdings_sync, "sync", refused)
     assert client.post("/api/kite/sync").status_code == 409
+
+
+def test_a_lots_buys_and_sells_of_one_stock_in_a_week_show_as_one_net_line():
+    """Owner, 2026-11-05: 6 bought and 2 sold is "buy 4"; 50 bought and 50 sold is no line."""
+    blocks = _build(
+        [
+            _rebalance(
+                "2026-10-30",
+                "Lot 3",
+                "c",
+                [
+                    _row("AETHER", "done", shares=6, avg=1800),
+                    _row("AETHER", "extra", shares=2, side="sell", avg=1790),
+                    _row("MICRON", "extra", shares=50, avg=188),
+                    _row("MICRON", "extra", shares=50, side="sell", avg=182),
+                ],
+            )
+        ]
+    )
+    week = blocks["2026-10-30"]
+    assert [(x["symbol"], x["side"], x["shares"], x["status"]) for x in week["lines"]] == [
+        ("AETHER", "buy", 4.0, "done")
+    ]
+    assert week["lines"][0]["value"] == 6 * 1800 - 2 * 1790
+    assert week["bought"] == 6 * 1800 - 2 * 1790 and week["sold"] == 0
