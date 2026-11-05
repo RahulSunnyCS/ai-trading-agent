@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — research only; nothing is shown or traded on it until Phase 1 passes |
-| **Status** | In progress (Phase 0 registered, Phase 1 running) |
+| **Status** | Done — killed by the registered rule (Phase 1, 2026-11-05); Phases 2–3 not started |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-05 |
@@ -119,6 +119,20 @@ Committed before any run (2026-11-05).
   `research/options/common/rotation-ranking.md`.
 - **Done when:** the verdict is written here with the numbers for both books, the halves and the
   forward set.
+- **Result (2026-11-05, `research/bl210/confidence_2026-11-05.json`):** **killed.** 423 research
+  days per book (2025-01-10 → 2026-10-09; the T1 track's results are backfilled over the same days).
+
+  | Book | ρ(C, net) [90 %] | Top − bottom tercile ₹/day [90 %] | Tercile means ₹/day (bottom · mid · top) | C range |
+  |---|---|---|---|---|
+  | Core | +0.081 [+0.008, +0.152] | +741 [−44, +1,734] | 846 · 1,053 · 1,587 | 51–96, mean 83 |
+  | T1 | +0.066 [−0.010, +0.144] | +689 [−260, +1,687] | 1,322 · 2,168 · 2,011 | 60–97, mean 86 |
+
+  Halves: Core ρ +0.040 [−0.061, +0.139] then +0.123 [+0.018, +0.229]; T1 +0.023 [−0.090,
+  +0.136] then +0.089 [−0.012, +0.192], its first-half spread −₹544. Forward (18 days, held out):
+  Core ρ +0.216 [−0.183, +0.476], T1 +0.366 [−0.066, +0.728], spread +₹6,372 [+846, +9,585] on T1.
+  The skip rule (C < 40) fired on no day: C never fell below 50. Reading: a small, consistently
+  positive lead that the registered test does not confirm, and a figure whose scale (₹3,000, the
+  50 % rupee floor) never reads "bad". Rescaling it is a sweep this item ruled out.
 
 ### Phase 2 — Shadow (only on a pass)
 - **Tasks:** compute C(D) each morning beside the picks into a side file (never the journal's
@@ -148,3 +162,7 @@ windows; a POC as research only, nothing shown.
 ## Log
 
 - 2026-11-05 — created from the owner's question; questions answered; Phase 0 registered.
+- 2026-11-05 — Phase 1 run once (one definition, no sweeps): killed on both books; numbers above and
+  on `research/options/common/rotation-confidence.md`. Phases 2–3 not started. Found while building it:
+  `explain.load_snapshot` reads every variant from the live results folder, so it cannot take a
+  track's names (the script reads through `store.load_matrix` instead); noted, not changed.
