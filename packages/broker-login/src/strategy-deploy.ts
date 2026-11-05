@@ -34,6 +34,7 @@ import {
   secondsUntil,
 } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { hhmm, setupSheet } from './live-sheet.js';
 import { algotestLoginLocked } from './login-lock.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage } from './selectors.js';
@@ -111,51 +112,6 @@ async function readLive(page: Page, opts: { brokers?: boolean } = {}): Promise<L
 
 /** Too close to a pick's entry minute to activate it: that pick only; later picks still deploy. */
 class TooLate extends Error {}
-
-/** "HH:MM" of minutes after midnight. */
-function hhmm(minutes: number): string {
-  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-}
-
-/**
- * Open the pick's Setup Execution sheet, check AlgoTest's defaults, put Trade monitoring on Candle
- * Close (BL-197: the overall MTM stop then checks at each minute's close, as the backtest does; leg
- * stops stay on LTP) and save it.
- */
-async function setupSheet(page: Page, pick: Pick): Promise<void> {
-  const { name } = pick;
-  await livePage.row(page, name).click();
-  await livePage.setupExecution(page).click();
-  const sheet = livePage.sheet(page, name);
-  await sheet.waitFor({ timeout: 15_000 });
-
-  // AlgoTest's defaults, checked inside the sheet rather than changed: 1 lot, NRML on every leg,
-  // no execution day ticked (so the deploy is for today only).
-  const multiplier = await sheet.locator('input[type=number]').first().inputValue();
-  if (multiplier !== '1') throw new Error(`quantity multiplier is ${multiplier}, not 1`);
-  const products = await sheet
-    .locator('select')
-    .evaluateAll((els) =>
-      els.map((e) => (e as HTMLSelectElement).value).filter((v) => v.startsWith('ProductType.')),
-    );
-  if (!products.length || products.some((v) => v !== 'ProductType.NRML'))
-    throw new Error(`leg product types ${products.join(', ')}, expected NRML`);
-  const ticked = await sheet
-    .locator('input[type=checkbox]')
-    .evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).length);
-  if (ticked > 0) throw new Error(`${ticked} box(es) ticked in the sheet; expected none`);
-  const time = (await livePage.executionTime(sheet).inputValue()).slice(0, 5);
-  if (time !== hhmm(pick.entry))
-    throw new Error(`strategy execution time ${time}, expected ${hhmm(pick.entry)}`);
-  const candle = livePage.monitoring(sheet, 'on Candle Close');
-  const radio = candle.locator('input[type=radio]');
-  if (!(await radio.isChecked())) await candle.click();
-  if (!(await radio.isChecked()))
-    throw new Error('Trade monitoring did not switch to on Candle Close');
-
-  await livePage.sheetSave(sheet).click();
-  await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
-}
 
 /** What /live shows for `name` after a stop, so nobody deploys it twice by hand. */
 async function deployedState(page: Page, name: string, before: number): Promise<string> {
@@ -525,11 +481,13 @@ async function runDir(dir: string, values: Values, automation: Automation | null
       if (values.apply) {
         for (const pick of p.setup) {
           try {
-            await setupSheet(page, pick);
+            const outcome = await setupSheet(page, pick);
             const row = (await readLive(page)).rows.find((r) => r.name === pick.name);
             if (!row || row.status === SETUP_PENDING)
               throw new Error(`still "${row?.status ?? 'not listed'}" after saving the sheet`);
-            lines.push(`✅ ${pick.name}: ${row.status} (Candle Close, ${hhmm(pick.entry)})`);
+            lines.push(
+              `✅ ${pick.name}: ${row.status} (Candle Close, ${hhmm(pick.entry)}${outcome === 'kept' ? ', set up before' : ''})`,
+            );
           } catch (error) {
             failed = true;
             await safeScreenshot(page, 'setup-failed');
