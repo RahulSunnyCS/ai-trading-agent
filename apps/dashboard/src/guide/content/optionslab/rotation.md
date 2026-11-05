@@ -75,7 +75,8 @@ The screen is one page, in the order you read it:
     twentieth of the days reached (*25% / 10% / 5% of days*).
 
   Hover a candle for the day's result, best and worst point, drawdown, when the book stop fired, each
-  strategy with its settings, each account's live result against paper, and the share of 2,000
+  strategy with its entry time and settings (a day can hold two entry times of one strategy), each
+  account's live result against paper, and the share of 2,000
   random baskets of the same number of strategies from the book's pool that the day beat (the
   baskets are cut at the same stop when they ended below it). A week's hover sums its days and
   gives the best and worst day. Click a day to pin it under the chart, then **Replay** a strategy to

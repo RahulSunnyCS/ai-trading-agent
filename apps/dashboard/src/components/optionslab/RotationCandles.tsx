@@ -43,6 +43,7 @@ import {
   cutPeriod,
   forwardFrom,
   liveTotal,
+  pickTitle,
   recordedCount,
   toBars,
 } from '../../lib/rotationCandlesView';
@@ -102,7 +103,7 @@ function TipBody({ bar, tip }: { bar: CandleBar; tip: Tip }) {
       {tip.picks.length ? (
         <div className="border-t border-border pt-1">
           {tip.picks.map((l, i) => (
-            // the same strategy can be picked twice in a day (two lots of the base's Widesl), so the label repeats
+            // a day can hold two slots of one strategy, so a label can repeat; the lines never reorder
             <Line key={`${i}-${l.label}`} l={l} />
           ))}
         </div>
@@ -321,13 +322,10 @@ function Pinned({
       </div>
       {one ? (
         <div className="space-y-1">
-          {one.picks.map((p, i) => (
-            <div key={`${i}-${p.name}`} className="flex items-center justify-between gap-3">
+          {one.picks.map((p) => (
+            <div key={p.name} className="flex items-center justify-between gap-3">
               <span className="min-w-0 truncate">
-                <span className="text-foreground">
-                  {p.label}
-                  {p.lots > 1 ? ` ×${p.lots}` : ''}
-                </span>{' '}
+                <span className="text-foreground">{pickTitle(p)}</span>{' '}
                 <span className="text-faint">{p.params}</span>
               </span>
               <span className="flex items-center gap-2">

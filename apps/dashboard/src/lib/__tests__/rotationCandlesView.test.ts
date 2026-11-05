@@ -66,7 +66,7 @@ describe('rotation candles view', () => {
     ]);
     expect(head[0]?.tone).toBe('neg');
     expect(head[4]?.value).toBe('hit at 12:24');
-    expect(picks.map((p) => p.label)).toEqual(['S_dir_ITM1', 'N_widesl_OTM1 ×2']);
+    expect(picks.map((p) => p.label)).toEqual(['S_dir_ITM1 09:17', 'N_widesl_OTM1 09:17 ×2']);
     expect(picks[1]?.tone).toBe('pos');
     expect(foot[0]?.label).toBe('AlgoTest · Angel One live');
     expect(foot[1]?.value).toBe('0.2%');
