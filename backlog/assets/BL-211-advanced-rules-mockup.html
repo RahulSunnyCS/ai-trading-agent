@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BL-211 mock-up: Advanced rules</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --surface-1: #f1f3f6; --border: #d9dde3;
+    --fg: #15181d; --muted: #5d6673; --accent: #2457d6; --accent-soft: #e4ebfb;
+    --warning: #9a5b00; --warning-soft: #fff1d6; --positive: #1a7f4b; --positive-soft: #dff3e8;
+    --mono: "IBM Plex Mono", ui-monospace, monospace; --sans: "IBM Plex Sans", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --surface: #171b21; --surface-1: #1e232b; --border: #2b323c;
+      --fg: #e8ebef; --muted: #98a2ae; --accent: #7aa2ff; --accent-soft: #1d2a47;
+      --warning: #f0b858; --warning-soft: #3a2c10; --positive: #5fd39a; --positive-soft: #11311f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --surface: #171b21; --surface-1: #1e232b; --border: #2b323c;
+    --fg: #e8ebef; --muted: #98a2ae; --accent: #7aa2ff; --accent-soft: #1d2a47;
+    --warning: #f0b858; --warning-soft: #3a2c10; --positive: #5fd39a; --positive-soft: #11311f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); padding: 24px 16px; }
+  .page { max-width: 880px; margin: 0 auto; }
+  .note { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .card h1 { font-size: 16px; margin: 0 0 4px; font-weight: 600; }
+  .card > p.sub { margin: 0 0 16px; color: var(--muted); font-size: 12px; }
+  .row { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .row .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 600; }
+  .row .line { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; }
+  .label { font-weight: 500; }
+  .hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 12px; }
+  .seg span { padding: 4px 10px; border-right: 1px solid var(--border); color: var(--muted); }
+  .seg span:last-child { border-right: 0; }
+  .seg span.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .switch { width: 34px; height: 20px; border-radius: 999px; background: var(--border); position: relative; flex: none; }
+  .switch.on { background: var(--accent); }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .switch.on::after { left: 16px; }
+  .collapsed { color: var(--muted); font-size: 12px; margin: -2px 0 10px; }
+  section.adv { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
+  .adv-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+  .adv-head .t { font-weight: 500; }
+  .adv-head .t .count { margin-left: 8px; font-size: 11px; background: var(--accent-soft); color: var(--accent); padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+  .adv-head .chev { color: var(--muted); font-size: 12px; }
+  .adv-body { margin-top: 10px; }
+  .adv-body > p.hint { margin: 0 0 10px; }
+  table.rules { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.rules th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; letter-spacing: .02em; text-transform: uppercase; padding: 0 8px 6px 0; border-bottom: 1px solid var(--border); }
+  table.rules td { padding: 8px 8px 8px 0; vertical-align: middle; border-bottom: 1px solid var(--border); }
+  table.rules tr.plain td { padding-top: 0; border-bottom: 1px solid var(--border); }
+  .plain .txt { color: var(--muted); font-size: 12px; }
+  .num { font-family: var(--mono); color: var(--muted); font-size: 12px; width: 22px; }
+  select, input[type=text] { font: inherit; font-size: 13px; color: var(--fg); background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; }
+  select { padding-right: 22px; }
+  .when { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .when .w { color: var(--muted); font-size: 12px; }
+  .icons { white-space: nowrap; }
+  .icons button { font: inherit; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; margin-left: 4px; }
+  .icons button:hover { color: var(--fg); }
+  .add { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 500; color: var(--accent); background: transparent; border: 1px dashed var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .preview { margin-top: 14px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .preview h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+  .preview .day { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .preview .d h4 { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
+  .preview .d h4 .mono { font-family: var(--mono); font-weight: 500; color: var(--muted); margin-left: 6px; }
+  .preview ul { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+  .preview li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--border); }
+  .preview li:last-child { border-bottom: 0; }
+  .preview li .v { font-weight: 500; white-space: nowrap; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; font-weight: 600; }
+  .badge.rule { background: var(--accent-soft); color: var(--accent); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .badge.ok { background: var(--positive-soft); color: var(--positive); }
+  .save { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
+  .save .changes { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+  .save .changes li { margin: 2px 0; }
+  .btn { font: inherit; font-size: 13px; font-weight: 600; background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 7px 14px; }
+  .btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); margin-left: 8px; font-weight: 500; }
+  @media (max-width: 640px) { .preview .day { grid-template-columns: 1fr; } table.rules { display: block; overflow-x: auto; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="note">BL-211 mock-up · Settings › Automation, with the new <b>Advanced rules</b> section expanded. The platform rows above it are as today (collapsed here to save space). Shape only: the real page uses the dashboard's tokens and <code>components/ui</code> controls.</p>
+
+  <div class="card">
+    <h1>Automation</h1>
+    <p class="sub">What the daily jobs do. Every Save is a new version; the jobs read it from the next session.</p>
+
+    <div class="row">
+      <div class="head">AlgoTest · Shoonya</div>
+      <div class="line"><span class="label">Log in at 08:00</span><span class="switch on"></span></div>
+      <div class="line"><span class="label">List <span class="hint">the base list; rules below can change it on some days</span></span>
+        <span class="seg"><span>None</span><span>Adaptive Classic</span><span class="on">Adaptive Tuned</span></span></div>
+      <div class="line"><span class="label">Upload the list's picks</span><span class="switch on"></span></div>
+      <div class="collapsed">Multiplier 1 · Buy add-on on · Dir ×2 on</div>
+    </div>
+    <div class="row">
+      <div class="head">AlgoTest · Angel One</div>
+      <div class="line"><span class="label">List</span><span class="seg"><span>None</span><span>Adaptive Classic</span><span class="on">Adaptive Tuned</span></span></div>
+      <div class="collapsed">Login on · Upload on · Multiplier 1 · Buy add-on on · Dir ×2 on</div>
+    </div>
+    <div class="collapsed">… Quantiply · Angel One, Quantiply · Shoonya as today …</div>
+
+    <section class="adv">
+      <div class="adv-head" onclick="document.getElementById('advbody').hidden=!document.getElementById('advbody').hidden">
+        <span class="t">Advanced rules <span class="count">1 rule</span></span>
+        <span class="chev">Hide ▴</span>
+      </div>
+      <div class="adv-body" id="advbody">
+        <p class="hint">A rule changes which list an account trades on a kind of day. Rules are tried from the top; the first one that matches a row decides it, and a row no rule matches trades its base list. Days to expiry are weekdays, as in the 09:16 message.</p>
+
+        <table class="rules">
+          <thead><tr><th>#</th><th>Account</th><th>When</th><th>Trade</th><th>Note</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="num">1</td>
+              <td><select><option>AlgoTest · Shoonya</option><option>AlgoTest · Angel One</option><option>Quantiply · Angel One</option><option>Quantiply · Shoonya</option></select></td>
+              <td><span class="when">
+                <select><option selected>days to expiry</option><option>weekday</option></select>
+                <select><option>NIFTY</option><option selected>SENSEX</option></select>
+                <span class="w">is</span>
+                <select><option selected>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7+</option></select>
+              </span></td>
+              <td><select><option>None</option><option selected>Adaptive Classic</option><option>Adaptive Tuned</option></select></td>
+              <td><input type="text" value="SENSEX expiry: Classic" size="18"></td>
+              <td class="icons"><button title="Move up">↑</button><button title="Move down">↓</button><button title="Remove">✕</button></td>
+            </tr>
+            <tr class="plain"><td></td><td colspan="5"><span class="txt">On a day SENSEX has 0 weekdays to expiry, AlgoTest · Shoonya trades <b>Adaptive Classic</b> instead of its base list (Adaptive Tuned).</span></td></tr>
+
+            <tr>
+              <td class="num">2</td>
+              <td><select><option>AlgoTest · Shoonya</option><option>AlgoTest · Angel One</option><option selected>Quantiply · Angel One</option><option>Quantiply · Shoonya</option></select></td>
+              <td><span class="when">
+                <select><option>days to expiry</option><option selected>weekday</option></select>
+                <select><option>Mon</option><option>Tue</option><option>Wed</option><option>Thu</option><option selected>Fri</option></select>
+              </span></td>
+              <td><select><option selected>None</option><option>Adaptive Classic</option><option>Adaptive Tuned</option></select></td>
+              <td><input type="text" placeholder="why (optional)" size="18"></td>
+              <td class="icons"><button title="Move up">↑</button><button title="Move down">↓</button><button title="Remove">✕</button></td>
+            </tr>
+            <tr class="plain"><td></td><td colspan="5"><span class="txt">On a Friday, Quantiply · Angel One trades <b>nothing</b> (its base list is Adaptive Tuned). <span class="badge warn">unsaved example</span></span></td></tr>
+          </tbody>
+        </table>
+        <button class="add">+ Add a rule</button>
+
+        <div class="preview">
+          <h3>What trades</h3>
+          <div class="day">
+            <div class="d">
+              <h4>Today · Wed 5 Nov <span class="mono">NIFTY 4 DTE · SENSEX 1 DTE</span></h4>
+              <ul>
+                <li><span>AlgoTest · Shoonya</span><span class="v">Adaptive Tuned</span></li>
+                <li><span>AlgoTest · Angel One</span><span class="v">Adaptive Tuned</span></li>
+                <li><span>Quantiply · Angel One</span><span class="v">Adaptive Tuned</span></li>
+                <li><span>Quantiply · Shoonya</span><span class="v">None</span></li>
+              </ul>
+            </div>
+            <div class="d">
+              <h4>Tomorrow · Thu 6 Nov <span class="mono">NIFTY 3 DTE · SENSEX 0 DTE</span></h4>
+              <ul>
+                <li><span>AlgoTest · Shoonya</span><span class="v">Adaptive Classic <span class="badge rule">rule 1</span></span></li>
+                <li><span>AlgoTest · Angel One</span><span class="v">Adaptive Tuned</span></li>
+                <li><span>Quantiply · Angel One</span><span class="v">Adaptive Tuned</span></li>
+                <li><span>Quantiply · Shoonya</span><span class="v">None</span></li>
+              </ul>
+            </div>
+          </div>
+          <p class="hint" style="margin:8px 0 0">Tomorrow AlgoTest carries both lists: Shoonya's Classic picks and Angel One's Tuned picks are uploaded at 16:40 and activated at 08:11 each on its own account. The T1 split (BL-209) is off that day, since only one AlgoTest account trades Tuned. The day types come from <span style="font-family:var(--mono)">rotation/day-type/&lt;day&gt;.json</span>, written by the evening job and the 09:16 pick.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="save">
+      <ul class="changes">
+        <li>Rule added: AlgoTest · Shoonya on SENSEX 0 DTE → Adaptive Classic</li>
+        <li>Rule added: Quantiply · Angel One on Fri → None</li>
+      </ul>
+      <button class="btn">Save as version 12</button><button class="btn ghost">Discard</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
