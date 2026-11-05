@@ -25,7 +25,7 @@ Open this page to read the week, to run something by hand, or to classify a poss
 | Names at the edge | The weakest names held and the strongest not held, by rank: next rebalance's likely trades. For a group, in the sleeve that trades next. |
 | Telegram message | Folded to one line: whether the headline's message was sent, when, and which run (*sent 16 Oct 20:01 · final*). Click it for the message word for word and **Re-send…**, which opens Run by hand, where a final run can be sent again after you confirm. |
 | Your lots | Only when lots are recorded for the headline (followed lot by lot on Kite): one row per lot with the shares booked to it, their value, its last and next rebalance, which lot is due this Friday and what the last Friday orders said for it; under it, what Kite holds that no lot has booked yet. See below. |
-| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. **Preview for…** shows another favourite's orders against the same holdings. See below. |
+| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. From Thursday evening the block shows Friday's orders **tentatively** (nothing saved) until the 14:15 run makes them. **Preview for…** shows another favourite's orders against the same holdings. See below. |
 
 ## Your orders
 
@@ -37,6 +37,13 @@ time. Nothing here places an order: you place them in your broker yourself.
   decides this Friday's trades from last Friday's ranks, which are already stored at 14:15. Which
   names are bought and sold is therefore exact; only the share counts and a few checks that read
   Friday's own prices (the price ceiling, circuit limits, cap trims) use the latest prices.
+- **Tentative, from Thursday.** Because of that, the same plan is made the evening before: the
+  Thursday 18:30 job plans Friday's orders (lot by lot, against the last holdings snapshot) and
+  sends one Telegram headed *Friday's orders (tentative)*; This week shows it here, marked
+  **Tentative · nothing saved**, until Friday's real orders exist. Nothing is written to the orders
+  or the lot ledger, so **Plan Friday's orders** can be pressed on any day of the week; the 14:15
+  run on Friday is the one to place. Kite logs in on Fridays and Mondays, so the Thursday plan
+  usually counts the holdings and cash as last read.
 - **Paper portfolio** (the default until money goes in): the model's portfolio at your paper
   capital (₹1,00,000, changeable in **Settings**). **Holdings from Kite** or **from Fyers**: what
   your account holds, read-only, at 14:15 or when you press **Sync**; any holding can be left out
@@ -53,8 +60,10 @@ time. Nothing here places an order: you place them in your broker yourself.
   sleeve that traded on your paper start Friday, **Lot 2** the next, and so on. On a Friday:
   - A lot that is **due** trades. A **new lot** (one that holds nothing yet) is funded with the
     weekly lot size (Settings, ₹50,000) or all your free Kite cash when that is more, and the page
-    says how much to **add to Kite** before you buy. A lot that **rebalances** uses its own shares
-    plus the free cash.
+    says how much to **add to Kite** before you buy. It buys the sleeve's **current picks in equal
+    weights**, what the model would buy starting from cash this week (the row says *fresh picks,
+    equal weights*), never the weights a model running for years has drifted to. A lot that
+    **rebalances** uses its own shares plus the free cash, to the sleeve's running target.
   - A lot that is **not due** trades nothing, even if what you hold differs from the model (a swap
     for a name blocked by the premium rule, whole shares). It sells only a name its sleeve marks
     SELL that week.

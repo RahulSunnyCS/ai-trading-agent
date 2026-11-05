@@ -675,3 +675,61 @@ def test_the_lots_panel_keeps_the_friday_orders_when_orders_are_made_by_hand_mid
 def test_the_preview_route_refuses_a_malformed_favourite(client):
     assert client.post("/api/orders/preview/jobs", json={"favourite": "../x"}).status_code == 422
     assert client.get("/api/orders/preview/jobs/unknown").status_code == 404
+
+
+def test_a_new_lot_buys_the_sleeves_fresh_picks_equally_not_the_drifted_weights(
+    client, monkeypatch
+):
+    """Owner, 2026-11-05: a lot bought from fresh cash takes what the model would buy starting
+    from cash this week (its picks split equally, the Rebalance preview's first allocation), not
+    the weights the running model has drifted to. A lot that already holds shares keeps planning
+    to the drifted target."""
+    _friday(monkeypatch, 2026, 10, 23)
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")  # lot 2 (ids[1]) is due and new
+    sig = _signal("2026-10-23", ids, ids[1])
+    drifted = {"CUPID": 0.55, "NAZARA": 0.35, "ACMESOLAR": 0.06, "GRWRHITECH": 0.04}
+    sig["_sleeves"][1]["signal"]["target_weights"] = drifted
+    sig["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig, "exact", None, ["ranking"]))
+    asked = []
+
+    def fresh(req):
+        asked.append(req)
+        return {"CUPID": 0.5, "NAZARA": 0.5}
+
+    monkeypatch.setattr(api, "_fresh_sleeve_target", fresh)
+    _snapshot(LOT1 + OUTSIDE, 4509.3)
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+
+    payload = api._compute_orders("scheduled")
+    assert asked == ["req-lot-2"]  # only the due, new lot; lot 1 holds shares and is not due
+    lot2 = {lot["label"]: lot for lot in payload["lots"]}["Lot 2"]
+    assert lot2["status"] == "new" and lot2["fresh"] is True
+    assert {r["symbol"]: r["quantity"] for r in lot2["plan"]["rows"] if r["quantity"]} == {
+        "CUPID": 73,
+        "NAZARA": 61,
+    }
+    assert (
+        "Lot 2 · NEW lot · ₹50,000 · fresh picks, equal weights"
+        in api._orders_message(payload).body
+    )
+
+    # Lot 1 due and rebalancing: planned to the sleeve's own target, the fresh one never asked.
+    monkeypatch.setattr(api, "_fresh_sleeve_target", lambda req: pytest.fail("not a new lot"))
+    sig2 = _signal("2026-10-23", ids, ids[0])
+    sig2["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig2, "exact", None, ["ranking"]))
+    payload = api._compute_orders("scheduled")
+    lot1 = {lot["id"]: lot for lot in payload["lots"]}[ids[0]]
+    assert lot1["status"] == "rebalance" and lot1["fresh"] is False

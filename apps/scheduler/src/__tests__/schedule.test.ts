@@ -195,7 +195,8 @@ describe('Angel One login check', () => {
     // phone login: + fyers-login-reminder, fyers-login-recheck, kite-login-reminder-monday
     // BL-203: + rotation-live-board
     // BL-197 Phase 2: + algotest-activate, - algotest-deploy, - algotest-topup
-    expect(JOBS).toHaveLength(49);
+    // owner 2026-11-05: + momentum-orders-tentative (Thu 18:30)
+    expect(JOBS).toHaveLength(50);
   });
 });
 

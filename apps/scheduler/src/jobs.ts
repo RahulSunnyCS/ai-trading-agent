@@ -117,6 +117,7 @@ function contractNotesRetry(id: string, at: string, catchUpHours: number): Job {
 }
 
 const FRIDAY = onWeekdays(5);
+const THURSDAY = onWeekdays(4);
 /** Mondays that are trading days: nothing reads Kite on a Monday holiday. */
 const TRADING_MONDAY: DayRule = (day) => tradingDays(day) && onWeekdays(1)(day);
 
@@ -244,6 +245,26 @@ const BASE_JOBS: Job[] = [
     alertsItself: true,
     logFile: `${MOMENTUM}/data/launchd-weekly-orders.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt orders run',
+  },
+  {
+    // Owner, 2026-11-05: with a signal delay of 1 the names are fixed by last Friday's ranks, so
+    // Friday's orders can be shown the evening before. `mbt orders tentative` plans them exactly
+    // as the 14:15 run will (lots included) and writes only tentative_orders.json in the state
+    // dir: no orders row, no lot booking, no pending lot. One Telegram, headed tentative; This
+    // week shows the plan until Friday's real orders exist. Kite logs in on Fridays and Mondays,
+    // so the holdings are usually as last read; the plan says so.
+    id: 'momentum-orders-tentative',
+    description: "Momentum: Friday's orders planned early (tentative), nothing saved",
+    schedule: { at: '18:30', on: THURSDAY, label: 'Thu 18:30' },
+    steps: [['uv', 'run', 'mbt', 'orders', 'tentative', '--send']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 20,
+    retries: 1,
+    retryDelayMinutes: 10,
+    catchUpHours: 12, // any time before Friday morning is still early
+    group: 'catalog',
+    alertsItself: true,
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt orders tentative --send',
   },
   {
     id: 'momentum-preview',

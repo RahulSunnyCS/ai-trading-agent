@@ -298,3 +298,9 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   undocumented endpoints, nothing that hides the scripted browser, a stop at any captcha, no retry
   of a refused password and a hold until the credentials change. Off until `KITE_AUTO_LOGIN=on`;
   needs `KITE_USER_ID`, `KITE_PASSWORD`, `KITE_TOTP_SECRET` in `.env`. Not yet run against Kite.
+- 2026-11-05 — Owner: a lot bought from fresh cash must buy the sleeve's current picks in equal
+  weights (what the model buys starting from cash), not the running model's drifted weights; the
+  13-name 21 %…0.4 % target a new Lot 3 would have been given showed it. `plan_lots` now takes
+  `api._fresh_sleeve_target` for a due lot with no history (the Rebalance preview's first-allocation
+  run, persisted prices); a rebalancing lot keeps the sleeve's running target. Found while building
+  Friday's tentative orders (Thursday 18:30 job); test in `tests/test_lot_orders.py`.

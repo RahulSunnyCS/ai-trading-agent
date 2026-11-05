@@ -550,6 +550,12 @@ contract, not a shared service).
   portfolio against the same snapshot and writes nothing: no orders row, no lot event, no pending
   lot (`tests/test_lot_orders.py` compares every catalog table and state file before and after).
   The dashboard's Rebalance preview page was retired for it; `/api/rebalance-preview*` remains.
+  `_compute_orders(dry_run=True)` (owner, 2026-11-05) is the same plan, lots included, with nothing written
+  to the catalog; `api.tentative_orders` keeps it as `tentative_orders.json` in the state dir and
+  `read_tentative(week)` serves it in `GET /api/orders` (`tentative`) while it is for the week asked.
+  `mbt orders tentative [--send]` (scheduler `momentum-orders-tentative`, Thu 18:30) and `POST
+  /api/orders/tentative/run` (`TENTATIVE_JOBS`) run it; `_tentative_message` is the 14:15 body under a
+  tentative heading, never action-required. Tests: `tests/test_tentative_orders.py`.
 - `kite.py` + `holdings_sync.py` (BL-142 Phase 1) — Zerodha Kite, read-only: the Momentum money
   is on Kite. `kite.py` calls only `/session/token`, `/portfolio/holdings` (quantity + T1),
   `/user/margins/equity` (`net` = free cash) and `/user/profile`; no order endpoint. The token
@@ -583,7 +589,10 @@ contract, not a shared service).
   move only on a run on the Friday itself with a Kite snapshot read that day. Symbols Kite still
   holds that are not strategy names today are never booked as sold (`ignore`).
   `plan_lots`: each lot planned alone with `orders.plan`: a due lot with no shares is a *new lot*
-  (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite),
+  (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite; its
+  target is `api._fresh_sleeve_target`, the sleeve's picks split equally as the Rebalance preview's
+  first allocation, never the running model's drifted weights: owner, 2026-11-05; the lot row and the
+  message say *fresh picks, equal weights*),
   a due lot with shares rebalances with the free cash left, a lot not due sells only names its
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
