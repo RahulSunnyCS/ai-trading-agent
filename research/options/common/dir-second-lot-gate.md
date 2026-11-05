@@ -39,7 +39,8 @@ Dir ×2 on every non-expiry day with a Dir pick, where the row's toggle is on (B
   (+₹492/day vs ×1, [+262, +724]) with a max drawdown of −₹34,775, *smaller than ×1's* −₹40,047, and a
   shallower worst week, because it sat out April–May 2025. On the test half it was deeper than ×2
   (−₹28,299 vs −₹27,281: a 2026 episode came at a low VIX) and it never dodged the worst day. One
-  episode decides it. Beside [Directional › VIX](../strategies/directional/vix.md).
+  episode decides it. It also reads the day's own VIX open, which the evening export (where `dir_boost`
+  is set) does not have: a follow-up must use the previous close's VIX or a 09:15 decision point. Beside [Directional › VIX](../strategies/directional/vix.md).
 - **Warm-up caveat for the trailing gates:** the period's deepest drawdown (Jan–May 2025) lies inside
   the 63 days they are forced on, so their all-days drawdown equals ×2's by construction; read their
   test-half columns.

@@ -27,7 +27,7 @@ def world(tmp_path, monkeypatch):
         exported.append(book)
         return ax.DayPicks(today, book, "preview", NAMES, [])
 
-    monkeypatch.setattr(cli, "_settings_books", lambda platform: (["core", "t1"], {}))
+    monkeypatch.setattr(cli, "_settings_books", lambda platform, session=None: (["core", "t1"], {}))
     monkeypatch.setattr(cli, "_resolve_picks", resolve)
     monkeypatch.setattr(cli, "_without_addon", lambda picks, *a, **k: picks)
     monkeypatch.setattr(cli, "_with_lots", lambda picks, *a, **k: picks)

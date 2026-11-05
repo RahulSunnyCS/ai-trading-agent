@@ -17,6 +17,7 @@ import {
   readAutomation,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
+import { automationForSession } from './day-type.js';
 import { istMinutes, morningPicks, parseLive } from './deploy-plan.js';
 import { describe } from './diagnose.js';
 import {
@@ -1171,7 +1172,7 @@ async function main(): Promise<number> {
   if (!root) return failed(1, 'did not run: TRADING_DATA_ROOT is not set', print);
   let automation: Automation;
   try {
-    automation = readAutomation();
+    automation = await automationForSession({ day }); // BL-211: today's lists
   } catch (error) {
     return failed(
       1,

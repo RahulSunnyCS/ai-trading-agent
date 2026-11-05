@@ -13,6 +13,7 @@ import {
   readAutomation,
 } from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
+import { automationForSession } from './day-type.js';
 import { describe } from './diagnose.js';
 import type { QuantiplyApi } from './quantiply-api.js';
 import {
@@ -223,10 +224,17 @@ async function main(): Promise<number> {
   let multiplier = 1;
   /** BL-172: the clientwise MTM SL the morning run keeps (rupees), or null to leave it */
   let mtmSl: number | null = null;
+  // The session this run works on, chosen before the settings are read: a day-type rule (BL-211)
+  // decides the account's list as it stands on that session.
+  const today = istToday();
+  const chosen = values.day
+    ? { day: values.day, why: '--day' }
+    : defaultSession(mode, today, istSeconds(), isTradingDay);
+  const session = chosen.day;
   if (mode !== 'disable') {
     let automation: Automation;
     try {
-      automation = readAutomation();
+      automation = await automationForSession({ day: session });
     } catch (error) {
       console.error(`automation settings: ${describe(error)}`);
       return EXIT_RETRY;
@@ -270,11 +278,6 @@ async function main(): Promise<number> {
   }
   const enabledFor = enabledSessions(deployRows);
 
-  const today = istToday();
-  const chosen = values.day
-    ? { day: values.day, why: '--day' }
-    : defaultSession(mode, today, istSeconds(), isTradingDay);
-  const session = chosen.day;
   const weekday = weekdayOf(session);
   const label = `${site.name} ${values.morning ? 'morning switch-on' : mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
   console.log(`${label}: session from ${chosen.why}; ${decidedBy}`);

@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-11-05 |
 | **Depends on** | BL-204 / BL-207's book replay, BL-210's confidence definition, the T1 track (BL-113) |
-| **TODO.md row** | 3.10.62 |
+| **TODO.md row** | 3.10.63 |
 
 ## Context
 
@@ -94,7 +94,7 @@ Committed before any run (2026-11-05).
   <reason>` in the Log.
 
 ### Phase 1 — The test
-- **Tasks:** `research/common/confidence.py` (BL-210's blend and matched-day confidence, moved so
+- **Tasks:** `research/common/pick_confidence.py` (BL-210's blend and matched-day confidence, moved so
   two items share it; `research/bl210/confidence.py` imports it and its 2026-11-05 output is
   checked unchanged), `research/bl212/dir_gate.py` (BL-207's replay with the arms above), its
   results JSON, the verdict here, and `research/options/common/dir-second-lot-gate.md`.
@@ -123,8 +123,9 @@ Committed before any run (2026-11-05).
   days); dirwin @ 50 % kept 0.61, took 0.53 / 1.00; dirwin @ 75 % kept 0.51, took 0.84 / 0.36; VIX kept
   0.69, took **1.17** of the extra DD (−28,299, deeper than ×2 in this window) and 0.23 of the worst
   day. The 0.5 % slippage reading without the stop orders the arms the same way. Look-ahead spot
-  check: 20 seeded random days, 10 of them Dir days, every predictor unchanged with the day's rows
-  blanked.
+  check: 20 seeded random days, 10 of them Dir days, the confidence and Dir win-rate predictors
+  unchanged with the day's rows blanked. This only confirms the row slicing (both already read rows
+  before the day); it does not cover `rank` or the day's own attributes (`vix_band`, `vix_open`).
 
   Primary arm's checks: kept ≥ 0.5 — yes (0.53); vs ×1 above zero — yes; DD taken ≤ 0.5 — **no**
   (1.00); worst day taken ≤ 0.5 — **no** (1.00); test-half signs — yes. **Killed.**
@@ -141,6 +142,9 @@ Committed before any run (2026-11-05).
   week; but in the test half it was deeper than ×2 (one episode in 2026 came at a low VIX), and it
   never dodged the worst day. One episode decides its drawdown figure, so it is a lead for its own
   pre-registered item (a VIX-conditioned second lot; it needs no warm-up), not a finding.
+  **Decision-time caveat:** the VIX arm (and `conf`'s VIX-band criterion) reads the day's own VIX open,
+  but `dir_boost` is set in the evening export from data up to the previous close. As tested it cannot run
+  there; the follow-up item must register either the previous close's VIX or a 09:15 decision point.
   (5) The warm-up matters for every trailing gate: the biggest drawdown of the period (Jan–May 2025)
   falls inside the 63 days they are forced on, so their all-days drawdown figures equal ×2's by
   construction; the test half is the fair window for them, and there none took less than a sixth of

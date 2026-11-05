@@ -57,8 +57,7 @@ from ..legwise.market import (
 )
 from ..legwise.schema import LegwiseStrategy, load_legwise
 from . import journal, labels, live_lots, slip_store, store
-from .automation_settings import BROKERS, PLATFORMS, paused_for
-from .automation_settings import read as read_settings
+from .automation_settings import BROKERS, PLATFORMS, paused_for, read_for_session
 from .lists import SIZING_DATE
 from .variants import strategy_path, underlying_of
 
@@ -833,7 +832,7 @@ def refresh(
         if not books:
             note_no_picks(day, root)
             return None
-        settings, _ = read_settings()
+        settings, _ = read_for_session(day)
         if client_factory is None:
             from ..angelone.client import AngelClient
 
