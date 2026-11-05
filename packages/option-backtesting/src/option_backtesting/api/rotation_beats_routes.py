@@ -3,6 +3,10 @@ months" (owner, 2026-11-05). The maths is `rotation/beats.py`; nothing here comp
 no route writes anything.
 
     GET /legwise/rotation/beats?book=core|t1|base
+    GET /legwise/rotation/beats/compare        both Adaptive books against the fixed base on the
+                                               days all three have: the gap in rupees per lot-day
+                                               with its 90% range, days ahead, edge over random in
+                                               standard deviations, and the 60-session drift alarm
 
 Answers the share of random same-shape baskets the book's cumulative gross beat over each window
 (`sessions60`, `months6`, `year1`, `years2`, the whole record `all`, and `recorded`: only the days
@@ -52,12 +56,10 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": message})
 
 
-@router.get("")
-def get_beats(book: str = Query(default="t1")) -> Any:
+def _answer(kind: str, book: str | None, fn: Any) -> Any:
+    """`fn(root, day)` cached on the files it is built from, run through `warm.run_within`."""
     from ..fyers.daily import data_dir
 
-    if book not in beats.BOOKS:
-        return _error(422, f"book must be one of {', '.join(beats.BOOKS)}")
     try:
         root = data_dir()
     except (RuntimeError, OSError, ValueError) as error:
@@ -65,7 +67,7 @@ def get_beats(book: str = Query(default="t1")) -> Any:
     # the day and the journal's and day list's modified times are the key: a cached answer never
     # carries over midnight or past a new entry or a stored day
     day = beats.today()
-    key = (str(root), book, day, _stamp(root), store.reading_slip())
+    key = (kind, str(root), book, day, _stamp(root), store.reading_slip())
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)
@@ -73,7 +75,7 @@ def get_beats(book: str = Query(default="t1")) -> Any:
         return hit[1]
 
     def work() -> dict:
-        return beats.windows(root, book, day)
+        return fn(root, day)
 
     try:
         done, value = warm.run_within(("beats", *key), work)
@@ -89,3 +91,16 @@ def get_beats(book: str = Query(default="t1")) -> Any:
             del _cache[old]
         _cache[key] = (stamp, value)
     return value
+
+
+@router.get("")
+def get_beats(book: str = Query(default="t1")) -> Any:
+    if book not in beats.BOOKS:
+        return _error(422, f"book must be one of {', '.join(beats.BOOKS)}")
+    return _answer("windows", book, lambda root, day: beats.windows(root, book, day))
+
+
+@router.get("/compare")
+def get_compare() -> Any:
+    """Classic and Tuned against the fixed base per window, and the drift alarm."""
+    return _answer("compare", None, beats.compare)

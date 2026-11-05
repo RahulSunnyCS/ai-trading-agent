@@ -164,10 +164,19 @@ does not move.
 | ₹ / lot-day | Average gross per lot per day. The fair way to compare books, because a list holds 3 strategies, or 4 on a day its Buy add-on fires |
 | Max DD / lot | The largest fall of the running total per lot from its peak, the peak starting at zero: the unit the registered rule compares (hover for the basket's drawdown in rupees) |
 | vs base / lot-day | The book's ₹ per lot-day minus the benchmark's, over the same days. Follows *Compare with* |
-| Beats random | Share of 1,000 random baskets of the same shape that the book's cumulative gross is above. Always on the registered basis, without a portfolio stop |
-| Last 60 sessions | The same beats-random share, over the book's last 60 sessions only, to see whether it is losing its edge now. Days the journal recorded at 09:16 count as recorded; earlier days are the 09:16 rule re-derived from the rows before each day (without the expiry-day rule). Adaptive Tuned's settings were tuned on that history, so its re-derived days are in-sample. Hover a figure for the days behind it. The Fixed base is one rule every day, and its random baskets are the same shape as a list's core. A few dozen days move a percentage a lot: read it as a direction, not a verdict |
-| Last 6 months | The same, over the last 6 calendar months of sessions |
+| History window | The picker above the table (60 sessions, 6 months, 1 year, 2 years; 6 months to start). It sets the two history columns and the cards under the table. The live columns before it do not move |
+| 6 months vs base / lot-day | The book's ₹ per lot-day minus the fixed base's over the picked window, on the days all three books have, with a 90% block-bootstrap range under it. A range that includes 0 says *includes 0*: not distinguishable from the base. Most of these days are stored results replayed through the 09:16 rule, not live picks; Adaptive Tuned's settings were tuned on that history |
+| Edge over random | The book's total over the window minus the average of 1,000 random same-shape baskets, in units of how much those baskets vary (σ). 0 is luck, about 1 beats 84% of random baskets, about 2 beats 98%. Unlike a percentage it has no ceiling at 100%, so a long window can still rank the books. It says how much better than luck, not how likely the edge is to continue |
 | Portfolio stop | The book's own stop (below) and, once its replay is in, how often it fired |
+
+Under the table two cards follow the picked window. **Against the fixed base** puts Tuned minus base and
+Classic minus base side by side with their ranges and the share of days each was ahead, and says how
+many of the window's sessions were recorded live. **Drift alarm** watches the 60-session gap to the base
+against a rule set in advance: two sessions in a row below −₹500 per lot-day opens a review (the states
+are *quiet*, *watch* for one session below, *review* for two). It is evaluated on this page from the
+latest stored data; nothing is sent to Telegram yet. The registered verdict stays under them, and it is the
+live test. A 60-session read-out catches a bad loss or a large edge, not a moderate one: the daily gap
+swings about ₹2,300, so a 60-session average is uncertain by about ±₹300.
 
 The Adaptive names are the table's only: the 09:16 and 16:00 Telegram messages and the rest of the page
 still say Adaptive and T1. Forward days only: a late entry or a day not yet scored is left out.
@@ -234,7 +243,7 @@ reached. See the [Daily log](guide:optionslab/rotation-daily-log) page for how t
 last setting is kept in this browser for each book separately (a stop kept from before 19 Oct 2026,
 when the default was 10,000 at 2 lots, is not carried over).
 
-The registered read-out does not move with it. **Beats random baskets**, the **verdict** and its
+The registered read-out does not move with it. The random baskets, the history columns, the **verdict** and its
 intervals always stay on the registered basis, without a portfolio stop, because the pre-registered
 test must not change after the fact. While a replay is running the row says *replaying…* and shows
 the registered figures; what the stop does is also explained in its pop-up.

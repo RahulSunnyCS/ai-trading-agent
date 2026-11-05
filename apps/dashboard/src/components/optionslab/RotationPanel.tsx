@@ -35,7 +35,7 @@ import {
   useRotationOverview,
   useRotationSummary,
 } from '../../hooks/useRotation';
-import { useRotationBeats } from '../../hooks/useRotationBeats';
+import { useRotationCompare } from '../../hooks/useRotationCompare';
 import { useRotationPlan } from '../../hooks/useRotationPlan';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
@@ -47,6 +47,7 @@ import {
   T1_STOP_KEYS,
 } from '../../lib/portfolioStop';
 import { baseBook, listBook, vsHeader } from '../../lib/rotationBooks';
+import { DEFAULT_COMPARE_WINDOW } from '../../lib/rotationCompare';
 import {
   ADAPTIVE_CARD,
   BASE_CARD,
@@ -76,6 +77,7 @@ import {
 import { type RotationBookView, useRotationBook } from '../../store/rotationBook';
 import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { RotationListKey } from '../../types/rotation';
+import type { CompareWindow } from '../../types/rotationCompare';
 import { Accordion } from '../ui/Accordion';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -98,6 +100,7 @@ import { EveningRunBar } from './results/EveningRunBar';
 import { ListPicker } from './rotation/ListPicker';
 import { RotationBaskets } from './rotation/RotationBaskets';
 import { type BookLine, RotationBooks } from './rotation/RotationBooks';
+import { RotationCompareCards } from './rotation/RotationCompareCards';
 import { RotationHealthStrip } from './rotation/RotationHealth';
 import { RotationHero } from './rotation/RotationHero';
 import { PlanPickLine, RotationTomorrow, recordedSession } from './rotation/RotationPlan';
@@ -162,9 +165,8 @@ export function RotationPanel() {
   const overview = useRotationOverview();
   // Each pick's settings and upload state, and the next session's tentative list.
   const planRes = useRotationPlan();
-  const classicBeats = useRotationBeats('core');
-  const tunedBeats = useRotationBeats('t1');
-  const baseBeats = useRotationBeats('base');
+  const compare = useRotationCompare();
+  const [compareWindow, setCompareWindow] = useState<CompareWindow>(DEFAULT_COMPARE_WINDOW);
   const plan = planRes.data;
   const summary = useRotationSummary(ONE_LOT);
   const tuned = useRotationSummary(TUNED);
@@ -260,11 +262,7 @@ export function RotationPanel() {
         name: ADAPTIVE_CARD.classic.name,
         note: ADAPTIVE_CARD.classic.note,
         focus: view === 'core',
-        beats: {
-          data: classicBeats.data,
-          loading: classicBeats.loading,
-          error: classicBeats.error,
-        },
+        compareBook: 'core',
         stop: {
           setting: portfolio,
           onChange: setPortfolio,
@@ -290,11 +288,7 @@ export function RotationPanel() {
         note: ADAPTIVE_CARD.tuned.note,
         focus: view === 'tuned',
         message: tunedMessage,
-        beats: {
-          data: tunedBeats.data,
-          loading: tunedBeats.loading,
-          error: tunedBeats.error,
-        },
+        compareBook: 't1',
         stop: {
           setting: tunedStop,
           onChange: setTunedStop,
@@ -319,11 +313,7 @@ export function RotationPanel() {
         name: BASE_CARD.name,
         note: BASE_CARD.note,
         focus: view === 'base',
-        beats: {
-          data: baseBeats.data,
-          loading: baseBeats.loading,
-          error: baseBeats.error,
-        },
+        compareBook: 'base',
         stop: {
           setting: baseStop,
           onChange: setBaseStop,
@@ -372,15 +362,6 @@ export function RotationPanel() {
     tunedBookNow,
     baseBookRes.error,
     baseBookNow,
-    classicBeats.data,
-    classicBeats.loading,
-    classicBeats.error,
-    tunedBeats.data,
-    tunedBeats.loading,
-    tunedBeats.error,
-    baseBeats.data,
-    baseBeats.loading,
-    baseBeats.error,
   ]);
 
   const reload = () => {
@@ -388,9 +369,7 @@ export function RotationPanel() {
     overview.refetch();
     summary.refetch();
     tuned.refetch();
-    classicBeats.refetch();
-    tunedBeats.refetch();
-    baseBeats.refetch();
+    compare.refetch();
   };
   const toggle = (k: RotationListKey) =>
     setShown((prev) => {
@@ -650,6 +629,10 @@ export function RotationPanel() {
             <>
               <RotationBooks
                 lines={lines}
+                compare={compare}
+                window={compareWindow}
+                onWindow={setCompareWindow}
+                below={<RotationCompareCards read={compare} window={compareWindow} />}
                 vsHeader={vsHeader(benchmark)}
                 footer={
                   verdictFor ? (
