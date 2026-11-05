@@ -387,6 +387,10 @@ def owner_lines(
         nxt = next((p.day for p in picks.values() if hasattr(p, "day")), None)
         if nxt is None:
             return None
+        if settings.get("rules"):  # BL-211: the lists as they stand on the session
+            from . import day_type
+
+            settings = auto.resolve(settings, day_type.ensure(nxt))
         if auto.paused_for(settings, nxt.isoformat()):
             return [
                 f"🏦 Margin for {nxt:%a} {nxt.day} {nxt:%b}: uploads are paused, nothing to check"

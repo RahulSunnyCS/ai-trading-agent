@@ -27,6 +27,7 @@ import {
   describeChanges,
   githubOutcome,
   heldByMaster,
+  rulesProblems,
   totalCapital,
   withCapital,
   withMargin,
@@ -47,6 +48,7 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { toast } from '../ui/Toast';
+import { AutomationRulesSection } from './AutomationRulesSection';
 import { SettingSwitch } from './SettingSwitch';
 
 const URL = `${SCHEDULER_API}/settings/automation`;
@@ -91,7 +93,7 @@ export function AutomationSettingsCard() {
   );
 
   async function save() {
-    if (!draft || saving || changes.length === 0) return;
+    if (!draft || saving || changes.length === 0 || ruleProblems.length > 0) return;
     setSaving(true);
     const result = await apiPut<AutomationView>(URL, draft);
     setSaving(false);
@@ -126,6 +128,8 @@ export function AutomationSettingsCard() {
   }
 
   const outcome = githubOutcome(view?.current.github ?? null);
+  // BL-211: the scheduler refuses these rules too; the page says why instead of failing a Save.
+  const ruleProblems = draft ? rulesProblems(draft.rules) : [];
 
   return (
     <Card>
@@ -283,6 +287,12 @@ export function AutomationSettingsCard() {
             })}
           </section>
 
+          <AutomationRulesSection
+            draft={draft}
+            disabled={saving}
+            onChange={(next) => setDraft(next)}
+          />
+
           <section className="space-y-3 border-t border-border pt-4" aria-label="Capital">
             <div>
               <p className="text-sm font-medium text-foreground">Capital</p>
@@ -411,7 +421,7 @@ export function AutomationSettingsCard() {
                   {changes.length} unsaved {changes.length === 1 ? 'change' : 'changes'}
                 </p>
                 <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-muted">
-                  {changes.map((line) => (
+                  {[...new Set(changes)].map((line) => (
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
@@ -437,7 +447,7 @@ export function AutomationSettingsCard() {
                 variant="primary"
                 onClick={() => void save()}
                 loading={saving}
-                disabled={changes.length === 0}
+                disabled={changes.length === 0 || ruleProblems.length > 0}
               >
                 Save
               </Button>

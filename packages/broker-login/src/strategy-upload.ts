@@ -5,8 +5,9 @@ import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { type Page, type Response, chromium } from 'playwright';
 import { BASE_URL } from './algotest.js';
-import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
+import { describeSource, uploadBooks } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
+import { automationForSession, todaySession } from './day-type.js';
 import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { algotestLoginLocked } from './login-lock.js';
@@ -283,7 +284,10 @@ async function main(): Promise<number> {
   let decidedBy = '';
   let books: string[] = values.latest ? [values.latest] : [];
   if (values['from-settings']) {
-    const automation = readAutomation();
+    // BL-211: the lists as they stand on the session uploaded: tomorrow's in the evening
+    const automation = await automationForSession(
+      values.mode === 'evening' ? { next: true } : todaySession(),
+    );
     decidedBy = describeSource(automation);
     books = uploadBooks(automation, 'algotest');
     if (!books.length) {

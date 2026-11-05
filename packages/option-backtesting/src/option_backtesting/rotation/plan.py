@@ -27,7 +27,7 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import automation_settings, journal, labels, result, store
+from . import automation_settings, day_type, journal, labels, result, store
 
 BOOKS = ("core", "t1")
 #: the name prefix each uploader gives a book's strategies
@@ -231,6 +231,15 @@ def build(root: Path, settings: dict | None = None) -> dict:
     sessions = [s for s in (recorded, tentative) if s is not None]
     days = [s["day"] for s in sessions]
     accounts = []
+    if settings is not None and days and settings.get("rules"):
+        # BL-211: an account's list can differ by session; the card shows the newest session's,
+        # the one being uploaded.
+        try:
+            settings = automation_settings.resolve(
+                settings, day_type.ensure(date.fromisoformat(days[-1]))
+            )
+        except automation_settings.DayTypeUnknown as error:
+            settings, settings_note = None, f"day-type rules cannot be applied: {error}"
     if settings is not None and settings["masters"].get("uploads"):
         for platform in automation_settings.PLATFORMS:
             for broker in automation_settings.BROKERS:

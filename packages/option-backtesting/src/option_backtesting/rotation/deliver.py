@@ -159,7 +159,7 @@ def pick_and_send(
     err = err or echo
     tag = f"{track.upper()} TRACK " if track else ""
     send_live = telegram and not dry_run
-    boost = message_boost()
+    boost = message_boost(day)
 
     def text_of(r: PickResult) -> str:
         return messages.render_entry(r.entry, r.options, boost) if any(boost.values()) else r.text
@@ -275,14 +275,17 @@ def pick_and_send(
     return 0
 
 
-def message_boost() -> dict[str, bool]:
+def message_boost(day: date | None = None) -> dict[str, bool]:
     """BL-183: which lists' messages say the Dir ×2 lots: Settings › Automation, for a platform
     whose `.env` upload switch is on. A message must always go: settings that cannot be read
-    leave the lots out, never stop it."""
+    leave the lots out, never stop it. `day`: the session the message is about, so a day-type rule
+    (BL-211) is read as it stands that day."""
     from . import automation_settings
 
     try:
-        settings, _ = automation_settings.read()
+        settings, _ = (
+            automation_settings.read_for_session(day) if day else automation_settings.read()
+        )
     except Exception:  # noqa: BLE001
         return {}
     return automation_settings.dir_boost_lists(settings, automation_settings.env_uploads_on())
@@ -342,14 +345,15 @@ def _t1_state(day: date, root: Path | None, err: Echo):
         return "error", f"{type(error).__name__}: {error}"
 
 
-def message_capital() -> dict[str, float]:
+def message_capital(day: date | None = None) -> dict[str, float]:
     """The capital the evening message measures the month against (Settings › Automation, owner
     2026-10-29): {'adaptive', 't1'}: the accounts that upload each list; 'total': every account
-    added up. Settings that cannot be read give the defaults: the message must always go."""
+    added up. Settings that cannot be read give the defaults: the message must always go. `day`:
+    the session the message is about (a day-type rule, BL-211, is read as it stands that day)."""
     from . import automation_settings as auto
 
     try:
-        settings, _ = auto.read()
+        settings, _ = auto.read_for_session(day) if day else auto.read()
     except Exception:  # noqa: BLE001
         settings = auto.DEFAULT
     return {
@@ -536,10 +540,10 @@ def _send_result_locked(
             t1_part = messages.T1_RESULT_NOT_READY
         # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
         live = live_compare.owner_lines(day, root, echo)
-        boost = message_boost()
+        boost = message_boost(day)
         t1_day = t1 if kind == "ready" else None
         paper, real = _month_so_far(day, adaptive, t1_day, boost, root, echo)
-        capital = message_capital()
+        capital = message_capital(day)
         standing_part = messages.standing_lines(_t1_standing(day, t1_day, root, echo))
         private = result.render(
             adaptive,
@@ -615,7 +619,7 @@ def _send_result_locked(
         echo(f"T1 result still not ready: {t1}")
     elif owed:
         next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None
-        text = result.render_t1_followup(t1, next_t1, boost=message_boost())
+        text = result.render_t1_followup(t1, next_t1, boost=message_boost(day))
         echo(text)
         for chat, marker in owed:
             if send(text, chat_id=chat):

@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — routes real money: the owner wants Shoonya on AlgoTest to trade Adaptive Classic on a SENSEX expiry day and Adaptive Tuned otherwise, without editing the row by hand the evening before |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | feature |
 | **Area** | options / scheduler / dashboard / broker-login |
 | **Created** | 2026-11-05 |
 | **Depends on** | BL-140 (the settings page and its versions), BL-197 (the evening export is what trades on AlgoTest), BL-209 (the T1 split reads the same rows; its PR 422 is open) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.62 |
 
 ## Context
 
@@ -195,6 +195,19 @@ What exists and is reused:
 
 ## Log
 
+- 2026-11-05 — **built** (Phases 1 to 3), PR in review. The open questions were not put to the owner
+  one by one; the proposed defaults were built, as the owner said "lets do the changes" after
+  reading them: (1) a Quantiply row's MTM SL stays the row's figure; (2) no "both indices"
+  condition; (3) a rule may give a row with no list one (it then uploads; the row's login must be
+  on); (4) the T1 split (BL-209, PR 422 still open) is not touched here; it follows the resolved
+  rows once merged; (5) the rule the owner named is the first thing "Add a rule" makes. Changed
+  from the plan as built: the day type is computed on demand (`day_type.ensure`, kept as a file for
+  the TypeScript jobs) rather than written by a dedicated step of the evening job and the 09:16
+  pick; the page's preview resolves the draft rules itself from `GET /legwise/rotation/day-type`
+  (so there is no `effective_by_session` in the scheduler's view); the export manifest does not
+  name the rule (the export command prints which rule decided each row); the Today plan card
+  shows the newest session's lists. Phase 4 (first live session) waits for a saved rule and a
+  scheduler restart.
 - 2026-11-05 — created from the owner's idea ("on a SENSEX expiry day, AlgoTest Shoonya should be
   Adaptive Core, not Adaptive Tuned; add a rule from the instrument and its days to expiry, or
   the weekday"). Plan written for a later session to build; mock-up of the page section in

@@ -17,6 +17,7 @@ import {
   uploadBooks,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
+import { automationForSession, todaySession } from './day-type.js';
 import {
   ACTIVATE_LEAD_SECONDS,
   BROKER_LABELS,
@@ -264,7 +265,8 @@ async function main(): Promise<number> {
   // check fails open (it runs), since it only reads /live and is the safety net.
   let automation: Automation | null = null;
   try {
-    automation = readAutomation();
+    // BL-211: the lists as they stand on the session worked on: tomorrow's for the evening setup
+    automation = await automationForSession(values.setup ? { next: true } : todaySession());
   } catch (error) {
     if (!values.check) throw error;
     console.error(`automation settings unreadable (${String(error)}): the check runs anyway`);
