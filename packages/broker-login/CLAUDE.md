@@ -238,6 +238,9 @@ week, until disabled.
   `--setup` (BL-197, the last step of `algotest-evening`) sets up the next session's picks instead: each
   sheet checked (multiplier 1, NRML, no day ticked, execution time = entry) and saved with Trade monitoring
   on Candle Close; it deploys nothing, so it needs `ALGOTEST_UPLOAD=on`, not `ALGOTEST_DEPLOY`.
+  A sheet set up before (its save button reads "Update Execution Settings": the morning activation reopens
+  last evening's) is only checked for Candle Close and no day ticked, then closed with Cancel, never saved
+  again (`src/live-sheet.ts`, tested against a stand-in page in `live-sheet.test.ts`).
 - Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read
   `latest-<book>.json`, written by `obt rotation algotest-export`. The page contract is in
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save

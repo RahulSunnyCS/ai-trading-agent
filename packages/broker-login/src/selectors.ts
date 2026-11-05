@@ -262,8 +262,11 @@ export const strategyPage = {
  * BL-138: Algo Trade (/live). VERIFIED 2026-10-19 from the owner's session: the Activation rows
  * (select a row by its name, then "Setup Execution" / "Edit Execution" and "Activate"), and the
  * "Edit execution for <name>" sheet (Quantity Multiplier, per-leg NRML/MIS selects, Weekdays/DTE
- * day boxes, "Setup Execution Settings"). "Activate" opens the broker sheet below (2026-11-03).
+ * day boxes, "Setup Execution Settings", or "Update Execution Settings" once it was set up before,
+ * 2026-11-05). "Activate" opens the broker sheet below (2026-11-03).
  */
+const SHEET_SAVE = /^(Setup|Update) Execution Settings$/;
+
 export const livePage = {
   // "n/6 Strategy Deployed" until late October 2026; "Deployed Strategies" on 2026-11-02
   header: (page: Page): Locator =>
@@ -286,10 +289,12 @@ export const livePage = {
           new RegExp(`(Edit|Select) execution for ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
         ),
       })
-      .filter({ has: page.getByRole('button', { name: 'Setup Execution Settings' }) })
+      .filter({ has: page.getByRole('button', { name: SHEET_SAVE }) })
       .last(),
-  sheetSave: (sheet: Locator): Locator =>
-    sheet.getByRole('button', { name: 'Setup Execution Settings' }),
+  /** "Setup Execution Settings" the first time, "Update Execution Settings" after (2026-11-05) */
+  sheetSave: (sheet: Locator): Locator => sheet.getByRole('button', { name: SHEET_SAVE }),
+  sheetCancel: (sheet: Locator): Locator =>
+    sheet.getByRole('button', { name: 'Cancel', exact: true }),
   /** The sheet's Trade monitoring choice: a radio inside each label (BL-197). */
   monitoring: (sheet: Locator, choice: 'on LTP' | 'on Candle Close'): Locator =>
     sheet
