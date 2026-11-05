@@ -170,6 +170,11 @@ def run(root: Path) -> tuple[dict[str, dict], dict]:
     skipped: list[str] = []
     trailing = Trailing()
     lookahead_checks: list[bool] = []
+    # Phase 0's spot check: 20 random days (seeded) whose predictors must not change when every
+    # row from the day on is blanked
+    candidates = [d for d in rec.days_available() if FIRST <= d <= LAST]
+    rng = np.random.default_rng(SEED)
+    check_days = set(rng.choice(candidates, size=min(20, len(candidates)), replace=False).tolist())
 
     def n_trades(m: str, d: date) -> int | None:
         if m not in trades:
@@ -220,7 +225,7 @@ def run(root: Path) -> tuple[dict[str, dict], dict]:
             if gates[PRIMARY]["threshold"] is None:
                 counts["gate_warmup"] += 1
             # look-ahead spot check: the predictors do not change when rows from D on are blanked
-            if len(lookahead_checks) < 20 and i % 23 == 0:
+            if d in check_days:
                 blank = rec.values.copy()
                 blank[i:] = np.nan
                 again = basket_confidence(
@@ -229,7 +234,11 @@ def run(root: Path) -> tuple[dict[str, dict], dict]:
                     dte_matrix(np.array([*rec.dte_n[:i], labels[0]]), np.array([*rec.dte_s[:i], labels[1]]), cols),
                     LISTS[LIST_KEY],
                 )  # fmt: skip
-                lookahead_checks.append(again["confidence"] == values["conf"])
+                last21b = blank[max(0, i - 21) : i, cols.index(dir_pick)]
+                lookahead_checks.append(
+                    again["confidence"] == values["conf"]
+                    and float((last21b > 0).mean()) == values["dirwin"]
+                )
             try:
                 loaded: dict = {}
                 paths = {m: portfolio.one_lot_path(root, d, m, loaded) for m in core}
@@ -246,7 +255,8 @@ def run(root: Path) -> tuple[dict[str, dict], dict]:
                 bd = portfolio.apply_book(
                     [portfolio.Member(m, lots, paths[m]) for m, lots in members.items()], stop
                 )
-                brokerage = sum(2 * ntr[m] * lots * BROKERAGE for m, lots in members.items())
+                # per order, whatever its lots, as BL-204 / BL-207 book it
+                brokerage = sum(2 * ntr[m] * BROKERAGE for m in members)
                 return {
                     "gross": bd.gross_with,
                     "stop": stop,
@@ -269,6 +279,7 @@ def run(root: Path) -> tuple[dict[str, dict], dict]:
                 "x2": x2,
             }
     assert lookahead_checks and all(lookahead_checks), "a predictor read the day's own rows"
+    # (a check day without a Dir pick is not scored, so fewer than 20 may be recorded)
     return rows, {"counts": counts, "skipped": skipped, "lookahead_checks": len(lookahead_checks)}
 
 
@@ -420,7 +431,7 @@ def main() -> None:
                     f"  {arm:9} {x.get('share_on', 1.0):5.0%} {x['per_day']:+7.0f} {x['total']:+9,.0f} {x['max_drawdown']:8,.0f} "
                     f"{x['worst_day']:8,.0f} {x['worst_week']:8,.0f} {x['book_stop_days']:5} "
                     f"{fmt_share(x.get('extra_net_kept'))} {fmt_share(x.get('extra_drawdown_taken'))} "
-                    f"{fmt_share(x.get('extra_worst_day_taken'))} | {fmt_iv(x.get('vs_x1'))}"
+                    f"{fmt_share(x.get('extra_worst_day_taken'))} {fmt_share(x.get('extra_worst_week_taken'))} | {fmt_iv(x.get('vs_x1'))}"
                 )
         print("  verdict:", json.dumps(block["verdict"]))
 

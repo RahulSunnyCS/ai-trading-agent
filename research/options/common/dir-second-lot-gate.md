@@ -21,24 +21,24 @@ Dir ×2 on every non-expiry day with a Dir pick, where the row's toggle is on (B
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| [BL-212][bl212] Phase 1 | ×1 (3 lots, stop ₹9k), ×2 (Dir doubled, stop ₹9k + its MTM SL), and ten gates: conf / rank / dirwin at trailing 50 / 67 / 75 %, VIX ≤ 15; judged on the share of ×2's extra return kept and of its extra drawdown and worst day taken | T1 list C as live, 220 normal days with a Dir pick 2025-01-10 → 2026-11-04, after brokerage, book stop, 0 % slippage (0.5 % reading beside it); fit ≤ 2025-10-08 / test after | **Killed** (primary conf @ 50 %: kept 0.50 of the extra return, took 1.00 of the extra drawdown and worst day; test half 0.52 / 0.25 / 1.00). No scored gate was off on the worst Dir day (−₹14,130) or week (−₹30,610) | `research/bl212/dir_gate_2026-11-05.json` (tracked); rows under `out/` git-ignored, regenerate with `dir_gate.py` |
+| [BL-212][bl212] Phase 1 | ×1 (3 lots, stop ₹9k), ×2 (Dir doubled, stop ₹9k + its MTM SL), and ten gates: conf / rank / dirwin at trailing 50 / 67 / 75 %, VIX ≤ 15; judged on the share of ×2's extra return kept and of its extra drawdown and worst day taken | T1 list C as live, 220 normal days with a Dir pick 2025-01-10 → 2026-11-04, after brokerage, book stop, 0 % slippage (0.5 % reading beside it); fit ≤ 2025-10-08 / test after | **Killed** (primary conf @ 50 %: kept 0.53 of the extra return, took 1.00 of the extra drawdown and worst day; test half 0.53 / 0.17 / 1.00). No scored gate was off on the worst Dir day (−₹13,941) or week (−₹29,996) | `research/bl212/dir_gate_2026-11-05.json` (tracked); rows under `out/` git-ignored, regenerate with `dir_gate.py` |
 
 ## What we know
 
 - **The Dir's own recent record does not mark its worst days.** Every confidence and win-rate gate at
-  50 % was on for the −₹14,130 day and the −₹30,610 week; so was VIX ≤ 15. The drawdown a gate shed
+  50 % was on for the −₹13,941 day and the −₹29,996 week; so was VIX ≤ 15. The drawdown a gate shed
   came from ordinary losing days, not the ones the owner wants to avoid.
 - **The scored gates act as a dimmer.** conf @ 50 % kept half the extra return and, on the test half,
-  a quarter of the extra drawdown but all of the extra worst day; conf @ 67 / 75 % are ×1 with the
-  lot on a third of the days (kept 0.13–0.18). Win rate (dirwin @ 50 %) kept 0.58 and took 0.53 of
+  a sixth of the extra drawdown but all of the extra worst day; conf @ 67 / 75 % are ×1 with the
+  lot on a third of the days (kept 0.15–0.26). Win rate (dirwin @ 50 %) kept 0.62 and took 0.53 of
   the drawdown on the test half. A gate that sheds return and risk in proportion adds nothing a
   smaller fixed size does not.
 - **A picked Dir's rank cannot gate itself.** Its composite percentile is in the top percentile by
   construction, so trailing quantile gates on it are on 89–99 % of days.
-- **VIX ≤ 15 is the one lead, not a finding.** Over all days it kept 74 % of the extra return
-  (+₹392/day vs ×1, [+163, +622]) with a max drawdown of −₹37,568, *smaller than ×1's* −₹40,047, and a
+- **VIX ≤ 15 is the one lead, not a finding.** Over all days it kept 73 % of the extra return
+  (+₹492/day vs ×1, [+262, +724]) with a max drawdown of −₹34,775, *smaller than ×1's* −₹40,047, and a
   shallower worst week, because it sat out April–May 2025. On the test half it was deeper than ×2
-  (−₹29,621 vs −₹28,272: a 2026 episode came at a low VIX) and it never dodged the worst day. One
+  (−₹28,299 vs −₹27,281: a 2026 episode came at a low VIX) and it never dodged the worst day. One
   episode decides it. Beside [Directional › VIX](../strategies/directional/vix.md).
 - **Warm-up caveat for the trailing gates:** the period's deepest drawdown (Jan–May 2025) lies inside
   the 63 days they are forced on, so their all-days drawdown equals ×2's by construction; read their
