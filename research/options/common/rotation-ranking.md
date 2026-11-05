@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-11-03
+**Status:** Tested · **Last updated:** 2026-11-05
 
 ## What it is
 
@@ -87,10 +87,13 @@ per lot-day is above zero and its drawdown per lot is no worse.
 
 - The forward read-out after 60 trading days from 2026-10-12 (the only unseen test).
 - BL-100 on P3.
+- An absolute 0–100 confidence beside the rank was tested and killed on one definition
+  ([rotation confidence](rotation-confidence.md), BL-210); a rescaled version is untested.
 
 ## Related
 
 - [Intraday state](intraday-state.md) (re-timing picks after 09:16), [portfolio stop](portfolio-stop.md),
+  [rotation confidence](rotation-confidence.md) (an absolute figure beside the rank, killed),
   [Buy](../strategies/buy-breakout/README.md) (the add-on).
 - Code: `src/option_backtesting/rotation/` (`score.py`, `lists.py`, `pick.py`), `research/bl057/rotate.py`.
   Picks and per-day outputs are git-ignored; regenerate with `rotate.py --basket …`.

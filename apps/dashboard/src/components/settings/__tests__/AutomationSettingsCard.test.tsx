@@ -60,6 +60,7 @@ const SETTINGS: AutomationSettings = {
     },
   },
   pause: { until: null },
+  rules: [],
   capital: { finvasia: 850_000, angelone: 850_000 },
   margin: { bufferPct: 10, days: 6 },
 };
@@ -359,5 +360,121 @@ describe('AutomationSettingsCard', () => {
     );
     render(<AutomationSettingsCard />);
     expect(await screen.findByText('Scheduler not reachable')).toBeTruthy();
+  });
+});
+
+describe('Advanced rules (BL-211)', () => {
+  const DAY_TYPES = {
+    today: {
+      day: '2026-11-05',
+      weekday: 'Thu',
+      dte: { NIFTY: '2', SENSEX: '0' },
+      source: 'master',
+    },
+    tomorrow: {
+      day: '2026-11-06',
+      weekday: 'Fri',
+      dte: { NIFTY: '1', SENSEX: '4' },
+      source: 'master',
+    },
+    errors: [],
+  };
+  function stubWithDays(put?: (body: AutomationSettings) => Response) {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('/rotation/day-type')) return ok(DAY_TYPES);
+      if (init?.method === 'PUT')
+        return put ? put(JSON.parse(String(init.body))) : ok(view(SETTINGS, 1));
+      return ok({ ...view(SETTINGS), next_session: '2026-11-06' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('starts closed with no rules, adds one, and previews today and tomorrow', async () => {
+    stubWithDays();
+    render(<AutomationSettingsCard />);
+    expect(await screen.findByText('0 rules')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Advanced rules/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    expect(
+      await screen.findByText('Rule added: AlgoTest · Shoonya on SENSEX 0 DTE → Adaptive Classic'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'On a day SENSEX has 0 weekdays to expiry, AlgoTest · Shoonya trades Adaptive Classic instead of its own list (Adaptive Tuned).',
+      ),
+    ).toBeTruthy();
+    // SENSEX expires today (Thu) and not tomorrow: the rule decides today's AlgoTest · Shoonya
+    const today = await screen.findByText(/Today · Thu/);
+    const list = today.closest('div') as HTMLElement;
+    expect(list.textContent).toContain('Adaptive Classic');
+    expect(list.textContent).toContain('rule 1');
+    const tomorrow = screen.getByText(/Tomorrow · Fri/).closest('div') as HTMLElement;
+    expect(tomorrow.textContent).not.toContain('rule 1');
+  });
+
+  it('saves the rules with the settings', async () => {
+    const fetchMock = stubWithDays((body) => ok(view(body, 1)));
+    render(<AutomationSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: /Advanced rules/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    fireEvent.change(screen.getByLabelText('Rule 1 account'), {
+      target: { value: 'quantiply.angelone' },
+    });
+    fireEvent.change(screen.getByLabelText('Rule 1 condition'), { target: { value: 'weekday' } });
+    fireEvent.change(screen.getByLabelText('Rule 1 weekday'), { target: { value: 'Thu' } });
+    fireEvent.change(screen.getByLabelText('Rule 1 list'), { target: { value: 'none' } });
+    fireEvent.change(screen.getByLabelText('Rule 1 note'), {
+      target: { value: 'no Quantiply on Thursdays' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).rules).toEqual([
+      {
+        row: 'quantiply.angelone',
+        when: { kind: 'weekday', weekday: 'Thu' },
+        list: 'none',
+        note: 'no Quantiply on Thursdays',
+      },
+    ]);
+  });
+
+  it('says a rule can never apply and does not allow the save', async () => {
+    const fetchMock = stubWithDays();
+    render(<AutomationSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: /Advanced rules/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    expect(
+      await screen.findByText(
+        'Rule 2 can never apply: rule 1 tests the same thing on the same row and is tried first.',
+      ),
+    ).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove rule 2' }));
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false);
+  });
+
+  it('opens with the rules showing when there are some', async () => {
+    const rule = {
+      row: 'algotest.finvasia',
+      when: { kind: 'dte', index: 'SENSEX', dte: '0' },
+      list: 'core',
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/rotation/day-type')
+          ? ok(DAY_TYPES)
+          : ok(view({ ...SETTINGS, rules: [rule] } as AutomationSettings, 4)),
+      ),
+    );
+    render(<AutomationSettingsCard />);
+    expect(await screen.findByText('1 rule')).toBeTruthy();
+    expect(await screen.findByLabelText('Rule 1 account')).toBeTruthy();
   });
 });

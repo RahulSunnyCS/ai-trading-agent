@@ -243,6 +243,12 @@ evening; the row turns "Ready to deploy"):
 | Execution days | Weekdays / DTE; M T W Th F Sa Su, **none ticked** |
 | Buttons | Cancel · "Setup Execution Settings" |
 
+Reopened once saved (the row's button then reads "Edit Execution"), the same sheet's save button reads
+**"Update Execution Settings"**, and it shows the Quantity Multiplier and Strategy execution time empty while
+Candle Close stays selected (2026-11-05 08:17, the first morning activation: it waited for "Setup Execution
+Settings" and failed on both lists). `setupSheet` (`packages/broker-login/src/live-sheet.ts`) then checks only
+Candle Close and that no execution day is ticked, and closes the sheet with Cancel; it never saves it again.
+
 **Read-only calls the /live and /broker pages make (BL-143, seen 2026-10-20 15:13 IST; GETs only, with the
 session cookies and the CSRF header).** The trade monitor (`packages/broker-login/src/trade-monitor.ts`) uses
 the first two:

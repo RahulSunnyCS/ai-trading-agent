@@ -289,7 +289,17 @@ Otherwise:
   net and days won over the month's journal days (`result.calculate`; an unscored day left out, never zero; a Dir ×2
   list's as-traded total by `result.as_traded`) in both copies, and the account's real month (`realised.views.days`'
   `profit`, up to the day before, the notes arriving at 00:00) in the owner's only; a failure drops those lines, never
-  the message.
+  the message. `rotation/standing.py` (owner, 2026-11-04) adds, after the month and in both copies, T1's drawdown
+  now against the last `WINDOW_DAYS` (730) days: the message's own series (list C, one lot per strategy, net after
+  costs and the message's slippage, `store.read_net` under `store.slipped`), journal days as recorded and earlier ones
+  re-derived with `daylog.reconstruction`, a day missing a pick's result left out; `measure` gives the drawdown from
+  the running high (peak starting at zero), the share of days at least that deep, the share under water and the
+  deepest, plus `ladder`: the depth at least 25 / 10 / 5 % of the days reached (`LADDER`, rounded up so the share is
+  never overstated). The message shows two lines (`messages.standing_lines`: the drawdown and its high, the share of
+  days as bad or worse); `detail=True` (the CLI) adds the rest. Only when T1's day is in; a failure drops the lines, never the message.
+  `keep=True` (the 16:00 job, and `obt rotation standing` unless `--no-save`) rewrites the series whole to
+  `rotation/track_t1/standing.csv` (`series_path`; day, net, total, high, drawdown, picks; atomic): a re-derivation from
+  the stored results, not a record, so a repaired day changes it.
   Slippage (owner, 2026-10-30): `rotation/slip_store.py` keeps a 0.5% slippage copy beside every results file
   (`store.slip_path`, `<folder>/slip-0.5/`), written by `rotation update`, the base's scoring and `obt rotation
   slippage-fill`. `store.slipped(pct)` (a context variable; the API's `slippage` parameter sets it per request in
@@ -427,6 +437,19 @@ Otherwise:
   down. `book_day` replays the nightly update's own strategy file and lot-sizing date. Reproduces BL-055's totals
   (`research/bl095/reproduce_bl055.py`) and the log's gross with no stop (`research/bl095/check_log_gross.py`). Stores
   nothing and never changes a stored result or the registered read-out.
+- `rotation/candles.py` + `api/rotation_candles_routes.py` — the Rotation page's "Day by day" card (owner, 2026-11-04;
+  `GET /legwise/rotation/candles`), read-only. Per day for `t1` / `core` (list C: the journal's picks, re-derived
+  with `daylog.reconstruction` before it) or `base` (2 × `N_wide_0917` + `N_dir_atm_0924`, every day both are stored,
+  read at 0 % so the day list does not depend on the slippage copy): `portfolio.book_day` at the request's slippage
+  under the book stop (`DEFAULT_STOP`, times `lots`); open = the running total before the day, high / low = open +
+  the best / worst of the stopped path (0 included), close = open + the day's result; each member's `at_stop` with
+  `labels.label`; `beat` = the share of `DRAWS` (2,000) random same-size baskets from the book's pool (Core-298, + T1's
+  variants for T1), seeded per book and day, whose one-lot sum was below the book's result / `lots` (the baskets
+  are cut at the stop when they ended below it, which flatters them, never the book). Each day also has its
+  `drawdown` (running high from zero minus the close) and `live` (`live_by_day`: `live_compare.compare_range`'s groups for
+  the list, per platform + broker, per lot); the response has `ladder` (the depth at least 25 / 10 / 5 % of the days
+  reached, rounded up) and `live_days`. A day the replay cannot run is `left_out` with its reason. Cold: 202 through
+  `rotation/warm.py`.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
   read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s

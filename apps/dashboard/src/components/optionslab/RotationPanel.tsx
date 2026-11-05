@@ -82,6 +82,7 @@ import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
+import { RotationCandles } from './RotationCandles';
 import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
@@ -735,6 +736,21 @@ export function RotationPanel() {
           <RotationDrawdowns list={focus} portfolio={portfolio} />
           <RotationDrift list={focus} />
         </Accordion>
+      </section>
+
+      <section aria-labelledby="band-day-by-day" className="space-y-3">
+        <header>
+          <h2
+            id="band-day-by-day"
+            className="text-base font-semibold tracking-tight text-foreground"
+          >
+            Day by day
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            Each day as a candle on the running total, with every strategy's result on hover.
+          </p>
+        </header>
+        <RotationCandles />
       </section>
 
       <section aria-labelledby="band-live-vs-paper" className="space-y-3">

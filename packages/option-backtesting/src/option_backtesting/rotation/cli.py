@@ -173,6 +173,33 @@ def track_readout(
     typer.echo(render(build(track)))
 
 
+@rotation_app.command("standing")
+def standing_cmd(
+    day: str | None = typer.Option(None, "--day", help="YYYY-MM-DD; default the newest T1 entry."),
+    no_save: bool = typer.Option(False, "--no-save", help="Print only; do not rewrite the file."),
+) -> None:
+    """T1's drawdown now against the last two years, as the 16:00 message says it, and its daily
+    series (net, running total and high, drawdown, picks) written to rotation/track_t1/standing.csv
+    (owner, 2026-11-04). Paper, one lot per strategy, the message's slippage."""
+    from . import journal, messages, standing, store
+
+    if day:
+        d = _day(day)
+    else:
+        entries = journal.read(store.journal_path(None, standing.TRACK))
+        if not entries:
+            typer.echo("no T1 journal entry yet")
+            raise typer.Exit(2)
+        d = date.fromisoformat(entries[-1]["day"])
+    s = standing.t1(d, keep=not no_save)
+    if s is None:
+        typer.echo(f"{d}: T1's results for the day are not all stored yet")
+        raise typer.Exit(2)
+    typer.echo("\n".join(messages.standing_lines(s, detail=True)))
+    if not no_save:
+        typer.echo(f"series: {standing.series_path()}")
+
+
 @rotation_app.command("lot-plans")
 def lot_plans_cmd(
     book: str = typer.Option("core", "--book", help="core (live Adaptive) or t1 (the T1 track)."),
@@ -188,6 +215,34 @@ def lot_plans_cmd(
         raise typer.BadParameter(f"--book must be one of {', '.join(BOOKS)}")
     r = build(book)
     typer.echo(json.dumps(r, indent=2, default=str) if as_json else render(r, last))
+
+
+@rotation_app.command("daytype")
+def daytype_cmd(
+    day: str | None = typer.Option(None, "--day", help="YYYY-MM-DD; default today (IST)."),
+    next_session: bool = typer.Option(False, "--next", help="The session after --day."),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Keep it at rotation/day-type/<day>.json (the TypeScript jobs read it).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="One JSON object on one line."),
+) -> None:
+    """A session's day type (BL-211): its weekday and each index's weekdays to expiry, the facts a
+    day-type rule in Settings › Automation is written on. Same labels as the 09:16 message."""
+    import json
+
+    from . import day_type
+
+    d = _session_of(day, next_session)
+    dt = day_type.ensure(d) if write else day_type.for_day(d)
+    if as_json:
+        typer.echo(json.dumps(dt.as_json()))
+        return
+    typer.echo(
+        f"{dt.day} {dt.weekday}: NIFTY {dt.dte['NIFTY']} DTE · SENSEX {dt.dte['SENSEX']} DTE "
+        f"({dt.source})"
+    )
 
 
 def _resolve_picks(day, book, preview, next_session, variants, wait):
@@ -314,6 +369,34 @@ def _morning(picks, book: str, folder):
     return replace(m.picks, dte=picks.dte), extra
 
 
+def _has_export(book: str, day: str | None, next_session: bool, preview: bool) -> bool:
+    """Whether `latest-<book>.json` already points at an existing export of that session's
+    expected picks (`--only-missing`)."""
+    import json
+
+    from . import store
+
+    d = _day(day)
+    if next_session:
+        from .tomorrow import next_session as following
+
+        d, preview = following(d), True
+    if not preview:
+        return False  # recorded picks are always exported afresh
+    pointer = store.rotation_dir() / "algotest" / f"latest-{book}.json"
+    try:
+        record = json.loads(pointer.read_text())
+    except (OSError, ValueError):
+        return False
+    from pathlib import Path
+
+    return (
+        record.get("day") == d.isoformat()
+        and record.get("source") == "preview"
+        and (Path(str(record.get("dir", ""))) / "manifest.json").exists()
+    )
+
+
 def _end_missing(missing: list[str], books: list[str]) -> None:
     """Exit 2 (the scheduler retries) only when no list could be exported. With some exported,
     exit 0 so the uploads run; the uploader refuses a list whose export is stale and says so."""
@@ -323,12 +406,29 @@ def _end_missing(missing: list[str], books: list[str]) -> None:
         typer.echo(f"not exported yet: {', '.join(missing)}")
 
 
-def _settings_books(platform: str) -> tuple[list[str], dict]:
+def _session_of(day: str | None, next_session: bool):
+    """The session an export is for: `--day` (default today, IST), the one after it under
+    `--next`. The day-type rules of Settings › Automation (BL-211) are read for this day."""
+    d = _day(day)
+    if next_session:
+        from .tomorrow import next_session as following
+
+        d = following(d)
+    return d
+
+
+def _settings_books(platform: str, session) -> tuple[list[str], dict]:
     """BL-140: the lists the dashboard's Settings › Automation gives `platform` (empty: none), and
-    the settings they came from (read once, so the add-on decision is of the same version)."""
+    the settings they came from (read once, so the add-on decision is of the same version).
+    BL-211: as they stand on `session`; a day-type rule that cannot be decided stops the export."""
     from . import automation_settings
 
-    settings, source = automation_settings.read()
+    try:
+        settings, source = automation_settings.read_for_session(session)
+    except (automation_settings.DayTypeUnknown, OSError, RuntimeError) as error:
+        # a rule cannot be decided, or the day-type file cannot be kept (data root not mounted)
+        typer.echo(f"not exported: {type(error).__name__}: {error}")
+        raise typer.Exit(1) from error
     books = automation_settings.upload_books(settings, platform)
     typer.echo(f"{platform}: {', '.join(books) or 'nothing to upload'} ({source})")
     return books, settings
@@ -366,6 +466,15 @@ def algotest_export(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 jobs)."
     ),
     dir_boost: bool | None = typer.Option(None, "--dir-boost/--no-dir-boost", help=_DIR_BOOST_HELP),
+    only_missing: bool = typer.Option(
+        False,
+        "--only-missing",
+        help=(
+            "Skip a list whose latest export already holds that session's expected picks (the "
+            "16:40 run made it); exit 3 when nothing was missing. The 08:11 catch-up for a row "
+            "switched to another list after 16:40 (2026-11-05)."
+        ),
+    ),
 ) -> None:
     """The day's Adaptive picks as AlgoTest .algtst files plus a zip (BL-137; uploads nothing)."""
     from pathlib import Path
@@ -374,14 +483,22 @@ def algotest_export(
     from . import algtst_export as ax
     from . import store
 
-    books, settings = _settings_books("algotest") if from_settings else ([book], None)
+    books, settings = (
+        _settings_books("algotest", _session_of(day, next_session))
+        if from_settings
+        else ([book], None)
+    )
     for b in books:
         if b not in ax.BOOKS:
             raise typer.BadParameter(f"--book must be one of {', '.join(ax.BOOKS)}")
     if from_settings and out and len(books) > 1:
         raise typer.BadParameter("--out takes one list; the settings give several")
     missing = []
+    skipped = []
     for b in books:
+        if only_missing and _has_export(b, day, next_session, preview):
+            skipped.append(b)
+            continue
         picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
         if picks is None:
             missing.append(b)
@@ -402,7 +519,11 @@ def algotest_export(
         if not out:  # the uploader (BL-137) reads the newest default export through this pointer
             ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
         typer.echo(ax.render(picks, exports, zip_path))
-    _end_missing(missing, books)
+    if skipped:
+        typer.echo(f"already exported for the session: {', '.join(skipped)}")
+    if only_missing and len(skipped) == len(books):
+        raise typer.Exit(3)  # nothing was missing: the catch-up's upload and setup are not needed
+    _end_missing(missing, [b for b in books if b not in skipped])
 
 
 @rotation_app.command("quantiply-export")
@@ -443,7 +564,11 @@ def quantiply_export(
     from . import quantiply_export as qx
     from . import store
 
-    books, settings = _settings_books("quantiply") if from_settings else ([book], None)
+    books, settings = (
+        _settings_books("quantiply", _session_of(day, next_session))
+        if from_settings
+        else ([book], None)
+    )
     for b in books:
         if b not in qx.BOOKS:
             raise typer.BadParameter(f"--book must be one of {', '.join(qx.BOOKS)}")

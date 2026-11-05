@@ -58,6 +58,32 @@ The screen is one page, in the order you read it:
 - **What happened** — the recorded or reconstructed day log, with what the live book made against
   paper on each recorded day. Below it, *Drawdowns and selection
   drift* opens the risk review for the list.
+- **Day by day** — candles for Adaptive Tuned, Adaptive Classic or the fixed base, one a day or one
+  a week (**Daily** / **Weekly**), laid on the running total of the stored history (it starts in
+  October 2024, and the ranking's first pick in January 2025). A candle opens at the total before it;
+  its wick runs to the best and worst points of the minute-by-minute P&L; its body closes at the
+  result, cut where the book's own stop would have cut it (₹9,000 for Tuned, ₹8,000 for Classic and
+  the base, per lot of the book). On the chart:
+  - a **dot** above each day your accounts traded the list live, green or red by their live result
+    per lot (the 15:40 capture);
+  - a **thin line**: the fixed base, started from the same point as the first candle shown, so you
+    see the two books over the same days;
+  - a small **▲ forward** mark under the first day with recorded picks (19 Oct 2026 for Tuned):
+    everything before it is re-derived on the history the strategies were tuned on, and only the
+    days from the mark are a forward test;
+  - a **drawdown strip** underneath, with dashed lines at the depth a quarter, a tenth and a
+    twentieth of the days reached (*25% / 10% / 5% of days*).
+
+  Hover a candle for the day's result, best and worst point, drawdown, when the book stop fired, each
+  strategy with its entry time and settings (a day can hold two entry times of one strategy), each
+  account's live result against paper, and the share of 2,000
+  random baskets of the same number of strategies from the book's pool that the day beat (the
+  baskets are cut at the same stop when they ended below it). A week's hover sums its days and
+  gives the best and worst day. Click a day to pin it under the chart, then **Replay** a strategy to
+  see its day minute by minute; click a week to pin its days and pick one. Switch the period (1 month
+  to All) and the lots per strategy (1 to 4; the stop widens with the lots). Paper figures, at the
+  page's slippage, before charges; picks before the journal began are re-derived by the ranking.
+  The first time it opens it replays every day, which takes a few minutes.
 - **Live vs paper** — what AlgoTest and Quantiply actually made on each captured day against the
   backtest for the same picks, the gap running day by day, and by shape. See
   [Rotation: live vs paper](guide:optionslab/rotation-live).

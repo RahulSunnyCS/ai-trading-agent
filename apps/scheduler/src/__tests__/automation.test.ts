@@ -532,3 +532,74 @@ describe('the margin block (BL-205, owner 2026-11-04)', () => {
     expect('settings' in checked && checked.settings.margin).toEqual({ bufferPct: 5, days: 10 });
   });
 });
+
+describe('day-type rules (BL-211)', () => {
+  const sensexExpiry = {
+    row: 'algotest.finvasia',
+    when: { kind: 'dte', index: 'SENSEX', dte: '0' },
+    list: 'core',
+    note: 'SENSEX expiry: Classic',
+  } as const;
+  const withRules = (rules: unknown[]) => ({ ...clone(DEFAULT_SETTINGS), rules });
+  const errorsOf = (value: unknown) => {
+    const checked = validate(value);
+    return 'errors' in checked ? checked.errors.join('\n') : '';
+  };
+
+  it('saves a good rule and keeps it in a fixed key order', () => {
+    const checked = validate(withRules([sensexExpiry]));
+    expect('settings' in checked && checked.settings.rules).toEqual([sensexExpiry]);
+  });
+
+  it('settings before BL-211 have no rules: none', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { rules?: unknown };
+    old.rules = undefined;
+    expect(withDefaults(old as AutomationSettings).rules).toEqual([]);
+  });
+
+  it('a save must say its rules, [] for none', () => {
+    const missing = clone(DEFAULT_SETTINGS) as unknown as { rules?: unknown };
+    missing.rules = undefined;
+    expect(errorsOf(missing)).toContain('rules must be a list');
+  });
+
+  it('refuses a bad row, list, condition, weekday, label, note and too many rules', () => {
+    const bad = [
+      { ...sensexExpiry, row: 'algotest.zerodha' },
+      { ...sensexExpiry, list: 'classic' },
+      { ...sensexExpiry, when: { kind: 'vix', above: 20 } },
+      { ...sensexExpiry, when: { kind: 'weekday', weekday: 'Sat' } },
+      { ...sensexExpiry, when: { kind: 'dte', index: 'NIFTY', dte: '8' } },
+      { ...sensexExpiry, when: { kind: 'dte', index: 'BANKNIFTY', dte: '0' } },
+      { ...sensexExpiry, note: 'x'.repeat(121) },
+      { ...sensexExpiry, extra: 1 },
+    ];
+    for (const rule of bad) expect(errorsOf(withRules([rule]))).toContain('rule 1');
+    expect(errorsOf(withRules(Array(21).fill(sensexExpiry)))).toContain('at most 20');
+  });
+
+  it('refuses a rule an earlier one on the same row already covers, naming both', () => {
+    const later = { ...sensexExpiry, list: 'none' };
+    expect(errorsOf(withRules([sensexExpiry, later]))).toContain(
+      'rule 2 can never apply: rule 1 tests the same thing on the same row',
+    );
+    // another row, another label, or another kind is a different rule
+    const other = [
+      { ...sensexExpiry, row: 'algotest.angelone' },
+      { ...sensexExpiry, when: { kind: 'dte', index: 'SENSEX', dte: '1' } },
+      { ...sensexExpiry, when: { kind: 'weekday', weekday: 'Thu' } },
+    ];
+    expect(errorsOf(withRules([sensexExpiry, ...other]))).toBe('');
+  });
+
+  it('writes the rules into the snapshot the jobs read', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rules-snapshot-'));
+    const snapshot = join(dir, 'automation-settings.json');
+    const store = new SettingsStore(join(dir, 'scheduler.db'), snapshot);
+    const checked = validate(withRules([sensexExpiry]));
+    if (!('settings' in checked)) throw new Error('should validate');
+    store.save(checked.settings);
+    expect(JSON.parse(readFileSync(snapshot, 'utf8')).rules).toEqual([sensexExpiry]);
+    store.close();
+  });
+});
