@@ -45,7 +45,9 @@ None. Not shown, not traded on.
 ## Not yet tested
 
 - A rescaled or percentile version of C (new item, new Phase 0).
-- The per-pick alternative (average of the three picks' figures) the owner set aside.
+- ~~The per-pick figure~~ — tested for the Dir pick as a gate on T1's second Dir lot in BL-212
+  ([gate page](dir-second-lot-gate.md)): killed; it sheds return and drawdown in proportion and was on
+  for the worst Dir day.
 
 ## Related
 
