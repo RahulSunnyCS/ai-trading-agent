@@ -58,8 +58,17 @@ A warning badge on a block means its master switch holds it back.
 
 - Shoonya takes the Widesl with a re-entry, since a re-entry is more orders and Shoonya's are cheaper; with none or both, the higher-ranked one. The Buy add-on, when on, goes to Shoonya. A Dir ×2 extra lot stays on the account whose row has Dir ×2 on.
 - The evening export uploads every copy either way needs: the split copies (a 2-lot copy is named `T1 · <strategy> · ×2`) and the 1-lot copies an account needs to trade all of T1 alone when the other is not logged in. Its manifest says which account trades which.
-- **Not yet:** the 08:11 activation and the 15:35 check stop on a split list and say so on Telegram, with each account's copies; activate them by hand, each on its own account only. The 09:25 deploy check and the 09:05 margin check do not read the split yet.
+- **Not yet:** the 08:11 activation and the 15:35 check stop on a split list and say so on Telegram, with each account's copies; activate them by hand, each on its own account only. The 09:25 deploy check and the 09:05 margin check do not read the split yet, nor do the 16:00 message's margin block and its lots line: with Dir ×2 on for one account only, they count that account's lots without the split (3 where the split export uploads 4), so read them with that in mind, or leave the switch off, until a later phase moves them onto the split.
 - On but with only one AlgoTest row uploading T1, it changes nothing.
+
+**Advanced rules.** Below the blocks, a collapsed section for the days a block should trade a different list from its own. A rule says: for **this account**, when **this condition** holds, trade **this list**. The condition is either **days to expiry** of one index (NIFTY or SENSEX, 0 to 6 or 7+, counted in weekdays as in the 09:16 message) or a **weekday**. Press **Add a rule**; the first one it makes is "AlgoTest · Shoonya, when SENSEX has 0 days to expiry, trade Adaptive Classic". A sentence under each rule says what it does in words, and an optional note keeps your reason.
+
+- Rules are tried **from the top**, and the first rule that matches a block decides its list for that day. A block no rule matches trades its own list. Use the arrows to reorder.
+- A rule that repeats an earlier rule's account and condition could never apply: the page says so and **Save** stays off until you remove or change it.
+- A rule can give a block a list it has none of (its own list is None). The block then uploads that list on those days, so its **Log in at 08:00** must be on. A rule giving **None** stops the block uploading that day.
+- **What trades** shows what each block trades **today** and **tomorrow** under the rules in the draft, with the days to expiry it read and the rule that decided each block, so you can check a rule before you save it.
+- The jobs read the rules for the session they work on: the **next** session for the evening exports and uploads, the 16:00 message's margin block and the evening deploy; **today** for the 08:11 activation, the morning checks, the live board and the 15:35 check. The Today page's plan card shows the next session's lists. If a rule needs a days-to-expiry figure that cannot be read, the job stops and says so; it does not trade the block's own list by guess.
+- Rules do not change the multiplier, Dir ×2, the Buy add-on or the MTM SL: those stay the block's own.
 
 **Capital.** Below the blocks, the money in each broker account: **Angel One** and **Shoonya**, in whole rupees (₹8.5 lakh each until you change them). The page shows their total. They feed the month-so-far lines of the 16:00 result message on Telegram, from November 2026:
 

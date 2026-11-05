@@ -11,6 +11,7 @@ import {
   uploadBooks,
 } from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
+import { automationForSession, sessionFor } from './day-type.js';
 import { describe } from './diagnose.js';
 import { definitelyRefused } from './quantiply-api.js';
 import { parseBrokers, parseDetail, pickBroker } from './quantiply-deploy-plan.js';
@@ -145,7 +146,8 @@ async function main(): Promise<number> {
   /** BL-172: the tool's own switch-on is in charge of this account (it turns a dropped pick off) */
   let deploysItself = false;
   if (values['from-settings']) {
-    const automation = readAutomation();
+    // BL-211: the lists as they stand on the session uploaded: tomorrow's in the evening
+    const automation = await automationForSession(sessionFor(values.mode === 'evening'));
     decidedBy = describeSource(automation);
     deploysItself =
       quantiplyDeploy(automation, broker).ok &&

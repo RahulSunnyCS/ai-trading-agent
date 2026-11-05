@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 ## Open
 
@@ -48,6 +48,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-200](BL-200-momentum-rebalance-log.md) | Momentum: a rebalance log in the Trade book, one block per lot per due week (done / waiting / not done, net shares per stock, the lot's holding after), the raw fills collapsed below | P1 | In progress | feature | momentum |
 | [BL-203](BL-203-rotation-live-board.md) | Rotation live board: today's Adaptive picks (Classic and Tuned) run through the backtest on Angel One's 1-minute prices so far, every 5 minutes and on a Refresh button, a lot each or at your lots | P1 | In progress | feature | options |
 | [BL-209](BL-209-t1-split-across-accounts.md) | T1 split across the two AlgoTest accounts: the like pair one per account at 2 lots, the odd pick 1 lot each, uploaded and activated by the tool (replay: +₹134 a day after brokerage, same lots per account) | P1 | In progress | feature | options / broker-login |
+| [BL-211](BL-211-day-type-list-rules.md) | Day-type list rules in Settings › Automation: an account row trades a different list (None / Classic / Tuned) when a condition on the session holds (one index's weekdays to expiry, or the weekday), first match wins, resolved per session by every job, with a today / tomorrow preview on the page | P1 | In progress | feature | options / scheduler / dashboard |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
@@ -93,6 +94,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-210](BL-210-rotation-absolute-confidence.md) | An absolute 0–100 confidence beside the rotation rank (the picked basket's win rate and ₹/lot in the ranking's own windows), tested against the basket's same-day net | Done, killed: ρ +0.08 (Core) / +0.07 (T1) with the tercile spread's interval including zero on both books; the figure never read below 50, so the declared skip rule fired on no day; nothing shown | 2026-11-05 |
 | [BL-207](BL-207-dir-second-lot-later.md) | The doubled Dir's second lot taken later: the same Dir 30 / 60 min on, or the best-ranked Dir at least 30 / 60 min later, against Dir ×2 at one minute (T1, non-expiry days, book stop) | Done, informative: every spaced second lot earns ₹259–564 a day less than Dir ×2 over 219 days (₹440–785 on the last year), 38–43 % of days won, no reliably smaller drawdown or worst day; Dir ×2 stays | 2026-11-04 |
 | [BL-205](BL-205-margin-for-tomorrow.md) | Margin for tomorrow: the brokers' daily margin statements, the requirement per lot by day type, and a block in the 16:00 message saying whether each account's lots for tomorrow fit (buffer, 50:50 cash rule) | Done: statements stored nightly (167 since June backfilled), `obt realised margin`, the owner's 16:00 block from 4 Nov, Settings › Automation buffer and look-back; the 09:05 check uses the same figures once `MARGIN_CHECK=on` | 2026-11-04 |
 | [BL-204](BL-204-t1-lot-ladder.md) | T1's fifth and sixth lot on normal days and a fourth (and fifth) on expiry days, with the book stop | Done, informative: on normal days the Dir takes every extra lot (Dir ×3 +₹405 [+3, +818] a day over the even spread, Dir ×4 +₹617 [+18, +1,234]; last year +₹608 / +₹915), no Widesl placement or added strategy clears zero, the edge rests on ~10 days and the worst day grows to −₹18k / −₹22k; on expiry days a fourth lot earns +₹770 a day but no placement beats the even spread, Dir ×2 = top Widesl ×2 and adding a strategy is clearly worse; a fifth expiry lot likewise | 2026-11-03 |

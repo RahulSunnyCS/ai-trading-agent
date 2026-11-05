@@ -12,7 +12,8 @@ import { createHash } from 'node:crypto';
  *   different content, are deleted, unless AlgoTest shows them deployed on /live (the owner's
  *   activation, which repeats on its weekdays): then they are kept and alerted. Wanted strategies
  *   that are missing are uploaded. An unchanged owned strategy is left alone.
- * - Morning (`topup`, after the 09:16 pick): only the missing picks are uploaded. Nothing is
+ * - Top-up (`topup`: today's recorded picks, or last evening's list for today): only the missing
+ *   picks are uploaded. Nothing is
  *   deleted; owned strategies that are not today's picks are reported as "not today".
  */
 

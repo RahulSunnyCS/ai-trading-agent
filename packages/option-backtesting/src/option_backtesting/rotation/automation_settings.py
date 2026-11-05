@@ -8,14 +8,22 @@ until the owner saves something. A file that cannot be read is an error: never g
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
+from datetime import date
 from pathlib import Path
 
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 PLATFORMS = ("algotest", "quantiply")
 BROKERS = ("finvasia", "angelone")
+LISTS = ("none", "core", "t1")
+#: BL-211: the most day-type rules a settings version may hold
+MAX_RULES = 20
+_DTE_LABELS = ("0", "1", "2", "3", "4", "5", "6", "7+")
+_WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
+_INDICES = ("NIFTY", "SENSEX")
 
 DEFAULT = {
     "version": 0,
@@ -56,6 +64,7 @@ DEFAULT = {
     },
     "pause": {"until": None},
     "splitT1": False,
+    "rules": [],
 }
 
 
@@ -107,7 +116,106 @@ def read(path: Path | None = None) -> tuple[dict, str]:
     if not isinstance(split, bool):
         raise ValueError(f"{path}: splitT1 is {split!r}")
     data["splitT1"] = split
+    data["rules"] = _read_rules(path, data.get("rules", []))  # settings before BL-211: none
     return data, f"settings v{data.get('version', 0)}"
+
+
+class DayTypeUnknown(RuntimeError):
+    """A day-type rule needs a fact about the session that is not known (an unknown days-to-expiry
+    label). Raised so the job stops loudly instead of trading a row's base list by guess."""
+
+
+def _read_rules(path: Path, raw: object) -> list[dict]:
+    """The day-type rules (BL-211), checked as the scheduler checks them on a Save. A bad rule is
+    an error, never a guess: a wrong list changes a real order."""
+    if not isinstance(raw, list):
+        raise ValueError(f"{path}: rules must be a list")
+    if len(raw) > MAX_RULES:
+        raise ValueError(f"{path}: more than {MAX_RULES} rules")
+    rows = {f"{p}.{b}" for p in PLATFORMS for b in BROKERS}
+    out = []
+    for i, rule in enumerate(raw, start=1):
+        where = f"{path}: rule {i}"
+        if not isinstance(rule, dict) or rule.get("row") not in rows:
+            raise ValueError(
+                f"{where} has row {rule.get('row') if isinstance(rule, dict) else rule!r}"
+            )
+        if rule.get("list") not in LISTS:
+            raise ValueError(f"{where} has list {rule.get('list')!r}")
+        when = rule.get("when")
+        if not isinstance(when, dict):
+            raise ValueError(f"{where} has no condition")
+        if when.get("kind") == "dte":
+            if when.get("index") not in _INDICES or when.get("dte") not in _DTE_LABELS:
+                raise ValueError(f"{where}: bad days-to-expiry condition {when!r}")
+        elif when.get("kind") == "weekday":
+            if when.get("weekday") not in _WEEKDAYS:
+                raise ValueError(f"{where}: bad weekday condition {when!r}")
+        else:
+            raise ValueError(f"{where}: unknown condition kind {when.get('kind')!r}")
+        out.append(rule)
+    return out
+
+
+def rule_matches(when: dict, day_type) -> bool:
+    """Whether a rule's condition holds on `day_type` (a `day_type.DayType`). A days-to-expiry
+    condition on an index whose label is not known raises `DayTypeUnknown`."""
+    if when["kind"] == "weekday":
+        return day_type.weekday == when["weekday"]
+    label = str(day_type.dte.get(when["index"], "unknown"))
+    if label not in _DTE_LABELS:
+        raise DayTypeUnknown(
+            f"{day_type.day}: days to expiry of {when['index']} is {label}, so a rule on it "
+            "cannot be decided"
+        )
+    return label == when["dte"]
+
+
+def resolve(settings: dict, day_type) -> dict:
+    """The settings as they stand for the session of `day_type`: each row's `list` replaced by the
+    first rule of that row whose condition holds (BL-211). Everything else is the row's own. A row
+    whose base list is None and which a rule gives a list is uploaded (it has no upload flag of its
+    own to inherit); a rule giving None turns the upload off. `rules_applied` records, per row,
+    which rule decided and the day type read. With no rule the settings come back untouched."""
+    rules = settings.get("rules") or []
+    if not rules:
+        return settings
+    out = copy.deepcopy(settings)
+    applied: dict[str, dict] = {}
+    for key, row in out["rows"].items():
+        for i, rule in enumerate(rules, start=1):
+            if rule["row"] != key or not rule_matches(rule["when"], day_type):
+                continue
+            was_none = row.get("list") == "none"
+            row["list"] = rule["list"]
+            if rule["list"] == "none":
+                row["upload"] = False
+            elif was_none:
+                row["upload"] = True
+            applied[key] = {"rule": i, "list": rule["list"], "note": rule.get("note") or ""}
+            break
+    out["rules_applied"] = applied
+    out["day_type"] = day_type.as_json()
+    return out
+
+
+def read_for_session(day: date, path: Path | None = None) -> tuple[dict, str]:
+    """`read`, resolved for the session on `day` (BL-211): what the jobs trade that day. With no
+    rule it is `read` exactly; with rules, the day type is computed (and kept for the TypeScript
+    jobs) and an unknown label a rule needs raises `DayTypeUnknown`."""
+    settings, source = read(path)
+    if not settings.get("rules"):
+        return settings, source
+    from . import day_type
+
+    resolved = resolve(settings, day_type.ensure(day))
+    applied = resolved.get("rules_applied") or {}
+    note = f"{source}, {day}: " + (
+        ", ".join(f"{k} → {v['list']} (rule {v['rule']})" for k, v in applied.items())
+        if applied
+        else "no rule applies"
+    )
+    return resolved, note
 
 
 #: what an account's capital reads as when the settings have none (owner, 2026-10-29: ₹8.5 lakh)

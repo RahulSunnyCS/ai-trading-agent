@@ -130,7 +130,7 @@ def test_the_lines():
 def _evening(root, monkeypatch, day):
     nxt = tomorrow.NextPicks(date(2026, 11, 5), "Thu", CORE, [], None, None)
     monkeypatch.setattr(tomorrow, "next_session_picks", lambda today, root=None, track=None: nxt)
-    monkeypatch.setattr(deliver, "message_boost", lambda: {"adaptive": False, "t1": False})
+    monkeypatch.setattr(deliver, "message_boost", lambda *_: {"adaptive": False, "t1": False})
     monkeypatch.setattr(standing, "_earlier_picks", lambda root, start, until: {})
     sent = []
 

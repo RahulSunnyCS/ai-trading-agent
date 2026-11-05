@@ -5,8 +5,9 @@ import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { type Page, type Response, chromium } from 'playwright';
 import { BASE_URL } from './algotest.js';
-import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
+import { describeSource, uploadBooks } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
+import { automationForSession, sessionFor } from './day-type.js';
 import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { algotestLoginLocked } from './login-lock.js';
@@ -42,6 +43,7 @@ import { visibleWithin } from './wait.js';
  * website (AlgoTest support OK'd automating one's own account, 2026-10-19). Never deploys.
  *
  *   tsx src/strategy-upload.ts --dir <export folder> --mode evening|topup [--apply] [--allow-delete]
+ *   (topup takes today's recorded picks or last evening's list for today, and never deletes)
  *
  * `--dir` is a folder written by `obt rotation algotest-export` (manifest.json + one .algtst per
  * pick). Without `--apply` it logs in, reads what AlgoTest has and prints the plan, changing
@@ -282,7 +284,8 @@ async function main(): Promise<number> {
   let decidedBy = '';
   let books: string[] = values.latest ? [values.latest] : [];
   if (values['from-settings']) {
-    const automation = readAutomation();
+    // BL-211: the lists as they stand on the session uploaded: tomorrow's in the evening
+    const automation = await automationForSession(sessionFor(values.mode === 'evening'));
     decidedBy = describeSource(automation);
     books = uploadBooks(automation, 'algotest');
     if (!books.length) {
@@ -323,10 +326,13 @@ async function main(): Promise<number> {
   for (const exportDir of exportDirs) {
     const dir = resolve(exportDir);
     const m = await readJson<Manifest>(join(dir, 'manifest.json'));
+    // Top-up takes today's recorded picks, or last evening's list for today (BL-197 Phase 2: the
+    // evening list is what AlgoTest trades; 2026-11-05, a row switched to another list after the
+    // 16:40 run needs that list uploaded before the morning activation). It never deletes.
     const fits =
       mode === 'evening'
         ? m.source === 'preview' && m.day > today
-        : m.source === 'recorded' && m.day === today;
+        : m.day === today && (m.source === 'recorded' || m.source === 'preview');
     if (!fits) {
       // With several lists from the settings, one not ready yet must not hold the others back.
       if (values['from-settings'] && exportDirs.length > 1) {

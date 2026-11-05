@@ -8,7 +8,7 @@
 | **Area** | options / broker-login / scheduler / dashboard |
 | **Created** | 2026-11-04 |
 | **Depends on** | BL-137 (AlgoTest upload), BL-197 Phase 2 (08:11 morning activation, PR 415), BL-183 (Dir ×2), BL-140 (Settings › Automation), BL-205 (margin block), BL-143 (09:25 deploy check) |
-| **TODO.md row** | 3.10.61 |
+| **TODO.md row** | 3.10.64 |
 
 ## Context
 
@@ -251,3 +251,10 @@ broker-level MTM SL today, on either account, with or without the split.
   Not verified: a supervised evening upload and setup of the copies, and whether set-up copies
   count toward /live's 6-strategy limit (six on a normal day, seven with the add-on). The 09:25
   deploy check and the 09:05 margin check (both off) do not read the split yet (Phases 3 and 4).
+
+
+## Review note (2026-11-05)
+
+- The split now declines a day where it would move a lot between accounts (Dir ×2 on both rows with two Dirs and one Widesl: Shoonya 5, Angel One 3 against 4 and 4); tested.
+- **Before switching `splitT1` on:** the 16:00 margin block (`margin_lines.tomorrow_lots`) and the lots line (`dir_boost_lists`) do not read the split, so with Dir ×2 on one account they count 3 lots where the export uploads 4. Move them onto `account_split` first, or accept the mismatch knowingly.
+- Nits left for the phase that builds per-account activation: the manifest is marked `split` on a day the split leaves alone (the 08:11 activation then refuses); the Buy add-on goes to Shoonya whatever each row's `addon` says; the dashboard's `splitApplies` ignores the day-type rules.

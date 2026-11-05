@@ -222,7 +222,7 @@ week, until disabled.
   adds it once from the listing (ledger only); it cannot tell a tool upload from the owner's copy of the same
   name, so it was run once, supervised.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) activates strategies on /live. `--morning` (BL-197 Phase 2,
-  scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: the export `--latest t1`
+  scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: with `--from-settings` (the three jobs) every book an AlgoTest row uploads, each from its `latest-<book>.json`, one login each, a book with no export reported and failed under `--apply`; the job first runs a catch-up step (`obt rotation algotest-export --from-settings --preview --only-missing` (exit 3 when no list is missing, which ends the chain) `&&` the top-up upload `&&` `--from-settings --setup`; `exit 0`, so it never blocks the activation): a row switched after 16:40 to a list no row had then still trades; or the export `--latest <book>`
   points at (the 16:40 run's `--next` export, source `preview`, for today; any other export is refused, so a catch-up never trades the 09:16 list), every strategy not yet deployed, through
   `planDeploy` like the old 09:16 run; the Buy add-on is left out when no AlgoTest row has it on now (`morningPicks`,
   `algotestAddon`: the settings are read again in the morning, since the export read them the evening before). The
@@ -238,6 +238,9 @@ week, until disabled.
   `--setup` (BL-197, the last step of `algotest-evening`) sets up the next session's picks instead: each
   sheet checked (multiplier 1, NRML, no day ticked, execution time = entry) and saved with Trade monitoring
   on Candle Close; it deploys nothing, so it needs `ALGOTEST_UPLOAD=on`, not `ALGOTEST_DEPLOY`.
+  A sheet set up before (its save button reads "Update Execution Settings": the morning activation reopens
+  last evening's) is only checked for Candle Close and no day ticked, then closed with Cancel, never saved
+  again (`src/live-sheet.ts`, tested against a stand-in page in `live-sheet.test.ts`).
 - Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read
   `latest-<book>.json`, written by `obt rotation algotest-export`. The page contract is in
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save

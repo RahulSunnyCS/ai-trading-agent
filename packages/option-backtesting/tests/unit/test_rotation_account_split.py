@@ -71,6 +71,16 @@ def test_two_dirs_the_doubled_one_stays_with_its_lot_whatever_re_enters():
     assert {b: sum(v.values()) for b, v in got.items()} == {"finvasia": 3, "angelone": 4}
 
 
+def test_a_split_that_would_move_a_lot_between_accounts_is_left_alone():
+    # two Dirs and one Widesl with Dir x2 on both rows: the doubled Dir would land on Shoonya at 4
+    # lots and leave Angel One at 3 (Shoonya 5, Angel One 3 against 4 and 4 without the split)
+    core = [DIR, W1, DIR2]
+    lots = _lots(core, NORMAL, boost_shoonya=True, boost_angel=True)
+    got = s.split(core, lots, reentry=_never)
+    assert {b: sum(v.values()) for b, v in got.items()} == {b: sum(v.values()) for b, v in lots.items()}
+    assert got == lots
+
+
 def test_days_the_split_leaves_alone():
     two = [W1, DIR]
     assert s.split(two, _lots(two, NORMAL)) == _lots(two, NORMAL)

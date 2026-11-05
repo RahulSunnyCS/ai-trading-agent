@@ -3,7 +3,8 @@ trades every pick: of the day's three core picks the odd one (the Dir on a 1 Dir
 the third Widesl on a 3-Widesl day, the Widesl on a 2 Dir + 1 Widesl day) still trades on each
 account, and the like pair goes one per account, each at both accounts' lots. A 2-lot leg is one
 order, so the pair costs half the brokerage; every pick trades the same lots across the two
-accounts, and each account the same number of lots, as without the split.
+accounts, and each account the same number of lots, as without the split (a day where the
+split would move a lot between accounts is left unsplit).
 
 The lead account (Shoonya, the cheaper one at ₹5 an order against Angel One's ₹20) takes the pair
 member with a re-entry, since a re-entry is more orders; with none or both, the first in pick
@@ -74,7 +75,7 @@ def split(
     elif even and reentry(b) and not reentry(a):
         a, b = b, a
     take = {lead: {odd, a}, other: {odd, b}}
-    return {
+    result = {
         broker: {
             n: (lots[broker][n] if n == odd else lots[lead][n] + lots[other][n])
             for n in core
@@ -82,3 +83,8 @@ def split(
         }
         for broker in (lead, other)
     }
+    # an account must keep its lot count (margin and the book stop rest on it): when a Dir x2 on
+    # both rows lands the doubled lot on a pair member the other account cannot match, no split
+    if any(sum(result[b].values()) != sum(lots[b].values()) for b in lots):
+        return unchanged
+    return result
