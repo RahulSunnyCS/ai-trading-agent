@@ -281,14 +281,25 @@ def message_boost(day: date | None = None) -> dict[str, bool]:
     leave the lots out, never stop it. `day`: the session the message is about, so a day-type rule
     (BL-211) is read as it stands that day."""
     from . import automation_settings
+    from .tomorrow import next_session
 
-    try:
-        settings, _ = (
-            automation_settings.read_for_session(day) if day else automation_settings.read()
-        )
-    except Exception:  # noqa: BLE001
-        return {}
-    return automation_settings.dir_boost_lists(settings, automation_settings.env_uploads_on())
+    # The message speaks of `day` and of the session after it (tomorrow's picks), so a day-type
+    # rule (BL-211) that only applies to one of them still has its lots said: the flags are the
+    # union of the two sessions'.
+    sessions = [day, next_session(day)] if day else [None]
+    out: dict[str, bool] = {}
+    for session in sessions:
+        try:
+            settings, _ = (
+                automation_settings.read_for_session(session)
+                if session
+                else automation_settings.read()
+            )
+        except Exception:  # noqa: BLE001
+            continue
+        flags = automation_settings.dir_boost_lists(settings, automation_settings.env_uploads_on())
+        out = {k: out.get(k, False) or v for k, v in flags.items()}
+    return out
 
 
 def _severity(entry: dict) -> str:

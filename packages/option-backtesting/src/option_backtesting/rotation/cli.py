@@ -425,8 +425,9 @@ def _settings_books(platform: str, session) -> tuple[list[str], dict]:
 
     try:
         settings, source = automation_settings.read_for_session(session)
-    except automation_settings.DayTypeUnknown as error:
-        typer.echo(f"not exported: {error}")
+    except (automation_settings.DayTypeUnknown, OSError, RuntimeError) as error:
+        # a rule cannot be decided, or the day-type file cannot be kept (data root not mounted)
+        typer.echo(f"not exported: {type(error).__name__}: {error}")
         raise typer.Exit(1) from error
     books = automation_settings.upload_books(settings, platform)
     typer.echo(f"{platform}: {', '.join(books) or 'nothing to upload'} ({source})")

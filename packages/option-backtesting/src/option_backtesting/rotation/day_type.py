@@ -10,6 +10,8 @@ expiries, read the same facts (`packages/broker-login/src/day-type.ts`)."""
 from __future__ import annotations
 
 import json
+import os
+import time
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -17,6 +19,9 @@ from pathlib import Path
 from . import store
 
 INDICES = ("NIFTY", "SENSEX")
+#: how long a day type read from the calendar (the master was unreachable) is kept before the
+#: listed contracts are asked again
+CALENDAR_RETRY_S = 15 * 60
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
 
 
@@ -68,7 +73,7 @@ def path(day: date, root: Path | None = None) -> Path:
 def write(dt: DayType, root: Path | None = None) -> Path:
     target = path(dt.day, root)
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_suffix(f".{id(dt)}.tmp")
+    tmp = target.with_suffix(f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(dt.as_json(), indent=2) + "\n")
     tmp.replace(target)
     return target
@@ -89,8 +94,15 @@ def ensure(day: date, root: Path | None = None) -> DayType:
     when it was read from the listed contracts and has no unknown label; a calendar fallback or an
     unknown is read again, since the master may answer now."""
     stored = read(day, root)
-    if stored is not None and stored.source == "master" and "unknown" not in stored.dte.values():
-        return stored
+    if stored is not None and "unknown" not in stored.dte.values():
+        if stored.source == "master":
+            return stored
+        # A calendar fallback is tried again, but not on every call: while the master is
+        # unreachable each retry costs two multi-MB download attempts (the live board asks every
+        # 5 minutes), so a fallback read within the last CALENDAR_RETRY_S is kept.
+        age = time.time() - path(day, root).stat().st_mtime
+        if age < CALENDAR_RETRY_S:
+            return stored
     dt = for_day(day)
     write(dt, root)
     return dt

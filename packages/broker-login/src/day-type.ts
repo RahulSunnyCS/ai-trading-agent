@@ -79,3 +79,11 @@ export async function automationForSession(
 }
 
 export const todaySession = (): Session => ({ day: istToday() });
+
+/**
+ * The session a job works on: the next one for the evening's exports, uploads, setup and enable,
+ * today for everything in the morning and the checks. One place, so the evening jobs cannot
+ * disagree about which day's rules they read.
+ */
+export const sessionFor = (evening: boolean): Session =>
+  evening ? { next: true } : todaySession();

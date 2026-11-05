@@ -112,12 +112,16 @@ def reference() -> ReferenceData:
 
 def _run(name: str, cache: FixtureCache, reference: ReferenceData):
     loaded = load_strategy(STRATEGIES_DIR / name)
-    sessions = run_backtest(loaded, cache, reference, cache.ordered_dates[0], cache.ordered_dates[-1])
+    sessions = run_backtest(
+        loaded, cache, reference, cache.ordered_dates[0], cache.ordered_dates[-1]
+    )
     return loaded, sessions
 
 
 class TestPerSessionABC:
-    def test_every_session_net_and_lots(self, cache: FixtureCache, reference: ReferenceData) -> None:
+    def test_every_session_net_and_lots(
+        self, cache: FixtureCache, reference: ReferenceData
+    ) -> None:
         for key, filename in STRATEGY_FILES.items():
             idx_net, idx_lots = {"A": (0, 1), "B": (2, 3), "C": (4, 5)}[key]
             _, sessions = _run(filename, cache, reference)
@@ -130,7 +134,9 @@ class TestPerSessionABC:
 
 class TestAggregate15Day:
     @pytest.mark.parametrize("key", ["A", "B", "C"])
-    def test_aggregate_matches(self, cache: FixtureCache, reference: ReferenceData, key: str) -> None:
+    def test_aggregate_matches(
+        self, cache: FixtureCache, reference: ReferenceData, key: str
+    ) -> None:
         _, sessions = _run(STRATEGY_FILES[key], cache, reference)
         result = aggregate(sessions)
         expected = AGGREGATE_15D[key]
@@ -142,7 +148,9 @@ class TestAggregate15Day:
         assert round(result.inr_per_lot_day) == expected["rate"]
 
     @pytest.mark.parametrize("key", ["A", "B", "C"])
-    def test_dte_buckets_match(self, cache: FixtureCache, reference: ReferenceData, key: str) -> None:
+    def test_dte_buckets_match(
+        self, cache: FixtureCache, reference: ReferenceData, key: str
+    ) -> None:
         _, sessions = _run(STRATEGY_FILES[key], cache, reference)
         result = aggregate(sessions)
         rounded = {dte: round(net) for dte, net in result.dte_buckets.items()}
@@ -164,7 +172,9 @@ class TestVariantD:
         )
         return sessions, store
 
-    def test_max_runup_for_every_session(self, cache: FixtureCache, reference: ReferenceData) -> None:
+    def test_max_runup_for_every_session(
+        self, cache: FixtureCache, reference: ReferenceData
+    ) -> None:
         _, store = self._feature_store_and_sessions(cache, reference)
         for d in cache.ordered_dates:
             got = store.scalar_value("straddle_runup", d)
@@ -212,7 +222,9 @@ class TestRecomputed10DaySubwindow:
         assert round(result.lot_days, 1) == expected["lots"]
         assert round(result.inr_per_lot_day) == expected["rate"]
 
-    def test_d_over_the_10_tradeable_days(self, cache: FixtureCache, reference: ReferenceData) -> None:
+    def test_d_over_the_10_tradeable_days(
+        self, cache: FixtureCache, reference: ReferenceData
+    ) -> None:
         _, sessions = _run("D_adaptive_trailing.yaml", cache, reference)
         result = aggregate(sessions[-10:])
         expected = SUBWINDOW_10D["D"]

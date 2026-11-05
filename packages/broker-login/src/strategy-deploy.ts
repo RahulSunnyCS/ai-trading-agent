@@ -17,7 +17,7 @@ import {
   uploadBooks,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
-import { automationForSession, todaySession } from './day-type.js';
+import { automationForSession, sessionFor } from './day-type.js';
 import {
   ACTIVATE_LEAD_SECONDS,
   BROKER_LABELS,
@@ -266,7 +266,7 @@ async function main(): Promise<number> {
   let automation: Automation | null = null;
   try {
     // BL-211: the lists as they stand on the session worked on: tomorrow's for the evening setup
-    automation = await automationForSession(values.setup ? { next: true } : todaySession());
+    automation = await automationForSession(sessionFor(Boolean(values.setup)));
   } catch (error) {
     if (!values.check) throw error;
     console.error(`automation settings unreadable (${String(error)}): the check runs anyway`);

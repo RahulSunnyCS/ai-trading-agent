@@ -162,8 +162,10 @@ def test_the_day_type_file_is_kept_and_reused_only_when_listed(tmp_path, monkeyp
     day_type.write(
         day_type.DayType(day, "Thu", {"NIFTY": "2", "SENSEX": "0"}, "calendar"), tmp_path
     )
+    old = __import__("time").time() - day_type.CALENDAR_RETRY_S - 5
+    __import__("os").utime(day_type.path(day, tmp_path), (old, old))
     day_type.ensure(day, tmp_path)
-    assert calls == [day, day]  # a calendar fallback is read again
+    assert calls == [day, day]  # a calendar fallback is read again once its window has passed
 
 
 def test_the_daytype_command_prints_the_labels(monkeypatch):
@@ -200,3 +202,86 @@ def test_the_route_answers_today_and_tomorrow_and_names_a_failure(monkeypatch):
     assert body["today"] == good.as_json()
     assert body["tomorrow"] is None
     assert body["errors"] == ["tomorrow: RuntimeError: master unreachable"]
+
+
+def test_a_calendar_fallback_is_kept_briefly_then_asked_again(tmp_path, monkeypatch):
+    import os
+    import time
+
+    calls = []
+
+    def fake(day):
+        calls.append(day)
+        return day_type.DayType(day, "Thu", {"NIFTY": "2", "SENSEX": "0"}, "calendar")
+
+    monkeypatch.setattr(day_type, "for_day", fake)
+    day = date(2026, 11, 5)
+    day_type.ensure(day, tmp_path)
+    day_type.ensure(day, tmp_path)
+    assert len(calls) == 1  # the master is not asked on every call while it is unreachable
+    old = time.time() - day_type.CALENDAR_RETRY_S - 5
+    os.utime(day_type.path(day, tmp_path), (old, old))
+    day_type.ensure(day, tmp_path)
+    assert len(calls) == 2  # after the window, the listed contracts are asked again
+
+
+def test_the_temp_file_name_is_per_process(tmp_path, monkeypatch):
+    seen = []
+    real = Path.replace
+
+    def spy(self, target):
+        seen.append(self.name)
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "replace", spy)
+    day_type.write(
+        day_type.DayType(date(2026, 11, 5), "Thu", {"NIFTY": "2", "SENSEX": "0"}, "master"),
+        tmp_path,
+    )
+    assert seen == [f"2026-11-05.{__import__('os').getpid()}.tmp"]
+
+
+@pytest.mark.parametrize("error", [a.DayTypeUnknown("SENSEX is unknown"), OSError("not mounted")])
+def test_an_export_stops_with_a_message_when_the_session_cannot_be_read(monkeypatch, capsys, error):
+    import typer
+
+    from option_backtesting.rotation import cli
+
+    seen = []
+
+    def boom(session, path=None):
+        seen.append(session)
+        raise error
+
+    monkeypatch.setattr(a, "read_for_session", boom)
+    with pytest.raises(typer.Exit) as stop:
+        cli._settings_books("algotest", date(2026, 11, 6))
+    assert stop.value.exit_code == 1
+    assert seen == [date(2026, 11, 6)]  # the rules are read for the session exported
+    assert "not exported" in capsys.readouterr().out
+
+
+def test_the_session_of_an_export_is_the_next_one_under_next(monkeypatch):
+    from option_backtesting.rotation import cli, tomorrow
+
+    monkeypatch.setattr(tomorrow, "next_session", lambda d: date(2026, 11, 9))
+    assert cli._session_of("2026-11-06", False) == date(2026, 11, 6)
+    assert cli._session_of("2026-11-06", True) == date(2026, 11, 9)
+
+
+def test_the_message_says_the_lots_when_either_session_has_the_rule(monkeypatch):
+    from option_backtesting.rotation import deliver, tomorrow
+
+    monkeypatch.setattr(tomorrow, "next_session", lambda d: date(2026, 11, 6))
+    monkeypatch.setattr(a, "env_uploads_on", lambda: {"algotest": True, "quantiply": True})
+    base = _settings([])
+
+    def read_for(session, path=None):
+        # the rule moves Shoonya's AlgoTest row to Classic with Dir x2 only on the 6th
+        s = json.loads(json.dumps(base))
+        if session == date(2026, 11, 6):
+            s["rows"]["algotest.finvasia"].update(list="core", dirBoost=True)
+        return s, "test"
+
+    monkeypatch.setattr(a, "read_for_session", read_for)
+    assert deliver.message_boost(date(2026, 11, 5)) == {"adaptive": True, "t1": False}

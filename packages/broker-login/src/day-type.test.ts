@@ -10,7 +10,7 @@ import {
   readAutomation,
   resolveAutomation,
 } from './automation-settings.js';
-import { automationForSession, loadDayType } from './day-type.js';
+import { automationForSession, loadDayType, sessionFor } from './day-type.js';
 
 /** The cases shared with the Python and dashboard resolvers (BL-211). */
 const CASES = JSON.parse(
@@ -55,7 +55,7 @@ describe('day-type rules (BL-211)', () => {
 
   it('no rules: the settings come back as they are', () => {
     const a = settings([]);
-    assert.equal(resolveAutomation(a, CASES.cases[0].dayType), a);
+    assert.equal(resolveAutomation(a, CASES.cases[0]?.dayType as DayType), a);
   });
 
   it('a snapshot without rules reads as none', () => {
@@ -109,5 +109,11 @@ describe('day-type rules (BL-211)', () => {
       TRADING_DATA_ROOT: root,
     });
     assert.equal(resolved.rows['algotest.finvasia'].list, 'core');
+  });
+
+  it('the evening jobs read the next session, everything else today', () => {
+    assert.deepEqual(sessionFor(true), { next: true });
+    const today = sessionFor(false);
+    assert.ok('day' in today && /^\d{4}-\d{2}-\d{2}$/.test(today.day));
   });
 });
