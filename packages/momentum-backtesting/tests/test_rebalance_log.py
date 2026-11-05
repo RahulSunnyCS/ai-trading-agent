@@ -322,11 +322,13 @@ def test_every_fill_of_the_week_shows_even_when_no_lot_claims_it():
     assert week1["holding_after"] == [{"symbol": "ALPHA", "shares": 33.0}]
     assert week1["bought"] == 33 * 400 and week1["sold"] == 0
     week2 = blocks["2026-10-23"]
-    # the lot's DELTA buy and the outside DELTA buy are one line, the lot's status kept
-    delta = next(x for x in week2["lines"] if x["symbol"] == "DELTA")
-    assert (delta["side"], delta["shares"], delta["status"]) == ("buy", 2.0, "done")
-    assert delta["value"] == 7065 + 1000
+    # the lot's DELTA buy and the outside DELTA buy stay two lines: an outside trade never
+    # changes the lot's line
+    assert [
+        (x["symbol"], x["side"], x["shares"]) for x in week2["lines"] if x["status"] == "done"
+    ] == [("DELTA", "buy", 1.0)]
     assert [(x["symbol"], x["side"]) for x in week2["lines"] if x["status"] == rl.OUTSIDE] == [
+        ("DELTA", "buy"),
         ("INDIA", "sell"),
     ]
     alone = blocks["2026-11-06"]

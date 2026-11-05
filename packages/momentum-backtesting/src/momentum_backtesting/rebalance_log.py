@@ -135,19 +135,21 @@ def _outside_lines(fills: list[dict]) -> list[dict]:
 def _net_lines(lines: list[dict]) -> list[dict]:
     """One line per stock, the week's buys and sells netted (owner, 2026-11-05): 6 bought and 2
     sold is a buy of 4, a round trip inside the week is no line. The value is netted the same
-    way (None when none of the merged lines had one); the status is the lot's own when it has a
-    line for the stock, else `outside`."""
-    by: dict[str, dict] = {}
+    way (None when none of the merged lines had one). The lot's lines and the outside lines of
+    one stock stay apart (a lot's buy and an outside sell are two lines)."""
+    # The lot's own lines and the outside ones are netted apart: an outside trade never changes
+    # the lot's line, its status or the holding computed from the lot's fills.
+    by: dict[tuple[str, bool], dict] = {}
     for line in lines:
         acc = by.setdefault(
-            line["symbol"],
+            (line["symbol"], line["status"] == OUTSIDE),
             {"symbol": line["symbol"], "shares": 0.0, "value": None, "status": None},
         )
         sign = 1.0 if line["side"] == "buy" else -1.0
         acc["shares"] += sign * float(line["shares"])
         if line.get("value") is not None:
             acc["value"] = (acc["value"] or 0.0) + sign * float(line["value"])
-        if acc["status"] is None or (acc["status"] == OUTSIDE and line["status"] != OUTSIDE):
+        if acc["status"] is None:
             acc["status"] = line["status"]
     out = []
     for acc in by.values():
@@ -163,7 +165,7 @@ def _net_lines(lines: list[dict]) -> list[dict]:
                 "status": acc["status"],
             }
         )
-    return sorted(out, key=lambda x: x["symbol"])
+    return sorted(out, key=lambda x: (x["symbol"], x["status"] == OUTSIDE))
 
 
 def _add_outside(blocks: list[dict], fills: list[dict], paper_start: str) -> None:

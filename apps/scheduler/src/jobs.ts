@@ -263,7 +263,8 @@ const BASE_JOBS: Job[] = [
     retryDelayMinutes: 10,
     catchUpHours: 12, // any time before Friday morning is still early
     group: 'catalog',
-    alertsItself: true,
+    // the CLI sends no alert on an uncaught failure: the scheduler's failure alert is the one
+    alertsItself: false,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt orders tentative --send',
   },
   {

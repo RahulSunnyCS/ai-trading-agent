@@ -3413,11 +3413,12 @@ def _orders_signal(
     already fixed (`_broad_sentinel_run(ahead=True)`); otherwise none yet."""
     sleeves = members or [headline]
     signals, kinds, rankings = [], set(), []
+    reqs: dict[str, BacktestRequest] = {}
     for sleeve in sleeves:
         config = sleeve["config"]
         if config.get("dataset") != "broad":
             return None, "unavailable", "Your orders cover Broad strategies for now.", None
-        req = BacktestRequest.model_validate(config)
+        req = reqs[sleeve["id"]] = BacktestRequest.model_validate(config)
         if split_every(req) > 1:  # All Fridays: no one portfolio for the engine to decide
             return None, "unavailable", analysis.SPLIT_SIGNAL_NOTE, None
         ranking = _broad_ranking(req)
@@ -3447,9 +3448,7 @@ def _orders_signal(
         # Each sleeve's own signal, for the per-lot orders (BL-142 Phase 3); never saved.
         combined["_sleeves"] = signals
         # Each sleeve's request, for a new lot's fresh target (`_fresh_sleeve_target`); never saved.
-        combined["_sleeve_reqs"] = {
-            sleeve["id"]: BacktestRequest.model_validate(sleeve["config"]) for sleeve in sleeves
-        }
+        combined["_sleeve_reqs"] = reqs
     else:
         only = signals[0]["signal"]
         combined = {
@@ -3871,11 +3870,14 @@ def _compute_lot_orders(
     reqs = signal.get("_sleeve_reqs") or {}
     for sid, info in sleeves.items():
         if info["due"] and sid not in has_history and sid in reqs:
-            info["target"] = {
-                k: float(v)
-                for k, v in _fresh_sleeve_target(reqs[sid]).items()
-                if k not in cash_names
-            }
+            try:
+                target = _fresh_sleeve_target(reqs[sid])
+            except (ValueError, KeyError) as error:
+                raise ValueError(
+                    f"{info['label']} ({info['name']}): the fresh target for a new lot could not "
+                    f"be decided: {error}"
+                ) from error
+            info["target"] = {k: float(v) for k, v in target.items() if k not in cash_names}
             info["fresh"] = True
 
     lot_inputs = [
