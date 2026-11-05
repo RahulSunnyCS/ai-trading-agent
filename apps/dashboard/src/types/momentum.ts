@@ -964,6 +964,8 @@ export interface MomentumOrders {
   plan?: MomentumOrderPlan;
   /** Followed lot by lot (BL-142 Phase 3): each lot's status and its own plan. */
   lots?: MomentumLotOrders[];
+  /** ETFs not bought as a new buy because their premium to NAV is over the limit (BL-136). */
+  premium_skips?: Array<{ name: string; premium: number; limit: number; as_of: string }>;
   /** The orders for Kite's basket page, when the holdings come from Kite (sells first). */
   kite_orders?: MomentumKiteOrder[];
   /** What to add to Kite before buying a new lot. */

@@ -808,3 +808,62 @@ def test_a_new_lot_spends_its_leftover_on_the_skipped_names_in_rank_order_and_bu
         },
     ]  # DDD has no price: left out
     assert api._kite_limit(284.94, True) == 286.4 and api._kite_limit(284.94, False) == 283.5
+
+
+def test_an_etf_over_its_premium_limit_is_no_new_buy_but_a_held_one_is_left_alone(
+    client, monkeypatch
+):
+    """Owner, 2026-11-06 (BL-136 Phase 1b): a name whose premium to NAV is over its limit is not
+    bought as a new buy; a fresh lot spreads its weights equally over the rest, a lot that holds
+    the name keeps it, and the skip is said in the message."""
+    _friday(monkeypatch, 2026, 10, 23)
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    sig = _signal("2026-10-23", ids, ids[1])
+    sig["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig, "exact", None, ["ranking"]))
+    monkeypatch.setattr(
+        api,
+        "_fresh_sleeve_target",
+        lambda req: {"CUPID": 1 / 3, "NAZARA": 1 / 3, "Nasdaq 100": 1 / 3},
+    )
+    skip = {"premium": 0.0549, "as_of": "2026-10-29", "limit": 0.05}
+    monkeypatch.setattr(api, "_premium_skips", lambda week, premiums=None: {"Nasdaq 100": skip})
+    _snapshot(LOT1 + OUTSIDE, 4509.3)
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+
+    payload = api._compute_orders("scheduled")
+    lot2 = {lot["id"]: lot for lot in payload["lots"]}[ids[1]]
+    rows = {r["symbol"]: r for r in lot2["plan"]["rows"]}
+    assert "Nasdaq 100" not in rows  # never planned
+    assert rows["CUPID"]["target"] == pytest.approx(0.5)  # equal over what is left
+    assert rows["NAZARA"]["target"] == pytest.approx(0.5)
+    assert payload["premium_skips"] == [{"name": "Nasdaq 100", **skip}]
+    assert "Nasdaq 100" not in {o["tradingsymbol"] for o in payload["kite_orders"]}
+    body = api._orders_message(payload).body
+    assert "Not bought, ETF above NAV: Nasdaq 100 +5.5% (limit 5%, premium of 29 Oct)" in body
+
+
+def test_the_premium_gate_reads_the_stored_premiums_by_the_live_limits():
+    """`_premium_skips`: only a name over its own limit, from premiums dated before the week."""
+    import pandas as pd
+
+    premiums = pd.DataFrame(
+        {"Nasdaq 100": [0.04, 0.0549, 0.20], "Hang Seng": [0.03, 0.031, 0.031]},
+        index=pd.to_datetime(["2026-10-27", "2026-10-29", "2026-11-06"]),
+    )
+    real = api._premium_skips.__wrapped__  # the suite stubs the gate off by default
+    got = real(pd.Timestamp("2026-11-06"), premiums)
+    assert got == {"Nasdaq 100": {"premium": 0.0549, "as_of": "2026-10-29", "limit": 0.05}}
+    # the premium of the week's own day is never read (it is not known at the decision)
+    assert real(pd.Timestamp("2026-10-29"), premiums) == {}

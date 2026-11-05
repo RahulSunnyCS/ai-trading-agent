@@ -60,3 +60,17 @@ def _no_real_angel_one(monkeypatch):
     monkeypatch.setattr(angelone, "_wait", lambda seconds: None)
     yield
     angelone.reset()
+
+
+@pytest.fixture(autouse=True)
+def _no_premium_gate(monkeypatch):
+    """BL-136 Phase 1b: the orders' premium gate reads the real `data/etf_premium.csv`; a test of
+    the orders would otherwise change with whatever Nasdaq 100 trades at. A test of the gate
+    sets its own `api._premium_skips`."""
+    from momentum_backtesting import api
+
+    def off(week, premiums=None):
+        return {}
+
+    off.__wrapped__ = api._premium_skips  # a test of the gate itself reaches the real one
+    monkeypatch.setattr(api, "_premium_skips", off)
