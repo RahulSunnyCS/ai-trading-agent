@@ -3970,6 +3970,7 @@ def _compute_lot_orders(
             lots.set_pending(con, who, group_id, due_ids[0], at, planned_now)
     for lot in planned["lots"]:
         lot["fresh"] = bool(sleeves.get(lot["id"], {}).get("fresh"))
+    net = lots.net_by_symbol(planned["plan"])
     payload.update(
         {
             "prices": source,
@@ -3979,8 +3980,8 @@ def _compute_lot_orders(
             "free_cash": round(cash, 2),
             "deposit_needed": planned["deposit_needed"],
             "lot_size": float(settings["lot_size_rs"]),
-            "net": lots.net_by_symbol(planned["plan"]),
-            "kite_orders": _kite_orders(lots.net_by_symbol(planned["plan"]), base_of),
+            "net": net,
+            "kite_orders": _kite_orders(net, base_of),
             "ledger": {
                 "booked": reconciled.events,
                 "unexplained": reconciled.unexplained,

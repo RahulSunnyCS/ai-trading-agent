@@ -41,7 +41,9 @@ time. Nothing here places an order: you place them in your broker yourself.
   opens Zerodha's own basket page in a new tab with these orders filled in (one per stock, sells
   first, delivery, market), and **you** review and place them there, signed in to Kite. Nothing is
   sent from this app and it places no order. Edit a quantity or make an order a limit on Kite's page
-  before you place it; a thinly traded name is better as a limit.
+  before you place it; a thinly traded name is better as a limit. Place during market hours: these are
+  regular orders, so outside them Kite refuses them (switch to an after-market order on its page). A
+  tentative plan's counts follow the prices when it was made; the 14:15 plan is the one to place.
 - **Leftover cash (new lots).** A new lot first buys its picks in equal weights in whole shares. Cash
   that is left then goes to the picks that cost more than an equal slice, best rank first, **one
   share each** while the cash covers it; the first one it cannot cover ends this, so a lower-ranked
