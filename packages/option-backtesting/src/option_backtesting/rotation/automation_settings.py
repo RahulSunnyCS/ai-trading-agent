@@ -63,6 +63,7 @@ DEFAULT = {
         },
     },
     "pause": {"until": None},
+    "splitT1": False,
     "rules": [],
 }
 
@@ -111,6 +112,10 @@ def read(path: Path | None = None) -> tuple[dict, str]:
     if until is not None and not (isinstance(until, str) and _DAY.fullmatch(until)):
         raise ValueError(f"{path}: pause.until is {until!r}")
     data["pause"] = {"until": until}
+    split = data.get("splitT1", False)  # settings before BL-209: off
+    if not isinstance(split, bool):
+        raise ValueError(f"{path}: splitT1 is {split!r}")
+    data["splitT1"] = split
     data["rules"] = _read_rules(path, data.get("rules", []))  # settings before BL-211: none
     return data, f"settings v{data.get('version', 0)}"
 
@@ -345,3 +350,21 @@ def env_uploads_on(env: dict[str, str] | None = None) -> dict[str, bool]:
     ALGOTEST_UPLOAD / QUANTIPLY_UPLOAD = on."""
     env = os.environ if env is None else env
     return {p: str(env.get(f"{p.upper()}_UPLOAD", "")).strip().lower() == "on" for p in PLATFORMS}
+
+
+def split_t1(settings: dict) -> list[str] | None:
+    """BL-209: the two AlgoTest accounts T1 is split across ([lead, other], `account_split.LEAD`
+    first) when the switch is on and both AlgoTest rows upload T1; None otherwise, and the export is
+    what it is without the split."""
+    if not settings.get("splitT1") or not settings["masters"].get("uploads"):
+        return None
+    rows = [
+        b
+        for b in BROKERS
+        if (r := settings["rows"][f"algotest.{b}"]).get("upload") and r.get("list") == "t1"
+    ]
+    if len(rows) != 2:
+        return None
+    from .account_split import LEAD
+
+    return sorted(rows, key=lambda b: b != LEAD)

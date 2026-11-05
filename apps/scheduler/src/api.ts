@@ -247,6 +247,10 @@ export function createApi({
     if (body && typeof body === 'object' && !Array.isArray(body) && !('margin' in body)) {
       body = { ...body, margin: withDefaults(settings.current().settings).margin };
     }
+    // BL-209: likewise a dashboard built before the split switch keeps the current one.
+    if (body && typeof body === 'object' && !Array.isArray(body) && !('splitT1' in body)) {
+      body = { ...body, splitT1: withDefaults(settings.current().settings).splitT1 };
+    }
     const checked = validate(body);
     if ('errors' in checked)
       return json({ error: 'invalid settings', errors: checked.errors }, 400);

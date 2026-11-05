@@ -179,3 +179,38 @@ def test_a_shared_list_with_mixed_addon_settings_says_so(tmp_path, monkeypatch, 
     picks = _picks("core")
     assert cli._without_addon(picks, "quantiply", "core", settings) is picks
     assert "Buy add-on KEPT" in capsys.readouterr().out
+
+
+def _both_t1(split=True):
+    data = json.loads(json.dumps(a.DEFAULT))
+    for b in a.BROKERS:
+        data["rows"][f"algotest.{b}"].update(upload=True, list="t1")
+    data["splitT1"] = split
+    return data
+
+
+def test_the_t1_split_needs_the_switch_and_both_algotest_rows_on_t1():
+    assert a.split_t1(_both_t1()) == ["finvasia", "angelone"]
+    assert a.split_t1(_both_t1(split=False)) is None
+    one = _both_t1()
+    one["rows"]["algotest.angelone"]["upload"] = False
+    assert a.split_t1(one) is None
+    core = _both_t1()
+    core["rows"]["algotest.angelone"]["list"] = "core"
+    assert a.split_t1(core) is None
+    off = _both_t1()
+    off["masters"]["uploads"] = False
+    assert a.split_t1(off) is None
+
+
+def test_the_split_switch_is_read_strictly(tmp_path):
+    path = tmp_path / "automation-settings.json"
+    path.write_text(json.dumps({**_both_t1(), "version": 12}))
+    assert a.read(path)[0]["splitT1"] is True
+    old = _both_t1()
+    del old["splitT1"]
+    path.write_text(json.dumps(old))
+    assert a.read(path)[0]["splitT1"] is False
+    path.write_text(json.dumps({**_both_t1(), "splitT1": "on"}))
+    with pytest.raises(ValueError, match="splitT1"):
+        a.read(path)

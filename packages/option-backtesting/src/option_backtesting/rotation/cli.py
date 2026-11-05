@@ -338,6 +338,34 @@ def _with_lots(picks, platform: str, book: str, settings: dict | None, flag: boo
     return replace(picks, lots=lots)
 
 
+def _with_split(picks, book: str, settings: dict | None):
+    """BL-209: under --from-settings, T1 split across the two AlgoTest accounts when Settings ›
+    Automation has the switch on and both AlgoTest rows upload T1 (`split_t1`); each account's
+    own lots (its row's Dir ×2) go into the split. Returns None when it does not apply."""
+    from dataclasses import replace
+
+    from . import account_split, automation_settings, live_lots
+
+    brokers = automation_settings.split_t1(settings) if settings and book == "t1" else None
+    if brokers is None:
+        if settings and settings.get("splitT1") and book == "t1":
+            typer.echo("algotest t1: split OFF: it needs both AlgoTest rows uploading T1")
+        return None
+    rows = settings["rows"]
+    own = {
+        b: live_lots.lots_for_day(picks.core, picks.dte, on=rows[f"algotest.{b}"]["dirBoost"])
+        for b in brokers
+    }
+    accounts = account_split.split(picks.core, own, lead=brokers[0])
+    names = automation_settings.BROKER_NAMES
+    for b, book_lots in accounts.items():
+        lots = " · ".join(f"{v} ×{n}" if n > 1 else v for v, n in book_lots.items())
+        typer.echo(f"algotest t1: split: {names.get(b, b)}: {lots}")
+    if accounts == own:
+        typer.echo("algotest t1: split: this day's picks are not split (each account trades all)")
+    return replace(picks, lots=None, accounts=accounts, alone=own)
+
+
 def _morning(picks, book: str, folder):
     """BL-172 Phase 4: the recorded picks under the owner's 09:17 rule, against the list the
     evening uploaded to `folder`. With no evening upload there (nothing of it is on the platform),
@@ -504,7 +532,8 @@ def algotest_export(
             missing.append(b)
             continue
         picks = _without_addon(picks, "algotest", b, settings)
-        picks = _with_lots(picks, "algotest", b, settings, dir_boost)
+        split = _with_split(picks, b, settings) if dir_boost is None else None
+        picks = split or _with_lots(picks, "algotest", b, settings, dir_boost)
         try:
             exports = ax.build(picks)
         except (Unmappable, FileNotFoundError) as error:

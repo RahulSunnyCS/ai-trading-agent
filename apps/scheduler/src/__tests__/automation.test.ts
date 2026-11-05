@@ -289,6 +289,19 @@ describe('API /settings/automation', () => {
     expect(store.current().settings.masters.logins).toBe(false);
   });
 
+  it('PUT from a dashboard without the split switch keeps the current one (BL-209)', async () => {
+    const handle = createApi({ ctx: ctx(), jobs: [], settings: store, gh: async () => {} });
+    const put = (body: unknown) =>
+      handle(
+        new Request('http://x/settings/automation', { method: 'PUT', body: JSON.stringify(body) }),
+      );
+    expect((await put({ ...clone(DEFAULT_SETTINGS), splitT1: true })).status).toBe(200);
+    const older = clone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+    older.splitT1 = undefined;
+    expect((await put(JSON.parse(JSON.stringify(older)))).status).toBe(200);
+    expect(store.current().settings.splitT1).toBe(true);
+  });
+
   it('answers 503 without a store', async () => {
     const handle = createApi({ ctx: ctx(), jobs: [] });
     expect((await handle(new Request('http://x/settings/automation'))).status).toBe(503);
@@ -530,6 +543,25 @@ describe('the margin block (BL-205, owner 2026-11-04)', () => {
     ok.margin = { bufferPct: 5, days: 10 };
     const checked = validate(ok);
     expect('settings' in checked && checked.settings.margin).toEqual({ bufferPct: 5, days: 10 });
+  });
+});
+
+describe('the T1 split switch (BL-209, owner 2026-11-04)', () => {
+  it('settings saved before the field read as off', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { splitT1?: unknown };
+    old.splitT1 = undefined;
+    expect(withDefaults(JSON.parse(JSON.stringify(old))).splitT1).toBe(false);
+  });
+
+  it('a save must say true or false', () => {
+    for (const bad of [undefined, 'on', 1, null]) {
+      const s = { ...clone(DEFAULT_SETTINGS), splitT1: bad } as unknown;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain('splitT1');
+    }
+    const ok = { ...clone(DEFAULT_SETTINGS), splitT1: true };
+    const checked = validate(ok);
+    expect('settings' in checked && checked.settings.splitT1).toBe(true);
   });
 });
 

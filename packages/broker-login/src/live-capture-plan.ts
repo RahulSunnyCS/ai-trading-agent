@@ -50,6 +50,8 @@ export interface StrategyLine {
   name: string;
   /** the rotation variant when the name is the tool's (`T1 · <variant>`), else null */
   variant: string | null;
+  /** BL-209: the lots a split export's copy carries in its name (`T1 · <variant> · ×2`); absent = 1 */
+  lots?: number;
   book: string | null;
   addon: boolean;
   source: Source;
@@ -90,15 +92,24 @@ export interface SectionLine {
 
 export type LiveLine = StrategyLine | SectionLine;
 
-/** `T1 · N_p150-t1s11_0917` / `Core · S_p250_1317 · add-on` -> the variant, its list, add-on. */
-export function toolName(name: string): { variant: string; book: string; addon: boolean } | null {
+/**
+ * `T1 · N_p150-t1s11_0917` / `Core · S_p250_1317 · add-on` / `T1 · S_p320_0947 · ×2` (BL-209, a
+ * split export's 2-lot copy) -> the variant, its list, add-on and the lots in the name (1 without).
+ */
+export function toolName(
+  name: string,
+): { variant: string; book: string; addon: boolean; lots: number } | null {
   const trimmed = name.trim();
   const p = TOOL_PREFIXES.find((x) => trimmed.startsWith(x.prefix));
   if (!p) return null;
-  const m = /^(\S+?)( · add-on)?$/.exec(trimmed.slice(p.prefix.length));
+  const m = /^(\S+?)(?: · ×([1-9]\d?))?( · add-on)?$/.exec(trimmed.slice(p.prefix.length));
   if (!m?.[1]) return null;
-  return { variant: m[1], book: p.book, addon: Boolean(m[2]) };
+  return { variant: m[1], book: p.book, addon: Boolean(m[3]), lots: m[2] ? Number(m[2]) : 1 };
 }
+
+/** The `lots` field of a tool line: only a copy above 1 lot carries it (BL-209). */
+const lotsField = (tool: { lots: number } | null) =>
+  tool && tool.lots > 1 ? { lots: tool.lots } : {};
 
 const isToolNamed = (name: string) =>
   TOOL_PREFIXES.some((p) => name.startsWith(p.prefix)) ||
@@ -269,6 +280,7 @@ export function algotestLines(
       broker: algotestBroker(str(e.broker_type)),
       name,
       variant: source === 'tool' ? (tool?.variant ?? null) : null,
+      ...(source === 'tool' ? lotsField(tool) : {}),
       book: source === 'tool' ? (tool?.book ?? null) : null,
       addon: source === 'tool' ? Boolean(tool?.addon) : false,
       source,
@@ -435,6 +447,7 @@ export function quantiplyLines(
       broker,
       name,
       variant: tool?.variant ?? null,
+      ...lotsField(tool),
       book: tool?.book ?? null,
       addon: Boolean(tool?.addon),
       source: mine ? 'tool' : 'discretionary',

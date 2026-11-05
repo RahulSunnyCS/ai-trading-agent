@@ -9,7 +9,14 @@ file, because an `.algtst` holds one strategy; a zip of them sits beside them.
 The AlgoTest name is the book prefix plus the variant id (`T1 · N_p150-t1s11_0917`), the Buy add-on
 marked `· add-on` (owner, 2026-10-19). The name does not say preview or recorded: an evening upload
 that the 09:16 pick confirms keeps its name, so it is not uploaded again. `manifest.json` records
-the source. Read-only over the journal and results; writes only under `out`."""
+the source. Read-only over the journal and results; writes only under `out`.
+
+BL-209: with the T1 split (`picks.accounts` set) one variant can be exported at several lots, so
+a copy above 1 lot is named and filed with its lots (`T1 · S_p320_0947 · ×2`,
+`S_p320_0947-x2.algtst`). The export holds every copy the split layout needs and every copy each
+account needs to trade all of T1 alone (`picks.alone`: the other account not logged in), and the
+manifest records which account trades which (`accounts`, `alone`): the morning activation reads
+that, never re-derives it."""
 
 from __future__ import annotations
 
@@ -44,14 +51,52 @@ class DayPicks:
     #: BL-183: lots per core pick (`live_lots.lots_for_day`) when the Dir ×2 rule was asked for;
     #: None = every pick 1 lot and the manifest as before
     lots: dict[str, int] | None = None
+    #: BL-209: {broker: {variant: lots}} of the core picks under the T1 split, lead account first
+    #: (`account_split.split`); None = no split, one export for every account as before
+    accounts: dict[str, dict[str, int]] | None = None
+    #: BL-209: {broker: {variant: lots}}, what each account trades when it trades all of T1 alone
+    alone: dict[str, dict[str, int]] | None = None
 
     def lots_of(self, variant: str) -> int:
         return (self.lots or {}).get(variant, 1)
 
 
-def strategy_name(book: str, variant: str, addon: bool = False) -> str:
+def strategy_name(book: str, variant: str, addon: bool = False, lots: int = 1) -> str:
+    """The AlgoTest name; `lots` above 1 is in the name only for a split export's copies."""
     name = f"{BOOKS[book][1]}{SEPARATOR}{variant}"
+    if lots > 1:
+        name = f"{name}{SEPARATOR}×{lots}"
     return f"{name}{SEPARATOR}{ADDON}" if addon else name
+
+
+def copies(picks: DayPicks) -> list[tuple[str, int, bool]]:
+    """(variant, lots, addon) per strategy to export: each pick at its lots, the add-on after; under
+    the split every distinct (variant, lots) either layout needs, in pick order then lots."""
+    if picks.accounts is None:
+        core = [(v, picks.lots_of(v), False) for v in picks.core]
+    else:
+        wanted = {
+            (v, n)
+            for layout in (picks.accounts, picks.alone or {})
+            for book in layout.values()
+            for v, n in book.items()
+        }
+        core = [
+            (v, n, False) for v, n in sorted(wanted, key=lambda c: (picks.core.index(c[0]), c[1]))
+        ]
+    return core + [(v, 1, True) for v in picks.buy]
+
+
+def copy_name(picks: DayPicks, variant: str, lots: int, addon: bool) -> str:
+    return strategy_name(picks.book, variant, addon, lots if picks.accounts is not None else 1)
+
+
+def copy_file(picks: DayPicks, variant: str, lots: int) -> str:
+    return (
+        f"{variant}-x{lots}.algtst"
+        if picks.accounts is not None and lots > 1
+        else f"{variant}.algtst"
+    )
 
 
 def _previous_session(day: date) -> date:
@@ -96,12 +141,24 @@ def build(picks: DayPicks) -> list[tuple[str, Export]]:
     """(variant, export) for every pick, core first; raises `Unmappable` on a setting with no
     known form."""
     out = []
-    for variant, addon in [(v, False) for v in picks.core] + [(v, True) for v in picks.buy]:
+    for variant, lots, addon in copies(picks):
         spec = load_legwise(strategy_path(variant))
-        if not addon:
-            # AlgoTest scales the overall MTM SL by the leg lots itself: keep the 1-lot figure
-            spec = live_lots.scaled(spec, picks.lots_of(variant), overall_per_lot=True)
-        out.append((variant, to_algtst(spec, strategy_name(picks.book, variant, addon))))
+        # AlgoTest scales the overall MTM SL by the leg lots itself: keep the 1-lot figure
+        spec = live_lots.scaled(spec, lots, overall_per_lot=True)
+        out.append((variant, to_algtst(spec, copy_name(picks, variant, lots, addon))))
+    return out
+
+
+def _account_names(picks: DayPicks, layout: dict[str, dict[str, int]]) -> dict[str, list[str]]:
+    """{broker: [AlgoTest names]} of a layout; the add-on goes with the lead account in the split
+    (owner, 2026-11-04: Shoonya takes it) and with each account trading alone."""
+    lead = next(iter(picks.accounts or {}), None)
+    out = {}
+    for broker, book in layout.items():
+        names = [copy_name(picks, v, n, False) for v, n in book.items()]
+        if layout is picks.alone or broker == lead:
+            names += [copy_name(picks, v, 1, True) for v in picks.buy]
+        out[broker] = names
     return out
 
 
@@ -121,27 +178,29 @@ def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path
         raise FileExistsError(
             f"{out} already holds .algtst files that no export wrote; choose an empty folder"
         )
-    files = []
-    for variant, export in exports:
-        path = out / f"{variant}.algtst"
+    files, strategies = [], []
+    for (variant, export), (_, lots, addon) in zip(exports, copies(picks), strict=True):
+        path = out / copy_file(picks, variant, lots)
         path.write_text(export.text())
         files.append(path)
+        field = (
+            {"lots": lots} if picks.accounts is not None else manifest_field(picks, variant, addon)
+        )
+        strategies.append(
+            {"variant": variant, "name": export.name, "addon": addon, "file": path.name, **field}
+        )
     manifest = {
         "day": picks.day.isoformat(),
         "book": picks.book,
         "source": picks.source,
-        "strategies": [
-            {
-                "variant": variant,
-                "name": export.name,
-                "addon": variant in picks.buy,
-                "file": f"{variant}.algtst",
-                **manifest_field(picks, variant, variant in picks.buy),
-            }
-            for variant, export in exports
-        ],
+        "strategies": strategies,
         **manifest_block(picks),
     }
+    if picks.accounts is not None:
+        manifest["split"] = "BL-209"
+        manifest["dte"] = picks.dte
+        manifest["accounts"] = _account_names(picks, picks.accounts)
+        manifest["alone"] = _account_names(picks, picks.alone or {})
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     zip_path = out / f"{picks.day.isoformat()}-{picks.book}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:

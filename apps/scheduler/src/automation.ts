@@ -26,6 +26,10 @@ import { jobPath } from './env.js';
  *   expiry, or on a weekday, a row trades another list. Tried in order, the first that matches a
  *   row wins; the jobs resolve them per session (broker-login's day-type.ts, Python's
  *   automation_settings.resolve), so the page and the jobs read one rule set.
+ * - BL-209 (owner 2026-11-04): split T1 across the two AlgoTest accounts (`splitT1`, default off):
+ *   the odd pick on each, the like pair one per account at 2 lots
+ *   (`packages/option-backtesting/.../rotation/account_split.py`). It changes the export only
+ *   while both AlgoTest rows upload T1; otherwise the export is what it is without it.
  *
  * Every Save is a new version in the scheduler's SQLite (`automation_settings`); nothing is
  * ever updated in place, so the page can show the history. The current version is also
@@ -140,6 +144,8 @@ export interface AutomationSettings {
   capital: Record<Broker, number>;
   /** the evening result message's margin block (BL-205) */
   margin: Margin;
+  /** BL-209: T1 split across the two AlgoTest accounts (effective only while both upload T1) */
+  splitT1: boolean;
 }
 
 export interface Version {
@@ -203,6 +209,7 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
   rules: [],
   capital: { finvasia: DEFAULT_CAPITAL, angelone: DEFAULT_CAPITAL },
   margin: { ...DEFAULT_MARGIN },
+  splitT1: false,
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -218,7 +225,7 @@ function isRealDay(value: string): boolean {
  * Settings saved before Phase 4 have no multiplier, add-on or pause: they mean 1, yes and none,
  * exactly what the jobs did; settings before BL-183 have no `dirBoost`: off; settings before
  * 2026-10-29 have no `capital`: ₹8.5 lakh an account; settings before BL-205 have no `margin`:
- * a 10% buffer over 6 days; settings before BL-211 have no `rules`: none. Anything present is kept as it is (and
+ * a 10% buffer over 6 days; settings before BL-209 have no `splitT1`: off, before BL-211 no `rules`: none. Anything present is kept as it is (and
  * validated on a Save).
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
@@ -228,6 +235,7 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
     rules?: DayRule[];
     capital?: Partial<Record<Broker, number>>;
     margin?: Partial<Margin>;
+    splitT1?: boolean;
   };
   return {
     ...settings,
@@ -252,6 +260,7 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
       bufferPct: partial.margin?.bufferPct ?? DEFAULT_MARGIN.bufferPct,
       days: partial.margin?.days ?? DEFAULT_MARGIN.days,
     },
+    splitT1: partial.splitT1 ?? false,
   };
 }
 
@@ -262,7 +271,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
     !!v && typeof v === 'object' && !Array.isArray(v);
   if (!obj(value)) return { errors: ['settings must be an object'] };
   const extra = Object.keys(value).filter(
-    (k) => !['masters', 'rows', 'pause', 'rules', 'capital', 'margin'].includes(k),
+    (k) => !['masters', 'rows', 'pause', 'rules', 'capital', 'margin', 'splitT1'].includes(k),
   );
   if (extra.length) errors.push(`unknown keys: ${extra.join(', ')}`);
 
@@ -368,6 +377,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         `margin.days must be a whole number from ${MARGIN_DAYS_MIN} to ${MARGIN_DAYS_MAX}`,
       );
   }
+  if (typeof value.splitT1 !== 'boolean') errors.push('splitT1 must be true or false');
   if (errors.length) return { errors };
   const v = value as unknown as AutomationSettings;
   // Rebuild in a fixed key order, so equal settings always serialise the same.
@@ -403,6 +413,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
       })),
       capital: Object.fromEntries(BROKERS.map((b) => [b, v.capital[b]])) as Record<Broker, number>,
       margin: { bufferPct: v.margin.bufferPct, days: v.margin.days },
+      splitT1: v.splitT1,
     },
   };
 }
