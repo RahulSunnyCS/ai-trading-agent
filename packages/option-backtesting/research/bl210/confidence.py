@@ -17,6 +17,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -31,14 +32,15 @@ from option_backtesting.rotation.score import composite, dte_matrix, family_inde
 from option_backtesting.rotation.variants import track_names, variant_names
 
 HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE.parent / "common"))
+from pick_confidence import CRITERIA, SCALE, basket_confidence  # noqa: E402
+
 LIST_KEY = "C"
-SCALE = 3000.0  # rupees per basket-day that read 0 (-) and 100 (+): fixed in Phase 0
 SKIP_BELOW = 40.0  # the one declared skip rule, descriptive only
 FIRST = date(2025, 1, 10)  # first day with WARMUP earlier days of results
 FORWARD_FROM = date(2026, 10, 12)  # the journal's first entry: held out of the verdict
 BLOCK, RESAMPLES, SEED, LEVEL = 5, 2000, 20261105, 0.90
 SPREAD_MIN = 500.0  # tercile spread a pass needs, rupees per basket-day
-CRITERIA = ("recent", "weekday", "dte", "vix")
 BOOKS = {"core": None, "t1": "t1"}
 
 
@@ -114,67 +116,12 @@ def picks_for(
 
 
 # ---------------------------------------------------------------------------------------------
-# The confidence
+# The confidence (the definition lives in research/common/pick_confidence.py since BL-212)
 # ---------------------------------------------------------------------------------------------
-def _blend(b: np.ndarray) -> tuple[float, float, float]:
-    """(win %, rupee score, c) of a basket series on matched days."""
-    win = 100.0 * float((b > 0).mean())
-    rup = float(np.clip(50.0 + 50.0 * b.mean() / SCALE, 0.0, 100.0))
-    return win, rup, (win + rup) / 2.0
-
-
 def confidence(prep: dict, i: int, core: list[str], weekday, band, dmat) -> dict:
     """C(D) for day i from the basket's own days in list C's windows (Phase 0 definitions)."""
-    names = prep["names"]
-    idx = [names.index(n) for n in core]
-    P = prep["net"][:i]  # rows strictly before i
-    b = P[:, idx].sum(axis=1)  # the basket's series (every variant has a result on common days)
-    lst = LISTS[LIST_KEY]
-    out: dict = {}
-    crit: dict[str, float] = {}
-    # recent: the last 10 days, 2/3 on the last 5, 1/3 on the 5 before (as score.recent_score)
-    if i >= 10:
-        last5, prev5 = b[i - 5 : i], b[i - 10 : i - 5]
-        w5, r5, c5 = _blend(last5)
-        w10, r10, c10 = _blend(prev5)
-        crit["recent"] = (2 / 3) * c5 + (1 / 3) * c10
-        out["recent"] = {
-            "win": round((2 / 3) * w5 + (1 / 3) * w10, 1),
-            "rupee": round((2 / 3) * r5 + (1 / 3) * r10, 1),
-            "days": 10,
-        }
-    # the fit criteria: matched days per lookback window, blended by the lookback weights and
-    # renormalised over the windows with a matching day (as score.skewed_fit)
-    matches = {
-        "weekday": weekday[:i] == weekday[i],
-        "vix": band[:i] == band[i],
-        # dte: every pick's own label matches the day's (a NIFTY pick dte_n, a SENSEX pick dte_s)
-        "dte": np.all(dmat[:i][:, idx] == dmat[i][idx][None, :], axis=1),
-    }
-    for k, m in matches.items():
-        num = den = 0.0
-        wins = rups = 0.0
-        n_days = 0
-        for n, w in lst.lookbacks:
-            lo = max(0, i - n)
-            mm = m[lo:i]
-            if not mm.any():
-                continue
-            win, rup, c = _blend(b[lo:i][mm])
-            num += w * c
-            wins += w * win
-            rups += w * rup
-            den += w
-            n_days = max(n_days, int(mm.sum()))
-        if den > 0:
-            crit[k] = num / den
-            out[k] = {"win": round(wins / den, 1), "rupee": round(rups / den, 1), "days": n_days}
-    weights = {k: lst.weights[k] for k in CRITERIA if k in crit}
-    total = sum(weights.values())
-    c = sum(weights[k] / total * crit[k] for k in weights) if total else float("nan")
-    out["confidence"] = round(float(c), 2)
-    out["criteria"] = {k: round(v, 2) for k, v in crit.items()}
-    return out
+    idx = [prep["names"].index(n) for n in core]
+    return basket_confidence(prep["net"], idx, i, weekday, band, dmat, LISTS[LIST_KEY], SCALE)
 
 
 # ---------------------------------------------------------------------------------------------
