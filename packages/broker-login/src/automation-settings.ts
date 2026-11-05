@@ -41,12 +41,40 @@ export function defaultMtmSl(platform: Platform, list: Row['list']): number | nu
   return list === 't1' ? 9000 : list === 'core' ? 8000 : null;
 }
 
+/** BL-211: the facts a day-type rule is written on (`obt rotation daytype`, rotation/day_type.py). */
+export interface DayType {
+  day: string;
+  weekday: string;
+  /** weekdays to the nearest expiry per index: '0'..'6', '7+' or 'unknown' */
+  dte: { NIFTY: string; SENSEX: string };
+  source: string;
+}
+
+export type RuleWhen =
+  | { kind: 'dte'; index: 'NIFTY' | 'SENSEX'; dte: string }
+  | { kind: 'weekday'; weekday: string };
+
+/** BL-211: on a day where `when` holds, the row `row` trades `list` instead of its own. */
+export interface DayRule {
+  row: `${Platform}.${Broker}`;
+  when: RuleWhen;
+  list: 'none' | Book;
+  note?: string;
+}
+
+export const MAX_RULES = 20;
+const DTE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7+'];
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const INDICES = ['NIFTY', 'SENSEX'];
+
 export interface Automation {
   version: number;
   masters: { logins: boolean; uploads: boolean; deploy: boolean };
   rows: Record<`${Platform}.${Broker}`, Row>;
   /** no uploads or deploys for any session up to and including this IST day; null = none */
   pause: { until: string | null };
+  /** BL-211: day-type rules, tried in order, the first that matches a row wins (none = []) */
+  rules: DayRule[];
   /** 'file' when read from the scheduler's snapshot, 'default' when there is none yet */
   source: 'file' | 'default';
 }
@@ -93,6 +121,7 @@ export const DEFAULT_AUTOMATION: Automation = {
     },
   },
   pause: { until: null },
+  rules: [],
   source: 'default',
 };
 
@@ -157,8 +186,76 @@ export function readAutomation(path: string = settingsPath()): Automation {
     masters: raw.masters,
     rows,
     pause: { until },
+    rules: readRules(path, (raw as { rules?: unknown }).rules ?? []),
     source: 'file',
   };
+}
+
+/** The day-type rules, checked as the scheduler checks them on a Save; a bad one is an error. */
+function readRules(path: string, raw: unknown): DayRule[] {
+  if (!Array.isArray(raw)) throw new Error(`${path}: rules must be a list`);
+  if (raw.length > MAX_RULES) throw new Error(`${path}: more than ${MAX_RULES} rules`);
+  const rows = new Set(['algotest', 'quantiply'].flatMap((p) => BROKERS.map((b) => `${p}.${b}`)));
+  return raw.map((r, i) => {
+    const rule = r as Partial<DayRule> | null;
+    const where = `${path}: rule ${i + 1}`;
+    if (!rule || !rows.has(String(rule.row))) {
+      throw new Error(`${where} has row ${JSON.stringify(rule?.row)}`);
+    }
+    if (!['none', 'core', 't1'].includes(String(rule.list))) {
+      throw new Error(`${where} has list ${JSON.stringify(rule.list)}`);
+    }
+    const when = rule.when as Partial<RuleWhen> | undefined;
+    if (when?.kind === 'dte') {
+      if (!INDICES.includes(String(when.index)) || !DTE_LABELS.includes(String(when.dte))) {
+        throw new Error(`${where}: bad days-to-expiry condition ${JSON.stringify(when)}`);
+      }
+    } else if (when?.kind === 'weekday') {
+      if (!WEEKDAYS.includes(String(when.weekday))) {
+        throw new Error(`${where}: bad weekday condition ${JSON.stringify(when)}`);
+      }
+    } else {
+      throw new Error(`${where}: unknown condition ${JSON.stringify(when)}`);
+    }
+    return rule as DayRule;
+  });
+}
+
+/** A rule on a label that is not known cannot be decided: the job stops, it does not guess. */
+export class DayTypeUnknown extends Error {}
+
+export function ruleMatches(when: RuleWhen, dt: DayType): boolean {
+  if (when.kind === 'weekday') return dt.weekday === when.weekday;
+  const label = String(dt.dte[when.index] ?? 'unknown');
+  if (!DTE_LABELS.includes(label)) {
+    throw new DayTypeUnknown(
+      `${dt.day}: days to expiry of ${when.index} is ${label}, so a rule on it cannot be decided`,
+    );
+  }
+  return label === when.dte;
+}
+
+/**
+ * BL-211, the same as `automation_settings.resolve` in Python (one shared fixture tests both):
+ * each row's `list` is the first matching rule's, else its own. A row with no list that a rule
+ * gives one is uploaded; a rule giving None turns the upload off. With no rule, `a` itself.
+ */
+export function resolveAutomation(a: Automation, dt: DayType): Automation {
+  if (!a.rules.length) return a;
+  const rows = { ...a.rows };
+  for (const key of Object.keys(rows) as (keyof Automation['rows'])[]) {
+    for (const rule of a.rules) {
+      if (rule.row !== key || !ruleMatches(rule.when, dt)) continue;
+      const row = { ...rows[key] };
+      const wasNone = row.list === 'none';
+      row.list = rule.list;
+      if (rule.list === 'none') row.upload = false;
+      else if (wasNone) row.upload = true;
+      rows[key] = row;
+      break;
+    }
+  }
+  return { ...a, rows };
 }
 
 /** The pause's last day when a session on `session` (IST day) is paused, else null. Inclusive. */

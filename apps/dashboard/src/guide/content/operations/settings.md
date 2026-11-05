@@ -54,6 +54,15 @@ Three master switches, then one block per platform and broker.
 
 A warning badge on a block means its master switch holds it back.
 
+**Advanced rules.** Below the blocks, a collapsed section for the days a block should trade a different list from its own. A rule says: for **this account**, when **this condition** holds, trade **this list**. The condition is either **days to expiry** of one index (NIFTY or SENSEX, 0 to 6 or 7+, counted in weekdays as in the 09:16 message) or a **weekday**. Press **Add a rule**; the first one it makes is "AlgoTest · Shoonya, when SENSEX has 0 days to expiry, trade Adaptive Classic". A sentence under each rule says what it does in words, and an optional note keeps your reason.
+
+- Rules are tried **from the top**, and the first rule that matches a block decides its list for that day. A block no rule matches trades its own list. Use the arrows to reorder.
+- A rule that repeats an earlier rule's account and condition could never apply: the page says so and **Save** stays off until you remove or change it.
+- A rule can give a block a list it has none of (its own list is None). The block then uploads that list on those days, so its **Log in at 08:00** must be on. A rule giving **None** stops the block uploading that day.
+- **What trades** shows what each block trades **today** and **tomorrow** under the rules in the draft, with the days to expiry it read and the rule that decided each block, so you can check a rule before you save it.
+- The jobs read the rules for the session they work on: the **next** session for the evening exports and uploads, the 16:00 message's margin block and the evening deploy; **today** for the 08:11 activation, the morning checks, the live board and the 15:35 check. The Today page's plan card shows the next session's lists. If a rule needs a days-to-expiry figure that cannot be read, the job stops and says so; it does not trade the block's own list by guess.
+- Rules do not change the multiplier, Dir ×2, the Buy add-on or the MTM SL: those stay the block's own.
+
 **Capital.** Below the blocks, the money in each broker account: **Angel One** and **Shoonya**, in whole rupees (₹8.5 lakh each until you change them). The page shows their total. They feed the month-so-far lines of the 16:00 result message on Telegram, from November 2026:
 
 - Each list's paper month (Adaptive and Tuned Adaptive) also reads as a share of that list's capital (`🎯 Adaptive   +₹23,400 (+2.8% of ₹8.5 L) · won 9 of 13 days`). A list's capital is the capital of the accounts whose rows upload it, each counted once.
