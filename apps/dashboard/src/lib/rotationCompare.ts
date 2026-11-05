@@ -17,13 +17,11 @@ import { formatDay, formatInr, formatNumber } from './format';
 export const COMPARE_WINDOWS: ReadonlyArray<{
   value: CompareWindow;
   label: string;
-  /** In the column header: "6 months vs base / lot-day". */
-  long: string;
 }> = [
-  { value: 'sessions60', label: '60 sessions', long: '60 sessions' },
-  { value: 'months6', label: '6 months', long: '6 months' },
-  { value: 'year1', label: '1 year', long: '1 year' },
-  { value: 'years2', label: '2 years', long: '2 years' },
+  { value: 'sessions60', label: '60 sessions' },
+  { value: 'months6', label: '6 months' },
+  { value: 'year1', label: '1 year' },
+  { value: 'years2', label: '2 years' },
 ];
 
 export const DEFAULT_COMPARE_WINDOW: CompareWindow = 'months6';
@@ -35,7 +33,7 @@ export type CompareRead = {
 };
 
 export function windowLabel(w: CompareWindow): string {
-  return COMPARE_WINDOWS.find((o) => o.value === w)?.long ?? w;
+  return COMPARE_WINDOWS.find((o) => o.value === w)?.label ?? w;
 }
 
 /** Why a book's history figures should be read with care. */

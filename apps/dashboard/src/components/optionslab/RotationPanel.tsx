@@ -630,7 +630,7 @@ export function RotationPanel() {
               <RotationBooks
                 lines={lines}
                 compare={compare}
-                window={compareWindow}
+                historyWindow={compareWindow}
                 onWindow={setCompareWindow}
                 below={<RotationCompareCards read={compare} window={compareWindow} />}
                 vsHeader={vsHeader(benchmark)}

@@ -67,9 +67,9 @@ function tone(v: number | null) {
 function GapCell({
   read,
   book,
-  window,
-}: { read: CompareRead; book: CompareBook; window: CompareWindow }) {
-  const c = gapCell(read, book, window);
+  historyWindow,
+}: { read: CompareRead; book: CompareBook; historyWindow: CompareWindow }) {
+  const c = gapCell(read, book, historyWindow);
   if (c.kind === 'gap' && c.money !== undefined)
     return (
       <Td dense align="right" numeric className={tone(c.money)}>
@@ -103,9 +103,9 @@ function GapCell({
 function SigmaCell({
   read,
   book,
-  window,
-}: { read: CompareRead; book: CompareBook; window: CompareWindow }) {
-  const f = read.data?.windows[window]?.books[book];
+  historyWindow,
+}: { read: CompareRead; book: CompareBook; historyWindow: CompareWindow }) {
+  const f = read.data?.windows[historyWindow]?.books[book];
   const text = sigmaText(f);
   return (
     <Td dense align="right" numeric className={text ? undefined : 'text-muted'}>
@@ -158,14 +158,14 @@ export function RotationBooks({
   vsHeader,
   footer,
   compare,
-  window,
+  historyWindow,
   onWindow,
   below,
 }: {
   lines: readonly BookLine[];
   /** The head-to-head with the fixed base, and the window its columns and cards follow. */
   compare: CompareRead;
-  window: CompareWindow;
+  historyWindow: CompareWindow;
   onWindow: (w: CompareWindow) => void;
   /** Cards under the table (head-to-head, drift alarm), above the verdict. */
   below?: ReactNode;
@@ -191,7 +191,7 @@ export function RotationBooks({
         <SegmentedControl
           ariaLabel="History window"
           size="sm"
-          value={window}
+          value={historyWindow}
           options={COMPARE_WINDOWS.map((o) => ({ value: o.value, label: o.label }))}
           onChange={onWindow}
         />
@@ -228,7 +228,7 @@ export function RotationBooks({
           </Th>
           <Th dense align="right">
             <span className="inline-flex items-center gap-1">
-              {windowLabel(window)} vs base / lot-day
+              {windowLabel(historyWindow)} vs base / lot-day
               <InfoTooltip
                 label="About the history gap"
                 text="The book's ₹ per lot-day minus the fixed base's over the chosen window, on the days all three books have, after 0.5% slippage when it is on. The range is a 90% block-bootstrap interval: one that includes 0 means not distinguishable from the base. Most of these days are stored results replayed through the 09:16 rule, not live picks; Adaptive Tuned's settings were tuned on that history."
@@ -320,15 +320,15 @@ export function RotationBooks({
                       money(r.vsBenchmark)
                     )}
                   </Td>
-                  <GapCell read={compare} book={l.compareBook} window={window} />
-                  <SigmaCell read={compare} book={l.compareBook} window={window} />
+                  <GapCell read={compare} book={l.compareBook} historyWindow={historyWindow} />
+                  <SigmaCell read={compare} book={l.compareBook} historyWindow={historyWindow} />
                   <Td dense>
                     <StopCell stop={l.stop} open={isOpen} onToggle={() => toggle(r.id)} />
                   </Td>
                 </TRow>
                 {isOpen && l.stop.effect ? (
                   <tr className="border-b border-border bg-surface-2/40">
-                    <td colSpan={11} className="px-3 py-2">
+                    <td colSpan={9} className="px-3 py-2">
                       <div className={cn('max-w-xl', !stopChanged(l.stop.effect) && 'opacity-80')}>
                         <StopEffectBlock effect={l.stop.effect} />
                       </div>
