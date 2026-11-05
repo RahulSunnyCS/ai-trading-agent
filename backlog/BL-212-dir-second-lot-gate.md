@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — research; the owner's question of 2026-11-05, answered once over the last two years |
-| **Status** | In progress (Phase 0 registered, Phase 1 running) |
+| **Status** | Done — killed by the registered rule (Phase 1, 2026-11-05); the VIX rule is a lead, not a finding |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-05 |
@@ -99,6 +99,49 @@ Committed before any run (2026-11-05).
   checked unchanged), `research/bl212/dir_gate.py` (BL-207's replay with the arms above), its
   results JSON, the verdict here, and `research/options/common/dir-second-lot-gate.md`.
 - **Done when:** the verdict and the table of every arm over every window are written here.
+- **Result (2026-11-05, `research/bl212/dir_gate_2026-11-05.json`): killed.** 220 normal days with
+  a Dir pick, 2025-01-10 → 2026-11-04 (187 expiry days, 33 three-Widesl days left out; the first 63
+  Dir days are the trailing gates' warm-up, gate on). Net under the book stop, 0 % slippage:
+
+  | Arm (all 220 days) | On | ₹/day | Max DD | Worst day | Worst week | Extra net kept | Extra DD taken | Extra worst day taken | vs ×1 [90 %] |
+  |---|---|---|---|---|---|---|---|---|---|
+  | ×1 | — | +829 | −40,047 | −9,513 | −21,405 | — | — | — | — |
+  | ×2 (live) | — | +1,363 | −47,455 | −14,130 | −30,610 | — | — | — | +534 [+235, +812] |
+  | **conf @ 50 % (primary)** | 65 % | +1,094 | −47,455 | −14,130 | −30,610 | 0.50 | 1.00 | 1.00 | +264 [+27, +491] |
+  | conf @ 67 % | 51 % | +928 | −47,455 | −14,130 | −30,610 | 0.18 | 1.00 | 1.00 | +98 [−95, +287] |
+  | conf @ 75 % | 46 % | +906 | −47,455 | −14,130 | −30,610 | 0.14 | 1.00 | 1.00 | +76 [−105, +264] |
+  | rank @ 50 / 67 / 75 % | 93 % | +1,265 | −47,455 | −14,130 | −30,610 | 0.82 | 1.00 | 1.00 | +436 [+153, +711] |
+  | dirwin @ 50 % | 77 % | +1,137 | −47,455 | −14,130 | −30,610 | 0.58 | 1.00 | 1.00 | +308 [+55, +555] |
+  | dirwin @ 67 % | 66 % | +1,071 | −47,455 | −14,130 | −30,610 | 0.45 | 1.00 | 1.00 | +242 [+14, +475] |
+  | dirwin @ 75 % | 64 % | +1,081 | −47,455 | −14,130 | −30,610 | 0.47 | 1.00 | 1.00 | +252 [+31, +467] |
+  | VIX ≤ 15 | 69 % | +1,222 | −37,568 | −14,130 | −25,354 | 0.74 | −0.33 | 1.00 | +392 [+163, +622] |
+
+  Test half (2025-10-10 →, 129 days; ×1 +1,327/day DD −21,405 worst −9,498; ×2 +2,074 DD −28,272
+  worst −13,845): conf @ 50 % kept 0.52, took 0.25 of the extra DD and 1.00 of the extra worst day;
+  conf @ 67 / 75 % kept 0.18 / 0.13 and took 0.06 and 0.00 (they are ×1 with the lot on a third of the
+  days); dirwin @ 50 % kept 0.59, took 0.53 / 1.00; dirwin @ 75 % kept 0.51, took 0.77 / 0.39; VIX kept
+  0.70, took **1.20** of the extra DD (−29,621, deeper than ×2 in this window) and 0.25 of the worst
+  day. The 0.5 % slippage reading without the stop orders the arms the same way.
+
+  Primary arm's checks: kept ≥ 0.5 — no (0.50 rounds to 0.4996); vs ×1 above zero — yes; DD taken
+  ≤ 0.5 — no; worst day taken ≤ 0.5 — no; test-half signs — yes. **Killed.**
+
+  Reading: (1) **no scored gate avoided the worst Dir day**: at every 50 % threshold, and for every
+  gate over all days, the second lot was ON on the −₹14,130 day and on the −₹30,610 week; the Dir's
+  own recent record said nothing about them. (2) The confidence and win-rate gates behave like a
+  dimmer: they shed return and drawdown in about the same proportion (conf @ 50 % on the test half:
+  0.52 of the return, 0.25 of the drawdown but all of the worst day), which is what a weak predictor
+  looks like. (3) `rank` is unusable as a gate: a picked Dir is in the top percentile by construction,
+  so its trailing quantile gates are on 89–99 % of days. (4) **The VIX rule is the one lead**: over all
+  days it kept 74 % of the extra return with a max drawdown *smaller than ×1's* (it was off through
+  April–May 2025, where the ×1 and ×2 drawdowns came from) and a shallower worst week; but in the test
+  half it was deeper than ×2 (one episode in 2026 came at a low VIX), and it never dodged the worst day.
+  One episode decides its drawdown figure, so it is a lead for its own pre-registered item
+  (a VIX-conditioned second lot, with the warm-up question moot since it needs none), not a finding.
+  (5) The warm-up matters for every trailing gate: the biggest drawdown of the period (Jan–May 2025)
+  falls inside the 63 days they are forced on, so their all-days drawdown figures equal ×2's by
+  construction; the test half is the fair window for them, and there none took less than a quarter of
+  the extra drawdown while keeping half the return.
 
 ### Phase 2 — Only on a pass
 - A shadow line beside the lot plans (BL-135's pattern) for 60 forward days, then, as its own item,
@@ -121,3 +164,7 @@ third, more) and several measurements; report, do not build.
 ## Log
 
 - 2026-11-05 — created from the owner's question; Phase 0 registered.
+- 2026-11-05 — Phase 1 run once (the ten declared arms, no sweep): killed; table and reading above,
+  page `research/options/common/dir-second-lot-gate.md`. The VIX ≤ 15 rule is noted as a lead for
+  a new item. BL-210's confidence moved to `research/common/pick_confidence.py` (BL-210's output
+  re-run and unchanged).

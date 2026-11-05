@@ -1,6 +1,6 @@
 # Directional: India VIX
 
-**Status:** Tested · **Last updated:** 2026-10-24
+**Status:** Tested · **Last updated:** 2026-11-05
 
 ## What it is
 
@@ -41,6 +41,10 @@ None. The rotation lists use a VIX-band fit as one ranking criterion
 
 ## Not yet tested
 
+- Dir ×2 only when the VIX open is ≤ 15 (BL-212, one declared rule beside the scored gates, descriptive): over
+  220 normal T1 days it kept 74 % of Dir ×2's extra return with a max drawdown smaller than Dir ×1's, by sitting
+  out April–May 2025; on the test half (2025-10 →) it was deeper than Dir ×2 and never dodged the worst day. A
+  lead for its own pre-registered item; see [the gate page](../../common/dir-second-lot-gate.md).
 - A pre-registered VIX 15–18 rule for Dir on unseen days (the cell is thin and may be noise).
 - Dir ITM1 by VIX band (BL-056 ran ATM only).
 

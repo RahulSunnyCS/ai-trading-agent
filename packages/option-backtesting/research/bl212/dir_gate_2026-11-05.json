@@ -1,0 +1,3045 @@
+{
+ "summary": {
+  "net": {
+   "windows": {
+    "all": {
+     "from": "2025-01-10",
+     "to": "2026-11-04",
+     "days": 220,
+     "arms": {
+      "x1": {
+       "days": 220,
+       "per_day": 829.2681818181819,
+       "total": 182439.00000000003,
+       "max_drawdown": -40047.44999999998,
+       "worst_day": -9512.549999999997,
+       "worst_week": -21405.199999999997,
+       "loss_day_share": 0.35454545454545455,
+       "book_stop_days": 7
+      },
+      "x2": {
+       "days": 220,
+       "per_day": 1362.7975,
+       "total": 299815.44999999995,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 4,
+       "vs_x1": {
+        "mean": 533.5293181818181,
+        "ci90": [
+         235.32031818181795,
+         812.3171249999997
+        ],
+        "reading": "above zero"
+       }
+      },
+      "conf@50": {
+       "days": 220,
+       "per_day": 1093.7493181818184,
+       "total": 240624.85000000003,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 5,
+       "days_on": 144,
+       "share_on": 0.6545454545454545,
+       "vs_x1": {
+        "mean": 264.4811363636363,
+        "ci90": [
+         26.575556818181656,
+         490.9257613636365
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -269.0481818181818,
+        "ci90": [
+         -407.15459090909087,
+         -129.8437613636363
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.49571996767665066,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 59190.59999999998,
+       "x2_minus_x1_on_on_days": 58185.85
+      },
+      "conf@67": {
+       "days": 220,
+       "per_day": 927.7277272727277,
+       "total": 204100.1000000001,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.35909090909090907,
+       "book_stop_days": 5,
+       "days_on": 112,
+       "share_on": 0.509090909090909,
+       "vs_x1": {
+        "mean": 98.45954545454549,
+        "ci90": [
+         -95.33080681818204,
+         287.37786363636354
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -435.0697727272726,
+        "ci90": [
+         -627.191943181818,
+         -240.3472386363635
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.18454383311132694,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 95715.35,
+       "x2_minus_x1_on_on_days": 21661.100000000013
+      },
+      "conf@75": {
+       "days": 220,
+       "per_day": 905.6470454545456,
+       "total": 199242.35000000003,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.35909090909090907,
+       "book_stop_days": 5,
+       "days_on": 101,
+       "share_on": 0.4590909090909091,
+       "vs_x1": {
+        "mean": 76.37886363636366,
+        "ci90": [
+         -104.54569318181814,
+         263.9569545454548
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -457.15045454545447,
+        "ci90": [
+         -667.7755909090907,
+         -240.24374999999995
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.14315776290729534,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 100573.09999999999,
+       "x2_minus_x1_on_on_days": 16803.35000000001
+      },
+      "rank@50": {
+       "days": 220,
+       "per_day": 1265.3038636363638,
+       "total": 278366.85000000003,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 4,
+       "days_on": 205,
+       "share_on": 0.9318181818181818,
+       "vs_x1": {
+        "mean": 436.0356818181818,
+        "ci90": [
+         152.98564772727275,
+         711.1967840909087
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -97.49363636363634,
+        "ci90": [
+         -156.9041136363636,
+         -40.24164772727273
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.8172665811583159,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 21448.59999999999,
+       "x2_minus_x1_on_on_days": 95927.84999999998
+      },
+      "rank@67": {
+       "days": 220,
+       "per_day": 1265.3038636363638,
+       "total": 278366.85000000003,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 4,
+       "days_on": 205,
+       "share_on": 0.9318181818181818,
+       "vs_x1": {
+        "mean": 436.0356818181818,
+        "ci90": [
+         152.98564772727275,
+         711.1967840909087
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -97.49363636363634,
+        "ci90": [
+         -156.9041136363636,
+         -40.24164772727273
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.8172665811583159,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 21448.59999999999,
+       "x2_minus_x1_on_on_days": 95927.84999999998
+      },
+      "rank@75": {
+       "days": 220,
+       "per_day": 1265.3038636363638,
+       "total": 278366.85000000003,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 4,
+       "days_on": 205,
+       "share_on": 0.9318181818181818,
+       "vs_x1": {
+        "mean": 436.0356818181818,
+        "ci90": [
+         152.98564772727275,
+         711.1967840909087
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -97.49363636363634,
+        "ci90": [
+         -156.9041136363636,
+         -40.24164772727273
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.8172665811583159,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 21448.59999999999,
+       "x2_minus_x1_on_on_days": 95927.84999999998
+      },
+      "dirwin@50": {
+       "days": 220,
+       "per_day": 1137.037045454546,
+       "total": 250148.15000000008,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 5,
+       "days_on": 169,
+       "share_on": 0.7681818181818182,
+       "vs_x1": {
+        "mean": 307.76886363636356,
+        "ci90": [
+         54.53834090909085,
+         554.844636363636
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -225.76045454545454,
+        "ci90": [
+         -350.4939204545454,
+         -112.96770454545455
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5768546416253004,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 49667.3,
+       "x2_minus_x1_on_on_days": 67709.14999999998
+      },
+      "dirwin@67": {
+       "days": 220,
+       "per_day": 1071.2877272727271,
+       "total": 235683.3,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.35909090909090907,
+       "book_stop_days": 5,
+       "days_on": 145,
+       "share_on": 0.6590909090909091,
+       "vs_x1": {
+        "mean": 242.01954545454538,
+        "ci90": [
+         13.600545454545422,
+         474.70668181818183
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -291.50977272727266,
+        "ci90": [
+         -446.4892499999999,
+         -142.17589772727274
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.4536199552806376,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 64132.14999999998,
+       "x2_minus_x1_on_on_days": 53244.299999999996
+      },
+      "dirwin@75": {
+       "days": 220,
+       "per_day": 1080.9086363636366,
+       "total": 237799.90000000002,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.35909090909090907,
+       "book_stop_days": 5,
+       "days_on": 140,
+       "share_on": 0.6363636363636364,
+       "vs_x1": {
+        "mean": 251.64045454545453,
+        "ci90": [
+         30.65895454545437,
+         466.78564772727253
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -281.88886363636357,
+        "ci90": [
+         -461.81336363636365,
+         -111.3485681818181
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.47165253336593504,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 62015.54999999999,
+       "x2_minus_x1_on_on_days": 55360.89999999999
+      },
+      "vix": {
+       "days": 220,
+       "per_day": 1221.6059090909093,
+       "total": 268753.30000000005,
+       "max_drawdown": -37568.19999999998,
+       "worst_day": -14129.899999999992,
+       "worst_week": -25353.850000000013,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 5,
+       "days_on": 152,
+       "share_on": 0.6909090909090909,
+       "vs_x1": {
+        "mean": 392.33772727272714,
+        "ci90": [
+         163.41384090909085,
+         621.9044659090907
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -141.1915909090909,
+        "ci90": [
+         -314.13714772727275,
+         32.48593181818185
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.7353630136198529,
+       "extra_drawdown_taken": -0.33469682549325386,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.4289819331428525,
+       "x2_minus_x1_on_off_days": 31062.149999999998,
+       "x2_minus_x1_on_on_days": 86314.29999999997
+      }
+     }
+    },
+    "last_year": {
+     "from": "2025-11-07",
+     "to": "2026-11-04",
+     "days": 121,
+     "arms": {
+      "x1": {
+       "days": 121,
+       "per_day": 1368.3913223140498,
+       "total": 165575.35000000003,
+       "max_drawdown": -21405.2,
+       "worst_day": -9497.5,
+       "worst_week": -21405.199999999997,
+       "loss_day_share": 0.2975206611570248,
+       "book_stop_days": 2
+      },
+      "x2": {
+       "days": 121,
+       "per_day": 2108.657024793388,
+       "total": 255147.49999999994,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.30578512396694213,
+       "book_stop_days": 1,
+       "vs_x1": {
+        "mean": 740.2657024793386,
+        "ci90": [
+         367.3881818181817,
+         1115.4065495867765
+        ],
+        "reading": "above zero"
+       }
+      },
+      "conf@50": {
+       "days": 121,
+       "per_day": 1774.6541322314051,
+       "total": 214733.15000000002,
+       "max_drawdown": -23119.649999999994,
+       "worst_day": -13844.7,
+       "worst_week": -21793.799999999996,
+       "loss_day_share": 0.30578512396694213,
+       "book_stop_days": 2,
+       "days_on": 67,
+       "share_on": 0.5537190082644629,
+       "vs_x1": {
+        "mean": 406.2628099173553,
+        "ci90": [
+         99.51568181818169,
+         708.3842148760327
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -334.0028925619834,
+        "ci90": [
+         -525.1159917355371,
+         -132.7158057851239
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5488067440605144,
+       "extra_drawdown_taken": 0.24966870057813403,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.084193649727551,
+       "x2_minus_x1_on_off_days": 40414.34999999999,
+       "x2_minus_x1_on_on_days": 49157.79999999999
+      },
+      "conf@67": {
+       "days": 121,
+       "per_day": 1519.2719008264464,
+       "total": 183831.90000000002,
+       "max_drawdown": -21793.800000000003,
+       "worst_day": -9497.5,
+       "worst_week": -21793.799999999996,
+       "loss_day_share": 0.2975206611570248,
+       "book_stop_days": 2,
+       "days_on": 45,
+       "share_on": 0.371900826446281,
+       "vs_x1": {
+        "mean": 150.88057851239665,
+        "ci90": [
+         -45.852520661157115,
+         343.0121280991735
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -589.3851239669419,
+        "ci90": [
+         -851.1501446280989,
+         -313.9978305785122
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.2038194907680568,
+       "extra_drawdown_taken": 0.05659031003800857,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.084193649727551,
+       "x2_minus_x1_on_off_days": 71315.59999999999,
+       "x2_minus_x1_on_on_days": 18256.549999999996
+      },
+      "conf@75": {
+       "days": 121,
+       "per_day": 1479.1252066115705,
+       "total": 178974.15000000002,
+       "max_drawdown": -21793.800000000003,
+       "worst_day": -9497.5,
+       "worst_week": -21793.799999999996,
+       "loss_day_share": 0.2975206611570248,
+       "book_stop_days": 2,
+       "days_on": 34,
+       "share_on": 0.2809917355371901,
+       "vs_x1": {
+        "mean": 110.7338842975206,
+        "ci90": [
+         -48.01520661157017,
+         273.4354132231404
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -629.5318181818182,
+        "ci90": [
+         -940.1739462809918,
+         -300.7815495867769
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.1495866739829288,
+       "extra_drawdown_taken": 0.05659031003800857,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.084193649727551,
+       "x2_minus_x1_on_off_days": 76173.34999999999,
+       "x2_minus_x1_on_on_days": 13398.799999999992
+      },
+      "rank@50": {
+       "days": 121,
+       "per_day": 1948.0537190082641,
+       "total": 235714.49999999997,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.30578512396694213,
+       "book_stop_days": 1,
+       "days_on": 107,
+       "share_on": 0.8842975206611571,
+       "vs_x1": {
+        "mean": 579.6623966942149,
+        "ci90": [
+         212.87776859504115,
+         963.7290082644623
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -160.6033057851239,
+        "ci90": [
+         -268.7053512396693,
+         -65.94012396694212
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7830464044906817,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 19432.999999999993,
+       "x2_minus_x1_on_on_days": 70139.14999999997
+      },
+      "rank@67": {
+       "days": 121,
+       "per_day": 1948.0537190082641,
+       "total": 235714.49999999997,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.30578512396694213,
+       "book_stop_days": 1,
+       "days_on": 107,
+       "share_on": 0.8842975206611571,
+       "vs_x1": {
+        "mean": 579.6623966942149,
+        "ci90": [
+         212.87776859504115,
+         963.7290082644623
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -160.6033057851239,
+        "ci90": [
+         -268.7053512396693,
+         -65.94012396694212
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7830464044906817,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 19432.999999999993,
+       "x2_minus_x1_on_on_days": 70139.14999999997
+      },
+      "rank@75": {
+       "days": 121,
+       "per_day": 1948.0537190082641,
+       "total": 235714.49999999997,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.30578512396694213,
+       "book_stop_days": 1,
+       "days_on": 107,
+       "share_on": 0.8842975206611571,
+       "vs_x1": {
+        "mean": 579.6623966942149,
+        "ci90": [
+         212.87776859504115,
+         963.7290082644623
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -160.6033057851239,
+        "ci90": [
+         -268.7053512396693,
+         -65.94012396694212
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7830464044906817,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 19432.999999999993,
+       "x2_minus_x1_on_on_days": 70139.14999999997
+      },
+      "dirwin@50": {
+       "days": 121,
+       "per_day": 1811.295867768595,
+       "total": 219166.8,
+       "max_drawdown": -25016.09999999999,
+       "worst_day": -13844.7,
+       "worst_week": -24553.05,
+       "loss_day_share": 0.30578512396694213,
+       "book_stop_days": 2,
+       "days_on": 84,
+       "share_on": 0.6942148760330579,
+       "vs_x1": {
+        "mean": 442.9045454545453,
+        "ci90": [
+         113.64760330578507,
+         755.0555785123966
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -297.3611570247934,
+        "ci90": [
+         -467.0539049586777,
+         -126.55357438016527
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.598304830240203,
+       "extra_drawdown_taken": 0.525841354905413,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.6820097279847467,
+       "x2_minus_x1_on_off_days": 35980.7,
+       "x2_minus_x1_on_on_days": 53591.44999999998
+      },
+      "dirwin@67": {
+       "days": 121,
+       "per_day": 1734.084297520661,
+       "total": 209824.19999999998,
+       "max_drawdown": -25016.09999999999,
+       "worst_day": -13844.7,
+       "worst_week": -24553.05,
+       "loss_day_share": 0.2975206611570248,
+       "book_stop_days": 2,
+       "days_on": 68,
+       "share_on": 0.5619834710743802,
+       "vs_x1": {
+        "mean": 365.6929752066114,
+        "ci90": [
+         76.24421487603283,
+         649.5939876033055
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -374.57272727272715,
+        "ci90": [
+         -591.0845041322314,
+         -159.88415289256213
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.4940023210339373,
+       "extra_drawdown_taken": 0.525841354905413,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.6820097279847467,
+       "x2_minus_x1_on_off_days": 45323.299999999996,
+       "x2_minus_x1_on_on_days": 44248.84999999998
+      },
+      "dirwin@75": {
+       "days": 121,
+       "per_day": 1751.5768595041322,
+       "total": 211940.8,
+       "max_drawdown": -26694.699999999983,
+       "worst_day": -11187.999999999996,
+       "worst_week": -24553.05,
+       "loss_day_share": 0.2975206611570248,
+       "book_stop_days": 2,
+       "days_on": 63,
+       "share_on": 0.5206611570247934,
+       "vs_x1": {
+        "mean": 383.1855371900825,
+        "ci90": [
+         144.69345041322293,
+         629.8638016528924
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -357.0801652892562,
+        "ci90": [
+         -618.7068388429751,
+         -90.06551652892557
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5176324337419611,
+       "extra_drawdown_taken": 0.7702893590994432,
+       "extra_worst_day_taken": 0.3888709974236281,
+       "extra_worst_week_taken": 0.6820097279847467,
+       "x2_minus_x1_on_off_days": 43206.7,
+       "x2_minus_x1_on_on_days": 46365.44999999998
+      },
+      "vix": {
+       "days": 121,
+       "per_day": 1866.004132231405,
+       "total": 225786.5,
+       "max_drawdown": -29621.049999999996,
+       "worst_day": -10586.0,
+       "worst_week": -24608.4,
+       "loss_day_share": 0.30578512396694213,
+       "book_stop_days": 1,
+       "days_on": 78,
+       "share_on": 0.6446280991735537,
+       "vs_x1": {
+        "mean": 497.6128099173552,
+        "ci90": [
+         205.89328512396676,
+         796.6611983471071
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -242.65289256198344,
+        "ci90": [
+         -509.8319421487603,
+         23.950619834710725
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.6722083817347244,
+       "extra_drawdown_taken": 1.1964423539005915,
+       "extra_worst_day_taken": 0.2503910563121089,
+       "extra_worst_week_taken": 0.6940017982688953,
+       "x2_minus_x1_on_off_days": 29360.999999999996,
+       "x2_minus_x1_on_on_days": 60211.14999999999
+      }
+     }
+    },
+    "fit_half": {
+     "from": "2025-01-10",
+     "to": "2025-10-08",
+     "days": 91,
+     "arms": {
+      "x1": {
+       "days": 91,
+       "per_day": 124.12142857142882,
+       "total": 11295.050000000023,
+       "max_drawdown": -40047.44999999998,
+       "worst_day": -9512.549999999997,
+       "worst_week": -20402.8,
+       "loss_day_share": 0.43956043956043955,
+       "book_stop_days": 5
+      },
+      "x2": {
+       "days": 91,
+       "per_day": 355.23571428571455,
+       "total": 32326.450000000026,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "vs_x1": {
+        "mean": 231.1142857142858,
+        "ci90": [
+         -218.8395879120877,
+         687.1203296703295
+        ],
+        "reading": "includes zero"
+       }
+      },
+      "conf@50": {
+       "days": 91,
+       "per_day": 212.2384615384618,
+       "total": 19313.700000000023,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 71,
+       "share_on": 0.7802197802197802,
+       "vs_x1": {
+        "mean": 88.11703296703311,
+        "ci90": [
+         -297.3897527472524,
+         486.35483516483527
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -142.9972527472527,
+        "ci90": [
+         -338.4628571428571,
+         43.32417582417591
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.3812703861844675,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 13012.749999999993,
+       "x2_minus_x1_on_on_days": 8018.650000000012
+      },
+      "conf@67": {
+       "days": 91,
+       "per_day": 173.09010989011014,
+       "total": 15751.200000000023,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 66,
+       "share_on": 0.7252747252747253,
+       "vs_x1": {
+        "mean": 48.968681318681476,
+        "ci90": [
+         -322.1966483516485,
+         435.91818681318676
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -182.14560439560432,
+        "ci90": [
+         -460.9028846153846,
+         72.49870879120883
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.21188080679365198,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16575.249999999993,
+       "x2_minus_x1_on_on_days": 4456.150000000012
+      },
+      "conf@75": {
+       "days": 91,
+       "per_day": 173.09010989011014,
+       "total": 15751.200000000023,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 66,
+       "share_on": 0.7252747252747253,
+       "vs_x1": {
+        "mean": 48.968681318681476,
+        "ci90": [
+         -322.1966483516485,
+         435.91818681318676
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -182.14560439560432,
+        "ci90": [
+         -460.9028846153846,
+         72.49870879120883
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.21188080679365198,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16575.249999999993,
+       "x2_minus_x1_on_on_days": 4456.150000000012
+      },
+      "rank@50": {
+       "days": 91,
+       "per_day": 333.08626373626396,
+       "total": 30310.85000000002,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 90,
+       "share_on": 0.989010989010989,
+       "vs_x1": {
+        "mean": 208.96483516483528,
+        "ci90": [
+         -237.98134615384603,
+         663.5632967032968
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -22.149450549450552,
+        "ci90": [
+         -66.44835164835165,
+         0.0
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.9041623477276834,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 2015.6000000000001,
+       "x2_minus_x1_on_on_days": 19015.800000000003
+      },
+      "rank@67": {
+       "days": 91,
+       "per_day": 333.08626373626396,
+       "total": 30310.85000000002,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 90,
+       "share_on": 0.989010989010989,
+       "vs_x1": {
+        "mean": 208.96483516483528,
+        "ci90": [
+         -237.98134615384603,
+         663.5632967032968
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -22.149450549450552,
+        "ci90": [
+         -66.44835164835165,
+         0.0
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.9041623477276834,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 2015.6000000000001,
+       "x2_minus_x1_on_on_days": 19015.800000000003
+      },
+      "rank@75": {
+       "days": 91,
+       "per_day": 333.08626373626396,
+       "total": 30310.85000000002,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 90,
+       "share_on": 0.989010989010989,
+       "vs_x1": {
+        "mean": 208.96483516483528,
+        "ci90": [
+         -237.98134615384603,
+         663.5632967032968
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -22.149450549450552,
+        "ci90": [
+         -66.44835164835165,
+         0.0
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.9041623477276834,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 2015.6000000000001,
+       "x2_minus_x1_on_on_days": 19015.800000000003
+      },
+      "dirwin@50": {
+       "days": 91,
+       "per_day": 242.09230769230794,
+       "total": 22030.400000000023,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 80,
+       "share_on": 0.8791208791208791,
+       "vs_x1": {
+        "mean": 117.97087912087919,
+        "ci90": [
+         -308.21563186813194,
+         547.3338736263734
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -113.14340659340658,
+        "ci90": [
+         -295.0468131868133,
+         29.543956043956065
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.5104439076808963,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 10296.05,
+       "x2_minus_x1_on_on_days": 10735.350000000006
+      },
+      "dirwin@67": {
+       "days": 91,
+       "per_day": 187.90934065934098,
+       "total": 17099.75000000003,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 73,
+       "share_on": 0.8021978021978022,
+       "vs_x1": {
+        "mean": 63.787912087912204,
+        "ci90": [
+         -320.99120879120886,
+         468.9436813186814
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -167.3263736263736,
+        "ci90": [
+         -401.7449725274725,
+         37.23269230769234
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.27600159761119125,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 15226.699999999997,
+       "x2_minus_x1_on_on_days": 5804.70000000001
+      },
+      "dirwin@75": {
+       "days": 91,
+       "per_day": 187.90934065934098,
+       "total": 17099.75000000003,
+       "max_drawdown": -47454.89999999997,
+       "worst_day": -14129.899999999992,
+       "worst_week": -30609.9,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 3,
+       "days_on": 73,
+       "share_on": 0.8021978021978022,
+       "vs_x1": {
+        "mean": 63.787912087912204,
+        "ci90": [
+         -320.99120879120886,
+         468.9436813186814
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -167.3263736263736,
+        "ci90": [
+         -401.7449725274725,
+         37.23269230769234
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.27600159761119125,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 15226.699999999997,
+       "x2_minus_x1_on_on_days": 5804.70000000001
+      },
+      "vix": {
+       "days": 91,
+       "per_day": 336.5417582417586,
+       "total": 30625.300000000032,
+       "max_drawdown": -37568.19999999998,
+       "worst_day": -14129.899999999992,
+       "worst_week": -25353.850000000013,
+       "loss_day_share": 0.45054945054945056,
+       "book_stop_days": 4,
+       "days_on": 66,
+       "share_on": 0.7252747252747253,
+       "vs_x1": {
+        "mean": 212.42032967032958,
+        "ci90": [
+         -152.63549450549442,
+         584.9454120879119
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -18.6939560439561,
+        "ci90": [
+         -232.6722252747254,
+         208.36016483516474
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.9191138012685786,
+       "extra_drawdown_taken": -0.33469682549325386,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.4850594194237357,
+       "x2_minus_x1_on_off_days": 1701.1500000000074,
+       "x2_minus_x1_on_on_days": 19330.25
+      }
+     }
+    },
+    "test_half": {
+     "from": "2025-10-10",
+     "to": "2026-11-04",
+     "days": 129,
+     "arms": {
+      "x1": {
+       "days": 129,
+       "per_day": 1326.6972868217056,
+       "total": 171143.95,
+       "max_drawdown": -21405.200000000004,
+       "worst_day": -9497.5,
+       "worst_week": -21405.199999999997,
+       "loss_day_share": 0.29457364341085274,
+       "book_stop_days": 2
+      },
+      "x2": {
+       "days": 129,
+       "per_day": 2073.558139534883,
+       "total": 267488.99999999994,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.3023255813953488,
+       "book_stop_days": 1,
+       "vs_x1": {
+        "mean": 746.8608527131782,
+        "ci90": [
+         367.2420930232557,
+         1102.6337015503873
+        ],
+        "reading": "above zero"
+       }
+      },
+      "conf@50": {
+       "days": 129,
+       "per_day": 1715.5903100775195,
+       "total": 221311.15000000002,
+       "max_drawdown": -23119.649999999994,
+       "worst_day": -13844.7,
+       "worst_week": -21793.799999999996,
+       "loss_day_share": 0.3023255813953488,
+       "book_stop_days": 2,
+       "days_on": 73,
+       "share_on": 0.5658914728682171,
+       "vs_x1": {
+        "mean": 388.8930232558139,
+        "ci90": [
+         97.0808720930231,
+         685.8075581395349
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -357.96782945736425,
+        "ci90": [
+         -544.884011627907,
+         -159.84063953488368
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5207034507740667,
+       "extra_drawdown_taken": 0.24966870057813362,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.084193649727551,
+       "x2_minus_x1_on_off_days": 46177.84999999999,
+       "x2_minus_x1_on_on_days": 50167.19999999998
+      },
+      "conf@67": {
+       "days": 129,
+       "per_day": 1460.0689922480622,
+       "total": 188348.90000000002,
+       "max_drawdown": -21793.799999999996,
+       "worst_day": -9497.5,
+       "worst_week": -21793.799999999996,
+       "loss_day_share": 0.29457364341085274,
+       "book_stop_days": 2,
+       "days_on": 46,
+       "share_on": 0.35658914728682173,
+       "vs_x1": {
+        "mean": 133.37170542635656,
+        "ci90": [
+         -49.82903100775201,
+         309.79486434108514
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -613.4891472868215,
+        "ci90": [
+         -871.9414728682168,
+         -335.667945736434
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.178576377302207,
+       "extra_drawdown_taken": 0.05659031003800701,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.084193649727551,
+       "x2_minus_x1_on_off_days": 79140.09999999999,
+       "x2_minus_x1_on_on_days": 17204.949999999993
+      },
+      "conf@75": {
+       "days": 129,
+       "per_day": 1422.4120155038759,
+       "total": 183491.15,
+       "max_drawdown": -21793.799999999996,
+       "worst_day": -9497.5,
+       "worst_week": -21793.799999999996,
+       "loss_day_share": 0.29457364341085274,
+       "book_stop_days": 2,
+       "days_on": 35,
+       "share_on": 0.2713178294573643,
+       "vs_x1": {
+        "mean": 95.7147286821705,
+        "ci90": [
+         -54.077655038759694,
+         250.7845542635659
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -651.1461240310076,
+        "ci90": [
+         -948.331937984496,
+         -329.0532751937984
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.12815603915302337,
+       "extra_drawdown_taken": 0.05659031003800701,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.084193649727551,
+       "x2_minus_x1_on_off_days": 83997.84999999999,
+       "x2_minus_x1_on_on_days": 12347.199999999993
+      },
+      "rank@50": {
+       "days": 129,
+       "per_day": 1922.9147286821703,
+       "total": 248055.99999999997,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.3023255813953488,
+       "book_stop_days": 1,
+       "days_on": 115,
+       "share_on": 0.8914728682170543,
+       "vs_x1": {
+        "mean": 596.217441860465,
+        "ci90": [
+         221.22672480620147,
+         949.4272286821703
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -150.64341085271315,
+        "ci90": [
+         -254.8665116279069,
+         -60.885077519379834
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7982978886823971,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 19432.999999999993,
+       "x2_minus_x1_on_on_days": 76912.04999999997
+      },
+      "rank@67": {
+       "days": 129,
+       "per_day": 1922.9147286821703,
+       "total": 248055.99999999997,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.3023255813953488,
+       "book_stop_days": 1,
+       "days_on": 115,
+       "share_on": 0.8914728682170543,
+       "vs_x1": {
+        "mean": 596.217441860465,
+        "ci90": [
+         221.22672480620147,
+         949.4272286821703
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -150.64341085271315,
+        "ci90": [
+         -254.8665116279069,
+         -60.885077519379834
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7982978886823971,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 19432.999999999993,
+       "x2_minus_x1_on_on_days": 76912.04999999997
+      },
+      "rank@75": {
+       "days": 129,
+       "per_day": 1922.9147286821703,
+       "total": 248055.99999999997,
+       "max_drawdown": -28272.10000000002,
+       "worst_day": -13844.7,
+       "worst_week": -26020.750000000004,
+       "loss_day_share": 0.3023255813953488,
+       "book_stop_days": 1,
+       "days_on": 115,
+       "share_on": 0.8914728682170543,
+       "vs_x1": {
+        "mean": 596.217441860465,
+        "ci90": [
+         221.22672480620147,
+         949.4272286821703
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -150.64341085271315,
+        "ci90": [
+         -254.8665116279069,
+         -60.885077519379834
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7982978886823971,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 19432.999999999993,
+       "x2_minus_x1_on_on_days": 76912.04999999997
+      },
+      "dirwin@50": {
+       "days": 129,
+       "per_day": 1768.3546511627906,
+       "total": 228117.74999999997,
+       "max_drawdown": -25016.100000000006,
+       "worst_day": -13844.7,
+       "worst_week": -24553.05,
+       "loss_day_share": 0.3023255813953488,
+       "book_stop_days": 2,
+       "days_on": 89,
+       "share_on": 0.689922480620155,
+       "vs_x1": {
+        "mean": 441.65736434108516,
+        "ci90": [
+         125.12160852713163,
+         751.3500193798449
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -305.203488372093,
+        "ci90": [
+         -458.30455426356576,
+         -138.36773255813952
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5913516055054202,
+       "extra_drawdown_taken": 0.5258413549054148,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.6820097279847467,
+       "x2_minus_x1_on_off_days": 39371.25,
+       "x2_minus_x1_on_on_days": 56973.799999999974
+      },
+      "dirwin@67": {
+       "days": 129,
+       "per_day": 1694.446124031008,
+       "total": 218583.55000000002,
+       "max_drawdown": -25016.100000000006,
+       "worst_day": -13844.7,
+       "worst_week": -24553.05,
+       "loss_day_share": 0.29457364341085274,
+       "book_stop_days": 2,
+       "days_on": 72,
+       "share_on": 0.5581395348837209,
+       "vs_x1": {
+        "mean": 367.7488372093022,
+        "ci90": [
+         87.60858527131779,
+         649.0290116279066
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -379.11201550387597,
+        "ci90": [
+         -579.9756201550385,
+         -171.1112209302326
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.4923927072537716,
+       "extra_drawdown_taken": 0.5258413549054148,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.6820097279847467,
+       "x2_minus_x1_on_off_days": 48905.45,
+       "x2_minus_x1_on_on_days": 47439.59999999998
+      },
+      "dirwin@75": {
+       "days": 129,
+       "per_day": 1710.853875968992,
+       "total": 220700.14999999997,
+       "max_drawdown": -26694.699999999997,
+       "worst_day": -11187.999999999996,
+       "worst_week": -24553.05,
+       "loss_day_share": 0.29457364341085274,
+       "book_stop_days": 2,
+       "days_on": 67,
+       "share_on": 0.5193798449612403,
+       "vs_x1": {
+        "mean": 384.1565891472867,
+        "ci90": [
+         151.67922480620143,
+         626.8550968992247
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -362.7042635658914,
+        "ci90": [
+         -616.2151356589146,
+         -96.78145348837214
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5143616615487769,
+       "extra_drawdown_taken": 0.7702893590994452,
+       "extra_worst_day_taken": 0.3888709974236281,
+       "extra_worst_week_taken": 0.6820097279847467,
+       "x2_minus_x1_on_off_days": 46788.84999999999,
+       "x2_minus_x1_on_on_days": 49556.19999999998
+      },
+      "vix": {
+       "days": 129,
+       "per_day": 1845.9534883720928,
+       "total": 238127.99999999997,
+       "max_drawdown": -29621.050000000003,
+       "worst_day": -10586.0,
+       "worst_week": -24608.4,
+       "loss_day_share": 0.3023255813953488,
+       "book_stop_days": 1,
+       "days_on": 86,
+       "share_on": 0.6666666666666666,
+       "vs_x1": {
+        "mean": 519.2562015503873,
+        "ci90": [
+         217.54096899224794,
+         790.1777713178293
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -227.60465116279065,
+        "ci90": [
+         -480.2104457364341,
+         19.678333333333406
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.6952515982917645,
+       "extra_drawdown_taken": 1.1964423539005926,
+       "extra_worst_day_taken": 0.2503910563121089,
+       "extra_worst_week_taken": 0.6940017982688953,
+       "x2_minus_x1_on_off_days": 29360.999999999996,
+       "x2_minus_x1_on_on_days": 66984.04999999999
+      }
+     }
+    }
+   },
+   "verdict": {
+    "arm": "conf@50",
+    "checks": {
+     "kept_at_least_half": false,
+     "vs_x1_above_zero": true,
+     "drawdown_taken_at_most_half": false,
+     "worst_day_taken_at_most_half": false,
+     "test_half_same_signs": true
+    },
+    "result": "kill"
+   }
+  },
+  "net_slip": {
+   "windows": {
+    "all": {
+     "from": "2025-01-10",
+     "to": "2026-11-04",
+     "days": 220,
+     "arms": {
+      "x1": {
+       "days": 220,
+       "per_day": 384.4911363636364,
+       "total": 84588.05,
+       "max_drawdown": -55126.49,
+       "worst_day": -13743.569999999998,
+       "worst_week": -24891.6,
+       "loss_day_share": 0.41818181818181815,
+       "book_stop_days": 7
+      },
+      "x2": {
+       "days": 220,
+       "per_day": 651.3969090909092,
+       "total": 143307.32,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.42272727272727273,
+       "book_stop_days": 4,
+       "vs_x1": {
+        "mean": 266.9057727272727,
+        "ci90": [
+         -38.373722727272856,
+         557.0575818181816
+        ],
+        "reading": "includes zero"
+       }
+      },
+      "conf@50": {
+       "days": 220,
+       "per_day": 480.5549090909092,
+       "total": 105722.08000000002,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.41818181818181815,
+       "book_stop_days": 5,
+       "days_on": 144,
+       "share_on": 0.6545454545454545,
+       "vs_x1": {
+        "mean": 96.06377272727272,
+        "ci90": [
+         -154.2811590909092,
+         330.4461681818182
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -170.84199999999996,
+        "ci90": [
+         -296.99363863636364,
+         -42.38075227272733
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.3599164294787725,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 37585.23999999999,
+       "x2_minus_x1_on_on_days": 21134.03
+      },
+      "conf@67": {
+       "days": 220,
+       "per_day": 367.5843636363636,
+       "total": 80868.56,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.41818181818181815,
+       "book_stop_days": 5,
+       "days_on": 112,
+       "share_on": 0.509090909090909,
+       "vs_x1": {
+        "mean": -16.906772727272738,
+        "ci90": [
+         -222.24328181818188,
+         180.31486818181807
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -283.81254545454544,
+        "ci90": [
+         -464.04946136363634,
+         -105.29482727272728
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": -0.0633436008315499,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 62438.75999999999,
+       "x2_minus_x1_on_on_days": -3719.4900000000016
+      },
+      "conf@75": {
+       "days": 220,
+       "per_day": 349.69645454545457,
+       "total": 76933.22,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.41818181818181815,
+       "book_stop_days": 5,
+       "days_on": 101,
+       "share_on": 0.4590909090909091,
+       "vs_x1": {
+        "mean": -34.79468181818183,
+        "ci90": [
+         -224.6572613636364,
+         147.80517045454542
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -301.7004545454546,
+        "ci90": [
+         -506.73703409090905,
+         -90.62231818181819
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": -0.13036316698078848,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 66374.09999999998,
+       "x2_minus_x1_on_on_days": -7654.829999999998
+      },
+      "rank@50": {
+       "days": 220,
+       "per_day": 568.3046818181818,
+       "total": 125027.03,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.42272727272727273,
+       "book_stop_days": 4,
+       "days_on": 205,
+       "share_on": 0.9318181818181818,
+       "vs_x1": {
+        "mean": 183.8135454545454,
+        "ci90": [
+         -108.32366136363643,
+         467.9768999999999
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -83.09222727272726,
+        "ci90": [
+         -139.95347954545454,
+         -28.37712272727273
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.6886832891485196,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 18280.290000000005,
+       "x2_minus_x1_on_on_days": 40438.97999999999
+      },
+      "rank@67": {
+       "days": 220,
+       "per_day": 568.3046818181818,
+       "total": 125027.03,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.42272727272727273,
+       "book_stop_days": 4,
+       "days_on": 205,
+       "share_on": 0.9318181818181818,
+       "vs_x1": {
+        "mean": 183.8135454545454,
+        "ci90": [
+         -108.32366136363643,
+         467.9768999999999
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -83.09222727272726,
+        "ci90": [
+         -139.95347954545454,
+         -28.37712272727273
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.6886832891485196,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 18280.290000000005,
+       "x2_minus_x1_on_on_days": 40438.97999999999
+      },
+      "rank@75": {
+       "days": 220,
+       "per_day": 568.3046818181818,
+       "total": 125027.03,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.42272727272727273,
+       "book_stop_days": 4,
+       "days_on": 205,
+       "share_on": 0.9318181818181818,
+       "vs_x1": {
+        "mean": 183.8135454545454,
+        "ci90": [
+         -108.32366136363643,
+         467.9768999999999
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -83.09222727272726,
+        "ci90": [
+         -139.95347954545454,
+         -28.37712272727273
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.6886832891485196,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 18280.290000000005,
+       "x2_minus_x1_on_on_days": 40438.97999999999
+      },
+      "dirwin@50": {
+       "days": 220,
+       "per_day": 501.2583181818182,
+       "total": 110276.83,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.42272727272727273,
+       "book_stop_days": 5,
+       "days_on": 169,
+       "share_on": 0.7681818181818182,
+       "vs_x1": {
+        "mean": 116.76718181818178,
+        "ci90": [
+         -148.59322500000002,
+         379.19022727272727
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -150.1385909090909,
+        "ci90": [
+         -266.53549772727274,
+         -36.9649681818182
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.43748466219011234,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 33030.49,
+       "x2_minus_x1_on_on_days": 25688.77999999999
+      },
+      "dirwin@67": {
+       "days": 220,
+       "per_day": 469.6521818181819,
+       "total": 103323.48000000001,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.41818181818181815,
+       "book_stop_days": 5,
+       "days_on": 145,
+       "share_on": 0.6590909090909091,
+       "vs_x1": {
+        "mean": 85.16104545454542,
+        "ci90": [
+         -153.9297295454546,
+         314.6622499999999
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -181.74472727272726,
+        "ci90": [
+         -346.359184090909,
+         -21.244261363636376
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.319067829010817,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 39983.83999999999,
+       "x2_minus_x1_on_on_days": 18735.430000000004
+      },
+      "dirwin@75": {
+       "days": 220,
+       "per_day": 484.23263636363646,
+       "total": 106531.18000000002,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.41818181818181815,
+       "book_stop_days": 5,
+       "days_on": 140,
+       "share_on": 0.6363636363636364,
+       "vs_x1": {
+        "mean": 99.7415,
+        "ci90": [
+         -124.59096363636375,
+         311.34971590909083
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -167.16427272727273,
+        "ci90": [
+         -346.1781704545454,
+         14.22564999999998
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.3736955517328469,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 36776.13999999999,
+       "x2_minus_x1_on_on_days": 21943.129999999997
+      },
+      "vix": {
+       "days": 220,
+       "per_day": 610.3961818181818,
+       "total": 134287.16,
+       "max_drawdown": -56718.34000000001,
+       "worst_day": -18852.59,
+       "worst_week": -30924.260000000002,
+       "loss_day_share": 0.4409090909090909,
+       "book_stop_days": 5,
+       "days_on": 152,
+       "share_on": 0.6909090909090909,
+       "vs_x1": {
+        "mean": 225.90504545454542,
+        "ci90": [
+         -14.960577272727406,
+         447.6075454545454
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -41.000727272727254,
+        "ci90": [
+         -214.7012363636363,
+         138.37114772727276
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.8463850112578034,
+       "extra_drawdown_taken": 0.10017097373221837,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.44526372272670595,
+       "x2_minus_x1_on_off_days": 9020.159999999996,
+       "x2_minus_x1_on_on_days": 49699.10999999999
+      }
+     }
+    },
+    "last_year": {
+     "from": "2025-11-07",
+     "to": "2026-11-04",
+     "days": 121,
+     "arms": {
+      "x1": {
+       "days": 121,
+       "per_day": 814.076694214876,
+       "total": 98503.28,
+       "max_drawdown": -22197.38,
+       "worst_day": -10573.38,
+       "worst_week": -19540.829999999998,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 2
+      },
+      "x2": {
+       "days": 121,
+       "per_day": 1241.9004958677685,
+       "total": 150269.96,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 1,
+       "vs_x1": {
+        "mean": 427.8238016528925,
+        "ci90": [
+         22.909946280991655,
+         834.7685578512395
+        ],
+        "reading": "above zero"
+       }
+      },
+      "conf@50": {
+       "days": 121,
+       "per_day": 1036.825867768595,
+       "total": 125455.93,
+       "max_drawdown": -29296.42,
+       "worst_day": -15133.53,
+       "worst_week": -26639.87,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 2,
+       "days_on": 67,
+       "share_on": 0.5537190082644629,
+       "vs_x1": {
+        "mean": 222.749173553719,
+        "ci90": [
+         -93.7558512396695,
+         540.5822355371901
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -205.07462809917354,
+        "ci90": [
+         -382.03804132231414,
+         -15.551966942148754
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5206563372424116,
+       "extra_drawdown_taken": 0.4259006617351498,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.4605301483691462,
+       "x2_minus_x1_on_off_days": 24814.029999999995,
+       "x2_minus_x1_on_on_days": 26952.64999999999
+      },
+      "conf@67": {
+       "days": 121,
+       "per_day": 862.1229752066116,
+       "total": 104316.88,
+       "max_drawdown": -29296.419999999995,
+       "worst_day": -10573.38,
+       "worst_week": -26639.87,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 2,
+       "days_on": 45,
+       "share_on": 0.371900826446281,
+       "vs_x1": {
+        "mean": 48.04628099173549,
+        "ci90": [
+         -165.04476859504135,
+         257.794061983471
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -379.777520661157,
+        "ci90": [
+         -641.7144710743802,
+         -115.33709917355365
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.11230389895585337,
+       "extra_drawdown_taken": 0.42590066173514957,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.4605301483691462,
+       "x2_minus_x1_on_off_days": 45953.07999999998,
+       "x2_minus_x1_on_on_days": 5813.599999999999
+      },
+      "conf@75": {
+       "days": 121,
+       "per_day": 829.5995041322315,
+       "total": 100381.54000000001,
+       "max_drawdown": -25542.57999999999,
+       "worst_day": -10573.38,
+       "worst_week": -22886.030000000002,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 2,
+       "days_on": 34,
+       "share_on": 0.2809917355371901,
+       "vs_x1": {
+        "mean": 15.522809917355344,
+        "ci90": [
+         -151.61897107438017,
+         188.83141735537185
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -412.30099173553714,
+        "ci90": [
+         -742.2077438016528,
+         -81.21048347107444
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.03628318447310117,
+       "extra_drawdown_taken": 0.20069233215144855,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.2170103918733335,
+       "x2_minus_x1_on_off_days": 49888.41999999999,
+       "x2_minus_x1_on_on_days": 1878.2599999999993
+      },
+      "rank@50": {
+       "days": 121,
+       "per_day": 1106.5985123966943,
+       "total": 133898.42,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 1,
+       "days_on": 107,
+       "share_on": 0.8842975206611571,
+       "vs_x1": {
+        "mean": 292.5218181818181,
+        "ci90": [
+         -92.7300909090909,
+         683.2339256198345
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -135.30198347107438,
+        "ci90": [
+         -240.68540082644628,
+         -44.445293388429754
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.6837436745025951,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16371.540000000005,
+       "x2_minus_x1_on_on_days": 35395.13999999999
+      },
+      "rank@67": {
+       "days": 121,
+       "per_day": 1106.5985123966943,
+       "total": 133898.42,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 1,
+       "days_on": 107,
+       "share_on": 0.8842975206611571,
+       "vs_x1": {
+        "mean": 292.5218181818181,
+        "ci90": [
+         -92.7300909090909,
+         683.2339256198345
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -135.30198347107438,
+        "ci90": [
+         -240.68540082644628,
+         -44.445293388429754
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.6837436745025951,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16371.540000000005,
+       "x2_minus_x1_on_on_days": 35395.13999999999
+      },
+      "rank@75": {
+       "days": 121,
+       "per_day": 1106.5985123966943,
+       "total": 133898.42,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 1,
+       "days_on": 107,
+       "share_on": 0.8842975206611571,
+       "vs_x1": {
+        "mean": 292.5218181818181,
+        "ci90": [
+         -92.7300909090909,
+         683.2339256198345
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -135.30198347107438,
+        "ci90": [
+         -240.68540082644628,
+         -44.445293388429754
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.6837436745025951,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16371.540000000005,
+       "x2_minus_x1_on_on_days": 35395.13999999999
+      },
+      "dirwin@50": {
+       "days": 121,
+       "per_day": 1052.4571900826445,
+       "total": 127347.31999999998,
+       "max_drawdown": -31224.609999999993,
+       "worst_day": -15133.53,
+       "worst_week": -26639.87,
+       "loss_day_share": 0.371900826446281,
+       "book_stop_days": 2,
+       "days_on": 84,
+       "share_on": 0.6942148760330579,
+       "vs_x1": {
+        "mean": 238.38049586776862,
+        "ci90": [
+         -114.11275619834728,
+         570.6309504132231
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -189.44330578512395,
+        "ci90": [
+         -363.0940082644628,
+         -11.725152892562095
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5571931597699525,
+       "extra_drawdown_taken": 0.5415807250889408,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.4605301483691462,
+       "x2_minus_x1_on_off_days": 22922.64,
+       "x2_minus_x1_on_on_days": 28844.039999999994
+      },
+      "dirwin@67": {
+       "days": 121,
+       "per_day": 1029.0760330578512,
+       "total": 124518.19999999998,
+       "max_drawdown": -27879.409999999996,
+       "worst_day": -15133.53,
+       "worst_week": -23294.670000000002,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 2,
+       "days_on": 68,
+       "share_on": 0.5619834710743802,
+       "vs_x1": {
+        "mean": 214.9993388429752,
+        "ci90": [
+         -59.99259090909101,
+         487.29086363636355
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -212.82446280991732,
+        "ci90": [
+         -449.4843925619835,
+         39.961950413223036
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.5025417894290305,
+       "extra_drawdown_taken": 0.34088839293749185,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.24351975649581312,
+       "x2_minus_x1_on_off_days": 25751.76,
+       "x2_minus_x1_on_on_days": 26014.919999999995
+      },
+      "dirwin@75": {
+       "days": 121,
+       "per_day": 1055.5859504132231,
+       "total": 127725.9,
+       "max_drawdown": -27879.410000000003,
+       "worst_day": -10573.38,
+       "worst_week": -23294.670000000002,
+       "loss_day_share": 0.36363636363636365,
+       "book_stop_days": 2,
+       "days_on": 63,
+       "share_on": 0.5206611570247934,
+       "vs_x1": {
+        "mean": 241.5092561983471,
+        "ci90": [
+         17.742793388429725,
+         468.0776280991735
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -186.31454545454542,
+        "ci90": [
+         -466.7703057851239,
+         107.46188842975207
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.5645063581438872,
+       "extra_drawdown_taken": 0.3408883929374923,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.24351975649581312,
+       "x2_minus_x1_on_off_days": 22544.059999999998,
+       "x2_minus_x1_on_on_days": 29222.619999999995
+      },
+      "vix": {
+       "days": 121,
+       "per_day": 1114.6740495867768,
+       "total": 134875.56,
+       "max_drawdown": -33220.59,
+       "worst_day": -12206.259999999998,
+       "worst_week": -20974.170000000002,
+       "loss_day_share": 0.3884297520661157,
+       "book_stop_days": 1,
+       "days_on": 78,
+       "share_on": 0.6446280991735537,
+       "vs_x1": {
+        "mean": 300.5973553719008,
+        "ci90": [
+         22.280177685950427,
+         588.5698801652892
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -127.22644628099168,
+        "ci90": [
+         -391.7072520661157,
+         154.05986776859498
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.7026195228281976,
+       "extra_drawdown_taken": 0.6613277898765918,
+       "extra_worst_day_taken": 0.3580759404844136,
+       "extra_worst_week_taken": 0.09298387991382408,
+       "x2_minus_x1_on_off_days": 15394.399999999994,
+       "x2_minus_x1_on_on_days": 36372.279999999984
+      }
+     }
+    },
+    "fit_half": {
+     "from": "2025-01-10",
+     "to": "2025-10-08",
+     "days": 91,
+     "arms": {
+      "x1": {
+       "days": 91,
+       "per_day": -181.06285714285715,
+       "total": -16476.72,
+       "max_drawdown": -55126.49,
+       "worst_day": -13743.569999999998,
+       "worst_week": -24891.6,
+       "loss_day_share": 0.5054945054945055,
+       "book_stop_days": 5
+      },
+      "x2": {
+       "days": 91,
+       "per_day": -161.4750549450548,
+       "total": -14694.229999999989,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4945054945054945,
+       "book_stop_days": 3,
+       "vs_x1": {
+        "mean": 19.587802197802144,
+        "ci90": [
+         -453.81684065934076,
+         499.89474725274704
+        ],
+        "reading": "includes zero"
+       }
+      },
+      "conf@50": {
+       "days": 91,
+       "per_day": -241.36648351648347,
+       "total": -21964.349999999995,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4835164835164835,
+       "book_stop_days": 3,
+       "days_on": 71,
+       "share_on": 0.7802197802197802,
+       "vs_x1": {
+        "mean": -60.30362637362641,
+        "ci90": [
+         -465.6839340659342,
+         354.84083516483497
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -79.89142857142853,
+        "ci90": [
+         -258.25423626373623,
+         88.06154395604389
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -3.078631577175759,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 7270.119999999998,
+       "x2_minus_x1_on_on_days": -5487.630000000003
+      },
+      "conf@67": {
+       "days": 91,
+       "per_day": -270.7875824175825,
+       "total": -24641.670000000006,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4835164835164835,
+       "book_stop_days": 3,
+       "days_on": 66,
+       "share_on": 0.7252747252747253,
+       "vs_x1": {
+        "mean": -89.72472527472529,
+        "ci90": [
+         -481.8846758241758,
+         312.6284230769229
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -109.31252747252746,
+        "ci90": [
+         -371.3560879120879,
+         133.94195054945055
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -4.5806428086553215,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 9947.439999999999,
+       "x2_minus_x1_on_on_days": -8164.950000000002
+      },
+      "conf@75": {
+       "days": 91,
+       "per_day": -270.7875824175825,
+       "total": -24641.670000000006,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4835164835164835,
+       "book_stop_days": 3,
+       "days_on": 66,
+       "share_on": 0.7252747252747253,
+       "vs_x1": {
+        "mean": -89.72472527472529,
+        "ci90": [
+         -481.8846758241758,
+         312.6284230769229
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -109.31252747252746,
+        "ci90": [
+         -371.3560879120879,
+         133.94195054945055
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -4.5806428086553215,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 9947.439999999999,
+       "x2_minus_x1_on_on_days": -8164.950000000002
+      },
+      "rank@50": {
+       "days": 91,
+       "per_day": -182.45032967032955,
+       "total": -16602.97999999999,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4945054945054945,
+       "book_stop_days": 3,
+       "days_on": 90,
+       "share_on": 0.989010989010989,
+       "vs_x1": {
+        "mean": -1.3874725274725799,
+        "ci90": [
+         -477.11626373626376,
+         474.9684065934064
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -20.975274725274726,
+        "ci90": [
+         -62.92582417582418,
+         0.0
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -0.07083349696211766,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 1908.7500000000002,
+       "x2_minus_x1_on_on_days": -126.25999999999931
+      },
+      "rank@67": {
+       "days": 91,
+       "per_day": -182.45032967032955,
+       "total": -16602.97999999999,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4945054945054945,
+       "book_stop_days": 3,
+       "days_on": 90,
+       "share_on": 0.989010989010989,
+       "vs_x1": {
+        "mean": -1.3874725274725799,
+        "ci90": [
+         -477.11626373626376,
+         474.9684065934064
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -20.975274725274726,
+        "ci90": [
+         -62.92582417582418,
+         0.0
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -0.07083349696211766,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 1908.7500000000002,
+       "x2_minus_x1_on_on_days": -126.25999999999931
+      },
+      "rank@75": {
+       "days": 91,
+       "per_day": -182.45032967032955,
+       "total": -16602.97999999999,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4945054945054945,
+       "book_stop_days": 3,
+       "days_on": 90,
+       "share_on": 0.989010989010989,
+       "vs_x1": {
+        "mean": -1.3874725274725799,
+        "ci90": [
+         -477.11626373626376,
+         474.9684065934064
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -20.975274725274726,
+        "ci90": [
+         -62.92582417582418,
+         0.0
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -0.07083349696211766,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 1908.7500000000002,
+       "x2_minus_x1_on_on_days": -126.25999999999931
+      },
+      "dirwin@50": {
+       "days": 91,
+       "per_day": -242.40725274725276,
+       "total": -22059.06,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4945054945054945,
+       "book_stop_days": 3,
+       "days_on": 80,
+       "share_on": 0.8791208791208791,
+       "vs_x1": {
+        "mean": -61.344395604395636,
+        "ci90": [
+         -507.1995164835166,
+         385.71145054945043
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -80.9321978021978,
+        "ci90": [
+         -252.78458241758244,
+         57.10714835164834
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -3.1317651150918198,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 7364.83,
+       "x2_minus_x1_on_on_days": -5582.339999999998
+      },
+      "dirwin@67": {
+       "days": 91,
+       "per_day": -286.8526373626373,
+       "total": -26103.589999999997,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4945054945054945,
+       "book_stop_days": 3,
+       "days_on": 73,
+       "share_on": 0.8021978021978022,
+       "vs_x1": {
+        "mean": -105.78978021978018,
+        "ci90": [
+         -505.5236098901101,
+         314.1056373626373
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -125.37758241758239,
+        "ci90": [
+         -356.92983516483514,
+         82.62141758241758
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -5.400798882462187,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 11409.359999999997,
+       "x2_minus_x1_on_on_days": -9626.869999999997
+      },
+      "dirwin@75": {
+       "days": 91,
+       "per_day": -286.8526373626373,
+       "total": -26103.589999999997,
+       "max_drawdown": -71017.81999999999,
+       "worst_day": -18852.59,
+       "worst_week": -38440.11,
+       "loss_day_share": 0.4945054945054945,
+       "book_stop_days": 3,
+       "days_on": 73,
+       "share_on": 0.8021978021978022,
+       "vs_x1": {
+        "mean": -105.78978021978018,
+        "ci90": [
+         -505.5236098901101,
+         314.1056373626373
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -125.37758241758239,
+        "ci90": [
+         -356.92983516483514,
+         82.62141758241758
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": -5.400798882462187,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 11409.359999999997,
+       "x2_minus_x1_on_on_days": -9626.869999999997
+      },
+      "vix": {
+       "days": 91,
+       "per_day": -91.42846153846152,
+       "total": -8319.989999999998,
+       "max_drawdown": -56718.34000000001,
+       "worst_day": -18852.59,
+       "worst_week": -30924.260000000002,
+       "loss_day_share": 0.5164835164835165,
+       "book_stop_days": 4,
+       "days_on": 66,
+       "share_on": 0.7252747252747253,
+       "vs_x1": {
+        "mean": 89.63439560439556,
+        "ci90": [
+         -296.368510989011,
+         484.1965659340658
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": 70.04659340659343,
+        "ci90": [
+         -140.91954945054945,
+         303.70263186813185
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 4.57603128208294,
+       "extra_drawdown_taken": 0.10017097373221837,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.44526372272670595,
+       "x2_minus_x1_on_off_days": -6374.240000000001,
+       "x2_minus_x1_on_on_days": 8156.729999999999
+      }
+     }
+    },
+    "test_half": {
+     "from": "2025-10-10",
+     "to": "2026-11-04",
+     "days": 129,
+     "arms": {
+      "x1": {
+       "days": 129,
+       "per_day": 783.4478294573644,
+       "total": 101064.77,
+       "max_drawdown": -22197.38,
+       "worst_day": -10573.38,
+       "worst_week": -19540.829999999998,
+       "loss_day_share": 0.35658914728682173,
+       "book_stop_days": 2
+      },
+      "x2": {
+       "days": 129,
+       "per_day": 1224.8182170542634,
+       "total": 158001.55,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 1,
+       "vs_x1": {
+        "mean": 441.37038759689915,
+        "ci90": [
+         30.920686046511634,
+         827.3064844961239
+        ],
+        "reading": "above zero"
+       }
+      },
+      "conf@50": {
+       "days": 129,
+       "per_day": 989.8172868217054,
+       "total": 127686.43,
+       "max_drawdown": -29296.420000000006,
+       "worst_day": -15133.53,
+       "worst_week": -26639.87,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 2,
+       "days_on": 73,
+       "share_on": 0.5658914728682171,
+       "vs_x1": {
+        "mean": 206.3694573643411,
+        "ci90": [
+         -103.19279844961244,
+         497.3077209302325
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -235.0009302325581,
+        "ci90": [
+         -411.0548023255813,
+         -43.52294186046514
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.46756525395359566,
+       "extra_drawdown_taken": 0.42590066173515023,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.4605301483691462,
+       "x2_minus_x1_on_off_days": 30315.119999999995,
+       "x2_minus_x1_on_on_days": 26621.659999999996
+      },
+      "conf@67": {
+       "days": 129,
+       "per_day": 817.9087596899226,
+       "total": 105510.23000000001,
+       "max_drawdown": -29296.420000000002,
+       "worst_day": -10573.38,
+       "worst_week": -26639.87,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 2,
+       "days_on": 46,
+       "share_on": 0.35658914728682173,
+       "vs_x1": {
+        "mean": 34.460930232558134,
+        "ci90": [
+         -171.1750620155039,
+         225.6433527131784
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -406.90945736434105,
+        "ci90": [
+         -663.127949612403,
+         -136.9316434108528
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.07807712343409655,
+       "extra_drawdown_taken": 0.42590066173515,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.4605301483691462,
+       "x2_minus_x1_on_off_days": 52491.31999999999,
+       "x2_minus_x1_on_on_days": 4445.46
+      },
+      "conf@75": {
+       "days": 129,
+       "per_day": 787.4022480620155,
+       "total": 101574.89,
+       "max_drawdown": -25542.579999999998,
+       "worst_day": -10573.38,
+       "worst_week": -22886.030000000002,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 2,
+       "days_on": 35,
+       "share_on": 0.2713178294573643,
+       "vs_x1": {
+        "mean": 3.954418604651155,
+        "ci90": [
+         -156.75311240310077,
+         168.9654418604651
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -437.4159689922481,
+        "ci90": [
+         -746.7251589147288,
+         -113.08113953488376
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.008959410771034102,
+       "extra_drawdown_taken": 0.200692332151449,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.2170103918733335,
+       "x2_minus_x1_on_off_days": 56426.65999999998,
+       "x2_minus_x1_on_on_days": 510.1199999999999
+      },
+      "rank@50": {
+       "days": 129,
+       "per_day": 1097.907054263566,
+       "total": 141630.01,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 1,
+       "days_on": 115,
+       "share_on": 0.8914728682170543,
+       "vs_x1": {
+        "mean": 314.45922480620146,
+        "ci90": [
+         -88.70339922480628,
+         696.146445736434
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -126.91116279069769,
+        "ci90": [
+         -226.88007364341087,
+         -42.27532170542636
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7124610840303929,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16371.540000000005,
+       "x2_minus_x1_on_on_days": 40565.23999999999
+      },
+      "rank@67": {
+       "days": 129,
+       "per_day": 1097.907054263566,
+       "total": 141630.01,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 1,
+       "days_on": 115,
+       "share_on": 0.8914728682170543,
+       "vs_x1": {
+        "mean": 314.45922480620146,
+        "ci90": [
+         -88.70339922480628,
+         696.146445736434
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -126.91116279069769,
+        "ci90": [
+         -226.88007364341087,
+         -42.27532170542636
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7124610840303929,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16371.540000000005,
+       "x2_minus_x1_on_on_days": 40565.23999999999
+      },
+      "rank@75": {
+       "days": 129,
+       "per_day": 1097.907054263566,
+       "total": 141630.01,
+       "max_drawdown": -38865.68,
+       "worst_day": -15133.53,
+       "worst_week": -34955.759999999995,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 1,
+       "days_on": 115,
+       "share_on": 0.8914728682170543,
+       "vs_x1": {
+        "mean": 314.45922480620146,
+        "ci90": [
+         -88.70339922480628,
+         696.146445736434
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -126.91116279069769,
+        "ci90": [
+         -226.88007364341087,
+         -42.27532170542636
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.7124610840303929,
+       "extra_drawdown_taken": 1.0,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 1.0,
+       "x2_minus_x1_on_off_days": 16371.540000000005,
+       "x2_minus_x1_on_on_days": 40565.23999999999
+      },
+      "dirwin@50": {
+       "days": 129,
+       "per_day": 1025.8596124031008,
+       "total": 132335.88999999998,
+       "max_drawdown": -31224.610000000008,
+       "worst_day": -15133.53,
+       "worst_week": -26639.87,
+       "loss_day_share": 0.37209302325581395,
+       "book_stop_days": 2,
+       "days_on": 89,
+       "share_on": 0.689922480620155,
+       "vs_x1": {
+        "mean": 242.41178294573638,
+        "ci90": [
+         -90.01185658914738,
+         563.422906976744
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -198.9586046511628,
+        "ci90": [
+         -362.75934108527133,
+         -27.95468604651166
+        ],
+        "reading": "below zero"
+       },
+       "extra_net_kept": 0.5492252986558074,
+       "extra_drawdown_taken": 0.5415807250889417,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.4605301483691462,
+       "x2_minus_x1_on_off_days": 25665.66,
+       "x2_minus_x1_on_on_days": 31271.119999999988
+      },
+      "dirwin@67": {
+       "days": 129,
+       "per_day": 1003.3106201550387,
+       "total": 129427.06999999999,
+       "max_drawdown": -27879.410000000003,
+       "worst_day": -15133.53,
+       "worst_week": -23294.670000000002,
+       "loss_day_share": 0.3643410852713178,
+       "book_stop_days": 2,
+       "days_on": 72,
+       "share_on": 0.5581395348837209,
+       "vs_x1": {
+        "mean": 219.8627906976744,
+        "ci90": [
+         -46.80163178294584,
+         491.4235542635658
+        ],
+        "reading": "includes zero"
+       },
+       "vs_x2": {
+        "mean": -221.50759689922478,
+        "ci90": [
+         -445.0306860465116,
+         24.957945736434098
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.4981367053071846,
+       "extra_drawdown_taken": 0.3408883929374923,
+       "extra_worst_day_taken": 1.0,
+       "extra_worst_week_taken": 0.24351975649581312,
+       "x2_minus_x1_on_off_days": 28574.479999999992,
+       "x2_minus_x1_on_on_days": 28362.300000000003
+      },
+      "dirwin@75": {
+       "days": 129,
+       "per_day": 1028.1765116279068,
+       "total": 132634.77,
+       "max_drawdown": -27879.410000000003,
+       "worst_day": -10573.38,
+       "worst_week": -23294.670000000002,
+       "loss_day_share": 0.3643410852713178,
+       "book_stop_days": 2,
+       "days_on": 67,
+       "share_on": 0.5193798449612403,
+       "vs_x1": {
+        "mean": 244.7286821705426,
+        "ci90": [
+         21.806674418604565,
+         467.12826744186043
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -196.64170542635657,
+        "ci90": [
+         -471.1128875968992,
+         100.79088759689911
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.5544746295803873,
+       "extra_drawdown_taken": 0.3408883929374923,
+       "extra_worst_day_taken": -0.0,
+       "extra_worst_week_taken": 0.24351975649581312,
+       "x2_minus_x1_on_off_days": 25366.779999999988,
+       "x2_minus_x1_on_on_days": 31569.999999999996
+      },
+      "vix": {
+       "days": 129,
+       "per_day": 1105.4817829457363,
+       "total": 142607.15,
+       "max_drawdown": -33220.59,
+       "worst_day": -12206.259999999998,
+       "worst_week": -20974.170000000002,
+       "loss_day_share": 0.3875968992248062,
+       "book_stop_days": 1,
+       "days_on": 86,
+       "share_on": 0.6666666666666666,
+       "vs_x1": {
+        "mean": 322.03395348837205,
+        "ci90": [
+         42.24000775193796,
+         588.5413217054262
+        ],
+        "reading": "above zero"
+       },
+       "vs_x2": {
+        "mean": -119.33643410852711,
+        "ci90": [
+         -369.249546511628,
+         142.78709689922482
+        ],
+        "reading": "includes zero"
+       },
+       "extra_net_kept": 0.7296229256378741,
+       "extra_drawdown_taken": 0.6613277898765918,
+       "extra_worst_day_taken": 0.3580759404844136,
+       "extra_worst_week_taken": 0.09298387991382408,
+       "x2_minus_x1_on_off_days": 15394.399999999994,
+       "x2_minus_x1_on_on_days": 41542.37999999999
+      }
+     }
+    }
+   },
+   "verdict": {
+    "arm": "conf@50",
+    "checks": {
+     "kept_at_least_half": false,
+     "vs_x1_above_zero": false,
+     "drawdown_taken_at_most_half": false,
+     "worst_day_taken_at_most_half": false,
+     "test_half_same_signs": true
+    },
+    "result": "kill"
+   }
+  }
+ },
+ "counts": {
+  "expiry": 187,
+  "other": 1,
+  "three_widesl": 33,
+  "normal_with_dir": 220,
+  "gate_warmup": 63
+ },
+ "skipped": [],
+ "lookahead_checks": 10,
+ "primary": "conf@50",
+ "note": "T1 list C, expiry rule + SL150 cap as live; normal days with a Dir pick only; x1 = 3 lots stop 9k, x2 = Dir doubled, stop 9k + the Dir's MTM SL; gate = x2 when the predictor is at or above its trailing 250-day quantile (on while under 63 values); net = gross under the stop at 0% slippage - brokerage; net_slip = 0.5%-slippage stored nets x lots - brokerage, no stop. extra_*_taken: (arm - x1) / (x2 - x1) of that figure; drawdowns negative."
+}
