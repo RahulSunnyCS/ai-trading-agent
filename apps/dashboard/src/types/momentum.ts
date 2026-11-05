@@ -978,6 +978,16 @@ export interface MomentumOrderPreviewJob {
   error: string | null;
 }
 
+/** Friday's orders planned early (owner, 2026-11-05): the plan the 14:15 run would make, lots
+ * included, kept in the state dir only. Nothing in the catalog changed; the Friday run replaces it. */
+export type MomentumTentativeOrders = Omit<
+  MomentumOrders,
+  'created_at' | 'trigger' | 'favourite_id' | 'holdings_source'
+> & {
+  tentative: true;
+  made_at: string;
+};
+
 /** `GET /api/momentum/orders`. */
 export interface MomentumOrdersView {
   week: string;
@@ -988,6 +998,9 @@ export interface MomentumOrdersView {
   margin?: { symbols: string[]; prefixes: string[] };
   orders: MomentumOrders[];
   job: MomentumLiveRules['job'];
+  /** Friday's orders planned early, when they are for this week; null otherwise. */
+  tentative?: MomentumTentativeOrders | null;
+  tentative_job?: MomentumLiveRules['job'];
 }
 
 export type MomentumAlertKind = 'split' | 'data' | 'journal' | 'change' | 'rules';

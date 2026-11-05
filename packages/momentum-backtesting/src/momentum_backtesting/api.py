@@ -3377,6 +3377,33 @@ def _run_live_rules_check() -> dict:
 # --- Your orders (BL-051 Phase 3) ---------------------------------------------------------------
 
 
+def _fresh_sleeve_target(req: BacktestRequest) -> dict[str, float]:
+    """A sleeve's target for a lot that holds nothing yet (owner, 2026-11-05): what the model
+    buys when it starts from cash this week, its current picks split equally, exactly as the
+    Rebalance preview's first allocation does, never the weights a model running since `start`
+    has drifted to (a name held for a year and down to 0.4 % is no buy for a fresh lot). Decided
+    on the newest stored week; with a signal delay of 1 that is the week whose ranks fix the
+    coming Friday's trades."""
+    ranking = _broad_ranking(req)
+    week = ranking.prices.index[-1]
+    settlement = week + pd.Timedelta(days=7)
+    fresh = req.model_copy(
+        update={
+            "start": week.strftime("%Y-%m-%d"),
+            "end": settlement.strftime("%Y-%m-%d"),
+            "rebalance": "weekly",
+            "rebalance_every": 1,
+            "rebalance_offset": 0,
+        }
+    )
+    outcome = _run_broad(
+        _decision_request(fresh),
+        rebalance.persisted_broad_ranking(ranking),
+        _outer_with_sentinel(week, settlement),
+    ).result
+    return rebalance.model_holdings(outcome, week)
+
+
 def _orders_signal(
     headline: dict, members: list[dict], target_week: pd.Timestamp
 ) -> tuple[dict | None, str, str | None, broad.UniverseRanking | None]:
@@ -3386,11 +3413,12 @@ def _orders_signal(
     already fixed (`_broad_sentinel_run(ahead=True)`); otherwise none yet."""
     sleeves = members or [headline]
     signals, kinds, rankings = [], set(), []
+    reqs: dict[str, BacktestRequest] = {}
     for sleeve in sleeves:
         config = sleeve["config"]
         if config.get("dataset") != "broad":
             return None, "unavailable", "Your orders cover Broad strategies for now.", None
-        req = BacktestRequest.model_validate(config)
+        req = reqs[sleeve["id"]] = BacktestRequest.model_validate(config)
         if split_every(req) > 1:  # All Fridays: no one portfolio for the engine to decide
             return None, "unavailable", analysis.SPLIT_SIGNAL_NOTE, None
         ranking = _broad_ranking(req)
@@ -3419,6 +3447,8 @@ def _orders_signal(
         combined = groups_mod.combine(headline, signals, week)
         # Each sleeve's own signal, for the per-lot orders (BL-142 Phase 3); never saved.
         combined["_sleeves"] = signals
+        # Each sleeve's request, for a new lot's fresh target (`_fresh_sleeve_target`); never saved.
+        combined["_sleeve_reqs"] = reqs
     else:
         only = signals[0]["signal"]
         combined = {
@@ -3490,6 +3520,7 @@ def _compute_orders(
     start_fresh: bool = False,
     favourite: str | None = None,
     preview: bool = False,
+    dry_run: bool = False,
 ) -> dict:
     """The headline's orders for this Friday against the owner's holdings (the paper portfolio
     until money goes in), saved to `momentum_orders`. The body of the 14:15 job and of the page's
@@ -3500,7 +3531,12 @@ def _compute_orders(
     `preview` (Your orders' "Preview for…", never the 14:15 job) writes nothing: no orders row, no
     lot ledger event, no pending lot. It reads the catalog read-only only, and it plans the
     favourite as ONE portfolio against the whole holdings snapshot, never lot by lot (the lots
-    belong to the followed strategy; booking Kite's changes to them is the job's to do)."""
+    belong to the followed strategy; booking Kite's changes to them is the job's to do).
+
+    `dry_run` (Friday's orders planned early, owner 2026-11-05) plans the headline exactly as the
+    real run would, lot by lot included, and writes nothing to the catalog: no orders row, no lot
+    event, no pending lot. The payload says `tentative` and `made_at`; `tentative_orders` keeps
+    it in the state dir for This week."""
     from . import holdings_store, orders
     from .weekly import week_ending_on_or_before
 
@@ -3574,6 +3610,7 @@ def _compute_orders(
             who=who,
             target_week=target_week,
             today=today,
+            dry_run=dry_run,
         )
     if preview and settings["holdings_source"] == "paper":
         # The paper portfolio is the headline's model, which this favourite's own last-week
@@ -3643,6 +3680,8 @@ def _compute_orders(
     if preview:
         payload["preview"] = True
         return payload
+    if dry_run:
+        return _mark_tentative(payload)
     with open_catalog() as con:
         payload["created_at"] = holdings_store.save_orders(
             con,
@@ -3654,6 +3693,67 @@ def _compute_orders(
             payload=payload,
         )
     return payload
+
+
+def _mark_tentative(payload: dict) -> dict:
+    payload["tentative"] = True
+    payload["made_at"] = datetime.now(IST).isoformat(timespec="seconds")
+    return payload
+
+
+TENTATIVE_FILE = "tentative_orders.json"
+
+
+def tentative_path() -> Path:
+    return this_week.state_dir() / TENTATIVE_FILE
+
+
+def tentative_orders(save: bool = True) -> dict:
+    """Friday's orders planned early (owner, 2026-11-05): the headline's orders for this or the
+    coming Friday, planned exactly as the 14:15 run would (the lots included) but written nowhere
+    in the catalog. With `save`, kept in the state dir (`TENTATIVE_FILE`, one file, replaced) for
+    This week and the Thursday message. The real Friday run is the one to place."""
+    payload = _compute_orders("tentative", dry_run=True)
+    if "tentative" not in payload:  # no signal yet: still say when this was looked at
+        _mark_tentative(payload)
+    if save:
+        path = tentative_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, default=str))
+        os.replace(tmp, path)
+    return payload
+
+
+def read_tentative(week: str) -> dict | None:
+    """The saved tentative orders when they are for `week` (an ISO Friday), else None."""
+    path = tentative_path()
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) and payload.get("week") == week else None
+
+
+def _tentative_message(payload: dict) -> Notification:
+    """The Thursday 18:30 Telegram: the 14:15 message's body under a tentative heading; never
+    'action required', since nothing is to be placed yet."""
+    note = _orders_message(payload)
+    head = payload.get("headline", {}).get("name", "Momentum")
+    week = pd.Timestamp(payload["week"])
+    made = payload.get("made_at")
+    when = f"{pd.Timestamp(made):%a %H:%M}" if made else "now"
+    first = (
+        f"Tentative, planned {when}: the names are fixed by last Friday's ranks; share counts "
+        "follow Friday's prices and cash. The 14:15 run on Friday is the one to place."
+    )
+    return Notification(
+        "momentum-orders",
+        "warn" if note.severity in ("warn", "error") else "info",
+        f"Friday's orders (tentative) — {head} — {week:%d %b %Y}",
+        f"{first}\n{note.body}",
+        type=note.type,
+    )
 
 
 def _lot_label(name: str, week: str, start: str | None, rebalance: dict | None) -> str:
@@ -3683,6 +3783,7 @@ def _compute_lot_orders(
     who: str,
     target_week: pd.Timestamp,
     today: date,
+    dry_run: bool = False,
 ) -> dict:
     """BL-142 Phase 3: orders for a favourite group followed with one lot per sleeve, against the
     Kite holdings. First the ledger takes in what changed in Kite since the last run (booked to the
@@ -3759,9 +3860,25 @@ def _compute_lot_orders(
         )
         at = (synced or {}).get("synced_at") or datetime.now(IST).isoformat(timespec="seconds")
         if reconciled.events:
-            lots.append(con, who, group_id, reconciled.events, at)
+            if not dry_run:  # a tentative plan reads Kite's changes but books nothing
+                lots.append(con, who, group_id, reconciled.events, at)
             ledger = lots.apply(ledger, reconciled.events)
         has_history = lots.funded(con, who, group_id)
+
+    # A lot that holds nothing yet buys the sleeve's fresh picks, split equally (owner,
+    # 2026-11-05), not the running model's drifted weights; computed only for the due new lots.
+    reqs = signal.get("_sleeve_reqs") or {}
+    for sid, info in sleeves.items():
+        if info["due"] and sid not in has_history and sid in reqs:
+            try:
+                target = _fresh_sleeve_target(reqs[sid])
+            except (ValueError, KeyError) as error:
+                raise ValueError(
+                    f"{info['label']} ({info['name']}): the fresh target for a new lot could not "
+                    f"be decided: {error}"
+                ) from error
+            info["target"] = {k: float(v) for k, v in target.items() if k not in cash_names}
+            info["fresh"] = True
 
     lot_inputs = [
         lots.Lot(
@@ -3798,7 +3915,7 @@ def _compute_lot_orders(
     synced_at = (synced or {}).get("synced_at") or ""
     fresh = synced_at[:10] == today.isoformat()
     due_ids = [sid for sid, info in sleeves.items() if info["due"]]
-    if today == target_week.date() and due_ids and fresh:
+    if today == target_week.date() and due_ids and fresh and not dry_run:
         planned_now: dict[str, dict[str, float]] = {}
         for lot in planned["lots"]:
             for row in (lot["plan"] or {}).get("rows", []):
@@ -3809,6 +3926,8 @@ def _compute_lot_orders(
                     by_symbol[base] = by_symbol.get(base, 0.0) + sign * row["quantity"]
         with open_catalog() as con:
             lots.set_pending(con, who, group_id, due_ids[0], at, planned_now)
+    for lot in planned["lots"]:
+        lot["fresh"] = bool(sleeves.get(lot["id"], {}).get("fresh"))
     payload.update(
         {
             "prices": source,
@@ -3834,6 +3953,8 @@ def _compute_lot_orders(
             },
         }
     )
+    if dry_run:
+        return _mark_tentative(payload)
     with open_catalog() as con:
         payload["created_at"] = holdings_store.save_orders(
             con,
@@ -3868,6 +3989,8 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
         head = f"{lot['label']} · {status}"
         if lot["status"] in ("new", "rebalance") and lot["budget"] is not None:
             head += f" · ₹{lot['budget']:,.0f}"
+        if lot.get("fresh"):
+            head += " · fresh picks, equal weights"
         if lot["status"] == "not due" and lot["next"]:
             head += f" · next {pd.Timestamp(lot['next']):%a %d %b}"
         lines.append(head)
@@ -4686,6 +4809,8 @@ ORDER_PREVIEW_JOBS = _PreviewJobs(
 WEEKLY_JOBS = _SingleFlightJob()
 LIVE_RULES_JOBS = _SingleFlightJob()
 ORDERS_JOBS = _SingleFlightJob()
+# Friday's orders planned early (tentative): `tentative_orders`, from the page's button.
+TENTATIVE_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
 
 
@@ -6024,6 +6149,9 @@ def create_app() -> FastAPI:
             "rules": {},
             "orders": [],
             "job": ORDERS_JOBS.latest(),
+            # Friday's orders planned early, when they are for this week (owner, 2026-11-05)
+            "tentative": read_tentative(target.isoformat()),
+            "tentative_job": TENTATIVE_JOBS.latest(),
         }
         try:
             with read_catalog() as con:
@@ -6070,6 +6198,13 @@ def create_app() -> FastAPI:
     @app.post("/api/orders/run", status_code=202)
     def orders_run() -> dict:
         job, started = ORDERS_JOBS.start(lambda: _compute_orders("manual"), {})
+        return {"job": job, "started": started}
+
+    @app.post("/api/orders/tentative/run", status_code=202)
+    def orders_tentative_run() -> dict:
+        """Friday's orders planned early: the same plan the 14:15 run would make, kept in the state
+        dir only (`tentative_orders`); nothing in the catalog changes."""
+        job, started = TENTATIVE_JOBS.start(lambda: tentative_orders(), {})
         return {"job": job, "started": started}
 
     @app.post("/api/orders/preview/jobs", status_code=202)

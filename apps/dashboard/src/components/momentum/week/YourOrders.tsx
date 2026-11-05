@@ -23,6 +23,7 @@ import type {
   MomentumOrderSettings,
   MomentumOrders,
   MomentumOrdersView,
+  MomentumTentativeOrders,
 } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -152,14 +153,20 @@ export function YourOrders({
   const view = usePolledResource<MomentumOrdersView>('/api/momentum/orders', { cache: true });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const running = view.data?.job?.status === 'running';
+  const planning = view.data?.tentative_job?.status === 'running';
   const refetch = view.refetch;
   useEffect(() => {
-    if (!running) return;
+    if (!running && !planning) return;
     const timer = setInterval(refetch, 4000);
     return () => clearInterval(timer);
-  }, [running, refetch]);
+  }, [running, planning, refetch]);
 
   const latest: MomentumOrders | null = view.data?.orders.at(-1) ?? null;
+  // Friday's orders planned early: shown until the week's real orders exist.
+  const tentative: MomentumTentativeOrders | null =
+    !latest && view.data?.tentative && view.data.tentative.week === view.data.week
+      ? view.data.tentative
+      : null;
   const settings = view.data?.settings ?? null;
   const stamp = view.data
     ? `${latest?.created_at ?? ''}|${view.data.holdings?.synced_at ?? ''}|${settings?.holdings_source ?? ''}`
@@ -182,14 +189,20 @@ export function YourOrders({
     refetch();
   }
 
+  async function planTentative(): Promise<void> {
+    const response = await apiPost('/api/momentum/orders/tentative/run', {});
+    if (!response.ok) toast(`Could not plan Friday's orders: ${response.error}`, 'error');
+    refetch();
+  }
+
   return (
     <Card flush>
       <div id="orders" className="flex scroll-mt-4 flex-wrap items-center gap-2 px-4 pt-3">
         <h2 className="text-base font-semibold text-foreground">Your orders</h2>
         {previewing ? (
           <span className="text-xs text-muted">preview for {previewName ?? 'a favourite'}</span>
-        ) : latest?.headline ? (
-          <span className="text-xs text-muted">for {latest.headline.name}</span>
+        ) : (latest ?? tentative)?.headline ? (
+          <span className="text-xs text-muted">for {(latest ?? tentative)?.headline.name}</span>
         ) : null}
         {settings ? (
           <Badge tone={settings.holdings_source === 'paper' ? 'info' : 'positive'}>
@@ -200,6 +213,8 @@ export function YourOrders({
         ) : null}
         {previewing ? (
           <Badge tone="warning">Preview · nothing saved</Badge>
+        ) : tentative ? (
+          <Badge tone="warning">Tentative · nothing saved</Badge>
         ) : latest && latest.kind !== 'unavailable' ? (
           <Badge tone={latest.kind === 'exact' ? 'primary' : 'neutral'}>
             {latest.kind === 'exact' ? 'Exact before the close' : 'From the final data'}
@@ -225,6 +240,16 @@ export function YourOrders({
             <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
             Settings
           </Button>
+          {previewing || latest ? null : (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void planTentative()}
+              loading={planning}
+            >
+              {planning ? 'Planning…' : "Plan Friday's orders"}
+            </Button>
+          )}
           {previewing ? null : (
             <Button size="sm" onClick={() => void makeOrders()} loading={running}>
               {running ? 'Making orders…' : 'Make orders now'}
@@ -235,6 +260,11 @@ export function YourOrders({
       {!previewing && view.data?.job?.status === 'failed' ? (
         <p className="px-4 pt-2 text-xs text-negative">
           The last run failed: {view.data.job.error}
+        </p>
+      ) : null}
+      {!previewing && !latest && view.data?.tentative_job?.status === 'failed' ? (
+        <p className="px-4 pt-2 text-xs text-negative">
+          Planning Friday's orders failed: {view.data.tentative_job.error}
         </p>
       ) : null}
 
@@ -250,9 +280,23 @@ export function YourOrders({
             description={view.error}
           />
         </div>
+      ) : tentative ? (
+        <PlanBody
+          orders={tentative}
+          settings={settings}
+          made={
+            <>
+              Planned {formatIstDateTime(tentative.made_at)} from last Friday's ranks, nothing
+              saved: the names are fixed, the share counts follow Friday's prices and cash. The
+              14:15 run on Friday replaces this.
+            </>
+          }
+          lots={tentative.lots ? <LotOrders orders={tentative} /> : null}
+        />
       ) : !latest ? (
         <p className="px-4 py-4 text-sm text-muted">
-          No orders for the week of {view.data?.week}. The Friday 14:15 job makes them, or press{' '}
+          No orders for the week of {view.data?.week}. The Thursday 18:30 job plans them early, the
+          Friday 14:15 job makes them, or press <b>Plan Friday&apos;s orders</b> /{' '}
           <b>Make orders now</b>.
         </p>
       ) : (
@@ -482,7 +526,11 @@ function PlanBody({
 
 /** BL-142: the strategy followed lot by lot: what each lot does this Friday, what to add to Kite,
  * the one order per stock, and any change in Kite no lot could take. */
-function LotOrders({ orders }: { orders: MomentumOrders }) {
+function LotOrders({
+  orders,
+}: {
+  orders: Pick<MomentumOrders, 'lots' | 'net' | 'ledger' | 'deposit_needed' | 'lot_size'>;
+}) {
   const lots = orders.lots ?? [];
   const net = Object.entries(orders.net ?? {});
   const unexplained = orders.ledger?.unexplained ?? [];
