@@ -170,3 +170,54 @@ def test_the_fixed_base_is_two_wide_and_one_dir_lots_over_its_own_days(monkeypat
     res = beats.windows(None, "base", days[-1])
     assert res["fixed"] is True and res["windows"]["recorded"] is None
     assert res["windows"]["sessions60"]["days"] == 60
+
+
+def _three_books(monkeypatch, days, edge):
+    """core and t1 earn `edge` a lot-day more than the base each day; the pool is noise."""
+    rng = np.random.default_rng(11)
+    gross = {n: {d: float(rng.normal(0, 100)) for d in days} for n in NAMES}
+    wide = beats.base_mod.WIDE_NAME
+    gross[wide] = {d: 0.0 for d in days}
+    dir_leg = {d: 0.0 for d in days}
+    monkeypatch.setattr(candles, "_pool", lambda book: list(NAMES) + [wide])
+    monkeypatch.setattr(beats, "_grosses", lambda names, root: gross)
+    monkeypatch.setattr(
+        beats.base_mod, "read_column", lambda path, column="gross", root=None: dir_leg
+    )
+    monkeypatch.setattr(beats, "MIN_POOL", 3)
+    monkeypatch.setattr(beats, "_late_days", lambda root, book: set())
+
+    def picks(root, book, start, end):
+        if book == "base":
+            names = [(wide, 2), (beats.base_mod.DIR_NAME, 1)]
+            kind = "fixed"
+        else:
+            # three lots a day whose gross is `edge` per lot: one pick standing in for all three
+            names = [(WIDE[0], 3)]
+            kind = "recorded"
+            for d in days:
+                gross[WIDE[0]][d] = 3 * edge
+        return {d: candles.DayPicks(names, kind) for d in days}
+
+    monkeypatch.setattr(candles, "picks_by_day", picks)
+    return gross
+
+
+def test_compare_gap_is_per_lot_day_against_the_base_on_the_shared_days(monkeypatch):
+    days = _days(130)
+    _three_books(monkeypatch, days, edge=40.0)
+    out = beats.compare(None, days[-1])
+    assert out["n_days"] == 130
+    row = out["windows"]["sessions60"]
+    assert row["days"] == 60 and row["books"]["t1"]["gap_mean"] == pytest.approx(40.0)
+    assert row["books"]["t1"]["better_days_pct"] == 100.0
+    assert row["books"]["base"].get("gap_mean") is None  # the base is the yardstick
+    assert out["alarm"]["books"]["t1"]["state"] == "quiet"
+
+
+def test_the_drift_alarm_needs_two_sessions_below_the_line(monkeypatch):
+    days = _days(130)
+    _three_books(monkeypatch, days, edge=-900.0)  # far below -500 a lot-day, every day
+    alarm = beats.compare(None, days[-1])["alarm"]["books"]["t1"]
+    assert alarm["state"] == "review" and alarm["gap"] == pytest.approx(-900.0)
+    assert alarm["last_review_day"] == days[-1].isoformat()

@@ -26,7 +26,7 @@ from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import candles
 from .lists import MIN_WIDE_N
-from .readout import N_RUNS, _grosses, random_day
+from .readout import N_RUNS, _grosses, block_bootstrap_mean, random_day
 from .variants import is_buy, is_wide
 
 #: name -> sessions, or calendar months (`months`)
@@ -79,6 +79,7 @@ def daily(root: Path, book: str, start: date, end: date, runs: int = N_RUNS) -> 
     book_g: list[float] = []
     rand: list[np.ndarray] = []
     source: list[str] = []
+    lots: list[int] = []
     left_out: dict[str, str] = {}
     for day in sorted(picks):
         p = picks[day]
@@ -108,11 +109,13 @@ def daily(root: Path, book: str, start: date, end: date, runs: int = N_RUNS) -> 
         book_g.append(sum(lots_of[n] * gross[n][day] for n in members))
         rand.append(core + (buy if has_buy else 0.0))
         source.append(p.source)
+        lots.append(sum(lots_of.values()))
     return {
         "days": days,
         "book": np.array(book_g),
         "random": np.array(rand) if rand else np.zeros((0, runs)),
         "source": source,
+        "lots": np.array(lots, dtype=float),
         "left_out": left_out,
     }
 
@@ -188,4 +191,86 @@ def windows(root: Path | None = None, book: str = "t1", end: date | None = None)
         fwd["from"] = days[int(rec[0])].isoformat()
         fwd["recorded_days"] = int(rec.size)
     out["windows"]["recorded"] = fwd
+    return out
+
+
+#: the drift alarm (owner, 2026-11-05): a book's 60-session gap to the base, in rupees per lot-day,
+#: below this on two consecutive sessions opens a review
+ALARM_WINDOW = 60
+ALARM_BELOW = -500.0
+
+
+def _edge_sigma(book: np.ndarray, rand: np.ndarray, sl: slice) -> float | None:
+    """The window's book total minus the random baskets' mean, in their standard deviations."""
+    tot = rand[sl].sum(axis=0)
+    sd = float(tot.std())
+    return float((book[sl].sum() - tot.mean()) / sd) if sd > 0 else None
+
+
+def compare(root: Path | None = None, end: date | None = None) -> dict:
+    """Both Adaptive books against the fixed base on the days all three have, per window: the
+    mean gap in rupees per lot-day with a 90% block-bootstrap range (the read-out's), the share of
+    days the book was ahead, and each book's edge over random in standard deviations (the
+    ceiling-free counterpart of beats random); plus the drift alarm on the 60-session gap."""
+    root = root or data_dir()
+    end = end or today()
+    data = {b: daily(root, b, date(2000, 1, 1), end) for b in BOOKS}
+    common = sorted(set.intersection(*[set(d["days"]) for d in data.values()]))
+    keep = set(common)
+    cols: dict[str, dict] = {}
+    for b, d in data.items():
+        ix = [i for i, x in enumerate(d["days"]) if x in keep]
+        cols[b] = {
+            "book": d["book"][ix],
+            "rand": d["random"][ix],
+            "per_lot": d["book"][ix] / d["lots"][ix],
+            "source": [d["source"][i] for i in ix],
+        }
+    out: dict = {
+        "n_days": len(common),
+        "first_day": common[0].isoformat() if common else None,
+        "last_day": common[-1].isoformat() if common else None,
+        "windows": {},
+        "alarm": {"window": ALARM_WINDOW, "below": ALARM_BELOW, "books": {}},
+    }
+    if not common:
+        return out
+    for name, spec in (*WINDOWS, ("all", {"sessions": len(common)})):
+        sl = window_slice(common, spec)
+        row: dict = {"days": sl.stop - sl.start, "from": common[sl.start].isoformat(), "books": {}}
+        for b in BOOKS:
+            c = cols[b]
+            got: dict = {
+                "edge_sigma": _edge_sigma(c["book"], c["rand"], sl),
+                "recorded_days": sum(1 for s in c["source"][sl] if s == "recorded"),
+            }
+            if b != "base":
+                diff = (c["per_lot"] - cols["base"]["per_lot"])[sl]
+                mean, lower, upper = block_bootstrap_mean(diff)
+                got.update(
+                    gap_mean=mean,
+                    gap_lower=lower,
+                    gap_upper=upper,
+                    better_days_pct=float((diff > 0).mean() * 100),
+                )
+            row["books"][b] = got
+        out["windows"][name] = row
+    for b in ("core", "t1"):
+        gap = cols[b]["per_lot"] - cols["base"]["per_lot"]
+        if len(gap) < ALARM_WINDOW + 1:
+            continue
+        ends = range(ALARM_WINDOW, len(gap) + 1)
+        roll = {e: float(gap[e - ALARM_WINDOW : e].mean()) for e in ends}
+        last, before = roll[len(gap)], roll[len(gap) - 1]
+        review = [
+            e
+            for e in ends
+            if e > ALARM_WINDOW and roll[e] < ALARM_BELOW and roll[e - 1] < ALARM_BELOW
+        ]
+        state = ("review" if before < ALARM_BELOW else "watch") if last < ALARM_BELOW else "quiet"
+        out["alarm"]["books"][b] = {
+            "gap": last,
+            "state": state,
+            "last_review_day": common[review[-1] - 1].isoformat() if review else None,
+        }
     return out
