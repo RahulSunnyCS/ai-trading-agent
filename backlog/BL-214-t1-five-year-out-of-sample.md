@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — it prices the rule T1's real money runs on: T1's forward record is 12 days and its paper drawdown is at the deepest of the stored two years |
-| **Status** | Planned (pre-registration below; not run) |
+| **Status** | Ready (owner answered the open questions 2026-11-06; pre-registration below; not run) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-06 |
@@ -17,11 +17,15 @@ don't have the data lake, can we add it".
 
 **The lake is already there; the missing piece is T1's results.** `tdata status` on 2026-11-06:
 NIFTY option 1-minute bars from 2013-12-12 (about 245 sessions a year), SENSEX options only from
-2023-07-26 (81 days in 2023, 75 in 2024, then full years), index and India VIX bars and the 5-minute
+2023-07-26 but only **sparsely before 2025** (81 days in 2023, 75 in all of 2024, 76 of the 99 before
+2024-10-09 judged usable; full years from 2025), index and India VIX bars and the 5-minute
 chain, straddle and contract tables from 2015. The rotation store starts at 2024-10-09 (`days.csv`, 507
 rows), because the 298 Core variants and T1's extras have only ever been run from there (the
 ranking needs 63 earlier days, so the first ranked day is January 2025). Five years back is November
-2021; for that stretch the data exists for NIFTY only until 2023-07-26.
+2021; for that whole stretch, to 2024-10-08, the data is in effect NIFTY only: SENSEX has about 99 scattered
+days there, too few and too patchy to rank a SENSEX universe. The NIFTY chain is also thin then (median 140–170
+contracts a day in 2021–23, 295 in 2024, against 830–940 in 2025–26) and `data_quality` excludes only 5 of
+about 730 NIFTY days in the window.
 
 **What has and has not been read before.** `rotation/matrix.py` already names P3 = 2022-04-05 →
 2024-10-08, NIFTY only, "not in the rotation store". P3 was read as a confirmation period for
@@ -61,9 +65,10 @@ second reading may add them, the primary does not).
 - **Universe:** the 298 Core variants plus the T1 track's variant files as they are today, run on every
   lake day 2021-08-02 → 2024-10-08 that `data_quality` judges usable (exclusions counted and listed,
   with the reason). Results from 2021-08-02 so the first scored day is the first session after 63
-  earlier days (about 2021-11-01). Before 2023-07-26 only the NIFTY variants exist: that stretch is
-  read as its own segment ("NIFTY-only T1 and Core", the Widesl-minimum rule applying to NIFTY's
-  Widesl) and never pooled with the two-index stretch without saying so. **Point-in-time caveat:** the
+  earlier days (about 2021-11-01). Over the whole window only the NIFTY variants are run (SENSEX has
+  about 99 scattered days there): the result is "NIFTY-only T1 and Core" (the Widesl-minimum rule applying to
+  NIFTY's Widesl), never pooled with the two-index 2025–26 results without saying so, and the live T1's
+  SENSEX picks are not tested at all. Owner, 2026-11-06: run it as its own segment. **Point-in-time caveat:** the
   variant set is today's, chosen with later knowledge; it cannot be made point-in-time, only flagged.
 - **Book and picks:** list C as in BL-207 / BL-204: expiring-index rule (`expiry.filter_picks`) and SL150%
   cap (`sl150_cap.cap_picks`) applied throughout as if live, core picks only, Buy left out; the
@@ -81,7 +86,7 @@ second reading may add them, the primary does not).
   the mean is at least half of the 2025-01 → 2026-11 gap (+₹254 per lot-day over two years, BL-213);
   **kill** (for the claim that the lead is not just the tuning) if the range includes zero and the mean is
   under a quarter of it; anything else is "no evidence either way". Reported by segment (2021-11 →
-  2022-03 never read before; 2022-04 → 2023-07 NIFTY-only; 2023-07 → 2024-10 both indexes) and by year;
+  2022-03, never read before; 2022-04 → 2024-10-08, the named P3 window) and by year;
   with 5 and 10 best days removed.
 - **Descriptive, not a gate:** the drawdown ladder (depth 25 / 10 / 5 % of days reached, as `standing.py`),
   every episode at least ₹15k per lot deep with its length and recovery, the share of days as bad as −₹29.5k,
@@ -91,8 +96,11 @@ second reading may add them, the primary does not).
   for other studies: 2022-04-05 → 2024-10-08, so the two are reported apart and the claim "out of sample"
   is made only for what a segment's history supports (to be settled at start with the owner's answer to
   question 3).
+- **Strike coverage:** a variant that cannot find its strike on a thin-chain day (closest-premium and far-OTM
+  settings first) is counted per variant and per year; a day is scored only with the variants that have a
+  result, and the Log states how many of the 298 each year had.
 - **Will not run:** re-fitting any weight, lookback or variant on the older days; a second pass with
-  different windows; SENSEX variants before 2023-07-26; an intermediate peek at the results before the
+  different windows; SENSEX variants before 2025; an intermediate peek at the results before the
   anchor passes.
 
 ### Phase 1 — Data readiness
@@ -139,13 +147,22 @@ second reading may add them, the primary does not).
 
 ## Open questions
 
-1. Start at 2021-11 (five years, the owner's ask) or at 2022-04 (the named P3 window, matching the matrix and BL-100)?
-2. The NIFTY-only stretch before 2023-07-26: include as its own segment (recommended), or leave out?
-3. Which settings count as "T1": the variant files and picker as they are today, unchanged (assumed)? And was any of them chosen using the 2022-04 → 2024-10 window?
-4. Run it on the Mac overnight into a separate root on the SSD, or a different place? How much disk is acceptable?
-5. Should this replace BL-213's walk-forward, run beside it, or feed it?
+Answered by the owner on 2026-11-06 (recorded in the Log):
+1. Start 2021-11, the full five years. 2. The NIFTY-only stretch is its own segment. 3. (Checked, not asked:
+BL-113 says T1's time-generic settings were chosen on 2024-10-09 → 2025-10-08 only, so every day in this window
+is before any T1 choice; the 298-variant universe and single-variable studies did read 2022-04 → 2024-10, as
+stated in Context.) 4. Run on the Mac overnight into a separate root, one timed week first. 5. Run beside
+BL-213, which stays as planned.
+
+Still open: how much disk the separate root may use (decided at the Phase 1 timing); whether the 76 usable
+SENSEX days before 2024-10-09 are worth a small separate look (default: no).
 
 ## Log
 
 - 2026-11-06 — Created from the owner's question and the follow-up on the data lake. Priority P1 (judged: T1's real
   money runs on a rule with 12 forward days and a drawdown at its two-year deepest). Phase 0 filled in; nothing run.
+- 2026-11-06 — Owner answered the open questions: start 2021-11; NIFTY-only stretch as its own segment; run on the Mac
+  overnight in a separate root after one timed week; run beside BL-213. Corrected Context and Phase 0 after checking
+  `data_quality`: SENSEX before 2025 is sparse (about 99 days before 2024-10-09), so the whole window is NIFTY-only, not
+  only the part before 2023-07; the NIFTY chain is thin before 2025 (140–170 contracts a day median), with only 5 of
+  about 730 days excluded; strike coverage per variant added to Phase 0. Status Ready.
