@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
 
 ## Open
 
@@ -49,6 +49,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-203](BL-203-rotation-live-board.md) | Rotation live board: today's Adaptive picks (Classic and Tuned) run through the backtest on Angel One's 1-minute prices so far, every 5 minutes and on a Refresh button, a lot each or at your lots | P1 | In progress | feature | options |
 | [BL-209](BL-209-t1-split-across-accounts.md) | T1 split across the two AlgoTest accounts: the like pair one per account at 2 lots, the odd pick 1 lot each, uploaded and activated by the tool (replay: +₹134 a day after brokerage, same lots per account) | P1 | In progress | feature | options / broker-login |
 | [BL-211](BL-211-day-type-list-rules.md) | Day-type list rules in Settings › Automation: an account row trades a different list (None / Classic / Tuned) when a condition on the session holds (one index's weekdays to expiry, or the weekday), first match wins, resolved per session by every job, with a today / tomorrow preview on the page | P1 | In progress | feature | options / scheduler / dashboard |
+| [BL-214](BL-214-t1-five-year-out-of-sample.md) | Adaptive Tuned and Core Adaptive over five years: results for the days before 9 Oct 2024, scored out of sample (drawdown placement, lead over the base, NIFTY-expiry days) | P1 | Planned | research | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
