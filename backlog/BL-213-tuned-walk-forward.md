@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — research; decides how much of Tuned's two-year gap to the fixed base to plan on |
-| **Status** | Idea |
+| **Status** | Dropped — absorbed into BL-215 (2026-11-07) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-05 |
@@ -56,3 +56,4 @@ Filled in and committed **before any run**.
 ## Log
 
 - 2026-11-05: created from the Books table recommendation. Not started; Phase 0 awaits the owner.
+- 2026-11-07: dropped. Its single tune-on-2025, test-2026 split is one fold of [BL-215](BL-215-annual-retune-walk-forward.md), which tests the tuning procedure across several folds; owner agreed to run that instead.
