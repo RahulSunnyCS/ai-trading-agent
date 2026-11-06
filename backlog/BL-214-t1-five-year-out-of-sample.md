@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — it prices the rule T1's real money runs on: T1's forward record is 12 days and its paper drawdown is at the deepest of the stored two years |
-| **Status** | Ready (owner answered the open questions 2026-11-06; pre-registration below; not run) |
+| **Status** | Done — informative: before T1's settings were chosen, over 2021-11 → 2024-10-08 (NIFTY only), neither Adaptive book beat the fixed base (T1 −₹114 [−222, −10] per lot-day after 0.5 % slippage) and T1 did not beat Core (+₹1 [−73, +73]); see Log |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-06 |
@@ -166,3 +166,60 @@ SENSEX days before 2024-10-09 are worth a small separate look (default: no).
   `data_quality`: SENSEX before 2025 is sparse (about 99 days before 2024-10-09), so the whole window is NIFTY-only, not
   only the part before 2023-07; the NIFTY chain is thin before 2025 (140–170 contracts a day median), with only 5 of
   about 730 days excluded; strike coverage per variant added to Phase 0. Status Ready.
+- 2026-11-06 — **Phases 1-4 run** (`research/bl214/backfill.py`, `anchor.py`, `score.py`; results `score_old_2026-11-06.json`,
+  `score_insample_2026-11-06.json`; the store itself is in `TRADING_DATA_ROOT/_bl214/`, symlinks to the lake and the quality
+  snapshot plus its own `rotation/`, not committed).
+  **Data.** 785 sessions run (2021-08-02 → 2024-10-08): 45 weekdays had no NIFTY option file (holidays), 2 were excluded by
+  `data_quality` (Diwali Muhurat sessions, 2021-11-04 and 2022-10-24); 322 NIFTY variants (Core-298's 149 and 173 T1 extras) ×
+  785 days, every file complete, 0 errors; the share of variant-days with no trade was 0.6-0.9 % in every year (the thin chain
+  cost no strike coverage that shows). The ranking needs 63 earlier rows, so 722 sessions are scored (2021-11-02 →
+  2024-10-08), none left out. **Anchor** (Phase 0, run before any older day was read): the live store's rows for 2024-10-09 →
+  2025-01-31 (79 sessions) reproduced to the rupee, 50,876 variant-days including the 0.5 % slippage copies, 0 differences.
+  **Deviations, none touching a registered rule:** (1) `lot_sizes.csv` starts in 2024-10, and the engine looks up every
+  contract's lot size even under `lot_sizing: current`, so 778 days failed at first; the backfill wraps the reference data so
+  a contract expiring before the table falls back to the sizing date's lot (the lot actually used under `current`, unchanged;
+  no strategy in these folders is `historical`), applied also to the slippage copies and the base's Dir leg; (2) the first
+  slippage copies were skipped for the same reason and were filled by re-running; (3) **added before reading any result:** the
+  same NIFTY-only books scored over 2024-10-09 → 2026-11-06 (507 sessions) as a like-for-like in-sample comparator, because the
+  Books table's +₹254 includes SENSEX picks. Net per day below is the three core picks at one lot each (per lot-day = ÷ 3);
+  "beats random" is the share of 1,000 random same-shape baskets (gross, the day's NIFTY pool) the book's window total was above.
+
+  **Registered reading (T1 − base, per lot-day, after 0.5 % slippage, all 722 days):** −₹114 [−222, −10], T1 ahead on 45 % of days,
+  −₹149 without the best 5. Pass needs the range above zero and a mean of at least ₹127; kill needs a range that includes zero
+  and a mean under ₹64. The range here lies wholly **below** zero, a case the rule did not name, so by its letter the answer is
+  "no evidence either way"; read plainly, the in-sample lead over the base is **not reproduced** before T1's tuning. Without
+  slippage the same gap is −₹68 [−176, +36], which by the letter is a kill. The rule is not edited after the run.
+
+  | 2021-11 → 2024-10-08, 0.5 % slippage | Net/day | Win | Max DD | Worst day | Beats random |
+  |---|---:|---:|---:|---:|---:|
+  | Core (N-only) | +515 | 57 % | −26.8k | −9.7k | 100 % |
+  | T1 (N-only) | +518 | 56 % | −66.1k | −13.9k | 100 % |
+  | Fixed base | +860 | 61 % | −44.9k | −10.0k | 100 % |
+
+  Gaps per lot-day (0.5 % slippage): Core − base −₹115 [−215, −18]; T1 − Core +₹1 [−73, +73]. By segment: 2021-11 → 2022-03 (never
+  read before, 102 days) T1 − base −₹60 [−436, +350]; 2022-04 → 2024-10-08 (the named P3, 620 days) −₹123 [−226, −22]. By year:
+  2021 +₹73 [−532, +739]; 2022 −₹121 [−301, +43]; 2023 +₹68 [−64, +195]; 2024 to 8 Oct −₹382 [−606, −163] (T1 +₹70 a day, Core +₹533,
+  base +₹1,217). **Like-for-like in-sample (2024-10-09 → 2026-11-06, same NIFTY-only books):** T1 − base +₹10 [−139, +156],
+  Core − base −₹99 [−243, +37], **T1 − Core +₹109 [+34, +187]**: T1's edge over Core appears only in the period it was tuned on.
+
+  **Drawdown placement (T1, net, 0.5 % slippage, one lot a strategy).** Deepest −₹66,068 on 2024-09-20, an episode that began 2024-06-19 and was
+  still open on 2024-10-08 (77 sessions, 66 to the trough). Depth reached on 25 / 10 / 5 / 1 % of days: ₹14.3k / 20.9k / 30.9k /
+  55.6k; **5.1 % of days were at least as deep as today's −₹29.5k** (4.8 % as deep as the 2026 low of −₹32.4k); under water on 83 % of days.
+  16 episodes of ₹15k or more, 15 recovered in 7-56 sessions from their start (e.g. 2021-12-07, ₹33.3k, 41 sessions; 2023-11-17,
+  ₹25.2k, 56). Core's deepest −₹26.8k, the base's −₹44.9k. In the like-for-like in-sample window T1's deepest is −₹37.6k (2026-03-06,
+  84 sessions) and the current episode from 2026-10-27 is ₹26.1k, open.
+  **The three deepest T1 episodes** each followed a strong run: in the ten sessions before the high T1 made +₹39k / +62k / +45k and
+  beat 80 / 100 / 100 % of random baskets; from the high to the trough it lost ₹35.1k / ₹25.6k / ₹18.4k and beat 3 / 1 / 2 %, while
+  Core made −₹0 / −6.5k / −9.6k (35 / 38 / 28 %) and the base +5.6k / −7.8k / −6.4k (46 / 32 / 47 %). That is the shape of the present
+  stage (T1 −₹22.0k, 0 % of random, the base +₹40.6k, from 27 Oct), at the size of its two smaller predecessors.
+
+  **NIFTY-expiry days (153 sessions, label 0), two books of 6 lots, 0.5 % slippage:** 2×T1 +₹2,873 a day, 2×Core +₹2,640, Core + T1 +₹2,757;
+  win 63 / 63 / 68 %; return over the 153 days on ₹17L 25.9 / 23.8 / 24.8 %; max DD −₹73.6k / −48.5k / −50.4k; without slippage +₹3,795 /
+  +3,329 / +3,562. About half of the 2025-26 figure (which includes SENSEX picks). **All 722 days:** +₹1,036 / +1,031 / +1,033 a day, max DD
+  −₹132.1k / −53.5k / −84.7k, worst day −₹27.8k / −19.3k / −22.4k (without slippage +₹2,033 / +1,906 / +1,970).
+
+  **What this does and does not say.** The T1 results are for the NIFTY half of T1 only; the live book's SENSEX picks are untested (no
+  usable SENSEX days before 2025). The variant set is today's, chosen with later knowledge, and 2022-04 → 2024-10 was read before as a
+  confirmation period for single-variable studies; 2021-11 → 2022-03 is the part never read, and it is too short (102 days) to settle
+  anything alone. The fixed base beat both Adaptive books over these three years: the ranking's lead over a fixed 2 × Widesl 09:17 + Dir
+  09:24 was not there before 2024-10. Descriptive and in-sample; nothing live changes. Phase 4's findings page: `research/options/common/rotation-ranking.md`.
