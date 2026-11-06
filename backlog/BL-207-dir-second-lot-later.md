@@ -178,3 +178,13 @@ worth a BL-183-style toggle.
   added: the same setting 30 / 60 minutes earlier (a lower-ranked slot of D's own setting; the later side was
   same+30 / same+60). Expectation: between rank-diff (−529 a day against N4) and rank+30 (−381); none beats Dir ×2.
   The eight earlier arms re-run in the same pass and must reproduce the 2026-11-06 figures.
+- 2026-11-06 — **Amendment 2 run** (`dir_spacing_2026-11-06b.json`; the eight earlier arms reproduce the previous
+  figures). Same 219 days, net per day vs Dir ×2 (+1,576; DD −42.8k; worst −13.9k): **rank-away30** +1,000, **−576
+  [−949, −226]**, DD −43.5k, worst −12.9k, wins 41 %; **rank-away60** +983, **−593 [−958, −237]**, DD −35.8k (16 %
+  shallower), worst −12.6k (10 % smaller), wins 43 %. Last year −821 / −796; test half −895 / −812; fit half −128 /
+  −283 (intervals include zero). No book stop, 0.5 % slippage: −595 / −603 over all days, −788 / −746 last year. Both
+  arms sit with the other spaced arms (rank+30 −381, rank+60 −564, rank-diff −529): letting the earlier side in did
+  not help. rank-away60's drawdown is the nearest to the registered "matches live with less risk" bar (20 %
+  smaller drawdown and worst day) and misses it on both counts, while giving up ₹593 a day. **Verdict: no evidence**
+  for both; across all nine second-lot arms none beats Dir ×2 on net in any window that counts. Dir ×2 at the
+  pick's slot stays. In-sample, descriptive.

@@ -41,7 +41,7 @@ FIRST = date(2025, 1, 10)
 LAST = date(2026, 11, 3)
 SPLIT = date(2025, 10, 8)  # BL-202's fit / test boundary (fit <= SPLIT)
 LAST_YEAR_FROM = date(2025, 11, 3)
-STAMP = "2026-11-06"
+STAMP = "2026-11-06b"
 SLIP = 0.5
 BASE = "N4"
 EVEN = "B4"
@@ -54,6 +54,9 @@ ARMS: dict[str, tuple[int | str | None, bool]] = {
     "rank-any": (None, False),
     # amendment 2026-11-06: the best-ranked other Dir whose slot differs from D's (earlier or later)
     "rank-diff": ("diff", False),
+    # amendment 2 (2026-11-06): at least 30 / 60 minutes away from D's slot, earlier or later
+    "rank-away30": ("abs30", False),
+    "rank-away60": ("abs60", False),
 }
 WINDOWS = {
     "all": (FIRST, LAST),
@@ -89,6 +92,8 @@ def second_dir(
             return True
         if gap == "diff":
             return minutes(parts(n)[2]) != t0
+        if isinstance(gap, str) and gap.startswith("abs"):
+            return abs(minutes(parts(n)[2]) - t0) >= int(gap[3:])
         return minutes(parts(n)[2]) >= t0 + gap
 
     cands = [n for n in cols if n not in chosen and is_dir(n) and not is_buy(n) and slot_ok(n)]
