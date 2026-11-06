@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — it decides how T1 is kept up to date while real money trades it; heavy compute, and the 60-session forward read-out (BL-135) comes first |
-| **Status** | Idea |
+| **Status** | In progress |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-07 |
 | **Depends on** | BL-113 / BL-115 / BL-106 (how T1's settings were chosen), BL-104 (the sweep grid), BL-214 (the NIFTY-only 2021 → 2024 store); absorbs BL-213 (its one fold is F4 below) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.66 |
 
 ## Context
 
@@ -122,3 +122,12 @@ for 2024-25 (checked in Phase 1); the pass fraction for the 6-month folds if a f
   6-month folds; the BL-213 question left to me. Decided: BL-213 is absorbed here (its tune-on-2025, test-2026 split is
   one of this item's folds) and dropped as a separate item. Where T1's selection code lives found (BL-104 stage 1, BL-106
   `pool.py`), not yet checked to reproduce T1's set. Phase 0 amended; still nothing run.
+- 2026-11-07 — **Started (owner: "run this overnight").** Phase 0 stands as committed (d73ed621). Compute started ahead of
+  Phase 1's written rule because the NIFTY Stage 1 grid does not depend on it: `research/bl104/run_grid.py --family all
+  --index N --from 2021-11-01 --to 2024-10-08 --tag bl215_stage1 --workers 6` (grid SHA `6a1078bb4fe68786`, 31,713 cells,
+  723 NIFTY days, the 7 Stage 1 slots; one pass whose per-day series are sliced per fold, so every tuning window and every
+  6-month window comes from this one run). Run from the `ata-bl215` worktree (the main checkout stays on `main` for the
+  launchd jobs); results git-ignored under `research/bl104/results/bl215_stage1/`; nothing is read from it before the
+  selection rule is registered in Phase 1. A 140-cell smoke run on Jan-Feb 2022 completed with 0 skipped cells, so the
+  early lot-size lookups work (`EarliestRowReference`). The F4 window (2024-10-09 → 2025-10-08) and the 6-month windows
+  after it come from BL-104's existing Stage 1 (488 days), NIFTY slice.
