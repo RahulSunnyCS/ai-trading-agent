@@ -338,6 +338,17 @@ def _with_lots(picks, platform: str, book: str, settings: dict | None, flag: boo
     return replace(picks, lots=lots)
 
 
+def _stamp_settings(folder, settings: dict) -> None:
+    """Record the Settings › Automation version an export was made under in its manifest, so the
+    morning activation (and `--only-missing`) can tell an export older than a settings change."""
+    import json
+
+    path = folder / "manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["settings_version"] = settings.get("version")
+    path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+
 def _with_split(picks, book: str, settings: dict | None):
     """BL-209: under --from-settings, T1 split across the two AlgoTest accounts when Settings ›
     Automation has the switch on and both AlgoTest rows upload T1 (`split_t1`); each account's
@@ -397,9 +408,18 @@ def _morning(picks, book: str, folder):
     return replace(m.picks, dte=picks.dte), extra
 
 
-def _has_export(book: str, day: str | None, next_session: bool, preview: bool) -> bool:
+def _has_export(
+    book: str,
+    day: str | None,
+    next_session: bool,
+    preview: bool,
+    settings: dict | None = None,
+) -> bool:
     """Whether `latest-<book>.json` already points at an existing export of that session's
-    expected picks (`--only-missing`)."""
+    expected picks (`--only-missing`). With `settings` (--from-settings), only one made under the
+    same version of Settings › Automation: an export older than a settings change (the split, a
+    row's Dir ×2) is exported again, never kept (2026-11-06: the 08:11 activation used one made
+    before the owner's split and put every strategy on both accounts)."""
     import json
 
     from . import store
@@ -418,11 +438,20 @@ def _has_export(book: str, day: str | None, next_session: bool, preview: bool) -
         return False
     from pathlib import Path
 
-    return (
+    manifest = Path(str(record.get("dir", ""))) / "manifest.json"
+    if not (
         record.get("day") == d.isoformat()
         and record.get("source") == "preview"
-        and (Path(str(record.get("dir", ""))) / "manifest.json").exists()
-    )
+        and manifest.exists()
+    ):
+        return False
+    if settings is None:
+        return True
+    try:
+        made_under = json.loads(manifest.read_text()).get("settings_version")
+    except (OSError, ValueError):
+        return False
+    return made_under == settings.get("version")
 
 
 def _end_missing(missing: list[str], books: list[str]) -> None:
@@ -524,7 +553,9 @@ def algotest_export(
     missing = []
     skipped = []
     for b in books:
-        if only_missing and _has_export(b, day, next_session, preview):
+        if only_missing and _has_export(
+            b, day, next_session, preview, settings if from_settings else None
+        ):
             skipped.append(b)
             continue
         picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
@@ -545,6 +576,8 @@ def algotest_export(
         except FileExistsError as error:
             typer.echo(f"not exported: {error}")
             raise typer.Exit(1) from error
+        if from_settings and settings:
+            _stamp_settings(folder, settings)
         if not out:  # the uploader (BL-137) reads the newest default export through this pointer
             ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
         typer.echo(ax.render(picks, exports, zip_path))

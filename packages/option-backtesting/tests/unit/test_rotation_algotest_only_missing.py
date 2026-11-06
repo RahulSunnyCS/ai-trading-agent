@@ -75,3 +75,33 @@ def test_an_older_or_recorded_export_does_not_count(world):
     exported.clear()
     assert run("--preview", "--only-missing").exit_code == 0
     assert sorted(exported) == ["core", "t1"]
+
+
+def test_an_export_older_than_a_settings_change_is_exported_again(world, monkeypatch):
+    """2026-11-06: the owner turned the T1 split on after the evening export; the 08:11 catch-up
+    kept that export (nothing was "missing") and the activation put every strategy on both
+    accounts. An export now carries the settings version it was made under."""
+    root, today, exported = world
+    version = {"v": 12}
+    monkeypatch.setattr(
+        cli,
+        "_settings_books",
+        lambda platform, session=None: (["t1"], {"version": version["v"], "splitT1": False}),
+    )
+    assert run("--preview").exit_code == 0
+    manifest = json.loads((root_manifest(root, today, "t1")).read_text())
+    assert manifest["settings_version"] == 12
+    exported.clear()
+
+    same = run("--preview", "--only-missing")
+    assert same.exit_code == 3 and exported == []  # same settings: nothing to do
+
+    version["v"] = 13  # the owner saved Settings › Automation after 16:40
+    changed = run("--preview", "--only-missing")
+    assert changed.exit_code == 0, changed.output
+    assert exported == ["t1"]
+    assert json.loads((root_manifest(root, today, "t1")).read_text())["settings_version"] == 13
+
+
+def root_manifest(root, today, book):
+    return root / "rotation" / "algotest" / today.isoformat() / book / "manifest.json"

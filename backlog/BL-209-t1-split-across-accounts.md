@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money every trading day: about ₹134 a day more after brokerage on the owner's two live T1 accounts (exploratory replay), the same lots and margin per account, built mostly from pieces that already run |
-| **Status** | In progress (Phase 2 built; Phase 3 next) |
+| **Status** | In progress (Phase 3 built; Phase 4 next) |
 | **Type** | feature (with an exploratory replay behind it) |
 | **Area** | options / broker-login / scheduler / dashboard |
 | **Created** | 2026-11-04 |
@@ -251,6 +251,16 @@ broker-level MTM SL today, on either account, with or without the split.
   Not verified: a supervised evening upload and setup of the copies, and whether set-up copies
   count toward /live's 6-strategy limit (six on a normal day, seven with the add-on). The 09:25
   deploy check and the 09:05 margin check (both off) do not read the split yet (Phases 3 and 4).
+
+- **2026-11-06 — Phase 3 built (morning activation).** The owner turned the split on after the evening export; the
+  08:11 run kept that export (`--only-missing`), read settings v13 but activated the pre-split list on both accounts,
+  and the owner cancelled it. Fixes: every export made `--from-settings` records `settings_version`; `--only-missing` exports
+  again when it moved; the morning activation refuses a manifest of another version. Per-account activation: the one-lot strategy
+  per account with that account's Quantity Multiplier set on the Activate sheet (owner's ask), instead of the `· ×N` copies the
+  design had assumed (copies stay in the export and are uploaded; a copy with no one-lot strategy is deployed at 1). The 09:25
+  check expects each account's own strategies. Not verified live: AlgoTest's MTM-stop scaling with the multiplier, a supervised
+  first run, the live capture's lots for a multiplier set on the broker sheet (its `execution-info` may show 1), and the 16:00
+  margin block (see the review note below).
 
 
 ## Review note (2026-11-05)
