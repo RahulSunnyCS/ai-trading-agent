@@ -70,7 +70,8 @@ const quantity = (p: Page, broker: string) =>
   p.locator(`[data-b="${broker}"] input[type=number]`).inputValue();
 
 describe('tickBrokers with quantities', () => {
-  it("ticks the wanted accounts and sets each one's quantity", { skip }, async () => {
+  it("ticks the wanted accounts and sets each one's quantity", async (t) => {
+    if (skip) return t.skip(skip);
     const p = await open();
     await tickBrokers(
       p.locator('#sheet'),
@@ -84,7 +85,8 @@ describe('tickBrokers with quantities', () => {
     await p.context().close();
   });
 
-  it('leaves the other account unticked', { skip }, async () => {
+  it('leaves the other account unticked', async (t) => {
+    if (skip) return t.skip(skip);
     const p = await open();
     await tickBrokers(p.locator('#sheet'), new Map([['angelone', 2]]));
     assert.equal(await quantity(p, 'Angel One'), '2');
@@ -92,7 +94,8 @@ describe('tickBrokers with quantities', () => {
     await p.context().close();
   });
 
-  it('stops when the quantity will not move', { skip }, async () => {
+  it('stops when the quantity will not move', async (t) => {
+    if (skip) return t.skip(skip);
     const p = await open(true);
     await assert.rejects(
       tickBrokers(p.locator('#sheet'), new Map([['finvasia', 2]])),
