@@ -153,3 +153,38 @@ worth a BL-183-style toggle.
   slot) also falls short of N4, so the shortfall is not only the later minute; part of every arm's gap is the fourth
   strategy's own brokerage, and this run does not split gross from brokerage. The edge of Dir ×2 over the even spread (+₹294 [+91, +502]) sits where BL-133
   found it. Nothing to adopt; Dir ×2 at the pick's slot stays. In-sample, descriptive.
+- 2026-11-06 — **Amendment (owner's question, registered before the run):** "if we take 2 Dir, what about 2 different
+  Dir; if the top two are at the same timing, take the next best with a different timing." One arm added to the
+  Phase 0 set: **rank-diff** = the best-ranked unpicked Dir (any index or setting in T1's universe, by the day's
+  composite, ties by name, Buy left out) whose slot differs from D's, earlier or later. It sits between the control
+  (rank-any, which may share D's slot) and rank+30 (later only, at least 30 minutes). Everything else as Phase 0:
+  same days (to 2026-11-03), book, stop, windows, intervals, reading. Expectation: between rank-any (−307 a day vs N4)
+  and rank+30 (−381); no arm is expected to beat Dir ×2. The six earlier arms are re-run in the same pass and must
+  reproduce the 2026-11-04 figures.
+- 2026-11-06 — **Amendment run** (`research/bl207/dir_spacing.py`, `dir_spacing_2026-11-06.json`; same 219 days, the six
+  earlier arms reproduce the 2026-11-04 figures to the rupee). **rank-diff** (best-ranked other Dir at a slot different
+  from D's) = **+1,047 a day against Dir ×2's +1,576: −529 [−876, −199]**, wins 41 % of days, max drawdown −44.5k (N4
+  −42.8k), worst day −13.1k (−13.9k), worst week −22.9k (−30.0k). Last year −731 [−1,106, −388]; fit half −162
+  [−738, +457]; test half −790 [−1,153, −423]. No book stop, 0.5 % slippage: −528 [−871, −206] over all days, −702
+  last year. It is the weakest of the six arms: below the any-slot control (−307) and below rank+30 (−381), so
+  forcing a different slot costs more than allowing the same one. It has the smallest worst week of any arm but a
+  drawdown no smaller than Dir ×2's, so it fails both the "beats live" and the "matches with less risk" tests.
+  **Verdict: no evidence**; Dir ×2 at the pick's slot stays. In-sample, descriptive; nothing live changes.
+- 2026-11-06 — **Amendment 2 (owner: "the second one should be at least 30 min / 1 hr away from the first"),
+  registered before the run:** two arms added. **rank-away30** / **rank-away60** = the best-ranked unpicked Dir (Buy
+  left out, ties by name) whose slot is at least 30 / 60 minutes from D's, earlier or later (|slot − t| ≥ gap). The
+  earlier rank+30 / rank+60 arms took later slots only, so this is the same idea with the earlier side allowed.
+  Everything else as Phase 0 and Amendment 1 (same days to 2026-11-03, book, stop, windows, intervals, reading). Not
+  added: the same setting 30 / 60 minutes earlier (a lower-ranked slot of D's own setting; the later side was
+  same+30 / same+60). Expectation: between rank-diff (−529 a day against N4) and rank+30 (−381); none beats Dir ×2.
+  The eight earlier arms re-run in the same pass and must reproduce the 2026-11-06 figures.
+- 2026-11-06 — **Amendment 2 run** (`dir_spacing_2026-11-06b.json`; the eight earlier arms reproduce the previous
+  figures). Same 219 days, net per day vs Dir ×2 (+1,576; DD −42.8k; worst −13.9k): **rank-away30** +1,000, **−576
+  [−949, −226]**, DD −43.5k, worst −12.9k, wins 41 %; **rank-away60** +983, **−593 [−958, −237]**, DD −35.8k (16 %
+  shallower), worst −12.6k (10 % smaller), wins 43 %. Last year −821 / −796; test half −895 / −812; fit half −128 /
+  −283 (intervals include zero). No book stop, 0.5 % slippage: −595 / −603 over all days, −788 / −746 last year. Both
+  arms sit with the other spaced arms (rank+30 −381, rank+60 −564, rank-diff −529): letting the earlier side in did
+  not help. rank-away60's drawdown is the nearest to the registered "matches live with less risk" bar (20 %
+  smaller drawdown and worst day) and misses it on both counts, while giving up ₹593 a day. **Verdict: no evidence**
+  for both; across all nine second-lot arms none beats Dir ×2 on net in any window that counts. Dir ×2 at the
+  pick's slot stays. In-sample, descriptive.
