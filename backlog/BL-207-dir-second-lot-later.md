@@ -170,3 +170,11 @@ worth a BL-183-style toggle.
   forcing a different slot costs more than allowing the same one. It has the smallest worst week of any arm but a
   drawdown no smaller than Dir ×2's, so it fails both the "beats live" and the "matches with less risk" tests.
   **Verdict: no evidence**; Dir ×2 at the pick's slot stays. In-sample, descriptive; nothing live changes.
+- 2026-11-06 — **Amendment 2 (owner: "the second one should be at least 30 min / 1 hr away from the first"),
+  registered before the run:** two arms added. **rank-away30** / **rank-away60** = the best-ranked unpicked Dir (Buy
+  left out, ties by name) whose slot is at least 30 / 60 minutes from D's, earlier or later (|slot − t| ≥ gap). The
+  earlier rank+30 / rank+60 arms took later slots only, so this is the same idea with the earlier side allowed.
+  Everything else as Phase 0 and Amendment 1 (same days to 2026-11-03, book, stop, windows, intervals, reading). Not
+  added: the same setting 30 / 60 minutes earlier (a lower-ranked slot of D's own setting; the later side was
+  same+30 / same+60). Expectation: between rank-diff (−529 a day against N4) and rank+30 (−381); none beats Dir ×2.
+  The eight earlier arms re-run in the same pass and must reproduce the 2026-11-06 figures.
