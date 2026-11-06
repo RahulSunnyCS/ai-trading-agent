@@ -41,17 +41,19 @@ FIRST = date(2025, 1, 10)
 LAST = date(2026, 11, 3)
 SPLIT = date(2025, 10, 8)  # BL-202's fit / test boundary (fit <= SPLIT)
 LAST_YEAR_FROM = date(2025, 11, 3)
-STAMP = "2026-11-04"
+STAMP = "2026-11-06"
 SLIP = 0.5
 BASE = "N4"
 EVEN = "B4"
 #: arm -> (gap in minutes, same setting?); the control has no gap
-ARMS: dict[str, tuple[int | None, bool]] = {
+ARMS: dict[str, tuple[int | str | None, bool]] = {
     "same+30": (30, True),
     "same+60": (60, True),
     "rank+30": (30, False),
     "rank+60": (60, False),
     "rank-any": (None, False),
+    # amendment 2026-11-06: the best-ranked other Dir whose slot differs from D's (earlier or later)
+    "rank-diff": ("diff", False),
 }
 WINDOWS = {
     "all": (FIRST, LAST),
@@ -66,10 +68,11 @@ def minutes(tag: str) -> int:
 
 
 def second_dir(
-    comp: np.ndarray, cols: list[str], core: list[str], d: str, gap: int | None, same: bool
+    comp: np.ndarray, cols: list[str], core: list[str], d: str, gap: int | str | None, same: bool
 ) -> str | None:
     """Phase 0's second lot for the day: the same setting `gap` minutes on, or the best-ranked
-    unpicked Dir whose slot is at least `gap` minutes after D's (any slot when gap is None)."""
+    unpicked Dir whose slot is at least `gap` minutes after D's (any slot when gap is None, any
+    slot but D's own when gap is "diff")."""
     score = {n: float(comp[j]) for j, n in enumerate(cols)}
     idx, fam, tag = parts(d)
     t0 = minutes(tag)
@@ -81,14 +84,14 @@ def second_dir(
             if n not in chosen and (i2, f2) == (idx, fam) and minutes(t2) == want:
                 return n
         return None
-    cands = [
-        n
-        for n in cols
-        if n not in chosen
-        and is_dir(n)
-        and not is_buy(n)
-        and (gap is None or minutes(parts(n)[2]) >= t0 + gap)
-    ]
+    def slot_ok(n: str) -> bool:
+        if gap is None:
+            return True
+        if gap == "diff":
+            return minutes(parts(n)[2]) != t0
+        return minutes(parts(n)[2]) >= t0 + gap
+
+    cands = [n for n in cols if n not in chosen and is_dir(n) and not is_buy(n) and slot_ok(n)]
     return min(cands, key=lambda n: (-score[n], n)) if cands else None
 
 

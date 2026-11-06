@@ -161,3 +161,12 @@ worth a BL-183-style toggle.
   same days (to 2026-11-03), book, stop, windows, intervals, reading. Expectation: between rank-any (−307 a day vs N4)
   and rank+30 (−381); no arm is expected to beat Dir ×2. The six earlier arms are re-run in the same pass and must
   reproduce the 2026-11-04 figures.
+- 2026-11-06 — **Amendment run** (`research/bl207/dir_spacing.py`, `dir_spacing_2026-11-06.json`; same 219 days, the six
+  earlier arms reproduce the 2026-11-04 figures to the rupee). **rank-diff** (best-ranked other Dir at a slot different
+  from D's) = **+1,047 a day against Dir ×2's +1,576: −529 [−876, −199]**, wins 41 % of days, max drawdown −44.5k (N4
+  −42.8k), worst day −13.1k (−13.9k), worst week −22.9k (−30.0k). Last year −731 [−1,106, −388]; fit half −162
+  [−738, +457]; test half −790 [−1,153, −423]. No book stop, 0.5 % slippage: −528 [−871, −206] over all days, −702
+  last year. It is the weakest of the six arms: below the any-slot control (−307) and below rank+30 (−381), so
+  forcing a different slot costs more than allowing the same one. It has the smallest worst week of any arm but a
+  drawdown no smaller than Dir ×2's, so it fails both the "beats live" and the "matches with less risk" tests.
+  **Verdict: no evidence**; Dir ×2 at the pick's slot stays. In-sample, descriptive; nothing live changes.
