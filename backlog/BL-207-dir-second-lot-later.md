@@ -153,3 +153,11 @@ worth a BL-183-style toggle.
   slot) also falls short of N4, so the shortfall is not only the later minute; part of every arm's gap is the fourth
   strategy's own brokerage, and this run does not split gross from brokerage. The edge of Dir ×2 over the even spread (+₹294 [+91, +502]) sits where BL-133
   found it. Nothing to adopt; Dir ×2 at the pick's slot stays. In-sample, descriptive.
+- 2026-11-06 — **Amendment (owner's question, registered before the run):** "if we take 2 Dir, what about 2 different
+  Dir; if the top two are at the same timing, take the next best with a different timing." One arm added to the
+  Phase 0 set: **rank-diff** = the best-ranked unpicked Dir (any index or setting in T1's universe, by the day's
+  composite, ties by name, Buy left out) whose slot differs from D's, earlier or later. It sits between the control
+  (rank-any, which may share D's slot) and rank+30 (later only, at least 30 minutes). Everything else as Phase 0:
+  same days (to 2026-11-03), book, stop, windows, intervals, reading. Expectation: between rank-any (−307 a day vs N4)
+  and rank+30 (−381); no arm is expected to beat Dir ×2. The six earlier arms are re-run in the same pass and must
+  reproduce the 2026-11-04 figures.
