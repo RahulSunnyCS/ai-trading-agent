@@ -56,11 +56,34 @@ objective than the one T1 used (unless the owner decides it in Phase 0); Buy add
   from 2021-11 to the latest day (about nine folds; the exact dates are listed here in Phase 1, before any run).
   The two lengths are reported apart and never mixed into one number. F4 is BL-113's own check (and BL-213's), re-run
   on NIFTY; a both-index re-run of F4 is reported beside it, not pooled.
-- **Selection rule:** exactly the one BL-113 / BL-115 used. Where it lives: the sweep's first-year band winners
-  (`research/bl104/results/stage1_y1/<family>_band_winners_tail.csv`) then BL-106's pool step (`research/bl106/pool.py`:
-  per family x index x band, up to 4 sets that differ in at least two settings, applied at every rotation slot). It is
-  written here, with its constants, in Phase 1 before any run; if F4 does not reproduce T1's recorded set, the item
-  stops there and says so.
+- **Selection rule (amended 2026-11-07, before any fold was selected: the first draft named the wrong procedure):**
+  exactly the one that built T1 — BL-104 `daytype_lists.py`, Amendments 1-11, rule R1 (`research/bl215/select_fold.py`
+  and `select_all.py` call it unchanged on a window). Per NIFTY family (N_wide, NIFTY Widesl premium, N_dir, N_ditm1,
+  NIFTY Buy premium) and day type (expiry / other), over the 12 sampled entry times: rank the grid's settings on the
+  window's first half and keep the best (a second one where it correlates below 0.7 with the first; premium families
+  with their premium ladder) only if it also beats the family's current files in the second half; each kept setting is
+  then run at all 25 entry times, and Adaptive (list C) chooses among Core NIFTY plus those. This is not the band-winner
+  / `pool.py` rule of BL-106 (a different, earlier experiment). **Anchor, passed 2026-11-07:** run on 2024-10-09 ->
+  2025-10-08 it returns exactly T1's recorded settings (`N_wide-t1s4` and `s8`, `N_p150-t1s11`, `N_dir-t1s29`,
+  `N_ditm1-t1s36`, `N_buy-t1s47` and `s48`; the SENSEX `S_p285` and `S_ditm1` have no NIFTY-only counterpart), and a
+  re-run of the original `--window first` selection matches 132 of its 133 stored rows, the 133rd being the same cell
+  (same gains). Deviations, all because the folds are NIFTY-only and older: SENSEX families are not selected; the
+  premium ladder for a tuning window before 2024-10 is the coarse ladder plus the levels BL-104's refine step added for
+  F4 (the refine step picks its levels from the first year's scores, so a per-fold refine would need a second run);
+  NIFTY expiry days before 2024-10-09 are the days the `_bl214` store labels `dte_n` 0 (the observed-expiry list begins
+  2024-10); a row the rule marks "owner to choose" takes its rank-1 setting.
+- **Folds, exact (Phase 1, registered before selection):** 12-month: F1 tune 2021-11-01 -> 2022-10-31 (ranked on the
+  first six months), test 2022-11-01 -> 2023-10-31; F2 tune 2022-11 -> 2023-10, test 2023-11-01 -> 2024-10-08; F3 tune
+  2023-11 -> 2024-10-08, test 2024-10-09 -> 2025-10-08; F4 tune 2024-10-09 -> 2025-10-08, test 2025-10-09 -> 2026-11-06.
+  6-month (tune window = the half-year before the test half-year; boundaries 2022-04-09, 2022-10-09, 2023-04-09,
+  2023-10-09, 2024-04-09, 2024-10-09, 2025-04-09, 2025-10-09, 2026-04-09; the first tune window runs from 2021-11-01):
+  H1 ... H9, tests 2022-04-09 -> 2022-10-08, ..., 2026-04-09 -> 2026-11-06. The code is `research/bl215/folds.py`.
+- **Prior evidence on the same method (found 2026-11-07, on the unmerged branch `research/bl106-pool-poc`):** BL-115
+  Experiments 3, 8 and 10 re-ran this selection on quarterly folds of 2025-10 -> 2026-10 (NIFTY and SENSEX, gross, Adaptive
+  list C): re-selected settings won 2 of 4 quarters, pooled +70 [-81, +215] per lot-day (growing window +66; whole-window
+  ranking +85; plateau +112), none passing, and only 2-3 of 7-14 settings survived from one fold to the next. A planned
+  4-year NIFTY walk-forward of the same method (that branch's "BL-116", status Planned, never run; main's BL-116 is a
+  different item) is what this item now is. So the result here is read against those quarters, not as a first look.
 - **Look-ahead check:** a fold's tuning reads results dated before its test start only; the test results are not
   opened until the selected set is written to the Log; each day's pick uses earlier rows only (`pick.score_history`);
   an anchor: re-running F4's selection must return T1's recorded set.
@@ -131,3 +154,10 @@ for 2024-25 (checked in Phase 1); the pass fraction for the 6-month folds if a f
   selection rule is registered in Phase 1. A 140-cell smoke run on Jan-Feb 2022 completed with 0 skipped cells, so the
   early lot-size lookups work (`EarliestRowReference`). The F4 window (2024-10-09 → 2025-10-08) and the 6-month windows
   after it come from BL-104's existing Stage 1 (488 days), NIFTY slice.
+- 2026-11-07 — **Stage 1 finished** (21 of 21 cohorts, no failures, ~1 h 20 min). **Phase 0 amended before any selection**
+  (see the Selection rule above): the first draft named BL-106's band-winner/pool step; T1 was in fact built by the
+  day-type method (BL-104 `daytype_lists`, rule R1). The anchor passed (F4 returns T1's recorded settings). That method
+  also reads the 12-slot grid, the premium ladders and the Buy/Dir cells that Stage 1 (7 slots, strike grid) does not hold,
+  so a second NIFTY run was started the same night for every cell it asks for and finds missing
+  (`research/bl215/needed_cells.py` -> 57,975 cells, `--tag bl215_extra`). Nothing from any test window has been read.
+  Owner (asleep) asked me to carry on without waiting.
