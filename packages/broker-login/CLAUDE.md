@@ -243,7 +243,7 @@ week, until disabled.
   Decrease buttons, the number and the card's `= N` total read back; anything else stops before Activate). A copy
   with no one-lot strategy is deployed as it is at 1. The morning run also refuses an export whose manifest
   `settings_version` is not the settings' current version (`staleExport`; the exporter stamps it under
-  `--from-settings`, and `--only-missing` exports again when it has moved), with a Telegram message; a hand
+  `--from-settings` with a `settings_layout` hash, and `--only-missing` exports again only when the layout moved, otherwise restamps the version, so a save of capital or margin never changes the traded list), with a Telegram message; a hand
   `--latest` deploy is not held to it. Not verified live: whether AlgoTest scales a strategy's MTM stop with the
   sheet's multiplier (the ×2 copies keep the one-lot figure and rely on leg lots), and the 09:25 check reads each
   account's own strategies from the split (`placements`) but not their quantities. Tests: `deploy-quantity.test.ts`,

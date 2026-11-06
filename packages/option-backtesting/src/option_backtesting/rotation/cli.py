@@ -338,14 +338,37 @@ def _with_lots(picks, platform: str, book: str, settings: dict | None, flag: boo
     return replace(picks, lots=lots)
 
 
+def _settings_layout(settings: dict) -> str:
+    """What the AlgoTest export reads from Settings › Automation: the split switch, the uploads
+    master, each AlgoTest row's list / upload / Dir ×2 / add-on / multiplier and the day-type rules.
+    A save that changes none of it (capital, margin, a pause) leaves the export as it is."""
+    import hashlib
+    import json
+
+    rows = {
+        key: {k: row.get(k) for k in ("upload", "list", "dirBoost", "addon", "multiplier")}
+        for key, row in (settings.get("rows") or {}).items()
+        if key.startswith("algotest.")
+    }
+    layout = {
+        "split": bool(settings.get("splitT1")),
+        "uploads": (settings.get("masters") or {}).get("uploads"),
+        "rows": rows,
+        "rules": settings.get("rules") or [],
+    }
+    return hashlib.sha1(json.dumps(layout, sort_keys=True).encode()).hexdigest()[:16]
+
+
 def _stamp_settings(folder, settings: dict) -> None:
-    """Record the Settings › Automation version an export was made under in its manifest, so the
-    morning activation (and `--only-missing`) can tell an export older than a settings change."""
+    """Record the Settings › Automation version (and the layout it read) an export was made under
+    in its manifest, so the morning activation (and `--only-missing`) can tell an export older
+    than a change to what it holds."""
     import json
 
     path = folder / "manifest.json"
     manifest = json.loads(path.read_text())
     manifest["settings_version"] = settings.get("version")
+    manifest["settings_layout"] = _settings_layout(settings)
     path.write_text(json.dumps(manifest, indent=2) + "\n")
 
 
@@ -417,9 +440,10 @@ def _has_export(
 ) -> bool:
     """Whether `latest-<book>.json` already points at an existing export of that session's
     expected picks (`--only-missing`). With `settings` (--from-settings), only one made under the
-    same version of Settings › Automation: an export older than a settings change (the split, a
-    row's Dir ×2) is exported again, never kept (2026-11-06: the 08:11 activation used one made
-    before the owner's split and put every strategy on both accounts)."""
+    same layout of Settings › Automation: an export older than a change to what it holds (the
+    split, a row's list or Dir ×2, the add-on) is exported again, never kept (2026-11-06: the
+    08:11 activation used one made before the owner's split and put every strategy on both
+    accounts)."""
     import json
 
     from . import store
@@ -445,13 +469,20 @@ def _has_export(
         and manifest.exists()
     ):
         return False
-    if settings is None:
+    if not settings:
         return True
     try:
-        made_under = json.loads(manifest.read_text()).get("settings_version")
+        made = json.loads(manifest.read_text())
     except (OSError, ValueError):
         return False
-    return made_under == settings.get("version")
+    if made.get("settings_layout") != _settings_layout(settings):
+        return False  # a change to what is exported: the split, a row's list, Dir x2, the add-on
+    if made.get("settings_version") != settings.get("version"):
+        # a save that changed nothing the export reads (capital, margin): the same picks stay,
+        # so the list uploaded at 16:40 is the list that trades; only the stamp moves
+        made["settings_version"] = settings.get("version")
+        manifest.write_text(json.dumps(made, indent=2) + "\n")
+    return True
 
 
 def _end_missing(missing: list[str], books: list[str]) -> None:

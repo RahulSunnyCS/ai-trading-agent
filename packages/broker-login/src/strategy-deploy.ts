@@ -438,11 +438,12 @@ async function runDir(dir: string, values: Values, automation: Automation | null
     return 1;
   }
   if (place.problem) console.error(`split export not read: ${place.problem}`);
-  const plan = place.problem
-    ? deployList(
-        new Map(brokers.map((b) => [b, morning.kept.map((k) => ({ name: k.name, lots: 1 }))])),
-      )
-    : deployList(place.byBroker);
+  // a split export that cannot be read falls back to every strategy on every account at 1
+  const plan = deployList(
+    place.problem
+      ? placements({ strategies: manifest.strategies }, morning.kept, brokers).byBroker
+      : place.byBroker,
+  );
   const lotsOf = (name: string): Map<Broker, number> =>
     new Map(Object.entries(plan.lots.get(name) ?? {}) as Array<[Broker, number]>);
   const picks: Pick[] = [];

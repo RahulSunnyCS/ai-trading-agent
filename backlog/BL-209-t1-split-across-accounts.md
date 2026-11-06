@@ -255,7 +255,7 @@ broker-level MTM SL today, on either account, with or without the split.
 - **2026-11-06 — Phase 3 built (morning activation).** The owner turned the split on after the evening export; the
   08:11 run kept that export (`--only-missing`), read settings v13 but activated the pre-split list on both accounts,
   and the owner cancelled it. Fixes: every export made `--from-settings` records `settings_version`; `--only-missing` exports
-  again when it moved; the morning activation refuses a manifest of another version. Per-account activation: the one-lot strategy
+  again when the layout it reads moved (a plain save only restamps); the morning activation refuses a manifest of another version. Per-account activation: the one-lot strategy
   per account with that account's Quantity Multiplier set on the Activate sheet (owner's ask), instead of the `· ×N` copies the
   design had assumed (copies stay in the export and are uploaded; a copy with no one-lot strategy is deployed at 1). The 09:25
   check expects each account's own strategies. Not verified live: AlgoTest's MTM-stop scaling with the multiplier, a supervised

@@ -57,7 +57,12 @@ async function setQuantity(box: Locator, label: string, want: number): Promise<v
     await card
       .getByRole('button', { name: have < want ? 'Increase' : 'Decrease', exact: true })
       .click();
-    const next = Number(await input.inputValue());
+    // the page may commit the new number a moment after the click: look for it for a short time
+    let next = have;
+    for (let waited = 0; next === have && waited < 3_000; waited += 100) {
+      next = Number(await input.inputValue());
+      if (next === have) await input.page().waitForTimeout(100);
+    }
     if (next === have) throw new Error(`${label}'s quantity did not move from ${have}`);
     have = next;
   }
