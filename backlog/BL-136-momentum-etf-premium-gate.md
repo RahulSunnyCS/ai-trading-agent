@@ -189,3 +189,8 @@ show in the journal and on This week.
 - 2026-10-28 — Owner answered open question 1 (asked in chat, 2026-10-28): the gate blocks new BUYs only,
   not top-ups (ADD) of held names. That is how Phase 1 already behaves (an ADD is flagged), so no code
   change. Status unchanged.
+- 2026-11-06 — Phase 1b, in part: Your orders (Broad lots and single portfolios) now apply the gate
+  to NEW buys (`api._premium_skips`, owner: Nasdaq 100 at +5.49 % as of 29 Oct was in a new lot's
+  picks). The signal itself, the journal and the backtest are unchanged; a held name is never sold or
+  trimmed. Not done: the Friday Telegram signal for Broad / Custom Index still says Buy at any premium.
+

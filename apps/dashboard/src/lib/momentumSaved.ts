@@ -103,10 +103,15 @@ export const TRUST: Record<StrategyTrust, { label: string; tone: Tone; hint: str
 };
 
 export const CHANGE: Record<ResultChangeLabel, { label: string; tone: Tone; hint: string }> = {
+  data_extended: {
+    label: 'Data extended',
+    tone: 'info',
+    hint: 'Same code, newer data: later weeks were added and every earlier week is unchanged.',
+  },
   data_revised: {
     label: 'Data revised',
     tone: 'info',
-    hint: 'Same code, new data: expected when prices or corporate actions are revised.',
+    hint: 'Same code, new data: an earlier week moved, as expected when prices or corporate actions are revised.',
   },
   intended: {
     label: 'Intended change',
@@ -143,6 +148,8 @@ export function changeSentence(change: ResultChange): string {
     ? ` The curves first differ in the week of ${formatDay(change.first_difference)}.`
     : '';
   switch (change.label) {
+    case 'data_extended':
+      return `Same code, newer data: later weeks were added and every earlier week is unchanged.${from}`;
     case 'data_revised': {
       const what = change.changed?.length ? change.changed.join(', ') : 'the data';
       return `Same code, new data: ${what} changed.${from}`;
@@ -150,7 +157,7 @@ export function changeSentence(change: ResultChange): string {
     case 'intended':
       return `The code changed with an accepted golden change of this dataset: "${change.detail?.reason ?? 'no reason written'}".${from}`;
     case 'check':
-      return `The code changed and no accepted golden change of this dataset explains it.${from} Re-run it to check.`;
+      return `The Momentum code changed and no accepted golden change of this dataset explains it.${from} Re-run it to check.`;
     case 'not_reproducible':
       return `Same settings, code and data gave a different result: a bug.${from}`;
     default:

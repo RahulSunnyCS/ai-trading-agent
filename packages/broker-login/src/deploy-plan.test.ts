@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   type LiveState,
+  brokerRefusal,
   cardShows,
   checkBrokerSheet,
   istMinutes,
   minutesOf,
+  morningPicks,
   nothingOnAlgotest,
   parseCards,
   parseLive,
@@ -478,4 +480,49 @@ test('broker sheet: every wanted broker listed and logged in (BL-197)', () => {
     missing: ['Angel One'],
     notLoggedIn: [],
   });
+});
+
+// 2026-11-03 09:16: both brokers logged in at 08:17, yet the deployer read no "Broker Login n/m"
+// and refused as "0/0". A count the page did not show is unread, never "logged out".
+test('the broker count is read when split over lines or spaced', () => {
+  for (const shown of ['Broker Login\n2/2', 'Broker Login 2 / 2', 'Broker Login2/2']) {
+    const live = parseLive(PAGE_NOV.replace('Broker Login 0/2', shown));
+    assert.equal(live.brokersLoggedIn, 2, shown);
+    assert.equal(live.brokersTotal, 2, shown);
+  }
+});
+
+test('a broker count missing from /live is unread: the deploy refuses as such, not as logged out', () => {
+  const live = parseLive(PAGE_NOV.replace('Broker Login 0/2\n', ''));
+  assert.equal(live.brokersLoggedIn, null);
+  assert.equal(live.brokersTotal, null);
+  const p = planDeploy(novPicks, live, minutesOf('09:16'));
+  assert.match(p.refused ?? '', /could not read the broker count/);
+  assert.doesNotMatch(p.refused ?? '', /0\/0|no broker logged in/);
+  assert.deepEqual(p.deploy, []);
+  assert.equal(
+    brokerRefusal(parseLive(PAGE_NOV)),
+    'no broker logged in on AlgoTest (Broker Login 0/2)',
+  );
+  assert.equal(
+    brokerRefusal(parseLive(PAGE_NOV.replace('Broker Login 0/2', 'Broker Login 2/2'))),
+    null,
+  );
+});
+
+test('morningPicks leaves the add-on out when the settings turned it off after the evening export (BL-197)', () => {
+  const entries = [
+    { name: 'T1 · N_wide_0917', addon: false },
+    { name: 'T1 · N_buy-t1s47_1047 · add-on', addon: true },
+    { name: 'T1 · S_ditm1-t1s44_0917' }, // an older manifest without the field
+  ];
+  const off = morningPicks(entries, false);
+  assert.deepEqual(
+    off.kept.map((e) => e.name),
+    ['T1 · N_wide_0917', 'T1 · S_ditm1-t1s44_0917'],
+  );
+  assert.deepEqual(off.leftOut, ['T1 · N_buy-t1s47_1047 · add-on']);
+  const on = morningPicks(entries, true);
+  assert.equal(on.kept.length, 3);
+  assert.deepEqual(on.leftOut, []);
 });

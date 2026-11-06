@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-10-29
+**Status:** Tested · **Last updated:** 2026-11-05
 
 ## What it is
 
@@ -52,6 +52,8 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-130 | Merge two same-index Widesl picks within 30 minutes into one two-lot entry at the earlier time | Core-298: no effect beyond the brokerage (intervals include zero). T1: the earlier entry earned more, merge +₹107 [+30, +186] (identical strategies) / +₹290 [+141, +437] (any Widesl, deeper drawdown) per one-lot day over two years; last year +90 / +217, the first inconclusive. Partly in T1's selection year | [BL-130][bl130] |
 | BL-133 | A fourth lot on non-expiry days (3 on expiry days): Core's Dir at two lots or an added Dir; T1's top / lowest Widesl at two lots, an added Widesl, or (owner override) its Dir at two lots; against the same size spread evenly | Core Dir ×2 beat the even spread (after brokerage +₹149 [+14, +279] two years, +₹230 [+90, +379] last year) but the top 10 days carry 68 % of it; no T1 Widesl placement beat it (lowest Widesl ×2 −₹95 / −₹105, an added Widesl −₹129 / −₹194); T1's Dir ×2 (owner override) +₹98 [−20, +215] / +₹150 [+27, +270], two-thirds of it from 5 days. Amendment 2, under the book stop (₹8k / ₹9k + the extra lot's MTM SL) and the expiry rule: always the Dir ×2 (Core +₹149 [+20, +283] over the even spread, T1 +₹96 [−20, +218]; last year +₹224 / +₹127) is at least as good as the top-score pick ×2 (the Dir on ~3 days in 4; clearly worse than the Dir only in Core's last year, −₹103 [−195, −17]) and the top Widesl ×2; both accounts with the Dir doubled +₹577 [+323, +840] a day over 6 lots, drawdown −₹58.8k vs −₹56.9k; cutting the overlap does not help. Amendment 3: on a one-index expiry day 3 lots of the expiring index beat 4 lots of the other index (Core −₹1,174 [−2,051, −277] per expiry day, T1 −₹1,394 [−2,348, −463]; drawdown deeper). In-sample | [BL-133][bl133] |
 | BL-134 | Two strategies a day: top Widesl ×2 + Dir (×2 normal days, ×1 expiry) vs three picks with the Dir doubled | T1 worse (−₹254 [−486, −30] / −₹330 [−621, −55] net per day); Core inconclusive (−₹152 [−392, +62] / +₹128 [−87, +337]); its −70k drawdown is one early stretch (2025-01 → 2025-05), outside which P is slightly ahead. The ~₹100/day brokerage saved does not pay for the dropped Widesl | [BL-134][bl134] |
+| BL-204 | T1's fifth and sixth lot on normal days (Dir ×3 / ×4, a Widesl doubled, a Dir / Widesl / next-best pick added) and a fourth and fifth on one-index expiry days (Dir ×2, W1 ×2, a Dir / Widesl / other-index pick added), under the book stop (₹9k + each extra lot's MTM SL), against the live lots (Dir ×2 / 3 expiring) and the even spread | Normal days: the Dir takes every extra lot: Dir ×3 +₹405 [+3, +818] a day over the even spread (last year +₹608 [+175, +1,056]), Dir ×4 +₹617 [+18, +1,234] / +₹915 [+265, +1,589]; no Widesl placement or added strategy clears zero; the edge is 10 days (94 %) and the worst day grows −₹13.9k → −₹18.0k (×3) / −₹22.0k (×4). Expiry days: a fourth lot earns +₹770 a day but no placement beats the even spread; Dir ×2 and top Widesl ×2 equal (+₹18 [−502, +521]); adding a strategy clearly below it (−₹580 to −₹664); a fifth lot likewise (Dir ×2 + W1 ×2 = Dir ×3). In-sample | [BL-204][bl204] |
+| BL-207 | The doubled Dir's second lot taken later on T1's normal days (the same Dir 30 / 60 min on, the best-ranked Dir at least 30 / 60 min later, the best other Dir at any slot as control) against Dir ×2 at the pick's minute, under the book stop | **No evidence**: every arm below Dir ×2, −₹259 to −₹564 a day over 219 days (last year −₹440 to −₹785), 38–43 % of days won; drawdown not smaller by the registered 20 % (rank+30 / +60 about 15 % shallower), worst day not reliably smaller; Dir ×2 at the pick's slot stays. In-sample | [BL-207][bl207] |
 | BL-154 | Adaptive's weekday / DTE / VIX fits shrunk toward the variant's own window mean by n/(n+10); plus opening-gap and previous-day-range bands (÷ ATR, terciles) at weight 10 from weekday; P1 decides, 20 label shuffles | **Killed**: on P1 shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above it, drawdown 21% deeper; labels −₹20 [−91, +48]. Out of P1 shrinkage is wholly negative (P2 −₹172 [−321, −38], whole span −₹71 [−146, −1]); the more weight on the plain mean, the worse. Today's fits beat all 20 label shuffles on P2 and the whole span (17 of 20 on P1). Gross, 431 days 2025-01 → 2026-10 | [BL-154][bl154] |
 | BL-090 | A cap in `select`: no two core picks above trailing 63-day Pearson 0.5 / 0.6 / 0.7, lists A / B / C / REF, on BL-075's P1 / P2 / P3 (248 variants, P3 NIFTY only); pass = drawdown 10% shallower with net at most 5% lower in 2 of 3 periods | **Killed** for all 12 cells (best: 1 period). Drawdown is often shallower but net falls; in P2 every cap loses 28%–105% of net. Before charges, lists in-sample | [BL-090][bl090] |
 | BL-167 | ITM2 Dir added to the Adaptive universe (Core-298; Core-298 + T1), in-sample, 431 days | **No gain**: Core −₹57 a day (interval −235 to +118), T1 −₹74 (−258 to +108); Core drawdown 25% shallower, T1's 11% deeper; 75–78% of Core's ITM1 picks and 51–58% of its ATM picks are dropped (ITM2 enters in their place) | [BL-167][bl167] |
@@ -72,6 +74,10 @@ per lot-day is above zero and its drawdown per lot is no worse.
 - The rule is fragile: few weight cells are above chance in every period, and which one is best is not
   knowable from one year (PBO near 0.5). Adding Dir ITM1 made it much less fragile (58% of cells).
 - The book's shape (BL-189, BL-190): on three-Widesl days the third Widesl that outranks every Dir is worth keeping on T1 (+₹1,168 a lot against the best Dir's +₹119 over 68 days, 2025-26); forcing a Dir in helped only Core-N in 2022-24. Re-using a stopped pick's lot the same morning adds nothing and deepens the worst run. Registered, after charges.
+- Lots beyond three (BL-133, BL-204, BL-207, in-sample): on normal days every extra lot goes on the Dir (×2, ×3, ×4 each earn
+  their lot against an even spread, on a handful of days), entered with the first lot at the pick's minute: a second
+  lot taken 30 / 60 minutes later, or a later-ranked Dir, earns less (BL-207); on a one-index expiry day the expiring index's three picks
+  are the book, an extra lot earns but no placement beats spreading it, and an added strategy is worst.
 - Charges: lists A / B / C / REF pay ₹80–81k each in P1 at ₹13 an order ([charges](charges.md)).
 - In-sample comparison only, not BL-100's test: over 2025-10-09 → 2026-10-09 the full pool earned more
   per lot-day than both restricted pools for every list (A ₹383.6 full vs ₹309.1 / ₹268.6), gross
@@ -81,10 +87,13 @@ per lot-day is above zero and its drawdown per lot is no worse.
 
 - The forward read-out after 60 trading days from 2026-10-12 (the only unseen test).
 - BL-100 on P3.
+- An absolute 0–100 confidence beside the rank was tested and killed on one definition
+  ([rotation confidence](rotation-confidence.md), BL-210); a rescaled version is untested.
 
 ## Related
 
 - [Intraday state](intraday-state.md) (re-timing picks after 09:16), [portfolio stop](portfolio-stop.md),
+  [rotation confidence](rotation-confidence.md) (an absolute figure beside the rank, killed),
   [Buy](../strategies/buy-breakout/README.md) (the add-on).
 - Code: `src/option_backtesting/rotation/` (`score.py`, `lists.py`, `pick.py`), `research/bl057/rotate.py`.
   Picks and per-day outputs are git-ignored; regenerate with `rotate.py --basket …`.
@@ -112,6 +121,8 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl130]: ../../../backlog/BL-130-merge-close-widesl-picks.md
 [bl133]: ../../../backlog/BL-133-fourth-lot-on-normal-days.md
 [bl134]: ../../../backlog/BL-134-two-strategy-book.md
+[bl204]: ../../../backlog/BL-204-t1-lot-ladder.md
+[bl207]: ../../../backlog/BL-207-dir-second-lot-later.md
 [bl154]: ../../../backlog/BL-154-adaptive-fit-shrinkage.md
 [bl180]: ../../../backlog/BL-180-evening-prediction-vs-0916-pick.md
 [bl090]: ../../../backlog/BL-090-strategy-correlation-and-diverse-baskets.md

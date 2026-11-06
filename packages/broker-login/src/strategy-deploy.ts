@@ -9,6 +9,7 @@ import {
   type Automation,
   type Book,
   type Broker,
+  algotestAddon,
   algotestDeployBrokers,
   algotestMultiplierRefusal,
   describeSource,
@@ -16,6 +17,7 @@ import {
   uploadBooks,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
+import { automationForSession, sessionFor } from './day-type.js';
 import {
   ACTIVATE_LEAD_SECONDS,
   BROKER_LABELS,
@@ -24,6 +26,7 @@ import {
   SETUP_PENDING,
   checkBrokerSheet,
   istMinutes,
+  morningPicks,
   nothingOnAlgotest,
   parseLive,
   planDeploy,
@@ -32,6 +35,7 @@ import {
   secondsUntil,
 } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { hhmm, setupSheet } from './live-sheet.js';
 import { algotestLoginLocked } from './login-lock.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage } from './selectors.js';
@@ -44,13 +48,23 @@ import { visibleWithin } from './wait.js';
  * ready but OFF: `--apply` needs `ALGOTEST_DEPLOY=on`; without it the run logs in, reads /live and
  * prints what it would deploy. The owner may never switch it on (2026-10-19).
  *
- *   tsx src/strategy-deploy.ts --latest t1 [--apply]       deploy (after the 09:16 pick)
+ *   tsx src/strategy-deploy.ts --from-settings --morning [--apply]  every book an AlgoTest row
+ *       uploads (Settings › Automation), each from its latest-<book>.json, one login each; the
+ *       scheduler's jobs use this so a row switched to another list is never left out (2026-11-05)
+ *   tsx src/strategy-deploy.ts --latest t1 --morning [--apply]  BL-197 Phase 2: right after the
+ *       08:02 login (scheduler `algotest-activate`, 08:11), activate last evening's list: the export
+ *       the 16:40 run uploaded and set up, for today. The evening list is what trades on AlgoTest;
+ *       the 09:16 pick changes nothing there (owner, 2026-11-02). The Buy add-on is left out when no
+ *       AlgoTest row has it on now (`algotestAddon`, read again in the morning)
+ *   tsx src/strategy-deploy.ts --latest t1 [--apply]       deploy today's recorded picks (by hand;
+ *       the 09:16 job was retired by BL-197 Phase 2)
  *   tsx src/strategy-deploy.ts --latest t1 --check          15:35: anything left repeating or running
  *   tsx src/strategy-deploy.ts --latest t1 --setup [--apply]  BL-197: each evening, after the upload,
  *       Setup Execution for the next session's picks (Trade monitoring on Candle Close); deploys
  *       nothing, so it needs ALGOTEST_UPLOAD=on rather than ALGOTEST_DEPLOY
  *
- * Only a recorded export for today (`obt rotation algotest-export`, source "recorded") is accepted.
+ * Without --morning only a recorded export for today (`obt rotation algotest-export`, source
+ * "recorded") is accepted; --morning takes any export for today (the evening's is "preview").
  * Each pick is set up with AlgoTest's defaults as seen on 2026-10-19 (docs/algotest-execution.md §7:
  * multiplier 1, NRML legs, no execution day ticked, so the deploy is for today only), then
  * activated: "Activate" opens the broker sheet (BL-197, seen 2026-11-03), where every broker whose
@@ -84,60 +98,21 @@ function entryOf(doc: unknown): number {
   return p.Hour * 60 + p.Minute;
 }
 
-async function readLive(page: Page): Promise<LiveState> {
+async function readLive(page: Page, opts: { brokers?: boolean } = {}): Promise<LiveState> {
   await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
   await livePage.header(page).waitFor({ timeout: 30_000 });
   await livePage.anyRowCount(page).waitFor({ timeout: 30_000 });
+  // the broker count renders after the rows; not shown in time = unread (planDeploy refuses)
+  if (opts.brokers)
+    await livePage
+      .brokerCount(page)
+      .waitFor({ timeout: 20_000 })
+      .catch(() => undefined);
   return parseLive(await page.evaluate(() => document.body.innerText));
 }
 
 /** Too close to a pick's entry minute to activate it: that pick only; later picks still deploy. */
 class TooLate extends Error {}
-
-/** "HH:MM" of minutes after midnight. */
-function hhmm(minutes: number): string {
-  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-}
-
-/**
- * Open the pick's Setup Execution sheet, check AlgoTest's defaults, put Trade monitoring on Candle
- * Close (BL-197: the overall MTM stop then checks at each minute's close, as the backtest does; leg
- * stops stay on LTP) and save it.
- */
-async function setupSheet(page: Page, pick: Pick): Promise<void> {
-  const { name } = pick;
-  await livePage.row(page, name).click();
-  await livePage.setupExecution(page).click();
-  const sheet = livePage.sheet(page, name);
-  await sheet.waitFor({ timeout: 15_000 });
-
-  // AlgoTest's defaults, checked inside the sheet rather than changed: 1 lot, NRML on every leg,
-  // no execution day ticked (so the deploy is for today only).
-  const multiplier = await sheet.locator('input[type=number]').first().inputValue();
-  if (multiplier !== '1') throw new Error(`quantity multiplier is ${multiplier}, not 1`);
-  const products = await sheet
-    .locator('select')
-    .evaluateAll((els) =>
-      els.map((e) => (e as HTMLSelectElement).value).filter((v) => v.startsWith('ProductType.')),
-    );
-  if (!products.length || products.some((v) => v !== 'ProductType.NRML'))
-    throw new Error(`leg product types ${products.join(', ')}, expected NRML`);
-  const ticked = await sheet
-    .locator('input[type=checkbox]')
-    .evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).length);
-  if (ticked > 0) throw new Error(`${ticked} box(es) ticked in the sheet; expected none`);
-  const time = (await livePage.executionTime(sheet).inputValue()).slice(0, 5);
-  if (time !== hhmm(pick.entry))
-    throw new Error(`strategy execution time ${time}, expected ${hhmm(pick.entry)}`);
-  const candle = livePage.monitoring(sheet, 'on Candle Close');
-  const radio = candle.locator('input[type=radio]');
-  if (!(await radio.isChecked())) await candle.click();
-  if (!(await radio.isChecked()))
-    throw new Error('Trade monitoring did not switch to on Candle Close');
-
-  await livePage.sheetSave(sheet).click();
-  await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
-}
 
 /** What /live shows for `name` after a stop, so nobody deploys it twice by hand. */
 async function deployedState(page: Page, name: string, before: number): Promise<string> {
@@ -241,20 +216,34 @@ async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Pr
   return `deployed on ${on} (${after} Deployed)`;
 }
 
+interface Values {
+  dir?: string | undefined;
+  latest?: string | undefined;
+  /** every book an AlgoTest row in Settings › Automation uploads, each from its `latest-<book>.json` */
+  'from-settings': boolean;
+  apply: boolean;
+  check: boolean;
+  setup: boolean;
+  morning: boolean;
+  headed: boolean;
+}
+
 async function main(): Promise<number> {
-  const { values } = parseArgs({
+  const values = parseArgs({
     options: {
       dir: { type: 'string' },
       latest: { type: 'string' },
+      'from-settings': { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
       setup: { type: 'boolean', default: false },
+      morning: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
-  });
+  }).values as Values;
   if (existsSync('.env')) process.loadEnvFile('.env');
-  if (values.setup && values.check) {
-    console.error('--setup and --check do not go together');
+  if ([values.setup, values.check, values.morning].filter(Boolean).length > 1) {
+    console.error('--setup, --check and --morning do not go together');
     return 64;
   }
   // BL-197: Setup Execution deploys nothing; it belongs to the upload and its switch
@@ -276,7 +265,8 @@ async function main(): Promise<number> {
   // check fails open (it runs), since it only reads /live and is the safety net.
   let automation: Automation | null = null;
   try {
-    automation = readAutomation();
+    // BL-211: the lists as they stand on the session worked on: tomorrow's for the evening setup
+    automation = await automationForSession(sessionFor(Boolean(values.setup)));
   } catch (error) {
     if (!values.check) throw error;
     console.error(`automation settings unreadable (${String(error)}): the check runs anyway`);
@@ -293,20 +283,81 @@ async function main(): Promise<number> {
       return 0;
     }
   }
-  let dir = values.dir;
-  if (!dir && values.latest) {
-    const root = process.env.TRADING_DATA_ROOT?.trim();
-    if (!root) {
-      console.error('--latest needs TRADING_DATA_ROOT');
-      return 1;
+  const dirs = await exportDirs(values, automation);
+  if (dirs === null) return 64;
+  if (dirs.length === 0) {
+    console.log('no AlgoTest row in Settings › Automation uploads a list: nothing to do');
+    return 0;
+  }
+  let worst = 0;
+  for (const dir of dirs) {
+    if (dir.missing) {
+      // a row uploads this book but no export exists: the evening job did not run for it
+      console.error(
+        `${dir.book.toUpperCase()}: no export (${dir.pointer}); did the evening job run?`,
+      );
+      if (values.apply && !values.check) worst = Math.max(worst, 1);
+      continue;
     }
-    const pointer = join(root, 'rotation', 'algotest', `latest-${values.latest}.json`);
-    dir = (JSON.parse(await readFile(pointer, 'utf8')) as { dir: string }).dir;
+    worst = Math.max(worst, await runDir(dir.dir, values, automation));
   }
-  if (!dir) {
-    console.error('usage: --dir <export folder> | --latest <book> [--apply | --check | --setup]');
-    return 64;
+  return worst;
+}
+
+/** The books the 15:35 check falls back to when the settings name none. */
+const CHECK_FALLBACK = ['t1', 'core'] as const;
+
+type ExportDir =
+  | { book: string; dir: string; missing: false }
+  | { book: string; dir?: undefined; pointer: string; missing: true };
+
+/** The export folders to run: `--dir`, `--latest <book>`, or every book the settings upload. */
+async function exportDirs(
+  values: Values,
+  automation: Automation | null,
+): Promise<ExportDir[] | null> {
+  if (values.dir) return [{ book: '', dir: values.dir, missing: false }];
+  let books = values['from-settings']
+    ? automation
+      ? (uploadBooks(automation, 'algotest') as string[])
+      : []
+    : values.latest
+      ? [values.latest]
+      : [];
+  // The 15:35 check reads every tool strategy on /live whatever list it came from, so it runs once,
+  // and it is the safety net: with no row uploading a list (or settings that cannot be read) it
+  // still runs on whichever export exists, and `nothingOnAlgotest` decides whether to log in.
+  if (values.check && values['from-settings']) books = books.length ? books : [...CHECK_FALLBACK];
+  if (!values['from-settings'] && !books.length) {
+    console.error(
+      'usage: --dir <export folder> | --latest <book> | --from-settings [--apply | --check | --setup | --morning]',
+    );
+    return null;
   }
+  const root = process.env.TRADING_DATA_ROOT?.trim();
+  if (!root) {
+    console.error('--latest / --from-settings need TRADING_DATA_ROOT');
+    return null;
+  }
+  const out: ExportDir[] = [];
+  for (const book of books) {
+    if (values.check && out.some((d) => !d.missing)) break; // one check run is the whole check
+    const pointer = join(root, 'rotation', 'algotest', `latest-${book}.json`);
+    if (!existsSync(pointer)) {
+      out.push({ book, pointer, missing: true });
+      continue;
+    }
+    out.push({
+      book,
+      dir: (JSON.parse(await readFile(pointer, 'utf8')) as { dir: string }).dir,
+      missing: false,
+    });
+  }
+  return out;
+}
+
+/** One export folder: set up, check, activate or deploy its picks (one AlgoTest login each). */
+async function runDir(dir: string, values: Values, automation: Automation | null): Promise<number> {
   const manifest = JSON.parse(
     await readFile(join(resolve(dir), 'manifest.json'), 'utf8'),
   ) as Manifest;
@@ -316,10 +367,33 @@ async function main(): Promise<number> {
       console.error(`the export is for ${manifest.day}, a past session: nothing to set up`);
       return 1;
     }
+  } else if (values.morning) {
+    // Only the evening export (`--next`, source "preview") for today: a recorded export for today
+    // is a hand export after 09:16, and activating it (a catch-up after sleep) would trade the 09:16
+    // list, which the owner's rule says not to.
+    if (manifest.day !== today || manifest.source !== 'preview') {
+      console.error(
+        `the export is ${manifest.source} for ${manifest.day}: --morning activates only last evening's export (preview, for today ${today}); nothing activated${manifest.day !== today ? "; did last evening's algotest-evening run?" : ''}`,
+      );
+      return 1;
+    }
   } else if (!values.check && (manifest.source !== 'recorded' || manifest.day !== today)) {
     console.error(
       `the export is ${manifest.source} for ${manifest.day}, not today's recorded picks`,
     );
+    return 1;
+  }
+  // BL-209: a split export puts each copy on one account; activating or checking it here would tick
+  // every uploading broker for every copy (the ×2 copies on both accounts). Until Phase 3 builds
+  // the per-account activation, it is activated by hand. The evening setup is unaffected.
+  if (manifest.split && !values.setup) {
+    const accounts = Object.entries(manifest.accounts ?? {})
+      .map(([b, names]) => `${b}: ${names.join(', ')}`)
+      .join('; ');
+    const text = `⚠️ AlgoTest ${manifest.book.toUpperCase()} for ${manifest.day} is split across the accounts (BL-209): the tool does not ${values.check ? 'check' : 'activate'} a split list yet; ${values.check ? 'check' : 'activate'} by hand on /live, each copy on its own account only: ${accounts}`;
+    console.error(text);
+    if (values.morning && values.apply)
+      await sendText(readTelegramConfig(), text, 'broker.algotest').catch(() => undefined);
     return 1;
   }
   // BL-140: no login at all when the settings give AlgoTest nothing of the tool's to deploy or check.
@@ -345,12 +419,14 @@ async function main(): Promise<number> {
     );
     if (nothing) {
       console.log(`${nothing} (${describeSource(automation)}); AlgoTest not logged in`);
-      // An AlgoTest row uploading another list is deployed by no job: say so, never silently.
-      const other = values.apply ? uploads.filter((b) => b !== manifest.book) : [];
+      // An AlgoTest row uploading another list is deployed by no job: say so, never silently
+      // (under --from-settings every uploaded book gets its own run, so there is no "other").
+      const other =
+        values.apply && !values['from-settings'] ? uploads.filter((b) => b !== manifest.book) : [];
       if (other.length) {
         await sendText(
           readTelegramConfig(),
-          `⚠️ AlgoTest: Settings › Automation uploads the ${other.map((b) => b.toUpperCase()).join(', ')} list, but the 09:16 deploy handles ${manifest.book.toUpperCase()} only: deploy those by hand on /live`,
+          `⚠️ AlgoTest: Settings › Automation uploads the ${other.map((b) => b.toUpperCase()).join(', ')} list, but the ${values.morning ? 'morning activation' : '09:16 deploy'} handles ${manifest.book.toUpperCase()} only: deploy those by hand on /live`,
           'broker.algotest',
         ).catch(() => undefined);
       }
@@ -367,8 +443,18 @@ async function main(): Promise<number> {
     );
     return 1;
   }
+  // BL-197 Phase 2: the add-on follows the settings as they are now, not as the evening export
+  // read them (2026-11-04: switched off at 18:47, after the 16:40 export had set it up)
+  const addonWanted =
+    values.morning && automation && algotestAddon(automation, manifest.book as Book);
+  const morning =
+    values.morning && automation
+      ? morningPicks(manifest.strategies, addonWanted === true)
+      : { kept: manifest.strategies, leftOut: [] as string[] };
+  // ... and the other way round: an add-on switched on after the evening export is not in AlgoTest
+  const addonMissing = addonWanted === true && !manifest.strategies.some((s) => s.addon);
   const picks: Pick[] = [];
-  for (const s of manifest.strategies) {
+  for (const s of morning.kept) {
     const doc = JSON.parse(await readFile(join(resolve(dir), s.file), 'utf8'));
     picks.push({ name: s.name, entry: entryOf(doc) });
   }
@@ -380,7 +466,13 @@ async function main(): Promise<number> {
     return 1;
   }
   registerSecret(password);
-  const what = values.setup ? `setup for ${manifest.day}` : values.check ? '15:35 check' : 'deploy';
+  const what = values.setup
+    ? `setup for ${manifest.day}`
+    : values.check
+      ? '15:35 check'
+      : values.morning
+        ? 'morning activation'
+        : 'deploy';
   const label = `AlgoTest ${manifest.book.toUpperCase()} ${what}${values.setup ? '' : ` ${today}`}`;
   const browser = await chromium.launch({ headless: !values.headed });
   const page = await (
@@ -392,7 +484,8 @@ async function main(): Promise<number> {
 
   try {
     await algotestLoginLocked(page, { phone: normalizePhone(phone), password }, 'strategy-deploy');
-    const live = await readLive(page);
+    // setting up needs no broker; the deploy and the 15:35 check read the count
+    const live = await readLive(page, { brokers: !values.setup });
     if (values.setup) {
       const p = planSetup(picks, live);
       if (p.deployed.length) lines.push(`already deployed, left alone: ${p.deployed.join(', ')}`);
@@ -403,11 +496,13 @@ async function main(): Promise<number> {
       if (values.apply) {
         for (const pick of p.setup) {
           try {
-            await setupSheet(page, pick);
+            const outcome = await setupSheet(page, pick);
             const row = (await readLive(page)).rows.find((r) => r.name === pick.name);
             if (!row || row.status === SETUP_PENDING)
               throw new Error(`still "${row?.status ?? 'not listed'}" after saving the sheet`);
-            lines.push(`✅ ${pick.name}: ${row.status} (Candle Close, ${hhmm(pick.entry)})`);
+            lines.push(
+              `✅ ${pick.name}: ${row.status} (Candle Close, ${hhmm(pick.entry)}${outcome === 'kept' ? ', set up before' : ''})`,
+            );
           } catch (error) {
             failed = true;
             await safeScreenshot(page, 'setup-failed');
@@ -425,8 +520,24 @@ async function main(): Promise<number> {
         lines.push(`repeat days ticked (would trade again): ${again.join(', ')}`);
       } else lines.push('no tool strategy repeats tomorrow');
     } else {
+      if (values.morning) {
+        lines.push(
+          `last evening's list (${manifest.source} export for ${manifest.day}): ${manifest.strategies.map((s) => s.name).join(', ') || 'nothing'}`,
+        );
+        if (morning.leftOut.length)
+          lines.push(`add-on left out (Settings › Automation): ${morning.leftOut.join(', ')}`);
+        if (addonMissing)
+          lines.push(
+            "add-on on in Settings › Automation but not in last evening's list (it was off at the 16:40 export): upload and activate it by hand if it should trade today",
+          );
+      }
       const p = planDeploy(picks, live, istMinutes());
-      if (p.refused) lines.push(`refused: ${p.refused}`);
+      if (p.refused) {
+        lines.push(`refused: ${p.refused}`);
+        // what /live showed, for the next look (2026-11-03's "0/0" left nothing behind)
+        await safeScreenshot(page, 'deploy-refused');
+        await dumpHtml(page, 'deploy-refused');
+      }
       if (p.already.length) lines.push(`already deployed: ${p.already.join(', ')}`);
       if (p.deploy.length)
         lines.push(

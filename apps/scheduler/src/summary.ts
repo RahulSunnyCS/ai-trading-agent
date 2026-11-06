@@ -143,11 +143,11 @@ interface LocalLogin {
     quantiplyShoonya: { name: string; status: string; detail: string } | null;
     fatal: string | null;
   } | null;
-  /** Kite's unattended login on Fridays and Mondays (owner, 2026-10-28) */
+  /** Kite's unattended login on every trading day (owner, 2026-10-28; daily from 2026-11-06) */
   kite?: { name: string; status: string; detail: string };
 }
 
-/** Kite's line of the Mac's login file: null when it did not run (not a Friday or Monday, or off). */
+/** Kite's line of the Mac's login file: null when it did not run (off, or the login did not run). */
 export function kiteLoginCheck(local: LocalLogin | null): Check | null {
   const kite = local?.kite;
   if (!kite || kite.status === 'SKIPPED') return null;

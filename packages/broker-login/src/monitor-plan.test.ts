@@ -49,9 +49,11 @@ import {
   parseDayWiseListed,
   parseDeployedOn,
   parseMarginCsv,
+  parseMarginPlan,
   parseRupees,
   pauseNote,
   pickNeed,
+  planPerLot,
   pnlFromSocketFrame,
   quantiplyReading,
   readMtmCardsInPage,
@@ -156,18 +158,18 @@ const tomorrow = (hhmm: string) => ist('2026-10-22', hhmm).toISOString();
 test("waiting for the platforms' jobs (A): running, due, queued, done, not today", () => {
   const now = ist('2026-10-21', '09:25');
   const views: SchedulerJobView[] = [
-    // the top-up's retry is still running
+    // the activation's catch-up (the Mac slept through 08:11) is still running
     {
-      id: 'algotest-topup',
-      nextRun: tomorrow('09:18'),
+      id: 'algotest-activate',
+      nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('09:18'), ended_at: null },
-      previousSlot: slot('09:18'),
+      previousSlot: slot('08:11'),
       previousSlotRun: { ended_at: null },
     },
     // ended
     {
-      id: 'algotest-deploy',
-      nextRun: tomorrow('09:16'),
+      id: 'algotest-deploy-check',
+      nextRun: tomorrow('15:35'),
       lastRun: { started_at: slot('09:16'), ended_at: slot('09:17') },
       previousSlot: slot('09:16'),
       previousSlotRun: { ended_at: slot('09:17') },
@@ -182,7 +184,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     },
   ];
   assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now), {
-    blocking: ['algotest-topup is running (since 09:18)'],
+    blocking: ['algotest-activate is running (since 09:18)'],
     pastCap: [],
   });
   assert.deepEqual(decided(views, PLATFORM_JOBS.quantiply, now), {
@@ -203,10 +205,10 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     blocking: [],
     pastCap: [],
   });
-  // a slot about to come blocks (a --now run at 09:12, the 09:16 deploy) ...
+  // a slot about to come blocks (a --now run at 09:12, an activation catch-up due 09:16) ...
   const later: SchedulerJobView[] = [
     {
-      id: 'algotest-deploy',
+      id: 'algotest-activate',
       nextRun: slot('09:16'),
       lastRun: null,
       previousSlot: '2026-10-20T03:46:00.000Z',
@@ -214,7 +216,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     },
   ];
   assert.deepEqual(decided(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:12')), {
-    blocking: ['algotest-deploy runs at 09:16'],
+    blocking: ['algotest-activate runs at 09:16'],
     pastCap: [],
   });
   // ... one further ahead does not (the 09:05 margin login, 11 minutes before it)
@@ -241,11 +243,11 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
   // a hand `jobs run` at 13:00 (no slot today's row: a manual run) blocks too
   const manual: SchedulerJobView[] = [
     {
-      id: 'algotest-topup',
-      nextRun: tomorrow('09:18'),
+      id: 'algotest-activate',
+      nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('13:00'), ended_at: null },
-      previousSlot: slot('09:18'),
-      previousSlotRun: { ended_at: slot('09:20') },
+      previousSlot: slot('08:11'),
+      previousSlotRun: { ended_at: slot('08:20') },
     },
   ];
   assert.equal(
@@ -319,10 +321,10 @@ test('a "running" row older than its longest run is one nothing closed: ignored 
   const noon = ist('2026-10-21', '12:00');
   const open = (maxRunMinutes?: number): SchedulerJobView[] => [
     {
-      id: 'algotest-topup',
-      nextRun: tomorrow('09:18'),
+      id: 'algotest-activate',
+      nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('09:30'), ended_at: null },
-      previousSlot: slot('09:18'),
+      previousSlot: slot('08:11'),
       previousSlotRun: { started_at: slot('09:30'), ended_at: null },
       maxRunMinutes,
     },
@@ -344,7 +346,7 @@ test('a "running" row older than its longest run is one nothing closed: ignored 
     previousSlotRun: v.previousSlotRun && { ...v.previousSlotRun, alive: true },
   }));
   assert.deepEqual(decided(alive, PLATFORM_JOBS.algotest, noon).blocking, [
-    'algotest-topup is running (since 09:30)',
+    'algotest-activate is running (since 09:30)',
   ]);
   // ... and one it reports not alive is judged by its age
   const dead = alive.map((v) => ({
@@ -534,6 +536,7 @@ test('margin need: half a straddle per sold leg-lot; a bought leg by premium x l
     inr: 210000,
     borrowed: ['SENSEX'],
     unestimated: false,
+    lots: 2, // its legs' largest
   });
   const byPremium = legsFromQuantiply({
     configurations: {
@@ -591,6 +594,88 @@ test('margin verdict and message: a 20% cushion, short, unknown, not estimated',
   assert.match(m.text, /SENSEX estimated with NIFTY/);
   assert.match(m.text, /❔ Angel One .*need not known/);
   assert.match(m.text, /❔ X .*buy: bought by strike, premium not estimated/);
+});
+
+test('BL-205: the evening plan gives the need: lots × per-lot + buffer, no second cushion', () => {
+  const doc = {
+    day: '2026-11-04',
+    type: 'normal',
+    bufferPct: 10,
+    accounts: { angelone: { perLot: 200000 }, finvasia: { perLot: null } },
+  };
+  const plan = parseMarginPlan(doc, '2026-11-04');
+  assert.ok(plan);
+  assert.equal(parseMarginPlan(doc, '2026-11-05'), null); // another day's plan
+  assert.equal(parseMarginPlan({ ...doc, accounts: {} }, '2026-11-04'), null);
+  assert.equal(planPerLot(plan, 'angelone'), 200000);
+  assert.equal(planPerLot(plan, 'finvasia'), 200000); // borrows the shared table's figure
+  const pick = (name: string, lots: number) => ({
+    name,
+    inr: 1,
+    borrowed: ['SENSEX'],
+    unestimated: true,
+    lots,
+  });
+  const planned = { perLot: 200000, bufferPct: 10, type: 'normal' };
+  const m = marginMessage('2026-11-04', [
+    {
+      account: 'Angel One',
+      uses: ['AlgoTest T1'],
+      picks: [pick('dir', 2), pick('w1', 1)],
+      free: 700000, // needs 3 × ₹2,00,000 + 10% = ₹6,60,000: enough, though under 20% more
+      source: 's',
+      planned,
+    },
+    {
+      account: 'Finvasia',
+      uses: ['AlgoTest T1'],
+      picks: [pick('w1', 1), pick('w2', 1), pick('dir', 1)],
+      free: 600000,
+      source: 's',
+      planned,
+    },
+  ]);
+  assert.match(
+    m.text,
+    /✅ Angel One .*need ~₹6,60,000 for 2 picks \(3 lots × ₹2,00,000 a lot \+10%\)/,
+  );
+  assert.match(m.text, /❌ Finvasia .*SHORT by ₹60,000/);
+  assert.doesNotMatch(m.text, /estimated with NIFTY|not estimated|Estimate: half/);
+  // a pick that only buys adds its premium, not a lot's margin
+  const withBuy = marginMessage('2026-11-04', [
+    {
+      account: 'Angel One',
+      uses: ['AlgoTest T1'],
+      picks: [
+        pick('dir', 2),
+        { name: 'buy', inr: 5000, borrowed: [], unestimated: false, lots: 0 },
+      ],
+      free: 500000,
+      source: 's',
+      planned,
+    },
+  ]);
+  assert.match(withBuy.text, /need ~₹4,45,000 for 2 picks \(2 lots × ₹2,00,000 a lot \+10%\)/);
+  // Shoonya under the strict 50:50 rule: ₹8 L free but ₹2 L cash, so ₹4 L usable
+  const capped = marginMessage('2026-11-04', [
+    {
+      account: 'Finvasia',
+      uses: ['AlgoTest T1'],
+      picks: [pick('w1', 1), pick('w2', 1)],
+      free: 800000,
+      source: 's',
+      planned: { ...planned, cashCap: 400000 },
+    },
+  ]);
+  assert.match(capped.text, /free ₹8,00,000 \(₹4,00,000 usable under 50:50\), need ~₹4,40,000/);
+  assert.match(capped.text, /SHORT by ₹40,000/);
+  assert.deepEqual(
+    parseMarginPlan({ ...doc, accounts: { finvasia: { perLot: 1, cash: 5 } } }, '2026-11-04')?.cash,
+    {
+      finvasia: 5,
+    },
+  );
+  assert.match(m.text, /Need: last evening's per-lot figure/);
 });
 
 test('AlgoTest deploy check: per BL-140 row and broker, multiplier, missing, extra, the owner’s own', () => {
@@ -910,4 +995,17 @@ test('the margin counts a row’s multiplier: every leg’s lots times it', () =
     { underlying: 'NIFTY', sell: true, lots: 3, premium: null },
   ]);
   assert.equal(legs[0]?.lots, 1); // the export's own legs are never changed
+});
+
+test('AlgoTest: a broker count the page did not show is said as unread, not as logged out', () => {
+  const text = liveText('2/2', '', row('T1 · A', 1)).replace('Broker Login 2/2\n', '');
+  const c = checkAlgoTest(
+    'AlgoTest T1',
+    [{ broker: 'finvasia', picks: ['T1 · A'] }],
+    parseLive(text),
+    new Map([['T1 · A', 1]]),
+    [],
+  );
+  assert.ok(c.problems.some((p) => /could not read the broker count/.test(p)));
+  assert.ok(!c.problems.some((p) => /no broker logged in/.test(p)));
 });

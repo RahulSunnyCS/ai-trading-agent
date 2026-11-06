@@ -87,8 +87,8 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
   brokers), `quantiply`, `quantiply_shoonya`; a refusal matching `REFUSED` never), sets the repository variable
   `LOCAL_LOGIN_DONE` (UTC day) so the workflow's crons skip, and writes `<scheduler state>/broker-login/<IST day>.json`
   for the 09:00 summary. Its Quantiply logins do not take `quantiply-session.ts`'s stamp yet (08:02 is clear of the
-  08:00 `angel-login-check` window; the 08:10 deployer waits for it, same scheduler group). On Fridays and Mondays
-  with `KITE_AUTO_LOGIN=on` (`kiteDue`) it also runs `uv run --directory ../momentum-backtesting mbt kite auto-login`
+  08:00 `angel-login-check` window; the 08:10 deployer waits for it, same scheduler group). On every trading day
+  with `KITE_AUTO_LOGIN=on` (`kiteDue`; Fridays and Mondays only until 2026-11-06) it also runs `uv run --directory ../momentum-backtesting mbt kite auto-login`
   beside `main.ts` (owner, 2026-10-28): its outcome is the status file's `kite` (the 08:10 `loginLine` and the 09:00
   summary's Kite line), a failure is alerted at once, and Kite is never handed to GitHub.
 - `src/morning-report.ts` (+ pure `src/morning-report-plan.ts`) — BL-172: the 08:10 `quantiply-deploy` job sets
@@ -128,7 +128,7 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
   - `QUANTIPLY_BROKERS` listing `finvasia` logs Quantiply · Shoonya in after the AlgoTest logins
     (`runQuantiplyShoonyaIsolated`, one attempt, its own report line counted in the verdict, never the
     exit code).
-- **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on and an AlgoTest row
+- **Deploy:** `strategy-deploy.ts --apply` (with or without `--morning`) also needs the deploy master switch on and an AlgoTest row
   uploading the export's book; without such a row `--apply` and `--check` stop before logging in
   (`nothingOnAlgotest`; the check still runs when `deploy-ledger.jsonl` has a row from today);
   `quantiply-deploy.ts --mode enable --apply` needs it and the account's row uploading a list
@@ -221,13 +221,26 @@ week, until disabled.
   it in place ("Update" keeps its id); rename it to keep it. Uploads before 2026-10-20 had no id: `--record-ids`
   adds it once from the listing (ledger only); it cannot tell a tool upload from the owner's copy of the same
   name, so it was run once, supervised.
-- `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) deploys the day's recorded picks on /live. `--apply`
-  and `--check` need `ALGOTEST_DEPLOY=on`. "Activate" opens the broker sheet (BL-197): it ticks every broker
+- `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) activates strategies on /live. `--morning` (BL-197 Phase 2,
+  scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: with `--from-settings` (the three jobs) every book an AlgoTest row uploads, each from its `latest-<book>.json`, one login each, a book with no export reported and failed under `--apply`; the job first runs a catch-up step (`obt rotation algotest-export --from-settings --preview --only-missing` (exit 3 when no list is missing, which ends the chain) `&&` the top-up upload `&&` `--from-settings --setup`; `exit 0`, so it never blocks the activation): a row switched after 16:40 to a list no row had then still trades; or the export `--latest <book>`
+  points at (the 16:40 run's `--next` export, source `preview`, for today; any other export is refused, so a catch-up never trades the 09:16 list), every strategy not yet deployed, through
+  `planDeploy` like the old 09:16 run; the Buy add-on is left out when no AlgoTest row has it on now (`morningPicks`,
+  `algotestAddon`: the settings are read again in the morning, since the export read them the evening before). The
+  evening list is what trades on AlgoTest (owner, 2026-11-02); the 09:16 `algotest-deploy` and 09:18
+  `algotest-topup` jobs were retired on 2026-11-04, so nothing re-exports today's AlgoTest folder after 09:16 and the
+  09:25 deploy check reads the evening list too. Without `--morning` it deploys today's recorded picks (by hand).
+  `--apply` and `--check` need `ALGOTEST_DEPLOY=on`. "Activate" opens the broker sheet (BL-197): it ticks every broker
   whose AlgoTest row uploads the list (`algotestDeployBrokers`, `checkBrokerSheet`), presses "Activate on n
-  Brokers" and expects "n Deployed" up by n; it stops at anything else that opens.
+  Brokers" and expects "n Deployed" up by n; it stops at anything else that opens. It waits for /live's
+  "Broker Login n/m" (rendered after the rows; also read split over lines); a count the page does not show is
+  unread (`brokersLoggedIn: null`, `brokerRefusal`), refused as such, never as "0/0", and every refusal saves a
+  `deploy-refused` screenshot and HTML (2026-11-03).
   `--setup` (BL-197, the last step of `algotest-evening`) sets up the next session's picks instead: each
   sheet checked (multiplier 1, NRML, no day ticked, execution time = entry) and saved with Trade monitoring
   on Candle Close; it deploys nothing, so it needs `ALGOTEST_UPLOAD=on`, not `ALGOTEST_DEPLOY`.
+  A sheet set up before (its save button reads "Update Execution Settings": the morning activation reopens
+  last evening's) is only checked for Candle Close and no day ticked, then closed with Cancel, never saved
+  again (`src/live-sheet.ts`, tested against a stand-in page in `live-sheet.test.ts`).
 - Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read
   `latest-<book>.json`, written by `obt rotation algotest-export`. The page contract is in
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save
@@ -240,11 +253,11 @@ week, until disabled.
 09:04-15:30, under `caffeinate -i`, restarted after a scheduler or laptop restart until 15:25):
 
 - **Timeline and switches** (`.env`, each off until `on`): `MARGIN_CHECK` 09:05-09:10; then **no login and no
-  open session 09:10-09:25** (the 09:16 deploy and the 09:18-09:21 top-ups log in; neither platform is known to
+  open session 09:10-09:25** (the 09:18-09:21 Quantiply top-ups log in; neither platform is known to
   keep two sessions per user), checked at every login (after the lock wait) and every use of an open session;
   `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. Before every login, at any
-  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-deploy`,
-  `algotest-topup`, `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
+  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-activate`,
+  `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
   `quantiply-deploy-topup`, `quantiply-disable`, `quantiply-evening`, `quantiply-deploy`; both: BL-141's
   `live-capture` and `live-capture-retry`), and again under the
   login lock right before the login (`jobsStillToEnd`, then `jobsWait`). A run of one of them in progress today
@@ -295,7 +308,13 @@ week, until disabled.
   target x the lot size (`lotSize`), and "not estimated" for a leg bought by strike; every pick at once, no hedge
   benefit; ok with a 20% cushion. Picks from the exports of the rows that upload (`latest-<book>.json`), per
   broker account across both platforms. Free: Finvasia = AlgoTest `GET /brokers` `margin.available` (as of
-  AlgoTest's broker login; not today's = not read), Angel One = SmartAPI `getRMS` `net`.
+  AlgoTest's broker login; not today's = not read), Angel One = SmartAPI `getRMS` `net`. BL-205 Phase 4: when last
+  evening's result message saved `TRADING_DATA_ROOT/rotation/margin-plan/<day>.json` (`parseMarginPlan`), the need
+  is today's lots (each pick's largest leg lots) × its per-lot figure (the most a lot needed on recent days of
+  the day's type, from the margin statements) + its buffer, and enough is ok (no second 20% cushion; Shoonya's
+  free capped at twice last evening's cash, the strict 50:50 rule of the evening block); the
+  margin.csv estimate stays the fallback. The free figures read go into the state (`margin.free`) so the next
+  evening's block can set Shoonya's 09:05 AlgoTest figure beside its own.
 - **Deploy** (`checkAlgoTest`, `checkQuantiply`): per BL-140 row that uploads. AlgoTest: each pick deployed once
   per row that holds it, on that row's broker where /live's card names it (`parseDeployedOn`), multiplier 1 from
   `GET /executable-strategies` (no weekday filter; a pick it does not list is said); Quantiply: enabled once for

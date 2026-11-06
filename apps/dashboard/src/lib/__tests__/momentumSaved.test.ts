@@ -156,6 +156,7 @@ describe('why it moved', () => {
       '"Fix E12"',
     );
     expect(changeSentence(change({ label: 'not_reproducible' }))).toContain('a bug');
+    expect(changeSentence(change({ label: 'data_extended' }))).toContain('later weeks were added');
   });
 
   it('shortens versions and keeps a dirty marker', () => {

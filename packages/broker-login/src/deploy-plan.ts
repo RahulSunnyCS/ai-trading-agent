@@ -21,8 +21,13 @@ export interface ActivationRow {
 }
 
 export interface LiveState {
-  brokersLoggedIn: number;
-  brokersTotal: number;
+  /**
+   * "Broker Login n/m" on /live. null when the page did not show it (not rendered yet, or a
+   * redesign): unread, never taken as "no broker logged in" (2026-11-03 refused 0/0 that way
+   * while both brokers were logged in).
+   */
+  brokersLoggedIn: number | null;
+  brokersTotal: number | null;
   slotsUsed: number;
   /** null when /live does not show "n/6 Strategy Deployed" (gone by 2026-11-02): no limit read */
   slotsMax: number | null;
@@ -76,8 +81,8 @@ export function planDeploy(picks: Pick[], live: LiveState, now: number): DeployP
   };
   if (now < WINDOW_OPEN || now >= WINDOW_CLOSE) {
     out.refused = 'outside AlgoTest deploy hours (08:00-15:40 IST)';
-  } else if (live.brokersLoggedIn < 1) {
-    out.refused = `no broker logged in on AlgoTest (Broker Login ${live.brokersLoggedIn}/${live.brokersTotal})`;
+  } else {
+    out.refused = brokerRefusal(live);
   }
   const rows = new Map(live.rows.map((r) => [r.name, r]));
   const candidates: Pick[] = [];
@@ -160,6 +165,29 @@ export function planSetup(picks: Pick[], live: LiveState): SetupPlan {
   return out;
 }
 
+export interface MorningPicks<T> {
+  kept: T[];
+  /** the Buy add-on picks left out because no AlgoTest row has the add-on on */
+  leftOut: string[];
+}
+
+/**
+ * BL-197 Phase 2: the evening list as the morning activates and checks it. The evening export
+ * carried the add-on if the settings then said so; the morning reads the settings again, so an
+ * add-on switched off overnight is left in AlgoTest unactivated (and said), never traded.
+ */
+export function morningPicks<T extends { name: string; addon?: boolean }>(
+  entries: readonly T[],
+  addonOn: boolean,
+): MorningPicks<T> {
+  const out: MorningPicks<T> = { kept: [], leftOut: [] };
+  for (const e of entries) {
+    if (e.addon && !addonOn) out.leftOut.push(e.name);
+    else out.kept.push(e);
+  }
+  return out;
+}
+
 /** Tool strategies that would run again on a later day (a ticked execution day). */
 export function repeating(live: LiveState): string[] {
   return live.rows
@@ -210,9 +238,25 @@ export function stillDeployed(name: string, live: LiveState, cards: DeployedCard
   return cards.some((c) => cardShows(c, name) && c.state !== 'SQD OFF');
 }
 
+/**
+ * Why AlgoTest cannot trade now, from /live's broker count, or null when a broker is logged in.
+ * A count the page did not show is its own refusal: deploying blind is not safe, and "0/0" in the
+ * message would read as "logged out".
+ */
+export function brokerRefusal(live: LiveState): string | null {
+  if (live.brokersLoggedIn === null)
+    return 'could not read the broker count on AlgoTest /live (no "Broker Login n/m" on the page)';
+  if (live.brokersLoggedIn < 1)
+    return `no broker logged in on AlgoTest (Broker Login ${live.brokersLoggedIn}/${live.brokersTotal})`;
+  return null;
+}
+
+/** "Broker Login n/m", also split over lines or spaced ("Broker Login\n2 / 2"). */
+export const BROKER_COUNT = /Broker Login\s*(\d+)\s*\/\s*(\d+)/;
+
 /** The /live page's text (document.body.innerText) as counts and Activation rows. */
 export function parseLive(text: string): LiveState {
-  const broker = /Broker Login (\d+)\/(\d+)/.exec(text);
+  const broker = BROKER_COUNT.exec(text);
   const slots = /(\d+)\/(\d+) Strategy Deployed/.exec(text);
   const start = text.indexOf('\nActivation\n');
   const body = start >= 0 ? text.slice(start) : text;
@@ -230,8 +274,8 @@ export function parseLive(text: string): LiveState {
     });
   }
   return {
-    brokersLoggedIn: broker ? Number(broker[1]) : 0,
-    brokersTotal: broker ? Number(broker[2]) : 0,
+    brokersLoggedIn: broker ? Number(broker[1]) : null,
+    brokersTotal: broker ? Number(broker[2]) : null,
     slotsUsed: slots ? Number(slots[1]) : 0,
     slotsMax: slots ? Number(slots[2]) : null,
     rows,

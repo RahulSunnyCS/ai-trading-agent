@@ -507,9 +507,12 @@ def test_tomorrow_expects_the_filtered_picks_on_a_rule_day(rule_store, monkeypat
     assert (core, buy) == (ruled["core"], ruled["buy"])
     # the evening message lists these picks in full, with the rule on a line of its own
     monkeypatch.setattr(tomorrow_mod, "next_session", lambda d: MONDAY)
-    monkeypatch.setattr("option_backtesting.rotation.live.calendar_dte_labels", lambda d: labels)
+    monkeypatch.setattr(
+        "option_backtesting.rotation.live.listed_dte_labels", lambda d: (labels, "master")
+    )
     nxt = tomorrow_mod.next_session_picks(PRE, root)
     assert nxt is not None and nxt.expiry_only == index and nxt.day == MONDAY
+    assert nxt.dte_source == "master"
     assert (nxt.core, nxt.buy) == (core, buy)
     text = messages.render_result(PRE, None, None, nxt)
     assert text.count(f"⚡ {index} only") == 1

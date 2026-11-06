@@ -117,6 +117,7 @@ function contractNotesRetry(id: string, at: string, catchUpHours: number): Job {
 }
 
 const FRIDAY = onWeekdays(5);
+const THURSDAY = onWeekdays(4);
 /** Mondays that are trading days: nothing reads Kite on a Monday holiday. */
 const TRADING_MONDAY: DayRule = (day) => tradingDays(day) && onWeekdays(1)(day);
 
@@ -244,6 +245,27 @@ const BASE_JOBS: Job[] = [
     alertsItself: true,
     logFile: `${MOMENTUM}/data/launchd-weekly-orders.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt orders run',
+  },
+  {
+    // Owner, 2026-11-05: with a signal delay of 1 the names are fixed by last Friday's ranks, so
+    // Friday's orders can be shown the evening before. `mbt orders tentative` plans them exactly
+    // as the 14:15 run will (lots included) and writes only tentative_orders.json in the state
+    // dir: no orders row, no lot booking, no pending lot. One Telegram, headed tentative; This
+    // week shows the plan until Friday's real orders exist. Kite logs in with the 08:02 morning login every trading day,
+    // so the holdings are usually as last read; the plan says so.
+    id: 'momentum-orders-tentative',
+    description: "Momentum: Friday's orders planned early (tentative), nothing saved",
+    schedule: { at: '18:30', on: THURSDAY, label: 'Thu 18:30' },
+    steps: [['uv', 'run', 'mbt', 'orders', 'tentative', '--send']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 20,
+    retries: 1,
+    retryDelayMinutes: 10,
+    catchUpHours: 12, // any time before Friday morning is still early
+    group: 'catalog',
+    // the CLI sends no alert on an uncaught failure: the scheduler's failure alert is the one
+    alertsItself: false,
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt orders tentative --send',
   },
   {
     id: 'momentum-preview',
@@ -534,7 +556,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-evening',
     description:
-      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones, then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the morning only has to activate. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
+      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones, then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
     // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
     // results are incomplete (a late Fyers login), so the retries carry it to 20:40. It deletes the
     // strategies it uploaded that tomorrow drops (--allow-delete, owner 2026-10-20): AlgoTest's own
@@ -562,8 +584,8 @@ const BASE_JOBS: Job[] = [
         '--apply',
         '--allow-delete',
       ],
-      // BL-197: Setup Execution for the T1 picks just uploaded (re-saving a set-up sheet is safe)
-      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--setup', '--apply'],
+      // BL-197: Setup Execution for every list's picks just uploaded (re-saving a set-up sheet is safe)
+      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--from-settings', '--setup', '--apply'],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 15,
@@ -575,78 +597,49 @@ const BASE_JOBS: Job[] = [
       'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
   },
   {
-    id: 'algotest-topup',
+    id: 'algotest-activate',
     description:
-      "After the 09:16 pick, upload any recorded pick of AlgoTest's lists (dashboard settings, BL-140) that last night's upload does not have (BL-137); deletes nothing and names the strategies that are not today's. Does nothing until ALGOTEST_UPLOAD=on",
-    // The pick is recorded at about 09:16:20; a changed 09:17 pick cannot be deployed in time
-    // anyway, so 09:18 costs nothing. Not caught up after a long sleep: the picks would be stale.
-    schedule: { at: '09:18', on: tradingDays, label: 'trading days 09:18' },
+      "Activate last evening's list on AlgoTest's /live right after the morning login (BL-197 Phase 2): every list an AlgoTest row in Settings › Automation uploads (Tuned, Classic or both, each from its own export; a list switched in after 16:40 is exported, uploaded and set up first), each strategy the 16:40 run (or that catch-up) uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose row uploads that list, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading a list",
+    // 08:11 in the quantiply group: it starts when the 08:02 `broker-login` (which waits for
+    // AlgoTest's 08:16 broker window, so about 08:20) and the 08:10 Quantiply switch-on have
+    // ended. Never retried: a second attempt could activate what the first already did; the run
+    // alerts instead. Caught up until about 12:40 (a pick whose entry has come is reported,
+    // never activated; the last entry, the 12:17 add-on, has come by then, so a later wake could
+    // only alert). Replaced the 09:16 `algotest-deploy` and the 09:18 `algotest-topup` (2026-11-04).
+    schedule: { at: '08:11', on: tradingDays, label: 'trading days 08:11' },
     steps: [
+      // 2026-11-05: a row switched after 16:40 to a list no row had then has no export or upload.
+      // Catch it up first: export only the missing lists (exit 3 when none, which ends the chain at
+      // once, so a normal morning adds no AlgoTest login), upload them (top-up never deletes) and
+      // set them up. Never fails the job: the activation below reports any list still missing.
       [
-        'uv',
-        'run',
-        '--directory',
-        '../option-backtesting',
-        'obt',
-        'rotation',
-        'algotest-export',
-        '--from-settings',
+        'bash',
+        '-c',
+        'uv run --directory ../option-backtesting obt rotation algotest-export --from-settings --preview --only-missing && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode topup --apply && node_modules/.bin/tsx src/strategy-deploy.ts --from-settings --setup --apply; exit 0',
       ],
       [
         'node_modules/.bin/tsx',
-        'src/strategy-upload.ts',
+        'src/strategy-deploy.ts',
         '--from-settings',
-        '--mode',
-        'topup',
+        '--morning',
         '--apply',
       ],
     ],
     cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 2,
-    noRetryExitCodes: [3], // a conflict or a read-back that differs: retrying only repeats it
-    retryDelayMinutes: 2,
-    catchUpHours: 0.5,
-    fixHint:
-      'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode topup --apply',
-  },
-  {
-    id: 'algotest-deploy',
-    description:
-      "Deploy the day's recorded T1 picks on AlgoTest's /live (BL-138), right after the 09:16 pick: 1 lot each, today only, never a pick whose entry minute has come. Built ready but OFF: does nothing until ALGOTEST_DEPLOY=on, and no AlgoTest login while no AlgoTest row in Settings › Automation uploads the T1 list (BL-140)",
-    // Starts with the pick and waits (up to 120 s) for its journal entry. A 09:17 pick may still be
-    // too late through the website; it is then reported, never deployed late. Not caught up.
-    schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
-    steps: [
-      [
-        'uv',
-        'run',
-        '--directory',
-        '../option-backtesting',
-        'obt',
-        'rotation',
-        'algotest-export',
-        '--book',
-        't1',
-        '--wait',
-        '120',
-      ],
-      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--apply'],
-    ],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 0, // a second attempt could deploy what the first already did; the run alerts instead
+    timeoutMinutes: 30, // the catch-up may upload and set up a list first
+    retries: 0,
     retryDelayMinutes: 0,
-    catchUpHours: 0,
+    catchUpHours: 4.5,
+    group: 'quantiply',
     fixHint:
-      "First read each pick's Deployed count on algotest.in/live (the alert says what it showed): a pick that is already deployed must not be deployed again. Deploy only the rest by hand; then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1  (dry run)",
+      "First read each strategy's Deployed count on algotest.in/live (the alert says what it showed): one already deployed must not be activated again. Activate only the rest by hand (Activate, tick both brokers); then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --morning  (dry run)",
   },
   {
     id: 'algotest-deploy-check',
     description:
-      'At 15:35, alert if any strategy the tool deploys on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on; no AlgoTest login when no AlgoTest row uploads the T1 list and the tool deployed nothing today',
+      'At 15:35, alert if any strategy the tool activates on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on; no AlgoTest login when no AlgoTest row uploads a list and the tool deployed nothing today',
     schedule: { at: '15:35', on: tradingDays, label: 'trading days 15:35' },
-    steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--check']],
+    steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--from-settings', '--check']],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 5,
     retries: 1,

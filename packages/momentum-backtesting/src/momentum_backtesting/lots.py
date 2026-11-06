@@ -314,6 +314,9 @@ class Lot:
     exits: frozenset[str] = frozenset()  # names the sleeve marks SELL this week (forced exits)
     #: has the lot ever held a share? None = unknown: then "holds nothing" means new (tests).
     has_history: bool | None = None
+    #: a new lot bought from fresh cash: its leftover cash buys one share of the names an equal
+    #: split could not afford, in the order of `target` (the model's rank, best first)
+    use_leftover: bool = False
 
 
 def plan_lots(
@@ -388,6 +391,8 @@ def plan_lots(
                 min_trade_rs=min_trade_rs,
                 blocked=blocked_names,
             )
+            if lot in new and lot.use_leftover:
+                orders.use_leftover(plan, list(lot.target))
         elif any(name in mapped for name in lot.exits):
             # Sell the whole of what the sleeve marks SELL, whatever else it holds.
             leaving = {name: shares for name, shares in mapped.items() if name in lot.exits}

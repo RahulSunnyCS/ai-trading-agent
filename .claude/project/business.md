@@ -19,10 +19,14 @@ only; their own money is their decision.
   **Zerodha Kite** (BL-142, where the Momentum money is from 2026-10-19) is read the same way:
   holdings and margins (the free equity cash) through the free Kite Connect Personal plan, never
   an order; the lot ledger and This week's Lots panel only describe what Kite already holds.
-  **Kite's login is automated** on Fridays and trading Mondays (owner, 2026-10-28, off until
+  **Kite's login is automated** on every trading day, with the morning broker logins (owner,
+  2026-10-28 for Fridays and Mondays, every trading day from 2026-11-06; off until
   `KITE_AUTO_LOGIN=on`), although a Zerodha representative states that automating it is not
   allowed under exchange regulations (https://kite.trade/forum/discussion/comment/19966/). The
   owner accepted the risk to the Kite account; turning the switch off ends it.
+  **"Open in Kite basket"** (owner, 2026-11-06) posts the week's orders to Zerodha's own basket page
+  (Kite Publisher) from the owner's browser; the owner reviews and places them on Kite, signed in. No
+  order goes through the API from this repo.
   AlgoTest strategies run on the owner's own broker accounts.
 - **Offering signals to others (check before doing it):** sharing buy/sell recommendations
   with people outside the owner's own use, especially for a fee, can fall under SEBI's

@@ -12,7 +12,7 @@ says what runs when, and when it is worth looking.
 | 09:16 | The rotation picks are recorded, then one Telegram message: Adaptive's three strategies (with their settings), then the T1 track as "Tuned Adaptive (In Testing phase)". The friends' group gets the same message. | [Today](app:/optionslab/rotation) |
 | 15:40 | The live results are read off AlgoTest and Quantiply: every strategy that ran today, the tool's and your own. Read-only. | [Jobs](app:/jobs) |
 | 15:45 | The [evening run](glossary:evening-run): today's 1-minute option data is collected and every saved options strategy is run over it, and the rotation and T1 results are stored. A summary goes to Telegram. | [Today](app:/optionslab/rotation) |
-| 16:00 | One short Telegram message: the day's result for Adaptive and T1, then (your copy only) live against paper per platform and list with the [slippage](glossary:slippage), and your [discretionary](glossary:discretionary-trade) trades on their own line, and tomorrow's strategies in full. | Telegram |
+| 16:00 | One short Telegram message: the day's result for Adaptive and T1, then (your copy only) live against paper per platform and list with the [slippage](glossary:slippage), and your [discretionary](glossary:discretionary-trade) trades on their own line, tomorrow's strategies in full and (your copy only) whether tomorrow's lots fit each account's margin. | Telegram |
 
 ## Every Friday
 

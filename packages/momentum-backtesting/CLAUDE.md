@@ -550,6 +550,19 @@ contract, not a shared service).
   portfolio against the same snapshot and writes nothing: no orders row, no lot event, no pending
   lot (`tests/test_lot_orders.py` compares every catalog table and state file before and after).
   The dashboard's Rebalance preview page was retired for it; `/api/rebalance-preview*` remains.
+  The orders apply BL-136's premium gate to NEW buys (`api._premium_skips`: `weekly.latest_premiums` /
+  `premium_blocked` over `etf_premium.csv` with `live_config.toml`'s limits; a held name is never touched; a
+  fresh lot spreads its equal weights over the rest; `premium_skips` in the payload and a message line).
+  Orders on Kite carry `kite_orders` (`api._kite_orders`: one CNC limit order per stock within 0.5 % of the plan's price,
+  sells first, base symbols; Kite's basket page takes no market protection) and `GET /api/orders` the public `kite_api_key`; the dashboard's "Open in Kite basket" form posts
+  them to `kite.zerodha.com/connect/basket` (Kite Publisher), where the owner places them: this package
+  still sends no order.
+  `_compute_orders(dry_run=True)` (owner, 2026-11-05) is the same plan, lots included, with nothing written
+  to the catalog; `api.tentative_orders` keeps it as `tentative_orders.json` in the state dir and
+  `read_tentative(week)` serves it in `GET /api/orders` (`tentative`) while it is for the week asked.
+  `mbt orders tentative [--send]` (scheduler `momentum-orders-tentative`, Thu 18:30) and `POST
+  /api/orders/tentative/run` (`TENTATIVE_JOBS`) run it; `_tentative_message` is the 14:15 body under a
+  tentative heading, never action-required. Tests: `tests/test_tentative_orders.py`.
 - `kite.py` + `holdings_sync.py` (BL-142 Phase 1) — Zerodha Kite, read-only: the Momentum money
   is on Kite. `kite.py` calls only `/session/token`, `/portfolio/holdings` (quantity + T1),
   `/user/margins/equity` (`net` = free cash) and `/user/profile`; no order endpoint. The token
@@ -566,7 +579,8 @@ contract, not a shared service).
   collateral, never below 0. `mbt kite remind --send` is the Fri
   13:30 `kite-login-reminder` job (`--when monday`: the Mon 08:45 `kite-login-reminder-monday`).
   `kite_login.py` (`mbt kite auto-login`, owner 2026-10-28, off until `KITE_AUTO_LOGIN=on`) logs
-  in unattended on Kite's own page, Fridays and Mondays from the 08:02 `broker-login` job;
+  in unattended on Kite's own page, every trading day from the 08:02 `broker-login` job (Fridays and
+  Mondays only until 2026-11-06);
   `finish_login` (exchange, save, holdings read) is shared with `/api/kite/callback`.
   `login_nudge.py` gives it and `mbt token-remind` (the 08:05 / 15:30 Fyers reminders) the link to
   the hosted Broker logins page (`DASHBOARD_PUBLIC_URL`) and the phone-login blockers (API port,
@@ -583,7 +597,12 @@ contract, not a shared service).
   move only on a run on the Friday itself with a Kite snapshot read that day. Symbols Kite still
   holds that are not strategy names today are never booked as sold (`ignore`).
   `plan_lots`: each lot planned alone with `orders.plan`: a due lot with no shares is a *new lot*
-  (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite),
+  (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite; its
+  target is `api._fresh_sleeve_target`, the sleeve's picks split equally as the Rebalance preview's
+  first allocation, never the running model's drifted weights: owner, 2026-11-05; the lot row and the
+  message say *fresh picks, equal weights*; `orders.use_leftover`: the cash an equal split leaves buys one
+  share of each skipped name in the target's order, best model rank first, stopping at the first it cannot
+  afford; the target dict is ordered by the engine's final rank in `_fresh_sleeve_target`),
   a due lot with shares rebalances with the free cash left, a lot not due sells only names its
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +

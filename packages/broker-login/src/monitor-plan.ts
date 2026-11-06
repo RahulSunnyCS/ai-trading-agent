@@ -1,4 +1,4 @@
-import type { LiveState } from './deploy-plan.js';
+import { type LiveState, brokerRefusal } from './deploy-plan.js';
 import { NAME_PREFIXES } from './strategy-plan.js';
 
 /**
@@ -163,8 +163,8 @@ export function mergeLogins<K extends string>(
 /**
  * The two windows the scheduler's platform jobs log in in. Inside one, a job may be "due" or about
  * to run; after its end (the cap) only a run that is actually in progress still blocks.
- * Morning: algotest-topup's three attempts (09:18, 10 min each, 2 min apart) end by 09:52 at worst,
- * quantiply-topup's two and the queued quantiply-deploy-topup by 09:51. Evening: the 15:35 / 15:40
+ * Morning: quantiply-topup's two attempts and the queued quantiply-deploy-topup end by 09:51; the
+ * 08:11 AlgoTest activation (BL-197 Phase 2) is long over, unless a catch-up after sleep runs it. Evening: the 15:35 / 15:40
  * deploy check and disable, the 15:40 / 15:55 live-results capture (BL-141), the 16:40 / 16:45
  * uploads and the 16:55 enable.
  */
@@ -194,8 +194,9 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
   algotest: [
     // BL-172: the morning login runs on the Mac and logs in to both platforms
     { id: 'broker-login', window: 'morning' },
-    { id: 'algotest-deploy', window: 'morning' },
-    { id: 'algotest-topup', window: 'morning' },
+    // BL-197 Phase 2: the 08:11 activation of the evening list (the 09:16 deploy and the 09:18
+    // top-up were retired with it)
+    { id: 'algotest-activate', window: 'morning' },
     { id: 'algotest-deploy-check', window: 'evening' },
     { id: 'algotest-evening', window: 'evening' },
     // BL-141: the 15:40 capture and its 15:55 retry log in to both platforms
@@ -551,6 +552,9 @@ export interface PickNeed {
   borrowed: string[];
   /** a bought leg whose premium is not known before entry (chosen by strike): need not estimated */
   unestimated: boolean;
+  /** the pick's lots: its sold legs' largest (a straddle at 2 lots has two 2-lot legs); 0 for a
+   * pick that only buys, which needs its premium, not a lot's margin */
+  lots?: number;
 }
 
 /**
@@ -582,7 +586,49 @@ export function pickNeed(
     }
     total += (straddle / 2) * leg.lots;
   }
-  return { name, inr: total, borrowed: [...borrowed], unestimated };
+  const lots = legs.filter((l) => l.sell).reduce((m, l) => Math.max(m, l.lots), 0);
+  return { name, inr: total, borrowed: [...borrowed], unestimated, lots };
+}
+
+/**
+ * BL-205 Phase 4: the evening result message's margin block saves, for the next session, each
+ * account's lots and the per-lot requirement it used (`rotation/margin-plan/<day>.json`): the most
+ * a lot needed on the last days of that day type, from Angel One's margin statements, and the
+ * buffer. The 09:05 check takes its need from it, with today's lots, instead of margin.csv.
+ */
+export interface MarginPlan {
+  day: string;
+  type: string;
+  bufferPct: number;
+  /** the per-lot requirement for each broker account the block covered */
+  perLot: Partial<Record<string, number>>;
+  /** each account's cash half last evening (funds, pledged SGBs and liquid ETFs), for 50:50 */
+  cash: Partial<Record<string, number>>;
+}
+
+/** The plan file for `day`, or null when it is not one (wrong day, no per-lot figure). */
+export function parseMarginPlan(json: unknown, day: string): MarginPlan | null {
+  const doc = json as {
+    day?: unknown;
+    type?: unknown;
+    bufferPct?: unknown;
+    accounts?: Record<string, { perLot?: unknown; cash?: unknown }>;
+  };
+  if (!doc || doc.day !== day || typeof doc.bufferPct !== 'number') return null;
+  const perLot: Record<string, number> = {};
+  const cash: Record<string, number> = {};
+  for (const [broker, a] of Object.entries(doc.accounts ?? {})) {
+    if (typeof a?.perLot === 'number' && a.perLot > 0) perLot[broker] = a.perLot;
+    if (typeof a?.cash === 'number') cash[broker] = a.cash;
+  }
+  if (!Object.keys(perLot).length) return null;
+  return { day, type: String(doc.type ?? ''), bufferPct: doc.bufferPct, perLot, cash };
+}
+
+/** A broker's per-lot figure from the plan: its own, else any account's (they share one table). */
+export function planPerLot(plan: MarginPlan | null, broker: string): number | null {
+  if (!plan) return null;
+  return plan.perLot[broker] ?? Object.values(plan.perLot).find((v) => v !== undefined) ?? null;
 }
 
 export type MarginVerdict = 'ok' | 'tight' | 'short' | 'unknown';
@@ -606,6 +652,9 @@ export interface AccountMargin {
   source: string;
   /** a list whose picks for today could not be read: the need is then unknown */
   picksMissing?: boolean;
+  /** BL-205: the evening plan's per-lot figure and buffer, used for the need when present;
+   * `cashCap` (Shoonya, the strict 50:50 rule): at most twice last evening's cash is usable */
+  planned?: { perLot: number; bufferPct: number; type: string; cashCap?: number };
 }
 
 const MARK: Record<MarginVerdict, string> = { ok: '✅', tight: '⚠️', short: '❌', unknown: '❔' };
@@ -616,33 +665,59 @@ export function marginMessage(
 ): { text: string; ok: boolean } {
   const lines: string[] = [];
   let ok = true;
+  let estimated = false;
   for (const a of accounts) {
-    const need = a.picks.reduce((s, p) => s + p.inr, 0);
-    const unest = a.picks.filter((p) => p.unestimated).map((p) => p.name);
-    const short = marginVerdict(a.free, need) === 'short';
-    // a known shortfall stands even when part of the need is unknown
-    const v: MarginVerdict = short
-      ? 'short'
-      : a.picksMissing || unest.length
+    const lots = a.picks.reduce((s, p) => s + (p.lots ?? 0), 0);
+    const plan = a.planned;
+    // a pick that only buys needs its premium (the margin.csv estimate's figure for it)
+    const bought = a.picks.filter((p) => !p.lots);
+    // BL-205: the plan's per-lot figure already carries its buffer, so enough is enough (no
+    // second 20% cushion); without a plan, the documented margin.csv estimate as before
+    const need = plan
+      ? lots * plan.perLot * (1 + plan.bufferPct / 100) + bought.reduce((s, p) => s + p.inr, 0)
+      : a.picks.reduce((s, p) => s + p.inr, 0);
+    if (!plan) estimated = true;
+    const unest = (plan ? bought : a.picks).filter((p) => p.unestimated).map((p) => p.name);
+    const usable =
+      a.free !== null && plan?.cashCap !== undefined
+        ? Math.max(0, Math.min(a.free, plan.cashCap))
+        : a.free;
+    const judged: MarginVerdict = plan
+      ? usable === null
         ? 'unknown'
-        : marginVerdict(a.free, need);
+        : usable >= need
+          ? 'ok'
+          : 'short'
+      : marginVerdict(a.free, need);
+    // a known shortfall stands even when part of the need is unknown
+    const v: MarginVerdict =
+      judged === 'short' ? 'short' : a.picksMissing || unest.length ? 'unknown' : judged;
     if (v !== 'ok') ok = false;
-    const free = a.free === null ? 'free not read' : `free ${inr(a.free)}`;
+    const capped =
+      usable !== null && a.free !== null && usable < a.free
+        ? ` (${inr(usable)} usable under 50:50)`
+        : '';
+    const free = a.free === null ? 'free not read' : `free ${inr(a.free)}${capped}`;
     const count = `${a.picks.length} pick${a.picks.length === 1 ? '' : 's'}`;
+    const basis = plan
+      ? `${lots} lot${lots === 1 ? '' : 's'} × ${inr(plan.perLot)} a lot +${plan.bufferPct}%`
+      : '';
     const needText = a.picksMissing
       ? `need not known (picks not read)${a.picks.length ? `, ~${inr(need)} for the ${count} read` : ''}`
       : unest.length
         ? `need at least ~${inr(need)} for ${count} (${unest.join(', ')}: bought by strike, premium not estimated)`
-        : `need ~${inr(need)} for ${count}`;
+        : plan
+          ? `need ~${inr(need)} for ${count} (${basis})`
+          : `need ~${inr(need)} for ${count}`;
     const tail =
       v === 'short'
-        ? ` — SHORT by ${inr(need - (a.free ?? 0))}`
+        ? ` — SHORT by ${inr(need - (usable ?? 0))}`
         : v === 'tight'
           ? ' — under a 20% cushion'
           : '';
     lines.push(`${MARK[v]} ${a.account} (${a.uses.join(', ')}): ${free}, ${needText}${tail}`);
     lines.push(`   ${a.source}`);
-    const borrowed = [...new Set(a.picks.flatMap((p) => p.borrowed))];
+    const borrowed = plan ? [] : [...new Set(a.picks.flatMap((p) => p.borrowed))];
     if (borrowed.length)
       lines.push(`   ${borrowed.join(', ')} estimated with NIFTY's per-lot margin`);
   }
@@ -651,7 +726,16 @@ export function marginMessage(
     text: [
       head,
       ...lines,
-      'Estimate: half the short-straddle margin per sold leg-lot, the premium x lot per bought leg-lot, no hedge benefit',
+      ...(accounts.some((a) => a.planned)
+        ? [
+            "Need: last evening's per-lot figure (the most a lot needed on recent days of today's type, from the margin statements) for today's lots",
+          ]
+        : []),
+      ...(estimated
+        ? [
+            'Estimate: half the short-straddle margin per sold leg-lot, the premium x lot per bought leg-lot, no hedge benefit',
+          ]
+        : []),
     ].join('\n'),
     ok,
   };
@@ -753,11 +837,8 @@ export function checkAlgoTest(
     extra: [],
     notes: [],
   };
-  if (live.brokersLoggedIn < 1) {
-    out.problems.push(
-      `no broker logged in on AlgoTest (Broker Login ${live.brokersLoggedIn}/${live.brokersTotal})`,
-    );
-  }
+  const brokers = brokerRefusal(live);
+  if (brokers) out.problems.push(brokers);
   const liveRows = new Map(live.rows.map((r) => [r.name, r]));
   const brokerUnread = new Set<string>();
   const multUnread: string[] = [];

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock-up: Books table after the beats-random recommendation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --surface-1: #f1f3f6; --border: #d9dde3;
+    --fg: #15181d; --muted: #5d6673; --faint: #8a93a0; --accent: #2457d6; --accent-soft: #e4ebfb;
+    --warning: #9a5b00; --warning-soft: #fff1d6; --positive: #1a7f4b; --positive-soft: #dff3e8;
+    --negative: #c0392b; --negative-soft: #fbe3e0;
+    --mono: "IBM Plex Mono", ui-monospace, monospace; --sans: "IBM Plex Sans", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --surface: #171b21; --surface-1: #1e232b; --border: #2b323c;
+      --fg: #e8ebef; --muted: #98a2ae; --faint: #6f7987; --accent: #7aa2ff; --accent-soft: #1d2a47;
+      --warning: #f0b858; --warning-soft: #3a2c10; --positive: #5fd39a; --positive-soft: #11311f;
+      --negative: #ff7b6b; --negative-soft: #3c1a16;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --surface: #171b21; --surface-1: #1e232b; --border: #2b323c;
+    --fg: #e8ebef; --muted: #98a2ae; --faint: #6f7987; --accent: #7aa2ff; --accent-soft: #1d2a47;
+    --warning: #f0b858; --warning-soft: #3a2c10; --positive: #5fd39a; --positive-soft: #11311f;
+    --negative: #ff7b6b; --negative-soft: #3c1a16;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); padding: 24px 16px; }
+  .page { max-width: 980px; margin: 0 auto; }
+  .note { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+  .note b { color: var(--fg); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 26px 0 8px; font-weight: 600; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 12px; }
+  .seg span { padding: 4px 10px; border-right: 1px solid var(--border); color: var(--muted); }
+  .seg span:last-child { border-right: 0; }
+  .seg span.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
+  th { text-align: right; color: var(--muted); font-weight: 500; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: right; font-family: var(--mono); font-size: 13px; white-space: nowrap; vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  tr.focus td { background: var(--accent-soft); }
+  td.book { font-family: var(--sans); white-space: normal; min-width: 180px; }
+  td.book .n { font-weight: 600; }
+  td.book .f { color: var(--accent); font-size: 10px; margin-left: 6px; }
+  td.book .d { display: block; color: var(--faint); font-size: 11px; }
+  .pos { color: var(--positive); } .neg { color: var(--negative); } .dim { color: var(--faint); }
+  .range { display: block; color: var(--faint); font-size: 11px; }
+  .pill { font-family: var(--sans); display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+  .pill.ok { background: var(--positive-soft); color: var(--positive); }
+  .pill.no { background: var(--surface-1); color: var(--muted); border: 1px solid var(--border); }
+  .pill.warn { background: var(--warning-soft); color: var(--warning); }
+  .stop { font-family: var(--sans); display: inline-flex; align-items: center; gap: 6px; }
+  .stop .b { background: var(--accent-soft); color: var(--accent); border-radius: 6px; padding: 2px 8px; font-weight: 600; font-family: var(--mono); }
+  .stop .t { color: var(--muted); font-size: 11px; text-decoration: underline dotted; }
+  .foot { padding: 12px 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .foot b { color: var(--fg); font-weight: 600; }
+  .foot .rule { margin-top: 6px; }
+  .sub { padding: 12px 14px; border-top: 1px solid var(--border); }
+  .sub h3 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+  .sub p { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .kpi .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  .kpi .v { font-family: var(--mono); font-size: 18px; font-weight: 500; margin-top: 2px; }
+  .kpi .s { color: var(--faint); font-size: 11px; font-family: var(--mono); }
+  .alert { display: flex; gap: 8px; align-items: flex-start; background: var(--warning-soft); color: var(--warning); border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-top: 10px; }
+  .alert.quiet { background: var(--surface-1); color: var(--muted); }
+  .before { opacity: .85; }
+  .strike { text-decoration: line-through; color: var(--faint); }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="note"><b>Mock-up, not the app.</b> Options Lab › Today, the Books table, as it would look after the recommendation. Every figure is real: 0.5% slippage, the 439 sessions since 10 Jan 2025 for the long windows, the live days for the live columns. Live and drawdown figures from the 5 Nov page.</p>
+
+  <h2>Before: PR 430 as built</h2>
+  <div class="card before">
+    <div class="wrap"><table>
+      <tr><th>Book</th><th>Latest day</th><th>Since 19 Oct 2026</th><th>₹ / lot-day</th><th>Max DD / lot</th><th>vs base / lot-day</th><th>Beats random</th><th>Last 60 sessions</th><th>Last 6 months</th><th style="text-align:left">Portfolio stop</th></tr>
+      <tr class="focus"><td class="book"><span class="n">Adaptive Tuned</span><span class="f">focus</span><span class="d">The same picker with 223 tuned-settings variants added</span></td><td class="pos">+₹2,274</td><td class="pos">+₹421</td><td class="pos">+₹81</td><td>−₹3,619</td><td class="neg">−₹724</td><td>31%</td><td>95%</td><td>99%</td><td style="text-align:left"><span class="stop"><span class="b">₹9,000</span><span class="t">fired 1 of 11</span></span></td></tr>
+      <tr><td class="book"><span class="n">Adaptive Classic</span><span class="d">The 298 tested variants</span></td><td class="pos">+₹5,716</td><td class="neg">−₹20,339</td><td class="neg">−₹555</td><td>−₹10,206</td><td class="neg">−₹1,361</td><td>1%</td><td>60%</td><td>95%</td><td style="text-align:left"><span class="stop"><span class="b">₹8,000</span><span class="t">fired 4 of 16</span></span></td></tr>
+      <tr><td class="book"><span class="n">Fixed base</span><span class="d">2 × Widesl OTM1 09:17 + 1 × Dir ATM 09:24</span></td><td class="neg">−₹1,977</td><td class="pos">+₹19,418</td><td class="pos">+₹405</td><td>−₹5,239</td><td class="dim">the base</td><td class="dim">—</td><td>73%</td><td>59%</td><td style="text-align:left"><span class="stop"><span class="b">₹8,000</span><span class="t">fired 3 of 16</span></span></td></tr>
+    </table></div>
+    <div class="foot">Three percentage columns, each against a different window. The two long ones hit 100% over a year, so they cannot rank the books, and three books × three windows invites a false alarm.</div>
+  </div>
+
+  <h2>After: the recommendation</h2>
+  <div class="card">
+    <div class="bar">
+      <span>Live test: <b style="color:var(--fg)">day 16 of 60</b> · 12 Oct → 5 Nov 2026</span>
+      <span style="margin-left:auto">History window</span>
+      <span class="seg"><span>60 sessions</span><span class="on">6 months</span><span>1 year</span><span>2 years</span></span>
+    </div>
+    <div class="wrap"><table>
+      <tr>
+        <th>Book</th><th>Latest day</th><th>Live since 19 Oct</th><th>Live ₹ / lot-day</th><th>Max DD / lot</th><th>Live vs base / lot-day</th><th>6 months vs base / lot-day</th><th>Edge over random</th><th style="text-align:left">Portfolio stop</th>
+      </tr>
+      <tr class="focus">
+        <td class="book"><span class="n">Adaptive Tuned</span><span class="f">focus</span><span class="d">The same picker with 223 tuned-settings variants added</span></td>
+        <td class="pos">+₹2,274</td><td class="pos">+₹421</td><td class="pos">+₹81</td><td>−₹3,619</td>
+        <td class="neg">−₹724<span class="range">11 days, too few to read</span></td>
+        <td class="pos">+₹208<span class="range">−162 to +596 · includes 0</span></td>
+        <td>2.6 σ<span class="range">in-sample: tuned on these days</span></td>
+        <td style="text-align:left"><span class="stop"><span class="b">₹9,000</span><span class="t">fired 1 of 11</span></span></td>
+      </tr>
+      <tr>
+        <td class="book"><span class="n">Adaptive Classic</span><span class="d">The 298 tested variants</span></td>
+        <td class="pos">+₹5,716</td><td class="neg">−₹20,339</td><td class="neg">−₹555</td><td>−₹10,206</td>
+        <td class="neg">−₹1,361<span class="range">16 days, too few to read</span></td>
+        <td class="pos">+₹102<span class="range">−265 to +458 · includes 0</span></td>
+        <td>1.8 σ<span class="range">re-derived rule</span></td>
+        <td style="text-align:left"><span class="stop"><span class="b">₹8,000</span><span class="t">fired 4 of 16</span></span></td>
+      </tr>
+      <tr>
+        <td class="book"><span class="n">Fixed base</span><span class="d">2 × Widesl OTM1 09:17 + 1 × Dir ATM 09:24</span></td>
+        <td class="neg">−₹1,977</td><td class="pos">+₹19,418</td><td class="pos">+₹405</td><td>−₹5,239</td>
+        <td class="dim">the base</td><td class="dim">the base</td>
+        <td>0.2 σ<span class="range">fixed rule</span></td>
+        <td style="text-align:left"><span class="stop"><span class="b">₹8,000</span><span class="t">fired 3 of 16</span></span></td>
+      </tr>
+    </table></div>
+
+    <div class="sub">
+      <h3>Against the fixed base · 6 months · 118 sessions to 5 Nov 2026</h3>
+      <p>Head-to-head on the same days, ₹ per lot-day after 0.5% slippage, with a 90% block-bootstrap range. A range that includes zero means "not distinguishable from the base".</p>
+      <div class="grid">
+        <div class="kpi"><div class="k">Tuned minus base</div><div class="v pos">+₹208</div><div class="s">−162 to +596 · ahead on 53% of days</div></div>
+        <div class="kpi"><div class="k">Classic minus base</div><div class="v pos">+₹102</div><div class="s">−265 to +458 · ahead on 57% of days</div></div>
+        <div class="kpi"><div class="k">Base, edge over random</div><div class="v">0.2 σ</div><div class="s">beats 59% of random baskets</div></div>
+      </div>
+      <div class="alert quiet">ⓘ&nbsp;118 of these 118 sessions are the 09:16 rule re-derived from stored results; 11 (Tuned) and 16 (Classic) were recorded live. Tuned's settings were chosen on this history, so its gap is flattering. The registered verdict is the live test below.</div>
+    </div>
+
+    <div class="sub">
+      <h3>Drift alarm · last 60 sessions</h3>
+      <p>Pre-set rule, evaluated on this page from the latest stored data (no Telegram alert yet): two consecutive checks with the 60-session gap to the base below −₹500 per lot-day opens a review. Read the number only when the alarm says so.</p>
+      <div class="grid">
+        <div class="kpi"><div class="k">Tuned</div><div class="v pos">+₹91</div><div class="s"><span class="pill ok">quiet</span>&nbsp; 60 sessions to 5 Nov</div></div>
+        <div class="kpi"><div class="k">Classic</div><div class="v neg">−₹32</div><div class="s"><span class="pill ok">quiet</span>&nbsp; above −₹500</div></div>
+        <div class="kpi"><div class="k">Last alarm</div><div class="v dim">none</div><div class="s">never in the record</div></div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <b>The registered verdict (unchanged).</b> Adaptive Classic minus the fixed base: −₹276 per lot-day, 90% interval −₹2,220 to +₹1,578, drawdown per lot worse. Does not beat the base on the registered rule. 16 scored sessions; judged at the 60-session read-out.
+      <div class="rule"><span class="pill warn">what 60 sessions can show</span>&nbsp; the daily gap swings about ₹2,300, so the 60-session average is uncertain by about ±₹300: a ₹250 edge will not clear zero. The read-out catches a bad loss or a large edge, not a moderate one.</div>
+    </div>
+  </div>
+
+  <h2>What changed, in one line each</h2>
+  <p class="note">
+    • "Beats random", "Last 60 sessions" and "Last 6 months" percentages are gone; one "vs base" column follows the window picker instead.<br>
+    • "Edge over random" in standard deviations replaces the percentage: it has no 100% ceiling, and the base can be compared on it.<br>
+    • The head-to-head card gives the range and "better on X% of days", which is what the percentages were being read as.<br>
+    • The drift alarm turns the 60-session window into a rule, not a number to watch.<br>
+    • The live columns and the registered verdict are untouched; the only new line is the honest note on what 60 sessions can show.
+  </p>
+</div>
+</body>
+</html>

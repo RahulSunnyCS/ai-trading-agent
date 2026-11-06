@@ -42,12 +42,22 @@ test('tool names: list, variant, add-on; anything else is not the tool', () => {
     variant: 'N_p150-t1s11_0917',
     book: 't1',
     addon: false,
+    lots: 1,
   });
   assert.deepEqual(toolName('Core · N_buy_0917 · add-on'), {
     variant: 'N_buy_0917',
     book: 'core',
     addon: true,
+    lots: 1,
   });
+  // BL-209: a split export's 2-lot copy
+  assert.deepEqual(toolName('T1 · S_p320_0947 · ×2'), {
+    variant: 'S_p320_0947',
+    book: 't1',
+    addon: false,
+    lots: 2,
+  });
+  assert.equal(toolName('T1 · S_p320_0947 · ×0'), null);
   assert.equal(toolName('N_ITM1_SL21_3000'), null);
   assert.equal(toolName('t1 · N_x'), null);
   assert.equal(savedName('T1 · N_p150-t1s11_0917 (2)'), 'T1 · N_p150-t1s11_0917');

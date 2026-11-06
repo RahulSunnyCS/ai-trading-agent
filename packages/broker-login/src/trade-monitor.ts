@@ -11,12 +11,14 @@ import {
   type Automation,
   type Book,
   type Broker,
+  algotestAddon,
   effectiveRow,
   pausedFor,
   readAutomation,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
-import { istMinutes, parseLive } from './deploy-plan.js';
+import { automationForSession } from './day-type.js';
+import { istMinutes, morningPicks, parseLive } from './deploy-plan.js';
 import { describe } from './diagnose.js';
 import {
   LockBusy,
@@ -76,8 +78,10 @@ import {
   parseDayWiseListed,
   parseDeployedOn,
   parseMarginCsv,
+  parseMarginPlan,
   pauseNote,
   pickNeed,
+  planPerLot,
   pnlFromSocketFrame,
   quantiplyReading,
   readMtmCardsInPage,
@@ -166,7 +170,13 @@ const BOOK_NAME: Record<Book, string> = { core: 'Core', t1: 'T1' };
 
 interface DayState {
   /** `skipped`: the monitor started after 09:10, said once */
-  margin?: { at: string; ok: boolean; skipped?: boolean };
+  margin?: {
+    at: string;
+    ok: boolean;
+    skipped?: boolean;
+    /** BL-205: the free margin read per broker, for the evening block's comparison */
+    free?: Partial<Record<Broker, number | null>>;
+  };
   deploy?: { at: string; ok: boolean };
   loss: MtmNoticeState & {
     warned: boolean;
@@ -330,9 +340,9 @@ class Monitor {
     const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) as {
       day: string;
       source: string;
-      strategies: { name: string; file: string }[];
+      strategies: { name: string; file: string; addon?: boolean }[];
     };
-    const picks: { name: string; legs: LegNeed[]; lots: number[] }[] = [];
+    const picks: { name: string; legs: LegNeed[]; lots: number[]; addon: boolean }[] = [];
     for (const s of manifest.strategies) {
       const doc = JSON.parse(await readFile(join(dir, s.file), 'utf8'));
       const legs = platform === 'algotest' ? legsFromAlgtst(doc) : legsFromQuantiply(doc);
@@ -340,6 +350,7 @@ class Monitor {
         name: s.name,
         legs,
         lots: platform === 'quantiply' ? legLots(doc) : legs.map((l) => l.lots),
+        addon: Boolean(s.addon),
       });
     }
     return { day: manifest.day, source: manifest.source, picks };
@@ -616,6 +627,13 @@ class Monitor {
       throw new SessionLost('AlgoTest logged the session out');
     }
     await livePage.header(page).waitFor({ timeout: 30_000 });
+    // the broker count renders after the header; missing in time = unread, said as such. Only on
+    // a reload (the deploy check): the minute's loss reading does not read it
+    if (reload)
+      await livePage
+        .brokerCount(page)
+        .waitFor({ timeout: 20_000 })
+        .catch(() => undefined);
     return page;
   }
 
@@ -767,6 +785,7 @@ class Monitor {
 
   async margin(): Promise<void> {
     const accounts: AccountMargin[] = [];
+    const free: Partial<Record<Broker, number | null>> = {};
     const csv = readFileSync(
       new URL(
         '../../option-backtesting/src/option_backtesting/data/reference/margin.csv',
@@ -775,6 +794,14 @@ class Monitor {
       'utf8',
     );
     const perStraddle = parseMarginCsv(csv);
+    // BL-205 Phase 4: last evening's per-lot figure for today, when the result message saved one
+    let plan: ReturnType<typeof parseMarginPlan> = null;
+    try {
+      const planFile = join(this.root, 'rotation', 'margin-plan', `${this.day}.json`);
+      plan = parseMarginPlan(JSON.parse(await readFile(planFile, 'utf8')), this.day);
+    } catch {
+      plan = null; // no plan (an evening without the block): the margin.csv estimate, as before
+    }
     const lotOf = (u: string) => {
       try {
         return lotSize(u as Underlying);
@@ -858,7 +885,19 @@ class Monitor {
       } catch (error) {
         account.source = `not read: ${describe(error)}`;
       }
+      const perLot = planPerLot(plan, broker);
+      if (plan && perLot !== null) {
+        const cash = plan.cash[broker];
+        account.planned = {
+          perLot,
+          bufferPct: plan.bufferPct,
+          type: plan.type,
+          // Shoonya is held to the 50:50 rule strictly, as in the evening block
+          ...(broker === 'finvasia' && cash !== undefined ? { cashCap: 2 * cash } : {}),
+        };
+      }
       accounts.push(account);
+      free[broker] = account.free;
     }
     if (!accounts.length) {
       console.log(
@@ -870,7 +909,7 @@ class Monitor {
     }
     const m = marginMessage(this.day, accounts);
     if (await this.send(m.text, 'monitor.margin')) {
-      this.state.margin = { at: new Date().toISOString(), ok: m.ok };
+      this.state.margin = { at: new Date().toISOString(), ok: m.ok, free };
       await this.save();
     }
   }
@@ -902,14 +941,20 @@ class Monitor {
             missing.push(`no ${r.book} picks exported for today (latest ${p.day})`);
             continue;
           }
-          if (p.source !== 'recorded') {
+          // BL-197 Phase 2: on AlgoTest the evening list (the preview export) is the list that
+          // trades (the 08:11 activation deploys it; the 09:16 pick changes nothing there), so
+          // that is the expected export and needs no note; anything else is a hand export.
+          if (p.source !== 'preview') {
             notes.push(
-              `checked against last evening's expected ${r.book} picks (no recorded export yet)`,
+              `checked against a ${p.source} export, not last evening's ${r.book.toUpperCase()} list (the 08:11 activation reads the evening's preview export, BL-197)`,
             );
           }
+          const m = morningPicks(p.picks, algotestAddon(this.automation, r.book));
+          if (m.leftOut.length)
+            notes.push(`add-on left out (Settings › Automation): ${m.leftOut.join(', ')}`);
           rows.push({
             broker: r.broker,
-            picks: p.picks.map((x) => x.name),
+            picks: m.kept.map((x) => x.name),
             multiplier: r.multiplier,
           });
         }
@@ -1127,7 +1172,7 @@ async function main(): Promise<number> {
   if (!root) return failed(1, 'did not run: TRADING_DATA_ROOT is not set', print);
   let automation: Automation;
   try {
-    automation = readAutomation();
+    automation = await automationForSession({ day }); // BL-211: today's lists
   } catch (error) {
     return failed(
       1,

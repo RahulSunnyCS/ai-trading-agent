@@ -12,6 +12,10 @@ import {
   CAPITAL_MIN,
   LIST_LABEL,
   type List,
+  MARGIN_BUFFER_MAX,
+  MARGIN_BUFFER_MIN,
+  MARGIN_DAYS_MAX,
+  MARGIN_DAYS_MIN,
   MASTER_LABEL,
   MTM_SL_MAX,
   MTM_SL_MIN,
@@ -23,8 +27,11 @@ import {
   describeChanges,
   githubOutcome,
   heldByMaster,
+  rulesProblems,
+  splitApplies,
   totalCapital,
   withCapital,
+  withMargin,
   withMaster,
   withPause,
   withRow,
@@ -42,6 +49,7 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { toast } from '../ui/Toast';
+import { AutomationRulesSection } from './AutomationRulesSection';
 import { SettingSwitch } from './SettingSwitch';
 
 const URL = `${SCHEDULER_API}/settings/automation`;
@@ -86,7 +94,7 @@ export function AutomationSettingsCard() {
   );
 
   async function save() {
-    if (!draft || saving || changes.length === 0) return;
+    if (!draft || saving || changes.length === 0 || ruleProblems.length > 0) return;
     setSaving(true);
     const result = await apiPut<AutomationView>(URL, draft);
     setSaving(false);
@@ -121,6 +129,8 @@ export function AutomationSettingsCard() {
   }
 
   const outcome = githubOutcome(view?.current.github ?? null);
+  // BL-211: the scheduler refuses these rules too; the page says why instead of failing a Save.
+  const ruleProblems = draft ? rulesProblems(draft.rules) : [];
 
   return (
     <Card>
@@ -278,6 +288,27 @@ export function AutomationSettingsCard() {
             })}
           </section>
 
+          <AutomationRulesSection
+            draft={draft}
+            disabled={saving}
+            onChange={(next) => setDraft(next)}
+          />
+          <section className="space-y-3 border-t border-border pt-4" aria-label="T1 split">
+            <SettingSwitch
+              label="Split T1 across the AlgoTest accounts"
+              description={
+                splitApplies(draft)
+                  ? 'The odd pick trades on each account; the like pair goes one per account at 2 lots (a re-entry one on Shoonya, as does the Buy add-on). The evening export uploads every copy; the 08:11 activation does not handle a split list yet: activate each copy on its own account by hand.'
+                  : draft.splitT1
+                    ? 'On, but it changes nothing until both AlgoTest rows upload T1.'
+                    : 'Off: each AlgoTest account trades every T1 pick.'
+              }
+              checked={draft.splitT1}
+              disabled={saving}
+              onChange={(splitT1) => setDraft({ ...draft, splitT1 })}
+            />
+          </section>
+
           <section className="space-y-3 border-t border-border pt-4" aria-label="Capital">
             <div>
               <p className="text-sm font-medium text-foreground">Capital</p>
@@ -310,6 +341,53 @@ export function AutomationSettingsCard() {
                 />
               </div>
             ))}
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-4" aria-label="Margin check">
+            <div>
+              <p className="text-sm font-medium text-foreground">Margin check</p>
+              <p className="text-xs text-muted">
+                The evening result message ends with whether tomorrow&apos;s lots fit each
+                account&apos;s margin: the most a lot needed on the last days of tomorrow&apos;s
+                type (from Angel One&apos;s margin statements), times the lots, plus this buffer.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <label htmlFor="margin-buffer" className="text-sm font-medium text-foreground">
+                Buffer (%)
+                <span className="ml-2 text-xs font-normal text-muted">
+                  {MARGIN_BUFFER_MIN} to {MARGIN_BUFFER_MAX}.
+                </span>
+              </label>
+              <NumberField
+                id="margin-buffer"
+                className="w-36"
+                min={MARGIN_BUFFER_MIN}
+                max={MARGIN_BUFFER_MAX}
+                step={1}
+                value={draft.margin.bufferPct}
+                disabled={saving}
+                onChange={(pct) => setDraft(withMargin(draft, { bufferPct: Math.round(pct) }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <label htmlFor="margin-days" className="text-sm font-medium text-foreground">
+                Days of each type to look back over
+                <span className="ml-2 text-xs font-normal text-muted">
+                  {MARGIN_DAYS_MIN} to {MARGIN_DAYS_MAX}.
+                </span>
+              </label>
+              <NumberField
+                id="margin-days"
+                className="w-36"
+                min={MARGIN_DAYS_MIN}
+                max={MARGIN_DAYS_MAX}
+                step={1}
+                value={draft.margin.days}
+                disabled={saving}
+                onChange={(days) => setDraft(withMargin(draft, { days: Math.round(days) }))}
+              />
+            </div>
           </section>
 
           <section className="space-y-3 border-t border-border pt-4" aria-label="Pause">
@@ -359,7 +437,7 @@ export function AutomationSettingsCard() {
                   {changes.length} unsaved {changes.length === 1 ? 'change' : 'changes'}
                 </p>
                 <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-muted">
-                  {changes.map((line) => (
+                  {[...new Set(changes)].map((line) => (
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
@@ -385,7 +463,7 @@ export function AutomationSettingsCard() {
                 variant="primary"
                 onClick={() => void save()}
                 loading={saving}
-                disabled={changes.length === 0}
+                disabled={changes.length === 0 || ruleProblems.length > 0}
               >
                 Save
               </Button>

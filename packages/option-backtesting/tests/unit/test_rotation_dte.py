@@ -4,7 +4,7 @@ journal entry labels, and the live labels."""
 from datetime import date
 from types import SimpleNamespace
 
-from option_backtesting.rotation import dte, live, store
+from option_backtesting.rotation import dte, live, store, tomorrow
 
 
 def test_a_friday_before_a_monday_expiry_is_one_weekday_not_three_days():
@@ -58,15 +58,7 @@ def test_the_calendar_labels_for_the_next_session_count_weekdays():
 
 
 def test_the_listed_master_labels_count_weekdays(monkeypatch):
-    expiries = {"NIFTY": date(2026, 10, 19), "SENSEX": date(2026, 10, 22)}
-    monkeypatch.setattr(live, "download_master", lambda segment: segment)
-    monkeypatch.setattr(
-        live,
-        "parse_master",
-        lambda raw, names: [
-            SimpleNamespace(expiry=expiries[name], option_type="CE") for name in names
-        ],
-    )
+    _master(monkeypatch, {"NIFTY": date(2026, 10, 19), "SENSEX": date(2026, 10, 22)})
     labels, source = live.listed_dte_labels(date(2026, 10, 16))
     assert source == "master"
     assert labels == {"dte_n": "1", "dte_s": "4"}
@@ -103,3 +95,103 @@ def test_readers_of_journal_entries_use_the_weekday_basis_for_a_legacy_entry():
     assert (row["dte_n"], row["dte_s"]) == ("2", "0")
     assert dte.entry_basis(legacy) == "calendar"
     assert dte.recorded_labels(legacy) == {"NIFTY": "4", "SENSEX": "0"}
+
+
+def _master(monkeypatch, expiries):
+    """Fyers' master faked: `expiries` is one date or a list of dates per index. A fresh cache,
+    so what an earlier test read is not reused."""
+    live.listed_labels.cache_clear()
+    monkeypatch.setattr(live, "download_master", lambda segment: segment)
+    monkeypatch.setattr(
+        live,
+        "parse_master",
+        lambda raw, names: [
+            SimpleNamespace(expiry=expiry, option_type="CE")
+            for name in names
+            for expiry in (expiries[name] if isinstance(expiries[name], list) else [expiries[name]])
+        ],
+    )
+
+
+def _capture_expected(monkeypatch):
+    """`expected_picks` stubbed: the labels it is given, and a fixed answer."""
+    seen = {}
+
+    def expected(day, root, dte_n, dte_s, last_day, track=None):
+        seen.update(day=day, dte_n=dte_n, dte_s=dte_s, last_day=last_day, track=track)
+        return SimpleNamespace(picks={"C": (["N_wide_0917"], [])}, next_best=None, expiry_only=None)
+
+    monkeypatch.setattr(tomorrow, "expected_picks", expected)
+    return seen
+
+
+def test_the_evening_list_uses_the_listed_expiries_as_the_morning_pick_does(monkeypatch, tmp_path):
+    """2026-11-04: Tue 10 Nov is a holiday, so NIFTY's weekly expiry moved to Mon 9 Nov (3 weekdays
+    from Wed 4 Nov). The calendar still says Tuesday (4), and the ranking differs by DTE bucket, so
+    the tentative list ranked on the calendar disagreed with the 09:16 pick."""
+    _master(monkeypatch, {"NIFTY": date(2026, 11, 9), "SENSEX": date(2026, 11, 5)})
+    seen = _capture_expected(monkeypatch)
+    nxt = tomorrow.next_session_picks(date(2026, 11, 3), tmp_path)
+    assert nxt is not None and nxt.day == date(2026, 11, 4)
+    assert (seen["dte_n"], seen["dte_s"]) == ("3", "1")
+    assert (seen["day"], seen["last_day"], seen["track"]) == (nxt.day, date(2026, 11, 3), None)
+    assert nxt.dte == {"NIFTY": "3", "SENSEX": "1"} and nxt.dte_source == "master"
+    assert live.calendar_dte_labels(nxt.day)["dte_n"] == "4"  # what the evening used to rank on
+
+
+def test_the_evening_list_falls_back_to_the_calendar_when_the_master_cannot_be_read(
+    monkeypatch, tmp_path, capsys
+):
+    def refuse(segment):
+        raise OSError("offline")
+
+    live.listed_labels.cache_clear()
+    monkeypatch.setattr(live, "download_master", refuse)
+    seen = _capture_expected(monkeypatch)
+    nxt = tomorrow.next_session_picks(date(2026, 11, 3), tmp_path, track="t1")
+    assert nxt is not None and seen["track"] == "t1"
+    assert (seen["dte_n"], seen["dte_s"]) == ("4", "1")
+    assert nxt.dte == {"NIFTY": "4", "SENSEX": "1"} and nxt.dte_source == "calendar"
+    assert "using the calendar" in capsys.readouterr().err
+
+
+def test_the_evening_of_an_expiry_day_counts_to_the_next_listed_expiry(monkeypatch, tmp_path):
+    """Thu 5 Nov is a SENSEX expiry and its contracts are still in the master at 16:00: the next
+    session's label counts to the 12 Nov expiry (4 weekdays), never 0 for the one just finished."""
+    _master(
+        monkeypatch,
+        {"NIFTY": date(2026, 11, 9), "SENSEX": [date(2026, 11, 5), date(2026, 11, 12)]},
+    )
+    seen = _capture_expected(monkeypatch)
+    nxt = tomorrow.next_session_picks(date(2026, 11, 5), tmp_path)
+    assert nxt is not None and nxt.day == date(2026, 11, 6)
+    assert (seen["dte_n"], seen["dte_s"]) == ("1", "4")
+    assert nxt.dte == {"NIFTY": "1", "SENSEX": "4"} and nxt.dte_source == "master"
+
+
+def test_the_master_is_read_once_per_session_date_in_a_process(monkeypatch, tmp_path):
+    calls = []
+    live.listed_labels.cache_clear()
+    monkeypatch.setattr(live, "download_master", lambda segment: calls.append(segment) or segment)
+    monkeypatch.setattr(
+        live,
+        "parse_master",
+        lambda raw, names: [SimpleNamespace(expiry=date(2026, 11, 9), option_type="CE")],
+    )
+    _capture_expected(monkeypatch)
+    for track in (None, "t1", None):  # the evening asks for both lists; a retry asks again
+        assert tomorrow.next_session_picks(date(2026, 11, 3), tmp_path, track=track) is not None
+    assert calls == ["NSE_FO", "BSE_FO"]
+    # a failed read is not kept: the next call asks again
+    live.listed_labels.cache_clear()
+    attempts = []
+
+    def flaky(segment):
+        attempts.append(segment)
+        if len(attempts) == 1:
+            raise OSError("offline")
+        return segment
+
+    monkeypatch.setattr(live, "download_master", flaky)
+    assert live.listed_dte_labels(date(2026, 11, 4))[1] == "calendar"
+    assert live.listed_dte_labels(date(2026, 11, 4))[1] == "master"

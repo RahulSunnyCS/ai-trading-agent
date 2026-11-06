@@ -20,6 +20,16 @@ import { jobPath } from './env.js';
  * - A pause (BL-140 Phase 4): no uploads or deploys for any session up to and including a day.
  * - The capital in each broker account (owner, 2026-10-29), for the evening result message: a
  *   list's line uses the capital of the accounts that upload it, and the total is their sum.
+ * - The margin block of the evening result message (BL-205, owner 2026-11-04): the buffer on the
+ *   per-lot requirement and how many days of each day type it looks back over.
+ * - Day-type rules (BL-211, owner 2026-11-05): on a day where one index has so many weekdays to
+ *   expiry, or on a weekday, a row trades another list. Tried in order, the first that matches a
+ *   row wins; the jobs resolve them per session (broker-login's day-type.ts, Python's
+ *   automation_settings.resolve), so the page and the jobs read one rule set.
+ * - BL-209 (owner 2026-11-04): split T1 across the two AlgoTest accounts (`splitT1`, default off):
+ *   the odd pick on each, the like pair one per account at 2 lots
+ *   (`packages/option-backtesting/.../rotation/account_split.py`). It changes the export only
+ *   while both AlgoTest rows upload T1; otherwise the export is what it is without it.
  *
  * Every Save is a new version in the scheduler's SQLite (`automation_settings`); nothing is
  * ever updated in place, so the page can show the history. The current version is also
@@ -46,6 +56,14 @@ export const CAPITAL_MIN = 10_000;
 export const CAPITAL_MAX = 100_000_000;
 /** The capital each account reads as when its settings predate the field (owner, 2026-10-29). */
 export const DEFAULT_CAPITAL = 850_000;
+
+/** The margin block's buffer (percent) and look-back (days of a type): whole numbers in range. */
+export const MARGIN_BUFFER_MIN = 0;
+export const MARGIN_BUFFER_MAX = 50;
+export const MARGIN_DAYS_MIN = 1;
+export const MARGIN_DAYS_MAX = 30;
+/** What the margin block reads when the settings predate it (owner, 2026-11-04). */
+export const DEFAULT_MARGIN: Margin = { bufferPct: 10, days: 6 };
 
 /** The Quantiply clientwise MTM SL a row may ask for (BL-172): whole rupees in this range. */
 export const MTM_SL_MIN = 500;
@@ -88,12 +106,46 @@ export interface Masters {
   deploy: boolean;
 }
 
+/** The evening message's margin block (BL-205). */
+export interface Margin {
+  /** percent added to the per-lot requirement */
+  bufferPct: number;
+  /** how many of the last days of each day type the per-lot figure looks back over */
+  days: number;
+}
+
+/** BL-211: the most day-type rules a version may hold. */
+export const MAX_RULES = 20;
+export const INDICES = ['NIFTY', 'SENSEX'] as const;
+/** Weekdays to the nearest expiry as the rotation labels them (BL-109). */
+export const DTE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7+'] as const;
+export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const;
+
+export type RuleWhen =
+  | { kind: 'dte'; index: (typeof INDICES)[number]; dte: (typeof DTE_LABELS)[number] }
+  | { kind: 'weekday'; weekday: (typeof WEEKDAYS)[number] };
+
+/** BL-211: on a day where `when` holds, `row` trades `list` instead of its own. */
+export interface DayRule {
+  row: RowKey;
+  when: RuleWhen;
+  list: List;
+  /** the owner's reason, optional, shown beside the rule */
+  note?: string;
+}
+
 export interface AutomationSettings {
   masters: Masters;
   rows: Record<RowKey, Row>;
   pause: Pause;
+  /** BL-211: day-type rules, in the order they are tried */
+  rules: DayRule[];
   /** rupees in each broker account (the evening result message's capital lines) */
   capital: Record<Broker, number>;
+  /** the evening result message's margin block (BL-205) */
+  margin: Margin;
+  /** BL-209: T1 split across the two AlgoTest accounts (effective only while both upload T1) */
+  splitT1: boolean;
 }
 
 export interface Version {
@@ -154,7 +206,10 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
     },
   },
   pause: { until: null },
+  rules: [],
   capital: { finvasia: DEFAULT_CAPITAL, angelone: DEFAULT_CAPITAL },
+  margin: { ...DEFAULT_MARGIN },
+  splitT1: false,
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -169,14 +224,18 @@ function isRealDay(value: string): boolean {
 /**
  * Settings saved before Phase 4 have no multiplier, add-on or pause: they mean 1, yes and none,
  * exactly what the jobs did; settings before BL-183 have no `dirBoost`: off; settings before
- * 2026-10-29 have no `capital`: ₹8.5 lakh an account. Anything present is kept as it is (and
+ * 2026-10-29 have no `capital`: ₹8.5 lakh an account; settings before BL-205 have no `margin`:
+ * a 10% buffer over 6 days; settings before BL-209 have no `splitT1`: off, before BL-211 no `rules`: none. Anything present is kept as it is (and
  * validated on a Save).
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
   const partial = settings as unknown as {
     rows: Record<string, Partial<Row>>;
     pause?: Partial<Pause>;
+    rules?: DayRule[];
     capital?: Partial<Record<Broker, number>>;
+    margin?: Partial<Margin>;
+    splitT1?: boolean;
   };
   return {
     ...settings,
@@ -193,9 +252,15 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
       ]),
     ) as Record<RowKey, Row>,
     pause: { until: partial.pause?.until ?? null },
+    rules: partial.rules ?? [],
     capital: Object.fromEntries(
       BROKERS.map((b) => [b, partial.capital?.[b] ?? DEFAULT_CAPITAL]),
     ) as Record<Broker, number>,
+    margin: {
+      bufferPct: partial.margin?.bufferPct ?? DEFAULT_MARGIN.bufferPct,
+      days: partial.margin?.days ?? DEFAULT_MARGIN.days,
+    },
+    splitT1: partial.splitT1 ?? false,
   };
 }
 
@@ -206,7 +271,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
     !!v && typeof v === 'object' && !Array.isArray(v);
   if (!obj(value)) return { errors: ['settings must be an object'] };
   const extra = Object.keys(value).filter(
-    (k) => !['masters', 'rows', 'pause', 'capital'].includes(k),
+    (k) => !['masters', 'rows', 'pause', 'rules', 'capital', 'margin', 'splitT1'].includes(k),
   );
   if (extra.length) errors.push(`unknown keys: ${extra.join(', ')}`);
 
@@ -280,6 +345,11 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
     if (until !== null && !(typeof until === 'string' && isRealDay(until)))
       errors.push('pause.until must be a day as YYYY-MM-DD, or null');
   }
+  // A save must say its rules ([] for none), like every other field: an older dashboard tab cannot
+  // quietly drop the rules by saving without them.
+  const rules = value.rules;
+  if (!Array.isArray(rules)) errors.push('rules must be a list');
+  else errors.push(...ruleErrors(rules));
   const capital = value.capital;
   if (!obj(capital)) errors.push('capital must be an object');
   else {
@@ -291,6 +361,23 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         errors.push(`capital.${b} must be whole rupees from ${CAPITAL_MIN} to ${CAPITAL_MAX}`);
     }
   }
+  const margin = value.margin;
+  if (!obj(margin)) errors.push('margin must be an object');
+  else {
+    for (const k of Object.keys(margin))
+      if (!['bufferPct', 'days'].includes(k)) errors.push(`unknown margin field: ${k}`);
+    const whole = (n: unknown, lo: number, hi: number) =>
+      typeof n === 'number' && Number.isInteger(n) && n >= lo && n <= hi;
+    if (!whole(margin.bufferPct, MARGIN_BUFFER_MIN, MARGIN_BUFFER_MAX))
+      errors.push(
+        `margin.bufferPct must be a whole percent from ${MARGIN_BUFFER_MIN} to ${MARGIN_BUFFER_MAX}`,
+      );
+    if (!whole(margin.days, MARGIN_DAYS_MIN, MARGIN_DAYS_MAX))
+      errors.push(
+        `margin.days must be a whole number from ${MARGIN_DAYS_MIN} to ${MARGIN_DAYS_MAX}`,
+      );
+  }
+  if (typeof value.splitT1 !== 'boolean') errors.push('splitT1 must be true or false');
   if (errors.length) return { errors };
   const v = value as unknown as AutomationSettings;
   // Rebuild in a fixed key order, so equal settings always serialise the same.
@@ -315,9 +402,87 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         }),
       ) as Record<RowKey, Row>,
       pause: { until: v.pause.until },
+      rules: v.rules.map((r) => ({
+        row: r.row,
+        when:
+          r.when.kind === 'dte'
+            ? { kind: 'dte' as const, index: r.when.index, dte: r.when.dte }
+            : { kind: 'weekday' as const, weekday: r.when.weekday },
+        list: r.list,
+        ...(r.note ? { note: r.note } : {}),
+      })),
       capital: Object.fromEntries(BROKERS.map((b) => [b, v.capital[b]])) as Record<Broker, number>,
+      margin: { bufferPct: v.margin.bufferPct, days: v.margin.days },
+      splitT1: v.splitT1,
     },
   };
+}
+
+/** The same condition: two rules on one row that test the same thing. */
+function sameWhen(a: RuleWhen, b: RuleWhen): boolean {
+  if (a.kind === 'dte' && b.kind === 'dte') return a.index === b.index && a.dte === b.dte;
+  if (a.kind === 'weekday' && b.kind === 'weekday') return a.weekday === b.weekday;
+  return false;
+}
+
+/** Why the rules cannot be saved; empty when they can. Messages name the rule by its number. */
+function ruleErrors(rules: unknown[]): string[] {
+  const errors: string[] = [];
+  if (rules.length > MAX_RULES) errors.push(`rules: at most ${MAX_RULES}, not ${rules.length}`);
+  const ok: { n: number; rule: DayRule }[] = [];
+  rules.forEach((r, i) => {
+    const n = i + 1;
+    const rule = r as Partial<DayRule> | null;
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
+      errors.push(`rule ${n} must be an object`);
+      return;
+    }
+    for (const k of Object.keys(rule))
+      if (!['row', 'when', 'list', 'note'].includes(k))
+        errors.push(`rule ${n}: unknown field ${k}`);
+    let bad = false;
+    if (!ROW_KEYS.includes(rule.row as RowKey)) {
+      errors.push(`rule ${n}: unknown row ${JSON.stringify(rule.row)}`);
+      bad = true;
+    }
+    if (!LISTS.includes(rule.list as List)) {
+      errors.push(`rule ${n}: list must be one of ${LISTS.join(', ')}`);
+      bad = true;
+    }
+    if (rule.note !== undefined && !(typeof rule.note === 'string' && rule.note.length <= 120)) {
+      errors.push(`rule ${n}: note must be text of at most 120 characters`);
+      bad = true;
+    }
+    const when = rule.when as Record<string, unknown> | undefined;
+    if (when?.kind === 'dte') {
+      if (
+        !INDICES.includes(when.index as never) ||
+        !DTE_LABELS.includes(when.dte as never) ||
+        Object.keys(when).length !== 3
+      ) {
+        errors.push(`rule ${n}: days to expiry needs an index (NIFTY, SENSEX) and 0 to 6 or 7+`);
+        bad = true;
+      }
+    } else if (when?.kind === 'weekday') {
+      if (!WEEKDAYS.includes(when.weekday as never) || Object.keys(when).length !== 2) {
+        errors.push(`rule ${n}: weekday must be one of ${WEEKDAYS.join(', ')}`);
+        bad = true;
+      }
+    } else {
+      errors.push(`rule ${n}: the condition must be days to expiry or a weekday`);
+      bad = true;
+    }
+    if (bad) return;
+    const earlier = ok.find(
+      (e) => e.rule.row === rule.row && sameWhen(e.rule.when, rule.when as RuleWhen),
+    );
+    if (earlier)
+      errors.push(
+        `rule ${n} can never apply: rule ${earlier.n} tests the same thing on the same row and is tried first`,
+      );
+    ok.push({ n, rule: rule as DayRule });
+  });
+  return errors;
 }
 
 /** What a job may actually do for a row: the row's choice, gated by its master switch. */

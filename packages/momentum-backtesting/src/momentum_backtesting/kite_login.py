@@ -1,4 +1,4 @@
-"""Kite's unattended login (owner, 2026-10-28): Fridays and trading Mondays, inside the 08:02
+"""Kite's unattended login (owner, 2026-10-28; every trading day from 2026-11-06), inside the 08:02
 morning broker login (`packages/broker-login/src/local-login.ts` runs `mbt kite auto-login`), so
 its result is in the same Telegram report. Off until `KITE_AUTO_LOGIN=on`.
 
@@ -10,8 +10,12 @@ stops at a captcha or any check it does not recognise instead of trying to pass 
 
 Flow: Kite Connect's login URL for this app (`kite.login_url`) -> user ID and password -> the
 external TOTP code -> Kite redirects to the app's registered redirect URL with `request_token`.
-That redirect is intercepted, never loaded, so the URL can be the hosted dashboard's. The token is
-exchanged and stored exactly as a manual login does (`finish_login`, shared with the API callback).
+The token is read off that redirect as the browser follows it (Playwright never routes a
+redirected request, so it cannot be intercepted: the callback host then sees a login state it does
+not know and answers 400 before it touches the token, which is harmless, as is an unreachable host;
+the single-use token does travel in that URL to the registered host, exchanged here within the
+second, one reason to keep the Kite app's redirect URL on this machine). The token is exchanged and
+stored exactly as a manual login does (`finish_login`, shared with the API callback).
 
 Safety: a refused user ID or password is never retried, and it holds every later run until one of
 KITE_USER_ID / KITE_PASSWORD / KITE_TOTP_SECRET changes in `.env` (a lockout costs more than a
@@ -30,6 +34,8 @@ import urllib.parse
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+from playwright.sync_api import Error as PlaywrightError
 
 from . import kite
 from .angelone import totp_now
@@ -173,6 +179,28 @@ def _screenshot(page) -> str:
         return ""
 
 
+def _watch_for_token(page, state: str, captured: dict) -> None:
+    """Catch Kite's redirect to the app as the browser follows it: Playwright fires `request` for a
+    redirected request but never a route handler, so this is the one place the token can be read."""
+
+    def on_request(request) -> None:
+        token = request_token_from(request.url, state)
+        if token:
+            captured["token"] = token
+
+    page.on("request", on_request)
+
+
+def _left_kite(url: str) -> str:
+    """Where the browser went when it is no longer on Kite's login ('' while it is): the host and
+    path, plus Kite's `status`, never the token."""
+    parts = urllib.parse.urlparse(url)
+    if not parts.netloc or parts.netloc.endswith("kite.zerodha.com"):
+        return ""
+    status = (urllib.parse.parse_qs(parts.query).get("status") or [""])[0]
+    return f"{parts.netloc}{parts.path}" + (f" status={status}" if status else "")
+
+
 def browser_login(creds: dict[str, str], *, headed: bool = False, wait_s: float = 25) -> str:
     """Log in on Kite's page and return the request_token. Raises KiteLoginError."""
     from playwright.sync_api import sync_playwright
@@ -181,21 +209,12 @@ def browser_login(creds: dict[str, str], *, headed: bool = False, wait_s: float 
     url = kite.login_url(state)
     captured: dict[str, str] = {}
 
-    def on_redirect(route) -> None:
-        token = request_token_from(route.request.url, state)
-        if token:
-            captured["token"] = token
-            route.fulfill(status=200, content_type="text/plain", body="ok")
-        else:
-            route.continue_()
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=not headed)
         try:
             context = browser.new_context()
-            # Kite's redirect to the app is answered here, never loaded.
-            context.route(lambda u: "request_token=" in u, on_redirect)
             page = context.new_page()
+            _watch_for_token(page, state, captured)
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=45_000)
                 _stop_on_human_check(page)
@@ -242,21 +261,58 @@ def _on_totp_step(page) -> bool:
     return numeric > 0 or bool(TOTP_WORDING.search(page.locator("body").inner_text(timeout=5_000)))
 
 
-def _wait_for(page, done, captured: dict, wait_s: float, stale: str = "") -> None:
-    """Poll until `done()` or the redirect was captured; raise on a Kite message or a check.
-    `stale` is a message already answered (the first code's refusal), not a new one."""
+def _poll(page, done) -> tuple[bool, str]:
+    """One look at the page: `done()` and Kite's message. Both read the DOM, which Playwright
+    refuses while the page is on its way somewhere else (Kite's redirect after the code): that
+    reads as not done and no message, and the caller looks again."""
+    try:
+        return done(), _page_message(page)
+    except PlaywrightError:
+        return False, ""
+
+
+def _wait_for(page, done, captured: dict, wait_s: float, stale: str = "", note: str = "") -> None:
+    """Poll until `done()` or the redirect was captured; raise on a Kite message, a check, or the
+    browser leaving Kite with no token (a cancelled or failed redirect). `stale` is a message
+    already answered (the first code's refusal), not a new one; `note` is what a timeout says."""
     deadline = time.monotonic() + wait_s
     while time.monotonic() < deadline:
-        if captured.get("token") or done():
+        if captured.get("token"):
             return
-        message = _page_message(page)
+        elsewhere = _left_kite(page.url)
+        if elsewhere:
+            raise KiteLoginError(f"Kite sent the browser to {elsewhere} without a login token")
+        finished, message = _poll(page, done)
+        if finished:
+            return
         if message and message != stale:
             kind = classify(message)
             if kind != "other":
                 raise KiteLoginError(f"Kite: {message}", kind)
         page.wait_for_timeout(500)
-    message = _page_message(page)
-    raise KiteLoginError(f"Kite: {message}" if message else "timed out", classify(message))
+    if captured.get("token"):
+        return
+    _finished, message = _poll(page, lambda: False)
+    detail = f"Kite: {message}" if message else "timed out"
+    raise KiteLoginError(f"{detail} ({note})" if note else detail, classify(message))
+
+
+def _submit_unless_gone(page, captured: dict) -> str:
+    """Click Login under the code if the form is still there. Kite submits a full code by itself
+    and then leaves for the app's redirect, so the button may be gone or going, and it may still
+    be checking the code: neither is a failure here (the wait after this decides). Returns what
+    went wrong with the click, for that wait to name if it times out."""
+    if captured.get("token"):
+        return ""
+    try:
+        submit = page.locator("button[type=submit]:visible")
+        if submit.count():
+            submit.first.click(timeout=3_000)
+    except PlaywrightError as error:
+        if captured.get("token") or _left_kite(page.url):
+            return ""  # Kite took the code
+        return f"Login click: {type(error).__name__}: {str(error).splitlines()[0][:120]}"
+    return ""
 
 
 def _enter_totp(page, secret: str, captured: dict, wait_s: float) -> None:
@@ -269,11 +325,9 @@ def _enter_totp(page, secret: str, captured: dict, wait_s: float) -> None:
     for attempt in (1, 2):
         code = _fresh_code(secret) if attempt == 1 else _next_window_code(secret)
         field.fill(code)
-        submit = page.locator("button[type=submit]:visible")
-        if submit.count():
-            submit.first.click()  # Kite usually submits a full code by itself
+        note = _submit_unless_gone(page, captured)
         try:
-            _wait_for(page, lambda: False, captured, wait_s, stale)
+            _wait_for(page, lambda: False, captured, wait_s, stale, note)
         except KiteLoginError as error:
             if error.kind == "totp" and attempt == 1:
                 stale = _page_message(page)  # still shown while the second code is checked

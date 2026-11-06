@@ -94,7 +94,7 @@ the hosted dashboard's `/api/momentum/kite/callback`, so a login works from your
 | Connected | Today's login is valid, until 06:00 IST tomorrow. The account ID is shown. |
 | Not logged in today | Log in before Friday's 14:15 orders, or before Monday's open. |
 
-On Fridays and trading Mondays the 08:02 morning login can log in to Kite for you
+On every trading day the 08:02 morning login (with Angel One and AlgoTest) can log in to Kite for you
 (`KITE_AUTO_LOGIN=on` in `.env`, with your Kite user ID, password and TOTP key; off by default).
 Its result is in the 08:10 message, and a failure is sent at once; the card then shows Not logged
 in today and the reminders below still come. Zerodha says automating its login is not allowed, so

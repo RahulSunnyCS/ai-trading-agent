@@ -330,6 +330,7 @@ export interface MomentumSavedRun {
 
 /** Why a saved strategy's result moved (BL-052, `saved_identity.explain`). */
 export type ResultChangeLabel =
+  | 'data_extended'
   | 'data_revised'
   | 'intended'
   | 'check'
@@ -923,6 +924,19 @@ export type MomentumLotsView =
       } | null;
     };
 
+/** One order as Kite's basket page takes it (`api._kite_orders`): a delivery limit order on NSE. */
+export interface MomentumKiteOrder {
+  variety: string;
+  exchange: string;
+  tradingsymbol: string;
+  transaction_type: 'BUY' | 'SELL';
+  order_type: string;
+  price: number;
+  product: string;
+  validity: string;
+  quantity: number;
+}
+
 /** One set of orders for a week, as `momentum_orders` keeps it. */
 export interface MomentumOrders {
   created_at: string;
@@ -950,6 +964,10 @@ export interface MomentumOrders {
   plan?: MomentumOrderPlan;
   /** Followed lot by lot (BL-142 Phase 3): each lot's status and its own plan. */
   lots?: MomentumLotOrders[];
+  /** ETFs not bought as a new buy because their premium to NAV is over the limit (BL-136). */
+  premium_skips?: Array<{ name: string; premium: number; limit: number; as_of: string }>;
+  /** The orders for Kite's basket page, when the holdings come from Kite (sells first). */
+  kite_orders?: MomentumKiteOrder[];
   /** What to add to Kite before buying a new lot. */
   deposit_needed?: number;
   lot_size?: number;
@@ -977,6 +995,16 @@ export interface MomentumOrderPreviewJob {
   error: string | null;
 }
 
+/** Friday's orders planned early (owner, 2026-11-05): the plan the 14:15 run would make, lots
+ * included, kept in the state dir only. Nothing in the catalog changed; the Friday run replaces it. */
+export type MomentumTentativeOrders = Omit<
+  MomentumOrders,
+  'created_at' | 'trigger' | 'favourite_id' | 'holdings_source'
+> & {
+  tentative: true;
+  made_at: string;
+};
+
 /** `GET /api/momentum/orders`. */
 export interface MomentumOrdersView {
   week: string;
@@ -987,6 +1015,11 @@ export interface MomentumOrdersView {
   margin?: { symbols: string[]; prefixes: string[] };
   orders: MomentumOrders[];
   job: MomentumLiveRules['job'];
+  /** The Kite app's public key for the basket form (no secret), null when not configured. */
+  kite_api_key?: string | null;
+  /** Friday's orders planned early, when they are for this week; null otherwise. */
+  tentative?: MomentumTentativeOrders | null;
+  tentative_job?: MomentumLiveRules['job'];
 }
 
 export type MomentumAlertKind = 'split' | 'data' | 'journal' | 'change' | 'rules';

@@ -261,6 +261,106 @@ def test_uncommitted_code_is_never_not_reproducible_or_intended(monkeypatch):
     assert explain("etf", _run(A, code=dirty), _run(B, code=dirty))["label"] == "check"
 
 
+# Two clean commits of the whole repo whose Momentum code is the same (another package moved).
+C1, C2 = "c9cf22b1", "96a00ca0"
+
+
+def _weeks(run, *extra):
+    """`run` with later weeks added to its curve."""
+    weeks = ["2026-01-23", "2026-01-30"][: len(extra)]
+    return {**run, "dates": run["dates"] + weeks, "strategy": run["strategy"] + list(extra)}
+
+
+def test_a_commit_to_another_package_is_not_a_code_change(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        saved_identity, "same_result_code", lambda a, b: seen.append((a, b)) or True
+    )
+    revised = explain("broad", _run(A, code=C1), _run(B, code=C2, data="d2"))
+    assert revised["label"] == "data_revised"
+    assert seen == [(C1, C2)]
+    # Same package code and the same data, yet a different result: a bug, not "check".
+    assert explain("broad", _run(A, code=C1), _run(B, code=C2))["label"] == "not_reproducible"
+
+
+def test_a_new_friday_with_only_other_packages_commits_is_data_extended(monkeypatch):
+    monkeypatch.setattr(saved_identity, "same_result_code", lambda a, b: True)
+    before = _run(A, code=C1)
+    after = _weeks(_run(A, code=C2, data="d2", tables={"prices": "d2"}), 104.0)
+    moved = explain("broad", before, after)
+    assert moved["label"] == "data_extended"
+    assert moved["first_difference"] == "2026-01-23"
+    assert moved["changed"] == ["prices"]
+    assert "data_extended" not in saved_identity.NEEDS_REVIEW
+    # The same code on the same commit extends the same way.
+    assert explain("broad", _run(A), _weeks(_run(A, data="d2"), 104.0))["label"] == "data_extended"
+    # An earlier week that moved as well is a revision.
+    revised = _weeks(_run(B, code=C2, data="d2"), 104.0)
+    assert explain("broad", before, revised)["label"] == "data_revised"
+    # When the package code did change, an extension still needs a look.
+    monkeypatch.setattr(saved_identity, "same_result_code", lambda a, b: False)
+    monkeypatch.setattr(saved_identity, "accepted_golden_change", lambda a, b, d: None)
+    assert explain("broad", before, after)["label"] == "check"
+
+
+def test_extends_needs_every_earlier_week_unchanged_and_one_more():
+    run = _run(A)
+    assert saved_identity.extends(run, _weeks(run, 104.0))
+    assert not saved_identity.extends(run, run)  # nothing added
+    assert not saved_identity.extends(_weeks(run, 104.0), run)  # a week removed
+    assert not saved_identity.extends(run, _weeks(_run(B), 104.0))  # an earlier week moved
+    shifted = {**_weeks(run, 104.0), "dates": ["2025-12-26", *run["dates"]]}
+    assert not saved_identity.extends(run, shifted)  # started a week earlier
+    assert not saved_identity.extends({**run, "dates": [], "strategy": []}, run)
+
+
+def test_uncommitted_or_unknown_code_never_reaches_the_package_diff(monkeypatch):
+    calls = []
+    monkeypatch.setattr(saved_identity, "same_result_code", lambda a, b: calls.append(1) or True)
+    assert explain("broad", _run(A, code=C1 + "+dirty"), _run(B, code=C2))["label"] == "check"
+    assert explain("broad", _run(A, code="unknown"), _run(B, code=C2))["label"] == "check"
+    assert calls == []
+
+
+def test_same_result_code_refuses_anything_but_a_commit_id(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        saved_identity.subprocess, "run", lambda *args, **kw: calls.append(args) or None
+    )
+    assert saved_identity.same_result_code("--output=/tmp/x", C2) is False
+    assert saved_identity.same_result_code(C1, "HEAD") is False
+    assert saved_identity.same_result_code(C1, f"{C2} -p") is False
+    assert calls == []
+
+
+def test_same_result_code_asks_git_about_the_package_paths_only(monkeypatch):
+    calls = []
+
+    class Done:
+        returncode = 0
+
+    def run(args, **kw):
+        calls.append(args)
+        return Done()
+
+    monkeypatch.setattr(saved_identity.subprocess, "run", run)
+    assert saved_identity.same_result_code(C1, C2) is True
+    assert calls == [["git", "diff", "--quiet", C1, C2, "--", *saved_identity.RESULT_CODE]]
+    Done.returncode = 1  # the package code differs
+    assert saved_identity.same_result_code(C1, C2) is False
+    Done.returncode = 128  # a commit this checkout does not have
+    assert saved_identity.same_result_code(C1, C2) is False
+
+
+def test_same_result_code_on_this_checkout():
+    head = saved_identity._git("rev-parse", "HEAD")
+    if not head:
+        pytest.skip("not a git checkout")
+    head = head.strip()
+    assert saved_identity.same_result_code(head, head) is True
+    assert saved_identity.same_result_code(head, "0" * 40) is False
+
+
 CHANGELOG_DIFF = """\
 +++ b/tests/golden/CHANGELOG.md
 +## 2026-10-09 (on top of `abc1234`)

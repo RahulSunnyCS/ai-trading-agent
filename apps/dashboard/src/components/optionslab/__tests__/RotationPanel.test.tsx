@@ -33,6 +33,15 @@ vi.mock('../../../hooks/useRotation', () => ({
     };
   },
 }));
+vi.mock('../../../hooks/useRotationCompare', () => ({
+  useRotationCompare: () => ({
+    data: null,
+    loading: false,
+    error: null,
+    refetch: () => undefined,
+    warming: false,
+  }),
+}));
 vi.mock('../../../hooks/useRotationPlan', () => ({
   useRotationPlan: () => ({ data: null, loading: false, error: null, refetch: () => undefined }),
 }));

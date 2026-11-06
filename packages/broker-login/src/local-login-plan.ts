@@ -148,14 +148,12 @@ export function secretsReminder(names: string[]): string {
 }
 
 /**
- * Kite's unattended login (owner, 2026-10-28): on Fridays (the 14:15 orders) and Mondays, with
- * `KITE_AUTO_LOGIN=on`. The job itself runs on trading days only. `day` is the IST 'YYYY-MM-DD'.
+ * Kite's unattended login (owner, 2026-10-28 on Fridays and Mondays; every day the job runs from
+ * 2026-11-06, with the Angel One / AlgoTest logins): with `KITE_AUTO_LOGIN=on`. The job itself
+ * runs on trading days only, so that is every trading day. `day` is the IST 'YYYY-MM-DD'.
  */
-export function kiteDue(day: string, env: Record<string, string | undefined>): boolean {
-  if ((env.KITE_AUTO_LOGIN ?? '').trim().toLowerCase() !== 'on') return false;
-  const [y, m, d] = day.split('-').map(Number);
-  const weekday = new Date(Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1)).getUTCDay();
-  return weekday === 1 || weekday === 5;
+export function kiteDue(_day: string, env: Record<string, string | undefined>): boolean {
+  return (env.KITE_AUTO_LOGIN ?? '').trim().toLowerCase() === 'on';
 }
 
 /** `mbt kite auto-login --json-out`'s outcome as a report line; null when unreadable. */

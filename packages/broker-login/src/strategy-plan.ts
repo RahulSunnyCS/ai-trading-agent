@@ -12,7 +12,8 @@ import { createHash } from 'node:crypto';
  *   different content, are deleted, unless AlgoTest shows them deployed on /live (the owner's
  *   activation, which repeats on its weekdays): then they are kept and alerted. Wanted strategies
  *   that are missing are uploaded. An unchanged owned strategy is left alone.
- * - Morning (`topup`, after the 09:16 pick): only the missing picks are uploaded. Nothing is
+ * - Top-up (`topup`: today's recorded picks, or last evening's list for today): only the missing
+ *   picks are uploaded. Nothing is
  *   deleted; owned strategies that are not today's picks are reported as "not today".
  */
 
@@ -30,6 +31,11 @@ export interface Manifest {
   book: string;
   source: string;
   strategies: ManifestEntry[];
+  /** BL-209: set on a T1 export split across the two AlgoTest accounts */
+  split?: string;
+  /** BL-209: {broker: [names]} under the split, and each account's list trading alone */
+  accounts?: Record<string, string[]>;
+  alone?: Record<string, string[]>;
 }
 
 export interface LedgerRow {

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   DEFAULT_AUTOMATION,
+  algotestAddon,
   algotestDeployBrokers,
   algotestMultiplierRefusal,
   describeSource,
@@ -216,5 +217,21 @@ describe('the brokers an AlgoTest deploy is ticked on (BL-197)', () => {
     assert.deepEqual(algotestDeployBrokers(a, 'core'), ['angelone']);
     a.masters.uploads = false;
     assert.deepEqual(algotestDeployBrokers(a, 't1'), []);
+  });
+
+  it('the add-on belongs to a book on AlgoTest while any uploading row has it on (BL-197)', () => {
+    const a = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as typeof DEFAULT_AUTOMATION;
+    assert.equal(algotestAddon(a, 't1'), true);
+    assert.equal(algotestAddon(a, 'core'), false); // no row uploads Core
+    a.rows['algotest.finvasia'].addon = false;
+    assert.equal(algotestAddon(a, 't1'), false);
+    // a second row uploading T1 with the add-on on brings it back (the export's rule)
+    a.rows['algotest.angelone'] = { ...a.rows['algotest.finvasia'], addon: true };
+    assert.equal(algotestAddon(a, 't1'), true);
+    // a row that does not upload has no say
+    a.rows['algotest.angelone'].upload = false;
+    assert.equal(algotestAddon(a, 't1'), false);
+    a.masters.uploads = false;
+    assert.equal(algotestAddon(a, 't1'), false);
   });
 });

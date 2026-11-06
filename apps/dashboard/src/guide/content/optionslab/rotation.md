@@ -58,6 +58,32 @@ The screen is one page, in the order you read it:
 - **What happened** — the recorded or reconstructed day log, with what the live book made against
   paper on each recorded day. Below it, *Drawdowns and selection
   drift* opens the risk review for the list.
+- **Day by day** — candles for Adaptive Tuned, Adaptive Classic or the fixed base, one a day or one
+  a week (**Daily** / **Weekly**), laid on the running total of the stored history (it starts in
+  October 2024, and the ranking's first pick in January 2025). A candle opens at the total before it;
+  its wick runs to the best and worst points of the minute-by-minute P&L; its body closes at the
+  result, cut where the book's own stop would have cut it (₹9,000 for Tuned, ₹8,000 for Classic and
+  the base, per lot of the book). On the chart:
+  - a **dot** above each day your accounts traded the list live, green or red by their live result
+    per lot (the 15:40 capture);
+  - a **thin line**: the fixed base, started from the same point as the first candle shown, so you
+    see the two books over the same days;
+  - a small **▲ forward** mark under the first day with recorded picks (19 Oct 2026 for Tuned):
+    everything before it is re-derived on the history the strategies were tuned on, and only the
+    days from the mark are a forward test;
+  - a **drawdown strip** underneath, with dashed lines at the depth a quarter, a tenth and a
+    twentieth of the days reached (*25% / 10% / 5% of days*).
+
+  Hover a candle for the day's result, best and worst point, drawdown, when the book stop fired, each
+  strategy with its entry time and settings (a day can hold two entry times of one strategy), each
+  account's live result against paper, and the share of 2,000
+  random baskets of the same number of strategies from the book's pool that the day beat (the
+  baskets are cut at the same stop when they ended below it). A week's hover sums its days and
+  gives the best and worst day. Click a day to pin it under the chart, then **Replay** a strategy to
+  see its day minute by minute; click a week to pin its days and pick one. Switch the period (1 month
+  to All) and the lots per strategy (1 to 4; the stop widens with the lots). Paper figures, at the
+  page's slippage, before charges; picks before the journal began are re-derived by the ranking.
+  The first time it opens it replays every day, which takes a few minutes.
 - **Live vs paper** — what AlgoTest and Quantiply actually made on each captured day against the
   backtest for the same picks, the gap running day by day, and by shape. See
   [Rotation: live vs paper](guide:optionslab/rotation-live).
@@ -138,8 +164,19 @@ does not move.
 | ₹ / lot-day | Average gross per lot per day. The fair way to compare books, because a list holds 3 strategies, or 4 on a day its Buy add-on fires |
 | Max DD / lot | The largest fall of the running total per lot from its peak, the peak starting at zero: the unit the registered rule compares (hover for the basket's drawdown in rupees) |
 | vs base / lot-day | The book's ₹ per lot-day minus the benchmark's, over the same days. Follows *Compare with* |
-| Beats random | Share of 1,000 random baskets of the same shape that the book's cumulative gross is above. Always on the registered basis, without a portfolio stop |
+| History window | The picker above the table (60 sessions, 6 months, 1 year, 2 years; 6 months to start). It sets the two history columns and the cards under the table. The live columns before it do not move |
+| 6 months vs base / lot-day | The book's ₹ per lot-day minus the fixed base's over the picked window, on the days all three books have, with a 90% block-bootstrap range under it. A range that includes 0 says *includes 0*: not distinguishable from the base. Most of these days are stored results replayed through the 09:16 rule, not live picks; Adaptive Tuned's settings were tuned on that history |
+| Edge over random | The book's total over the window minus the average of 1,000 random same-shape baskets, in units of how much those baskets vary (σ). 0 is luck, about 1 beats 84% of random baskets, about 2 beats 98%. Unlike a percentage it has no ceiling at 100%, so a long window can still rank the books. It says how much better than luck, not how likely the edge is to continue |
 | Portfolio stop | The book's own stop (below) and, once its replay is in, how often it fired |
+
+Under the table two cards follow the picked window. **Against the fixed base** puts Tuned minus base and
+Classic minus base side by side with their ranges and the share of days each was ahead, and says how
+many of the window's sessions were recorded live. **Drift alarm** watches the 60-session gap to the base
+against a rule set in advance: two sessions in a row below −₹500 per lot-day opens a review (the states
+are *quiet*, *watch* for one session below, *review* for two). It is evaluated on this page from the
+latest stored data; nothing is sent to Telegram yet. The registered verdict stays under them, and it is the
+live test. A 60-session read-out catches a bad loss or a large edge, not a moderate one: the daily gap
+swings about ₹2,300, so a 60-session average is uncertain by about ±₹300.
 
 The Adaptive names are the table's only: the 09:16 and 16:00 Telegram messages and the rest of the page
 still say Adaptive and T1. Forward days only: a late entry or a day not yet scored is left out.
@@ -206,7 +243,7 @@ reached. See the [Daily log](guide:optionslab/rotation-daily-log) page for how t
 last setting is kept in this browser for each book separately (a stop kept from before 19 Oct 2026,
 when the default was 10,000 at 2 lots, is not carried over).
 
-The registered read-out does not move with it. **Beats random baskets**, the **verdict** and its
+The registered read-out does not move with it. The random baskets, the history columns, the **verdict** and its
 intervals always stay on the registered basis, without a portfolio stop, because the pre-registered
 test must not change after the fact. While a replay is running the row says *replaying…* and shows
 the registered figures; what the stop does is also explained in its pop-up.

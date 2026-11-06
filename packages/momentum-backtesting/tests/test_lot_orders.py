@@ -675,3 +675,195 @@ def test_the_lots_panel_keeps_the_friday_orders_when_orders_are_made_by_hand_mid
 def test_the_preview_route_refuses_a_malformed_favourite(client):
     assert client.post("/api/orders/preview/jobs", json={"favourite": "../x"}).status_code == 422
     assert client.get("/api/orders/preview/jobs/unknown").status_code == 404
+
+
+def test_a_new_lot_buys_the_sleeves_fresh_picks_equally_not_the_drifted_weights(
+    client, monkeypatch
+):
+    """Owner, 2026-11-05: a lot bought from fresh cash takes what the model would buy starting
+    from cash this week (its picks split equally, the Rebalance preview's first allocation), not
+    the weights the running model has drifted to. A lot that already holds shares keeps planning
+    to the drifted target."""
+    _friday(monkeypatch, 2026, 10, 23)
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")  # lot 2 (ids[1]) is due and new
+    sig = _signal("2026-10-23", ids, ids[1])
+    drifted = {"CUPID": 0.55, "NAZARA": 0.35, "ACMESOLAR": 0.06, "GRWRHITECH": 0.04}
+    sig["_sleeves"][1]["signal"]["target_weights"] = drifted
+    sig["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig, "exact", None, ["ranking"]))
+    asked = []
+
+    def fresh(req):
+        asked.append(req)
+        return {"CUPID": 0.5, "NAZARA": 0.5}
+
+    monkeypatch.setattr(api, "_fresh_sleeve_target", fresh)
+    _snapshot(LOT1 + OUTSIDE, 4509.3)
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+
+    payload = api._compute_orders("scheduled")
+    assert asked == ["req-lot-2"]  # only the due, new lot; lot 1 holds shares and is not due
+    lot2 = {lot["label"]: lot for lot in payload["lots"]}["Lot 2"]
+    assert lot2["status"] == "new" and lot2["fresh"] is True
+    assert {r["symbol"]: r["quantity"] for r in lot2["plan"]["rows"] if r["quantity"]} == {
+        "CUPID": 73,
+        "NAZARA": 61,
+    }
+    assert (
+        "Lot 2 · NEW lot · ₹50,000 · fresh picks, equal weights"
+        in api._orders_message(payload).body
+    )
+
+    # Lot 1 due and rebalancing: planned to the sleeve's own target, the fresh one never asked.
+    monkeypatch.setattr(api, "_fresh_sleeve_target", lambda req: pytest.fail("not a new lot"))
+    sig2 = _signal("2026-10-23", ids, ids[0])
+    sig2["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig2, "exact", None, ["ranking"]))
+    payload = api._compute_orders("scheduled")
+    lot1 = {lot["id"]: lot for lot in payload["lots"]}[ids[0]]
+    assert lot1["status"] == "rebalance" and lot1["fresh"] is False
+
+
+def test_a_new_lot_spends_its_leftover_on_the_skipped_names_in_rank_order_and_builds_a_kite_basket(
+    client, monkeypatch
+):
+    """Owner, 2026-11-05: a fresh lot's leftover cash buys one share of the names an equal split
+    could not afford, best rank first (the order of the fresh target), and the orders come out as
+    a Kite basket (one delivery market order per stock, sells first, base symbols)."""
+    _friday(monkeypatch, 2026, 10, 23)
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    sig = _signal("2026-10-23", ids, ids[1])
+    sig["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig, "exact", None, ["ranking"]))
+    # best rank first: RATEGAIN, GRWRHITECH, CUPID
+    monkeypatch.setattr(
+        api,
+        "_fresh_sleeve_target",
+        lambda req: {"RATEGAIN": 1 / 3, "GRWRHITECH": 1 / 3, "CUPID": 1 / 3},
+    )
+    _snapshot(LOT1 + OUTSIDE, 4509.3)
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+
+    payload = api._compute_orders("scheduled")
+    lot2 = {lot["id"]: lot for lot in payload["lots"]}[ids[1]]
+    rows = {r["symbol"]: r for r in lot2["plan"]["rows"]}
+    # a third of 50,000 is 16,667: CUPID 49 at 338 (16,562) and RATEGAIN 21 at 790 (16,590);
+    # GRWRHITECH (6,796) buys 2 already at that slice, so nothing was skipped here
+    assert all(rows[n]["quantity"] > 0 for n in ("RATEGAIN", "GRWRHITECH", "CUPID"))
+    kite = payload["kite_orders"]
+    assert [(o["tradingsymbol"], o["transaction_type"]) for o in kite] == [
+        ("CUPID", "BUY"),
+        ("GRWRHITECH", "BUY"),
+        ("RATEGAIN", "BUY"),
+    ]
+    assert all(
+        o["product"] == "CNC" and o["exchange"] == "NSE" and o["order_type"] == "LIMIT"
+        for o in kite
+    )
+    # a buy's limit is within 0.5 % above the planned price, on a 0.05 tick
+    for o in kite:
+        price = PRICES[o["tradingsymbol"]]
+        assert price <= o["price"] <= price * 1.005 + 0.05
+        assert round(o["price"] / 0.05) * 0.05 == pytest.approx(o["price"])
+    assert {o["tradingsymbol"]: o["quantity"] for o in kite} == {
+        n: payload["net"][n] for n in ("CUPID", "GRWRHITECH", "RATEGAIN")
+    }
+    prices = {"AAA": 200.0, "BBB": 100.0, "CCC": 50.0}
+    assert api._kite_orders({"AAA": -3, "BBB": 5, "CCC": 0, "DDD": 2}, {"AAA": "AAA1"}, prices) == [
+        {
+            **kite[0],
+            "tradingsymbol": "AAA1",
+            "transaction_type": "SELL",
+            "quantity": 3,
+            "price": 199.0,
+        },
+        {
+            **kite[0],
+            "tradingsymbol": "BBB",
+            "transaction_type": "BUY",
+            "quantity": 5,
+            "price": 100.5,
+        },
+    ]  # DDD has no price: left out
+    assert api._kite_limit(284.94, True) == 286.4 and api._kite_limit(284.94, False) == 283.5
+
+
+def test_an_etf_over_its_premium_limit_is_no_new_buy_but_a_held_one_is_left_alone(
+    client, monkeypatch
+):
+    """Owner, 2026-11-06 (BL-136 Phase 1b): a name whose premium to NAV is over its limit is not
+    bought as a new buy; a fresh lot spreads its weights equally over the rest, a lot that holds
+    the name keeps it, and the skip is said in the message."""
+    _friday(monkeypatch, 2026, 10, 23)
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    sig = _signal("2026-10-23", ids, ids[1])
+    sig["_sleeve_reqs"] = {ids[0]: "req-lot-1", ids[1]: "req-lot-2"}
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (sig, "exact", None, ["ranking"]))
+    monkeypatch.setattr(
+        api,
+        "_fresh_sleeve_target",
+        lambda req: {"CUPID": 1 / 3, "NAZARA": 1 / 3, "Nasdaq 100": 1 / 3},
+    )
+    skip = {"premium": 0.0549, "as_of": "2026-10-29", "limit": 0.05}
+    monkeypatch.setattr(api, "_premium_skips", lambda week, premiums=None: {"Nasdaq 100": skip})
+    _snapshot(LOT1 + OUTSIDE, 4509.3)
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+
+    payload = api._compute_orders("scheduled")
+    lot2 = {lot["id"]: lot for lot in payload["lots"]}[ids[1]]
+    rows = {r["symbol"]: r for r in lot2["plan"]["rows"]}
+    assert "Nasdaq 100" not in rows  # never planned
+    assert rows["CUPID"]["target"] == pytest.approx(0.5)  # equal over what is left
+    assert rows["NAZARA"]["target"] == pytest.approx(0.5)
+    assert payload["premium_skips"] == [{"name": "Nasdaq 100", **skip}]
+    assert "Nasdaq 100" not in {o["tradingsymbol"] for o in payload["kite_orders"]}
+    body = api._orders_message(payload).body
+    assert "Not bought, ETF above NAV: Nasdaq 100 +5.5% (limit 5%, premium of 29 Oct)" in body
+
+
+def test_the_premium_gate_reads_the_stored_premiums_by_the_live_limits():
+    """`_premium_skips`: only a name over its own limit, from premiums dated before the week."""
+    import pandas as pd
+
+    premiums = pd.DataFrame(
+        {"Nasdaq 100": [0.04, 0.0549, 0.20], "Hang Seng": [0.03, 0.031, 0.031]},
+        index=pd.to_datetime(["2026-10-27", "2026-10-29", "2026-11-06"]),
+    )
+    real = api._premium_skips.__wrapped__  # the suite stubs the gate off by default
+    got = real(pd.Timestamp("2026-11-06"), premiums)
+    assert got == {"Nasdaq 100": {"premium": 0.0549, "as_of": "2026-10-29", "limit": 0.05}}
+    # the premium of the week's own day is never read (it is not known at the decision)
+    assert real(pd.Timestamp("2026-10-29"), premiums) == {}

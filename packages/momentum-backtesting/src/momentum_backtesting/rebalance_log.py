@@ -132,6 +132,42 @@ def _outside_lines(fills: list[dict]) -> list[dict]:
     return sorted(by.values(), key=lambda x: (x["symbol"], x["side"]))
 
 
+def _net_lines(lines: list[dict]) -> list[dict]:
+    """One line per stock, the week's buys and sells netted (owner, 2026-11-05): 6 bought and 2
+    sold is a buy of 4, a round trip inside the week is no line. The value is netted the same
+    way (None when none of the merged lines had one). The lot's lines and the outside lines of
+    one stock stay apart (a lot's buy and an outside sell are two lines)."""
+    # The lot's own lines and the outside ones are netted apart: an outside trade never changes
+    # the lot's line, its status or the holding computed from the lot's fills.
+    by: dict[tuple[str, bool], dict] = {}
+    for line in lines:
+        acc = by.setdefault(
+            (line["symbol"], line["status"] == OUTSIDE),
+            {"symbol": line["symbol"], "shares": 0.0, "value": None, "status": None},
+        )
+        sign = 1.0 if line["side"] == "buy" else -1.0
+        acc["shares"] += sign * float(line["shares"])
+        if line.get("value") is not None:
+            acc["value"] = (acc["value"] or 0.0) + sign * float(line["value"])
+        if acc["status"] is None:
+            acc["status"] = line["status"]
+    out = []
+    for acc in by.values():
+        if abs(acc["shares"]) <= EPS:
+            continue
+        side = "buy" if acc["shares"] > 0 else "sell"
+        out.append(
+            {
+                "symbol": acc["symbol"],
+                "side": side,
+                "shares": abs(acc["shares"]),
+                "value": None if acc["value"] is None else abs(acc["value"]),
+                "status": acc["status"],
+            }
+        )
+    return sorted(out, key=lambda x: (x["symbol"], x["status"] == OUTSIDE))
+
+
 def _add_outside(blocks: list[dict], fills: list[dict], paper_start: str) -> None:
     """Put each fill no lot claims into the block of its week; a week with no block gets one
     with no lot (nothing was due, but the account traded)."""
@@ -337,6 +373,10 @@ def build(
         for symbol, shares in _outside_net(group.get("outside_lots") or [], paper_start).items():
             outside_now[symbol] += max(0.0, shares - max(0.0, booked[symbol]))
         _add_outside(blocks, group.get("outside_lots") or [], paper_start)
+        for block in blocks:
+            block["lines"] = _net_lines(block["lines"])
+            block["bought"] = sum(x["value"] or 0.0 for x in block["lines"] if x["side"] == "buy")
+            block["sold"] = sum(x["value"] or 0.0 for x in block["lines"] if x["side"] == "sell")
         blocks = [
             b for b in blocks if (not start or b["week"] >= start) and (not end or b["week"] <= end)
         ]

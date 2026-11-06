@@ -11,11 +11,21 @@
 import { Fragment, type ReactNode, useState } from 'react';
 
 import { cn } from '../../../lib/cn';
-import { EMPTY, formatDay, formatInr, formatPct } from '../../../lib/format';
+import { EMPTY, formatDay, formatInr } from '../../../lib/format';
 import type { PortfolioStopSetting } from '../../../lib/portfolioStop';
 import { type BookRow, stopChanged, stopSummary } from '../../../lib/rotationBooks';
+import {
+  BOOK_CAVEAT,
+  COMPARE_WINDOWS,
+  type CompareRead,
+  gapCell,
+  sigmaText,
+  windowLabel,
+} from '../../../lib/rotationCompare';
 import type { StopEffect } from '../../../lib/rotationPortfolioView';
+import type { CompareBook, CompareWindow } from '../../../types/rotationCompare';
 import { InfoTooltip } from '../../ui/InfoTooltip';
+import { SegmentedControl } from '../../ui/SegmentedControl';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 import { PortfolioStopButton } from '../PortfolioStopButton';
 import { pnlClass } from '../shared';
@@ -42,6 +52,8 @@ export interface BookLine {
   stop: BookStop;
   /** Why the book has no figures yet, or why it could not be read. */
   message?: { text: string; error: boolean } | null;
+  /** Which book of the head-to-head this row is (`rotation/beats.py` compare). */
+  compareBook: CompareBook;
 }
 
 function money(v: number | null, sign = true) {
@@ -50,6 +62,59 @@ function money(v: number | null, sign = true) {
 
 function tone(v: number | null) {
   return v === null ? 'text-muted' : pnlClass(v);
+}
+
+function GapCell({
+  read,
+  book,
+  historyWindow,
+}: { read: CompareRead; book: CompareBook; historyWindow: CompareWindow }) {
+  const c = gapCell(read, book, historyWindow);
+  if (c.kind === 'gap' && c.money !== undefined)
+    return (
+      <Td dense align="right" numeric className={tone(c.money)}>
+        {money(c.money)}
+        {c.range ? (
+          <span className="block text-[10px] font-normal text-faint">
+            {c.range} · {c.includesZero ? 'includes 0' : 'clears 0'}
+          </span>
+        ) : null}
+      </Td>
+    );
+  return (
+    <Td
+      dense
+      align="right"
+      numeric
+      className="text-muted"
+      title={c.kind === 'error' ? c.text : undefined}
+    >
+      {c.kind === 'base' ? (
+        <span className="text-faint">the base</span>
+      ) : c.kind === 'loading' ? (
+        '…'
+      ) : (
+        EMPTY
+      )}
+    </Td>
+  );
+}
+
+function SigmaCell({
+  read,
+  book,
+  historyWindow,
+}: { read: CompareRead; book: CompareBook; historyWindow: CompareWindow }) {
+  const f = read.data?.windows[historyWindow]?.books[book];
+  const text = sigmaText(f);
+  return (
+    <Td dense align="right" numeric className={text ? undefined : 'text-muted'}>
+      {text ?? (read.loading ? '…' : EMPTY)}
+      {text ? (
+        <span className="block text-[10px] font-normal text-faint">{BOOK_CAVEAT[book]}</span>
+      ) : null}
+    </Td>
+  );
 }
 
 function StopCell({
@@ -92,8 +157,18 @@ export function RotationBooks({
   lines,
   vsHeader,
   footer,
+  compare,
+  historyWindow,
+  onWindow,
+  below,
 }: {
   lines: readonly BookLine[];
+  /** The head-to-head with the fixed base, and the window its columns and cards follow. */
+  compare: CompareRead;
+  historyWindow: CompareWindow;
+  onWindow: (w: CompareWindow) => void;
+  /** Cards under the table (head-to-head, drift alarm), above the verdict. */
+  below?: ReactNode;
   /** "vs base", "vs random median": what the gap column is measured against. */
   vsHeader: string;
   /** The registered verdict, under the table. */
@@ -111,6 +186,16 @@ export function RotationBooks({
 
   return (
     <section aria-label="Books" className="rounded-xl border border-border bg-surface shadow-card">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border px-3 py-2 text-xs text-muted">
+        <span>History window</span>
+        <SegmentedControl
+          ariaLabel="History window"
+          size="sm"
+          value={historyWindow}
+          options={COMPARE_WINDOWS.map((o) => ({ value: o.value, label: o.label }))}
+          onChange={onWindow}
+        />
+      </div>
       <Table>
         <THead>
           <Th dense>Book</Th>
@@ -143,10 +228,19 @@ export function RotationBooks({
           </Th>
           <Th dense align="right">
             <span className="inline-flex items-center gap-1">
-              Beats random
+              {windowLabel(historyWindow)} vs base / lot-day
               <InfoTooltip
-                label="About beats random"
-                text="Share of 1,000 random baskets of the same shape that the book's cumulative gross is above. Always on the registered basis, without a portfolio stop."
+                label="About the history gap"
+                text="The book's ₹ per lot-day minus the fixed base's over the chosen window, on the days all three books have, after 0.5% slippage when it is on. The range is a 90% block-bootstrap interval: one that includes 0 means not distinguishable from the base. Most of these days are stored results replayed through the 09:16 rule, not live picks; Adaptive Tuned's settings were tuned on that history."
+              />
+            </span>
+          </Th>
+          <Th dense align="right">
+            <span className="inline-flex items-center gap-1">
+              Edge over random
+              <InfoTooltip
+                label="About edge over random"
+                text="The book's total over the window minus the average of 1,000 random same-shape baskets, in units of how much those baskets vary (σ). 0 is luck; about 2 is as good as beating 98% of random baskets; unlike a percentage it has no ceiling at 100%, so a long window can still rank books."
               />
             </span>
           </Th>
@@ -226,18 +320,15 @@ export function RotationBooks({
                       money(r.vsBenchmark)
                     )}
                   </Td>
-                  <Td dense align="right" numeric>
-                    {r.beatsRandom === null
-                      ? EMPTY
-                      : formatPct(r.beatsRandom, 0, { unit: 'percent' })}
-                  </Td>
+                  <GapCell read={compare} book={l.compareBook} historyWindow={historyWindow} />
+                  <SigmaCell read={compare} book={l.compareBook} historyWindow={historyWindow} />
                   <Td dense>
                     <StopCell stop={l.stop} open={isOpen} onToggle={() => toggle(r.id)} />
                   </Td>
                 </TRow>
                 {isOpen && l.stop.effect ? (
                   <tr className="border-b border-border bg-surface-2/40">
-                    <td colSpan={8} className="px-3 py-2">
+                    <td colSpan={9} className="px-3 py-2">
                       <div className={cn('max-w-xl', !stopChanged(l.stop.effect) && 'opacity-80')}>
                         <StopEffectBlock effect={l.stop.effect} />
                       </div>
@@ -249,6 +340,7 @@ export function RotationBooks({
           })}
         </tbody>
       </Table>
+      {below}
       {footer ? <div className="border-t border-border px-4 py-3">{footer}</div> : null}
     </section>
   );

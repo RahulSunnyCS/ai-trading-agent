@@ -53,8 +53,8 @@ describe('pause (BL-140 Phase 4)', () => {
     expect(sessionFor('quantiply-evening', '2026-10-21')).toBe('2026-10-22');
     // BL-172: the switch-on runs at 08:10 for today
     expect(sessionFor('quantiply-deploy', '2026-10-21')).toBe('2026-10-21');
-    expect(sessionFor('algotest-topup', '2026-10-23')).toBe('2026-10-23');
-    expect(sessionFor('algotest-deploy', '2026-10-23')).toBe('2026-10-23');
+    // BL-197 Phase 2: the 08:11 activation of last evening's list is for today
+    expect(sessionFor('algotest-activate', '2026-10-23')).toBe('2026-10-23');
   });
 
   it('no file or no pause holds nothing', () => {
@@ -69,10 +69,10 @@ describe('pause (BL-140 Phase 4)', () => {
     expect(pausedReason('algotest-evening', env, ist('2026-10-23', '16:40'))).toContain(
       'paused until 2026-10-26',
     );
-    // Friday's own morning top-up is for Friday, also inside the pause: held
-    expect(pausedReason('algotest-topup', env, ist('2026-10-23', '09:18'))).not.toBeNull();
-    // Monday morning's deploy is for Monday: held
-    expect(pausedReason('algotest-deploy', env, ist('2026-10-26', '09:16'))).not.toBeNull();
+    // Friday's own morning activation is for Friday, also inside the pause: held
+    expect(pausedReason('algotest-activate', env, ist('2026-10-23', '08:11'))).not.toBeNull();
+    // Monday morning's activation is for Monday: held
+    expect(pausedReason('algotest-activate', env, ist('2026-10-26', '08:11'))).not.toBeNull();
     // Monday's evening prepares Tuesday: runs
     expect(pausedReason('quantiply-evening', env, ist('2026-10-26', '16:45'))).toBeNull();
     // Monday's 08:10 switch-on is for Monday: held
@@ -84,7 +84,7 @@ describe('pause (BL-140 Phase 4)', () => {
     expect(pausedReason('quantiply-topup', env, ist('2026-10-22', '09:19'))).not.toBeNull();
     // Thursday evening prepares Friday, after the pause: runs
     expect(pausedReason('algotest-evening', env, ist('2026-10-22', '16:40'))).toBeNull();
-    expect(pausedReason('algotest-topup', env, ist('2026-10-23', '09:18'))).toBeNull();
+    expect(pausedReason('algotest-activate', env, ist('2026-10-23', '08:11'))).toBeNull();
   });
 
   it('never holds the switch-off or a read-only job', () => {

@@ -10,6 +10,7 @@ describe('parseArgs()', () => {
       to: null,
       reparse: false,
       acceptFigures: false,
+      marginOnly: false,
     });
   });
 
@@ -22,6 +23,7 @@ describe('parseArgs()', () => {
       to: null,
       reparse: false,
       acceptFigures: false,
+      marginOnly: false,
     });
     expect(parseArgs(['--from', '2025-04-01', '--to', '2026-10-23']).from).toBe('2025-04-01');
     expect(() => parseArgs(['--reparse'])).toThrow(/--reparse takes/);

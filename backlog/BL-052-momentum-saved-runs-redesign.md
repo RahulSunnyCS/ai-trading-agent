@@ -319,3 +319,9 @@ Answered by the owner on 2026-10-08 (see the Log):
 - 2026-10-08 — the alert-bell follow-up is done in BL-051 Phase 5: an unreviewed Check (warning) or
   Not reproducible (error) change is an alert whose link opens the strategy's drawer on Saved
   runs (`/momentum/saved?strategy=<id>`); **Mark reviewed** there resolves it.
+- 2026-11-04 — four Broad favourites raised Check after the Friday 30 Oct week was appended (512
+  earlier weeks identical): `explain` compared whole-repo HEAD commits, so an options-package
+  commit read as a code change. Two clean commits now count as the same code when `git diff
+  --quiet` finds nothing under `saved_identity.RESULT_CODE` (momentum and trading-data `src`,
+  momentum's `uv.lock`), and a result that only added later weeks is the new `data_extended` label
+  (no review; trading-data migration 015 widens the label CHECK).

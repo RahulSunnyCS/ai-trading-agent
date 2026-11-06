@@ -1,0 +1,442 @@
+{
+  "comment": "BL-211: shared by the Python, broker-login and dashboard tests; settings = base rows + each case's rules",
+  "base": {
+    "masters": {
+      "logins": true,
+      "uploads": true,
+      "deploy": false
+    },
+    "rows": {
+      "algotest.finvasia": {
+        "login": true,
+        "list": "t1",
+        "upload": true,
+        "multiplier": 1,
+        "addon": true,
+        "dirBoost": false,
+        "mtmSl": null
+      },
+      "algotest.angelone": {
+        "login": false,
+        "list": "none",
+        "upload": false,
+        "multiplier": 1,
+        "addon": true,
+        "dirBoost": false,
+        "mtmSl": null
+      },
+      "quantiply.angelone": {
+        "login": true,
+        "list": "core",
+        "upload": true,
+        "multiplier": 1,
+        "addon": true,
+        "dirBoost": false,
+        "mtmSl": 8000
+      },
+      "quantiply.finvasia": {
+        "login": false,
+        "list": "none",
+        "upload": false,
+        "multiplier": 1,
+        "addon": true,
+        "dirBoost": false,
+        "mtmSl": null
+      }
+    },
+    "pause": {
+      "until": null
+    }
+  },
+  "cases": [
+    {
+      "name": "no rules: every row keeps its list",
+      "rules": [],
+      "dayType": {
+        "day": "2026-11-05",
+        "weekday": "Thu",
+        "dte": {
+          "NIFTY": "2",
+          "SENSEX": "0"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "t1",
+          "upload": true,
+          "rule": null
+        },
+        "algotest.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        },
+        "quantiply.angelone": {
+          "list": "core",
+          "upload": true,
+          "rule": null
+        },
+        "quantiply.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        }
+      }
+    },
+    {
+      "name": "SENSEX 0 DTE gives Shoonya on AlgoTest Adaptive Classic",
+      "rules": [
+        {
+          "row": "algotest.finvasia",
+          "when": {
+            "kind": "dte",
+            "index": "SENSEX",
+            "dte": "0"
+          },
+          "list": "core",
+          "note": "SENSEX expiry: Classic"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-05",
+        "weekday": "Thu",
+        "dte": {
+          "NIFTY": "2",
+          "SENSEX": "0"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "core",
+          "upload": true,
+          "rule": 1
+        },
+        "algotest.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        },
+        "quantiply.angelone": {
+          "list": "core",
+          "upload": true,
+          "rule": null
+        },
+        "quantiply.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        }
+      }
+    },
+    {
+      "name": "the same rule on a day SENSEX has 4 DTE changes nothing",
+      "rules": [
+        {
+          "row": "algotest.finvasia",
+          "when": {
+            "kind": "dte",
+            "index": "SENSEX",
+            "dte": "0"
+          },
+          "list": "core"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-06",
+        "weekday": "Fri",
+        "dte": {
+          "NIFTY": "1",
+          "SENSEX": "4"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "t1",
+          "upload": true,
+          "rule": null
+        },
+        "algotest.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        },
+        "quantiply.angelone": {
+          "list": "core",
+          "upload": true,
+          "rule": null
+        },
+        "quantiply.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        }
+      }
+    },
+    {
+      "name": "a weekday rule giving None turns the upload off",
+      "rules": [
+        {
+          "row": "quantiply.angelone",
+          "when": {
+            "kind": "weekday",
+            "weekday": "Fri"
+          },
+          "list": "none"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-06",
+        "weekday": "Fri",
+        "dte": {
+          "NIFTY": "1",
+          "SENSEX": "4"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "t1",
+          "upload": true,
+          "rule": null
+        },
+        "algotest.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        },
+        "quantiply.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": 1
+        },
+        "quantiply.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        }
+      }
+    },
+    {
+      "name": "the first rule that matches a row wins",
+      "rules": [
+        {
+          "row": "algotest.finvasia",
+          "when": {
+            "kind": "dte",
+            "index": "SENSEX",
+            "dte": "0"
+          },
+          "list": "none"
+        },
+        {
+          "row": "algotest.finvasia",
+          "when": {
+            "kind": "weekday",
+            "weekday": "Thu"
+          },
+          "list": "core"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-05",
+        "weekday": "Thu",
+        "dte": {
+          "NIFTY": "2",
+          "SENSEX": "0"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": 1
+        },
+        "algotest.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        },
+        "quantiply.angelone": {
+          "list": "core",
+          "upload": true,
+          "rule": null
+        },
+        "quantiply.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        }
+      }
+    },
+    {
+      "name": "a rule gives a row with no list one, and it uploads",
+      "rules": [
+        {
+          "row": "algotest.angelone",
+          "when": {
+            "kind": "dte",
+            "index": "NIFTY",
+            "dte": "0"
+          },
+          "list": "t1"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-03",
+        "weekday": "Tue",
+        "dte": {
+          "NIFTY": "0",
+          "SENSEX": "5"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "t1",
+          "upload": true,
+          "rule": null
+        },
+        "algotest.angelone": {
+          "list": "t1",
+          "upload": true,
+          "rule": 1
+        },
+        "quantiply.angelone": {
+          "list": "core",
+          "upload": true,
+          "rule": null
+        },
+        "quantiply.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        }
+      }
+    },
+    {
+      "name": "a rule on an unknown days-to-expiry label cannot be decided",
+      "rules": [
+        {
+          "row": "algotest.finvasia",
+          "when": {
+            "kind": "dte",
+            "index": "SENSEX",
+            "dte": "0"
+          },
+          "list": "core"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-05",
+        "weekday": "Thu",
+        "dte": {
+          "NIFTY": "2",
+          "SENSEX": "unknown"
+        },
+        "source": "master"
+      },
+      "error": true
+    },
+    {
+      "name": "an earlier match means a later unknown label is never needed",
+      "rules": [
+        {
+          "row": "algotest.finvasia",
+          "when": {
+            "kind": "weekday",
+            "weekday": "Thu"
+          },
+          "list": "core"
+        },
+        {
+          "row": "algotest.finvasia",
+          "when": {
+            "kind": "dte",
+            "index": "SENSEX",
+            "dte": "0"
+          },
+          "list": "none"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-05",
+        "weekday": "Thu",
+        "dte": {
+          "NIFTY": "2",
+          "SENSEX": "unknown"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "core",
+          "upload": true,
+          "rule": 1
+        },
+        "algotest.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        },
+        "quantiply.angelone": {
+          "list": "core",
+          "upload": true,
+          "rule": null
+        },
+        "quantiply.finvasia": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        }
+      }
+    },
+    {
+      "name": "a weekday rule never reads the labels",
+      "rules": [
+        {
+          "row": "quantiply.finvasia",
+          "when": {
+            "kind": "weekday",
+            "weekday": "Thu"
+          },
+          "list": "core"
+        }
+      ],
+      "dayType": {
+        "day": "2026-11-05",
+        "weekday": "Thu",
+        "dte": {
+          "NIFTY": "unknown",
+          "SENSEX": "unknown"
+        },
+        "source": "master"
+      },
+      "expect": {
+        "algotest.finvasia": {
+          "list": "t1",
+          "upload": true,
+          "rule": null
+        },
+        "algotest.angelone": {
+          "list": "none",
+          "upload": false,
+          "rule": null
+        },
+        "quantiply.angelone": {
+          "list": "core",
+          "upload": true,
+          "rule": null
+        },
+        "quantiply.finvasia": {
+          "list": "core",
+          "upload": true,
+          "rule": 1
+        }
+      }
+    }
+  ]
+}

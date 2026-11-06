@@ -10,6 +10,7 @@ import {
   describeChanges,
   githubOutcome,
   heldByMaster,
+  splitApplies,
   withDefaults,
   withMaster,
   withPause,
@@ -60,7 +61,10 @@ const SETTINGS: AutomationSettings = {
     },
   },
   pause: { until: null },
+  rules: [],
   capital: { finvasia: 850_000, angelone: 850_000 },
+  margin: { bufferPct: 10, days: 6 },
+  splitT1: false,
 };
 
 const view = (
@@ -116,6 +120,20 @@ describe('automation helpers', () => {
       dirBoost: false,
       mtmSl: null,
     });
+  });
+
+  it('the T1 split applies only with both AlgoTest rows uploading T1 (BL-209)', () => {
+    const both = withRow({ ...SETTINGS, splitT1: true }, 'algotest.angelone', {
+      list: 't1',
+      upload: true,
+    });
+    expect(splitApplies(both)).toBe(true);
+    expect(splitApplies({ ...both, splitT1: false })).toBe(false);
+    expect(splitApplies({ ...SETTINGS, splitT1: true })).toBe(false);
+    expect(splitApplies(withMaster(both, 'uploads', false))).toBe(false);
+    const old = { ...SETTINGS } as Partial<AutomationSettings>;
+    delete old.splitT1;
+    expect(withDefaults(old as AutomationSettings).splitT1).toBe(false);
   });
 
   it('says when a master switch holds a row back', () => {
@@ -181,6 +199,7 @@ describe('multiplier, add-on and pause', () => {
     const old = JSON.parse(JSON.stringify(SETTINGS)) as Record<string, unknown>;
     delete old.pause;
     delete old.capital;
+    delete old.margin;
     for (const row of Object.values(old.rows as Record<string, Record<string, unknown>>)) {
       row.multiplier = undefined;
       row.addon = undefined;
@@ -255,10 +274,41 @@ describe('AutomationSettingsCard', () => {
     });
   });
 
+  it('saves the margin check’s buffer and look-back', async () => {
+    const fetchMock = stub((body) => ok(view(body, 1)));
+    render(<AutomationSettingsCard />);
+    fireEvent.change(await screen.findByLabelText(/^Buffer/), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText(/^Days of each type/), { target: { value: '10' } });
+    expect(await screen.findByText('Margin buffer: 10% → 5%')).toBeTruthy();
+    expect(screen.getByText('Margin look-back: 6 → 10 days of a type')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).margin).toEqual({ bufferPct: 5, days: 10 });
+  });
+
+  it('saves the T1 split switch (BL-209) and says when it changes nothing', async () => {
+    const fetchMock = stub((body) => ok(view(body, 1)));
+    render(<AutomationSettingsCard />);
+    const toggle = await screen.findByLabelText('Split T1 across the AlgoTest accounts');
+    expect(screen.getByText('Off: each AlgoTest account trades every T1 pick.')).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(await screen.findByText('T1 split across the AlgoTest accounts: off → on')).toBeTruthy();
+    // Angel One's AlgoTest row does not upload T1 in the fixture
+    expect(
+      screen.getByText('On, but it changes nothing until both AlgoTest rows upload T1.'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).splitT1).toBe(true);
+  });
+
   it('works against a scheduler that does not send the new fields yet', async () => {
     const old = JSON.parse(JSON.stringify(SETTINGS)) as Record<string, unknown>;
     delete old.pause;
     delete old.capital;
+    delete old.margin;
     for (const row of Object.values(old.rows as Record<string, Record<string, unknown>>)) {
       row.multiplier = undefined;
       row.addon = undefined;
@@ -268,10 +318,11 @@ describe('AutomationSettingsCard', () => {
       vi.fn(async () => ok(view(old as unknown as AutomationSettings))),
     );
     render(<AutomationSettingsCard />);
-    // four multipliers, the MTM SL of the one Quantiply row with a list (BL-172 default) and
-    // the two accounts' capital (₹8.5 lakh each by default)
-    expect(await screen.findAllByRole('spinbutton')).toHaveLength(7);
+    // four multipliers, the MTM SL of the one Quantiply row with a list (BL-172 default), the
+    // two accounts' capital (₹8.5 lakh each by default) and the margin check's two (10%, 6 days)
+    expect(await screen.findAllByRole('spinbutton')).toHaveLength(9);
     expect((screen.getByLabelText(/^Shoonya/) as HTMLInputElement).value).toBe('850000');
+    expect((screen.getByLabelText(/^Buffer/) as HTMLInputElement).value).toBe('10');
     expect(screen.queryByRole('button', { name: /Skip next session/ })).toBeNull();
     expect(screen.queryByText(/unsaved change/)).toBeNull();
   });
@@ -342,5 +393,121 @@ describe('AutomationSettingsCard', () => {
     );
     render(<AutomationSettingsCard />);
     expect(await screen.findByText('Scheduler not reachable')).toBeTruthy();
+  });
+});
+
+describe('Advanced rules (BL-211)', () => {
+  const DAY_TYPES = {
+    today: {
+      day: '2026-11-05',
+      weekday: 'Thu',
+      dte: { NIFTY: '2', SENSEX: '0' },
+      source: 'master',
+    },
+    tomorrow: {
+      day: '2026-11-06',
+      weekday: 'Fri',
+      dte: { NIFTY: '1', SENSEX: '4' },
+      source: 'master',
+    },
+    errors: [],
+  };
+  function stubWithDays(put?: (body: AutomationSettings) => Response) {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('/rotation/day-type')) return ok(DAY_TYPES);
+      if (init?.method === 'PUT')
+        return put ? put(JSON.parse(String(init.body))) : ok(view(SETTINGS, 1));
+      return ok({ ...view(SETTINGS), next_session: '2026-11-06' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('starts closed with no rules, adds one, and previews today and tomorrow', async () => {
+    stubWithDays();
+    render(<AutomationSettingsCard />);
+    expect(await screen.findByText('0 rules')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Advanced rules/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    expect(
+      await screen.findByText('Rule added: AlgoTest · Shoonya on SENSEX 0 DTE → Adaptive Classic'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'On a day SENSEX has 0 weekdays to expiry, AlgoTest · Shoonya trades Adaptive Classic instead of its own list (Adaptive Tuned).',
+      ),
+    ).toBeTruthy();
+    // SENSEX expires today (Thu) and not tomorrow: the rule decides today's AlgoTest · Shoonya
+    const today = await screen.findByText(/Today · Thu/);
+    const list = today.closest('div') as HTMLElement;
+    expect(list.textContent).toContain('Adaptive Classic');
+    expect(list.textContent).toContain('rule 1');
+    const tomorrow = screen.getByText(/Tomorrow · Fri/).closest('div') as HTMLElement;
+    expect(tomorrow.textContent).not.toContain('rule 1');
+  });
+
+  it('saves the rules with the settings', async () => {
+    const fetchMock = stubWithDays((body) => ok(view(body, 1)));
+    render(<AutomationSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: /Advanced rules/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    fireEvent.change(screen.getByLabelText('Rule 1 account'), {
+      target: { value: 'quantiply.angelone' },
+    });
+    fireEvent.change(screen.getByLabelText('Rule 1 condition'), { target: { value: 'weekday' } });
+    fireEvent.change(screen.getByLabelText('Rule 1 weekday'), { target: { value: 'Thu' } });
+    fireEvent.change(screen.getByLabelText('Rule 1 list'), { target: { value: 'none' } });
+    fireEvent.change(screen.getByLabelText('Rule 1 note'), {
+      target: { value: 'no Quantiply on Thursdays' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).rules).toEqual([
+      {
+        row: 'quantiply.angelone',
+        when: { kind: 'weekday', weekday: 'Thu' },
+        list: 'none',
+        note: 'no Quantiply on Thursdays',
+      },
+    ]);
+  });
+
+  it('says a rule can never apply and does not allow the save', async () => {
+    const fetchMock = stubWithDays();
+    render(<AutomationSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: /Advanced rules/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Add a rule/ }));
+    expect(
+      await screen.findByText(
+        'Rule 2 can never apply: rule 1 tests the same thing on the same row and is tried first.',
+      ),
+    ).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove rule 2' }));
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false);
+  });
+
+  it('opens with the rules showing when there are some', async () => {
+    const rule = {
+      row: 'algotest.finvasia',
+      when: { kind: 'dte', index: 'SENSEX', dte: '0' },
+      list: 'core',
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/rotation/day-type')
+          ? ok(DAY_TYPES)
+          : ok(view({ ...SETTINGS, rules: [rule] } as AutomationSettings, 4)),
+      ),
+    );
+    render(<AutomationSettingsCard />);
+    expect(await screen.findByText('1 rule')).toBeTruthy();
+    expect(await screen.findByLabelText('Rule 1 account')).toBeTruthy();
   });
 });

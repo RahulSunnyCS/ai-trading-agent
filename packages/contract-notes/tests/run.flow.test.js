@@ -277,3 +277,143 @@ test('--reparse keeps a note whose figures now read differently, unless --accept
   expect(await main([...args, '--accept-figures'], deps(MON_NIGHT))).toBe(0);
   expect(line('2026-10-26').fno.payin_payout_obligation).toBe(800);
 });
+
+// BL-205: the daily margin statements. A statement's content here is JSON standing for the
+// parsed PDF ('bad' = one that does not read); the reader is injected.
+describe('margin statements', () => {
+  const { readMarginDay } = require('../margin');
+  const angel = (uid, day, body, { file, received, from } = {}) => {
+    const [y, m, d] = day.split('-');
+    return {
+      uid,
+      subject: 'Margin Statement for the day',
+      from: from ?? 'contract.notes@angeltrade.in',
+      received: received ?? `${day}T22:00:00Z`,
+      messageId: `<m${uid}@x>`,
+      attachments: [
+        {
+          filename: file ?? `CM_R1_${d}${m}${y}.pdf`,
+          content: Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)),
+        },
+      ],
+    };
+  };
+  const parsedFor = (day, available) => ({
+    day,
+    account: 'R1',
+    total: { available, upfront: 100, funds: 10 },
+    segments: {},
+    holdings: [],
+  });
+  const withReader = (d) => {
+    d.readStatement = async (content) => {
+      const text = content.toString();
+      if (text === 'bad') return { error: 'margin table: no Total row' };
+      return { parsed: JSON.parse(text) };
+    };
+    return d;
+  };
+  const accounts = [account('angelone', 'R1')];
+  // The account has no contract notes here, so the run also raises its quiet-account alert:
+  // these tests look only for margin problems.
+  const marginProblems = () =>
+    errors
+      .join('\n')
+      .split('\n')
+      .filter(
+        (e) => /margin|sender/.test(e) && !/no contract note/.test(e) && !/problem\(s\)/.test(e),
+      );
+
+  test('stores each statement under its trade date, keeps the PDF and sets the bookmark', async () => {
+    mail = [angel(201, '2026-10-23', parsedFor('2026-10-23', 500))];
+    await main([], withReader(deps(MON_NIGHT, accounts)));
+    expect(marginProblems()).toEqual([]);
+    const [stored] = readMarginDay(root(), '2026-10-23');
+    expect(stored).toMatchObject({
+      broker: 'angelone',
+      account: 'R1',
+      kind: 'margin_statement',
+      total: { available: 500 },
+      message_id: '<m201@x>',
+    });
+    expect(
+      fs.existsSync(path.join(root(), 'raw', 'angelone', 'R1', 'margin', '2026-10-23.pdf')),
+    ).toBe(true);
+    expect(readCursors(root())['m@x.com|margin/angelone'].last_uid).toBe(201);
+  });
+
+  test("another account's statement is skipped, and a foreign sender is reported", async () => {
+    mail = [
+      angel(201, '2026-10-23', parsedFor('2026-10-23', 500), { file: 'CM_R9_23102026.pdf' }),
+      angel(202, '2026-10-23', parsedFor('2026-10-23', 500), { from: 'x@example.com' }),
+    ];
+    expect(await main([], withReader(deps(MON_NIGHT, accounts)))).toBe(1);
+    expect(readMarginDay(root(), '2026-10-23')).toEqual([]);
+    expect(errors.join('\n')).toMatch(/another sender \(example\.com\)/);
+  });
+
+  test('a statement that does not read is reported once, then not behind the bookmark', async () => {
+    mail = [angel(201, '2026-10-23', 'bad')];
+    expect(await main([], withReader(deps(MON_NIGHT, accounts)))).toBe(1);
+    expect(errors.join('\n')).toMatch(/margin 2026-10-23: margin table: no Total row/);
+    errors = [];
+    await main([], withReader(deps(MON_NIGHT, accounts)));
+    expect(marginProblems()).toEqual([]);
+  });
+
+  test('a statement whose date differs from its file name is refused', async () => {
+    mail = [angel(201, '2026-10-23', parsedFor('2026-10-22', 500))];
+    expect(await main([], withReader(deps(MON_NIGHT, accounts)))).toBe(1);
+    expect(errors.join('\n')).toMatch(/for 2026-10-22, its file name says 2026-10-23/);
+    expect(readMarginDay(root(), '2026-10-23')).toEqual([]);
+  });
+
+  test('a later copy with other content replaces the line; an earlier copy does not', async () => {
+    mail = [angel(201, '2026-10-23', parsedFor('2026-10-23', 500))];
+    await main([], withReader(deps(MON_NIGHT, accounts)));
+    mail.push(
+      angel(202, '2026-10-23', parsedFor('2026-10-23', 600), { received: '2026-10-24T03:00:00Z' }),
+      angel(203, '2026-10-23', parsedFor('2026-10-23', 400), { received: '2026-10-23T20:00:00Z' }),
+    );
+    errors = [];
+    await main([], withReader(deps(MON_NIGHT, accounts)));
+    expect(marginProblems()).toEqual([]);
+    expect(readMarginDay(root(), '2026-10-23').map((l) => l.total.available)).toEqual([600]);
+  });
+
+  test('--margin-only --from/--to reads only statements: no note lines, no bookmark', async () => {
+    mail = [
+      angel(201, '2026-10-22', parsedFor('2026-10-22', 500)),
+      angel(202, '2026-10-26', parsedFor('2026-10-26', 700)),
+      finvasia(101, '2026-10-22', 500),
+    ];
+    const d = withReader(deps(MON_NIGHT, [...accounts, account('finvasia', 'FA1')]));
+    expect(await main(['--margin-only', '--from', '2026-10-21', '--to', '2026-10-23'], d)).toBe(0);
+    expect(readMarginDay(root(), '2026-10-22')).toHaveLength(1);
+    expect(readMarginDay(root(), '2026-10-26')).toEqual([]);
+    expect(readDay(root(), '2026-10-22')).toEqual([]);
+    expect(readCursors(root())).toEqual({});
+  });
+
+  test('a broken margin file is reported and stops neither the notes nor the bookmarks', async () => {
+    fs.mkdirSync(path.join(root(), 'margin'), { recursive: true });
+    fs.writeFileSync(path.join(root(), 'margin', '2026-10-23.jsonl'), '{not json\n');
+    mail = [
+      angel(201, '2026-10-23', parsedFor('2026-10-23', 500)),
+      finvasia(101, '2026-10-26', 700),
+    ];
+    const d = withReader(deps(MON_NIGHT, [...accounts, account('finvasia', 'FA1')]));
+    expect(await main([], d)).toBe(1);
+    expect(marginProblems().join('\n')).toMatch(/margin 2026-10-23: .*JSON/);
+    expect(line('2026-10-26').status).toBe('note');
+    expect(readCursors(root())['m@x.com|finvasia/FA1'].last_uid).toBe(101);
+    expect(readCursors(root())['m@x.com|margin/angelone'].last_uid).toBe(201);
+  });
+
+  test('--dry-run writes no statement', async () => {
+    mail = [angel(201, '2026-10-23', parsedFor('2026-10-23', 500))];
+    await main(['--dry-run'], withReader(deps(MON_NIGHT, accounts)));
+    expect(marginProblems()).toEqual([]);
+    expect(readMarginDay(root(), '2026-10-23')).toEqual([]);
+  });
+});

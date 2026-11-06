@@ -120,9 +120,9 @@ def test_month_lines_with_capital():
 def _evening(root, monkeypatch, day):
     nxt = tomorrow.NextPicks(date(2026, 11, 4), "Wed", CORE, [], None, None)
     monkeypatch.setattr(tomorrow, "next_session_picks", lambda today, root=None, track=None: nxt)
-    monkeypatch.setattr(deliver, "message_boost", lambda: {"adaptive": False, "t1": True})
+    monkeypatch.setattr(deliver, "message_boost", lambda *_: {"adaptive": False, "t1": True})
     capital = {"adaptive": 850_000, "t1": 1_000_000, "total": 1_700_000}
-    monkeypatch.setattr(deliver, "message_capital", lambda: capital)
+    monkeypatch.setattr(deliver, "message_capital", lambda *_: capital)
     sent = []
 
     def send(text, severity="info", chat_id=None):

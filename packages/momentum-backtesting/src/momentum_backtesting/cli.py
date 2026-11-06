@@ -1959,6 +1959,42 @@ def orders_run(
         notify.send(note)
 
 
+@orders_app.command("tentative")
+def orders_tentative(
+    send: bool = typer.Option(False, help="Also send the summary to Telegram."),
+    sync: bool = typer.Option(
+        True, help="Read the broker's holdings first when the source is 'fyers' or 'kite'."
+    ),
+) -> None:
+    """Thu 18:30 (scheduler job `momentum-orders-tentative`): Friday's orders planned early. With a
+    signal delay of 1 the names are fixed by last Friday's ranks, so the plan the 14:15 run will
+    make can be shown the evening before. Writes only tentative_orders.json in the state dir: no
+    orders row, no lot booking, no pending lot. A broker that cannot be read (Kite logs in on
+    every trading day, but a failed login) is noted and the last snapshot used. Never trades."""
+    from . import api, holdings_store, holdings_sync, notify
+    from .config import load_repo_env
+    from .db_read import open_catalog
+
+    load_repo_env()
+    if sync:
+        with open_catalog() as con:
+            source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
+        if source in ("fyers", "kite"):
+            try:
+                holdings_sync.sync(source)
+            except (*holdings_sync.LOGIN_ERRORS, RuntimeError) as error:
+                message = notify.redact(f"{type(error).__name__}: {error}")
+                typer.echo(
+                    f"orders: could not read the {source.title()} holdings ({message}); "
+                    "planning on the last snapshot"
+                )
+    payload = api.tentative_orders()
+    note = api._tentative_message(payload)
+    typer.echo(f"{note.title}\n{note.body}")
+    if send:
+        notify.send(note)
+
+
 lots_app = typer.Typer(
     help="BL-142: which Kite shares belong to which weekly lot (one lot per sleeve; never trades)."
 )
@@ -2110,7 +2146,7 @@ def kite_auto_login_cmd(
 ) -> None:
     """Log in to Kite unattended (owner, 2026-10-28; off until KITE_AUTO_LOGIN=on): Kite's own
     login page with KITE_USER_ID, KITE_PASSWORD and a code from KITE_TOTP_SECRET. Run by the
-    08:02 morning login on Fridays and trading Mondays. A refused password is never retried and
+    08:02 morning login on every trading day. A refused password is never retried and
     holds later runs until the credentials change. Exit 0 = logged in, already logged in or
     off; 1 = failed."""
     from . import kite_login

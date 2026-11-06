@@ -35,6 +35,7 @@ import {
   useRotationOverview,
   useRotationSummary,
 } from '../../hooks/useRotation';
+import { useRotationCompare } from '../../hooks/useRotationCompare';
 import { useRotationPlan } from '../../hooks/useRotationPlan';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
@@ -46,6 +47,7 @@ import {
   T1_STOP_KEYS,
 } from '../../lib/portfolioStop';
 import { baseBook, listBook, vsHeader } from '../../lib/rotationBooks';
+import { DEFAULT_COMPARE_WINDOW } from '../../lib/rotationCompare';
 import {
   ADAPTIVE_CARD,
   BASE_CARD,
@@ -75,6 +77,7 @@ import {
 import { type RotationBookView, useRotationBook } from '../../store/rotationBook';
 import { useRotationSlippage } from '../../store/rotationSlippage';
 import type { RotationListKey } from '../../types/rotation';
+import type { CompareWindow } from '../../types/rotationCompare';
 import { Accordion } from '../ui/Accordion';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -82,6 +85,7 @@ import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
+import { RotationCandles } from './RotationCandles';
 import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
@@ -96,6 +100,7 @@ import { EveningRunBar } from './results/EveningRunBar';
 import { ListPicker } from './rotation/ListPicker';
 import { RotationBaskets } from './rotation/RotationBaskets';
 import { type BookLine, RotationBooks } from './rotation/RotationBooks';
+import { RotationCompareCards } from './rotation/RotationCompareCards';
 import { RotationHealthStrip } from './rotation/RotationHealth';
 import { RotationHero } from './rotation/RotationHero';
 import { PlanPickLine, RotationTomorrow, recordedSession } from './rotation/RotationPlan';
@@ -160,6 +165,8 @@ export function RotationPanel() {
   const overview = useRotationOverview();
   // Each pick's settings and upload state, and the next session's tentative list.
   const planRes = useRotationPlan();
+  const compare = useRotationCompare();
+  const [compareWindow, setCompareWindow] = useState<CompareWindow>(DEFAULT_COMPARE_WINDOW);
   const plan = planRes.data;
   const summary = useRotationSummary(ONE_LOT);
   const tuned = useRotationSummary(TUNED);
@@ -255,6 +262,7 @@ export function RotationPanel() {
         name: ADAPTIVE_CARD.classic.name,
         note: ADAPTIVE_CARD.classic.note,
         focus: view === 'core',
+        compareBook: 'core',
         stop: {
           setting: portfolio,
           onChange: setPortfolio,
@@ -280,6 +288,7 @@ export function RotationPanel() {
         note: ADAPTIVE_CARD.tuned.note,
         focus: view === 'tuned',
         message: tunedMessage,
+        compareBook: 't1',
         stop: {
           setting: tunedStop,
           onChange: setTunedStop,
@@ -304,6 +313,7 @@ export function RotationPanel() {
         name: BASE_CARD.name,
         note: BASE_CARD.note,
         focus: view === 'base',
+        compareBook: 'base',
         stop: {
           setting: baseStop,
           onChange: setBaseStop,
@@ -359,6 +369,7 @@ export function RotationPanel() {
     overview.refetch();
     summary.refetch();
     tuned.refetch();
+    compare.refetch();
   };
   const toggle = (k: RotationListKey) =>
     setShown((prev) => {
@@ -618,6 +629,10 @@ export function RotationPanel() {
             <>
               <RotationBooks
                 lines={lines}
+                compare={compare}
+                historyWindow={compareWindow}
+                onWindow={setCompareWindow}
+                below={<RotationCompareCards read={compare} window={compareWindow} />}
                 vsHeader={vsHeader(benchmark)}
                 footer={
                   verdictFor ? (
@@ -735,6 +750,21 @@ export function RotationPanel() {
           <RotationDrawdowns list={focus} portfolio={portfolio} />
           <RotationDrift list={focus} />
         </Accordion>
+      </section>
+
+      <section aria-labelledby="band-day-by-day" className="space-y-3">
+        <header>
+          <h2
+            id="band-day-by-day"
+            className="text-base font-semibold tracking-tight text-foreground"
+          >
+            Day by day
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            Each day as a candle on the running total, with every strategy's result on hover.
+          </p>
+        </header>
+        <RotationCandles />
       </section>
 
       <section aria-labelledby="band-live-vs-paper" className="space-y-3">

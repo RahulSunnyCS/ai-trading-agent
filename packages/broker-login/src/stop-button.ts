@@ -129,8 +129,15 @@ function hasCredentials(broker: QuantiplyBroker, env: NodeJS.ProcessEnv): boolea
  */
 function usedByTool(broker: QuantiplyBroker): boolean {
   try {
-    const row = readAutomation().rows[`quantiply.${broker}`];
-    return !row || row.upload || row.list !== 'none';
+    const a = readAutomation();
+    const row = a.rows[`quantiply.${broker}`];
+    // BL-211: a day-type rule can give the account a list on some days
+    return (
+      !row ||
+      row.upload ||
+      row.list !== 'none' ||
+      a.rules.some((r) => r.row === `quantiply.${broker}` && r.list !== 'none')
+    );
   } catch {
     return true;
   }

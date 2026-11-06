@@ -6,11 +6,13 @@ faked: no test logs in or reads a candle."""
 from __future__ import annotations
 
 import json
+import time
 from datetime import date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
+from option_backtesting.api import rotation_live_board_routes as routes
 from option_backtesting.api.app import create_app
 from option_backtesting.legwise.market import DayData, Series
 from option_backtesting.legwise.schema import load_legwise
@@ -283,6 +285,80 @@ def test_the_button_asks_a_running_loop(tmp_path, monkeypatch):
     r = TestClient(create_app()).post("/legwise/rotation/live-board/refresh")
     assert r.status_code == 202 and r.json() == {"status": "requested"}
     assert (tmp_path / "rotation" / "live-board" / "request.json").exists()
+
+
+def test_the_button_makes_no_login_before_the_picks_are_recorded(tmp_path, monkeypatch):
+    """2026-11-04: a Refresh at 08:18 logged in to Angel One for nothing and collided with the
+    08:15 AlgoTest broker login. Picks are checked before the login guard, as the loop does."""
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(lb, "loop_status", lambda root=None: {"running": False})
+    monkeypatch.setattr(lb, "todays_picks", lambda day, root=None: [])
+
+    def no_login(*args, **kwargs):
+        raise AssertionError("the login guard must not be taken without picks")
+
+    monkeypatch.setattr(routes.check, "begin", no_login)
+    r = TestClient(create_app()).post("/legwise/rotation/live-board/refresh")
+    assert r.status_code == 202 and r.json()["status"] == "no_picks"
+    state = lb.read_state(tmp_path)
+    assert state["refreshing"] is False and state["last_error"] is None
+    assert state["last_note"].startswith("no picks recorded for") and state["last_done_at"]
+
+
+def test_the_button_takes_the_guard_once_the_picks_are_recorded(tmp_path, monkeypatch):
+    """The other side of the check above: with picks, the guard is taken and the refresh runs in
+    the background over the picks the route read (the journals are not read twice)."""
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(lb, "loop_status", lambda root=None: {"running": False})
+    picks = [
+        lb.BookPicks(
+            book="core",
+            name="Adaptive Classic",
+            core=["N_wide_0917"],
+            buy=[],
+            dte=None,
+            late=False,
+            expiry_only=None,
+        )
+    ]
+    monkeypatch.setattr(lb, "todays_picks", lambda day, root=None: picks)
+    seen: dict = {}
+
+    class FakePending:
+        started_at = "2026-11-04T09:30:00+05:30"
+
+        def attempt(self):
+            return None, object(), None
+
+        def release(self):
+            seen["released"] = True
+
+    monkeypatch.setattr(routes.check, "begin", lambda source: FakePending())
+
+    def fake_refresh(session, day=None, root=None, *, by, log, books=None):
+        seen.update(by=by, books=books)
+        return {"day": day.isoformat()}
+
+    monkeypatch.setattr(lb, "refresh", fake_refresh)
+    r = TestClient(create_app()).post("/legwise/rotation/live-board/refresh")
+    assert r.status_code == 202 and r.json()["status"] == "started"
+    for _ in range(50):
+        if seen.get("released"):
+            break
+        time.sleep(0.02)
+    assert seen == {"released": True, "by": "button", "books": picks}
+
+
+def test_an_unmounted_root_is_a_503_not_a_500(tmp_path, monkeypatch):
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(lb, "loop_status", lambda root=None: {"running": False})
+
+    def not_mounted(day, root=None):
+        raise RuntimeError("TRADING_DATA_ROOT is not mounted")
+
+    monkeypatch.setattr(lb, "todays_picks", not_mounted)
+    r = TestClient(create_app()).post("/legwise/rotation/live-board/refresh")
+    assert r.status_code == 503 and "not mounted" in r.json()["error"]
 
 
 def test_the_board_reads_the_newest_snapshot(tmp_path, monkeypatch):

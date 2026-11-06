@@ -272,6 +272,36 @@ describe('API /settings/automation', () => {
     expect(store.current().version).toBe(1); // nothing saved
   });
 
+  it('PUT from a dashboard without the margin block keeps the current margin (BL-205)', async () => {
+    const handle = createApi({ ctx: ctx(), jobs: [], settings: store, gh: async () => {} });
+    const put = (body: unknown) =>
+      handle(
+        new Request('http://x/settings/automation', { method: 'PUT', body: JSON.stringify(body) }),
+      );
+    const s = clone(DEFAULT_SETTINGS);
+    s.margin = { bufferPct: 5, days: 3 };
+    expect((await put(s)).status).toBe(200);
+    const older = clone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+    older.margin = undefined;
+    (older.masters as Record<string, boolean>).logins = false;
+    expect((await put(JSON.parse(JSON.stringify(older)))).status).toBe(200);
+    expect(store.current().settings.margin).toEqual({ bufferPct: 5, days: 3 });
+    expect(store.current().settings.masters.logins).toBe(false);
+  });
+
+  it('PUT from a dashboard without the split switch keeps the current one (BL-209)', async () => {
+    const handle = createApi({ ctx: ctx(), jobs: [], settings: store, gh: async () => {} });
+    const put = (body: unknown) =>
+      handle(
+        new Request('http://x/settings/automation', { method: 'PUT', body: JSON.stringify(body) }),
+      );
+    expect((await put({ ...clone(DEFAULT_SETTINGS), splitT1: true })).status).toBe(200);
+    const older = clone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+    older.splitT1 = undefined;
+    expect((await put(JSON.parse(JSON.stringify(older)))).status).toBe(200);
+    expect(store.current().settings.splitT1).toBe(true);
+  });
+
   it('answers 503 without a store', async () => {
     const handle = createApi({ ctx: ctx(), jobs: [] });
     expect((await handle(new Request('http://x/settings/automation'))).status).toBe(503);
@@ -478,5 +508,130 @@ describe('capital per broker account (owner, 2026-10-29)', () => {
       finvasia: 900_000,
       angelone: 800_000,
     });
+  });
+});
+
+describe('the margin block (BL-205, owner 2026-11-04)', () => {
+  it('settings saved before the field read as a 10% buffer over 6 days', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { margin?: unknown };
+    old.margin = undefined;
+    const filled = withDefaults(JSON.parse(JSON.stringify(old)));
+    expect(filled.margin).toEqual({ bufferPct: 10, days: 6 });
+  });
+
+  it('a save must give whole numbers in range and no other field', () => {
+    for (const [field, bad] of [
+      ['bufferPct', -1],
+      ['bufferPct', 51],
+      ['bufferPct', 5.5],
+      ['days', 0],
+      ['days', 31],
+      ['days', '6'],
+    ] as const) {
+      const s = clone(DEFAULT_SETTINGS) as unknown as { margin: Record<string, unknown> };
+      s.margin[field] = bad;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain(`margin.${field}`);
+    }
+    const extra = clone(DEFAULT_SETTINGS) as unknown as { margin: Record<string, unknown> };
+    extra.margin.lots = 4;
+    const refused = validate(extra);
+    expect('errors' in refused && refused.errors.join()).toContain('unknown margin field: lots');
+    const missing = { ...clone(DEFAULT_SETTINGS), margin: undefined } as unknown;
+    expect('errors' in validate(missing)).toBe(true);
+    const ok = clone(DEFAULT_SETTINGS);
+    ok.margin = { bufferPct: 5, days: 10 };
+    const checked = validate(ok);
+    expect('settings' in checked && checked.settings.margin).toEqual({ bufferPct: 5, days: 10 });
+  });
+});
+
+describe('the T1 split switch (BL-209, owner 2026-11-04)', () => {
+  it('settings saved before the field read as off', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { splitT1?: unknown };
+    old.splitT1 = undefined;
+    expect(withDefaults(JSON.parse(JSON.stringify(old))).splitT1).toBe(false);
+  });
+
+  it('a save must say true or false', () => {
+    for (const bad of [undefined, 'on', 1, null]) {
+      const s = { ...clone(DEFAULT_SETTINGS), splitT1: bad } as unknown;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain('splitT1');
+    }
+    const ok = { ...clone(DEFAULT_SETTINGS), splitT1: true };
+    const checked = validate(ok);
+    expect('settings' in checked && checked.settings.splitT1).toBe(true);
+  });
+});
+
+describe('day-type rules (BL-211)', () => {
+  const sensexExpiry = {
+    row: 'algotest.finvasia',
+    when: { kind: 'dte', index: 'SENSEX', dte: '0' },
+    list: 'core',
+    note: 'SENSEX expiry: Classic',
+  } as const;
+  const withRules = (rules: unknown[]) => ({ ...clone(DEFAULT_SETTINGS), rules });
+  const errorsOf = (value: unknown) => {
+    const checked = validate(value);
+    return 'errors' in checked ? checked.errors.join('\n') : '';
+  };
+
+  it('saves a good rule and keeps it in a fixed key order', () => {
+    const checked = validate(withRules([sensexExpiry]));
+    expect('settings' in checked && checked.settings.rules).toEqual([sensexExpiry]);
+  });
+
+  it('settings before BL-211 have no rules: none', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as { rules?: unknown };
+    old.rules = undefined;
+    expect(withDefaults(old as AutomationSettings).rules).toEqual([]);
+  });
+
+  it('a save must say its rules, [] for none', () => {
+    const missing = clone(DEFAULT_SETTINGS) as unknown as { rules?: unknown };
+    missing.rules = undefined;
+    expect(errorsOf(missing)).toContain('rules must be a list');
+  });
+
+  it('refuses a bad row, list, condition, weekday, label, note and too many rules', () => {
+    const bad = [
+      { ...sensexExpiry, row: 'algotest.zerodha' },
+      { ...sensexExpiry, list: 'classic' },
+      { ...sensexExpiry, when: { kind: 'vix', above: 20 } },
+      { ...sensexExpiry, when: { kind: 'weekday', weekday: 'Sat' } },
+      { ...sensexExpiry, when: { kind: 'dte', index: 'NIFTY', dte: '8' } },
+      { ...sensexExpiry, when: { kind: 'dte', index: 'BANKNIFTY', dte: '0' } },
+      { ...sensexExpiry, note: 'x'.repeat(121) },
+      { ...sensexExpiry, extra: 1 },
+    ];
+    for (const rule of bad) expect(errorsOf(withRules([rule]))).toContain('rule 1');
+    expect(errorsOf(withRules(Array(21).fill(sensexExpiry)))).toContain('at most 20');
+  });
+
+  it('refuses a rule an earlier one on the same row already covers, naming both', () => {
+    const later = { ...sensexExpiry, list: 'none' };
+    expect(errorsOf(withRules([sensexExpiry, later]))).toContain(
+      'rule 2 can never apply: rule 1 tests the same thing on the same row',
+    );
+    // another row, another label, or another kind is a different rule
+    const other = [
+      { ...sensexExpiry, row: 'algotest.angelone' },
+      { ...sensexExpiry, when: { kind: 'dte', index: 'SENSEX', dte: '1' } },
+      { ...sensexExpiry, when: { kind: 'weekday', weekday: 'Thu' } },
+    ];
+    expect(errorsOf(withRules([sensexExpiry, ...other]))).toBe('');
+  });
+
+  it('writes the rules into the snapshot the jobs read', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rules-snapshot-'));
+    const snapshot = join(dir, 'automation-settings.json');
+    const store = new SettingsStore(join(dir, 'scheduler.db'), snapshot);
+    const checked = validate(withRules([sensexExpiry]));
+    if (!('settings' in checked)) throw new Error('should validate');
+    store.save(checked.settings);
+    expect(JSON.parse(readFileSync(snapshot, 'utf8')).rules).toEqual([sensexExpiry]);
+    store.close();
   });
 });

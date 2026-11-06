@@ -40,7 +40,7 @@ import { istToday } from './strategy-plan.js';
  * 4. Sets the repository variable `LOCAL_LOGIN_DONE` to today (UTC, as the workflow reads dates) so
  *    the workflow's cron backstops skip: the Mac ran, and anything left is the backup run's.
  * 5. Writes `<scheduler state>/broker-login/<IST day>.json`, which the 09:00 summary reads.
- * 6. On Fridays and Mondays with `KITE_AUTO_LOGIN=on` (owner, 2026-10-28), logs in to Kite at the
+ * 6. With `KITE_AUTO_LOGIN=on` (owner, 2026-10-28; every trading day from 2026-11-06), logs in to Kite at the
  *    same time (`mbt kite auto-login`), its line in the same file and the 08:10 message. A failure
  *    is alerted at once; Kite is never handed to GitHub (no Kite secrets there).
  *
@@ -126,7 +126,7 @@ async function runKite(): Promise<BrokerResult> {
 function startKite(day: string, dryRun: boolean): Promise<BrokerResult | null> {
   if (!kiteDue(day, process.env)) return Promise.resolve(null);
   if (dryRun) {
-    console.log('Kite: would log in (KITE_AUTO_LOGIN=on, a Friday or Monday)');
+    console.log('Kite: would log in (KITE_AUTO_LOGIN=on)');
     return Promise.resolve(null);
   }
   for (const key of ['KITE_PASSWORD', 'KITE_TOTP_SECRET', 'KITE_API_SECRET']) {

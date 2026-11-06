@@ -114,3 +114,33 @@ def test_fyers_holdings_are_read_only_merged_per_symbol_and_named_like_nse(monke
     assert set(got) == {"SBIN", "M&M"}
     assert got["SBIN"]["quantity"] == 15 and got["SBIN"]["avg_price"] == pytest.approx(810.0)
     assert fyers.nse_symbol("NSE:NAVINFLUOR-BE") == "NAVINFLUOR"
+
+
+def test_leftover_buys_skipped_names_in_rank_order_and_stops_at_the_first_it_cannot():
+    """Owner, 2026-11-05: after an equal split the names under one share are taken best rank
+    first, one share each while the leftover covers it; the first that does not fit stops it."""
+    from momentum_backtesting import orders
+
+    prices = {"A": 100.0, "B": 7_000.0, "C": 8_000.0, "D": 5_000.0}
+    target = {n: 0.25 for n in prices}
+    plan = orders.plan({}, prices, target, cash=20_000.0, min_trade_rs=0.0)
+    # 25 % of 20,000 is 5,000: A 50, D 1; B and C are under one share
+    assert {r.symbol: r.quantity for r in plan.rows if r.quantity} == {"A": 50, "D": 1}
+    before = plan.cash_after
+    # rank order B, C, D, A: B (7,000) fits the leftover, C (8,000) does not fit and stops it
+    orders.use_leftover(plan, ["B", "C", "D", "A"])
+    got = {r.symbol: (r.action, r.quantity, r.note) for r in plan.rows}
+    assert got["B"] == ("BUY", 1, orders.LEFTOVER_NOTE)
+    assert got["C"][0] == "SKIP" and got["C"][1] == 0
+    assert plan.cash_after == before - 7_000.0 - orders.buy_charges(7_000.0)
+    assert plan.not_traded == 1 and plan.buys == 50 * 100 + 5_000 + 7_000
+
+
+def test_leftover_is_not_used_for_names_already_held_or_for_a_plan_with_nothing_left():
+    from momentum_backtesting import orders
+
+    prices = {"A": 100.0, "B": 9_000.0}
+    plan = orders.plan({"B": 1.0}, prices, {"A": 0.5, "B": 0.5}, cash=2_000.0, min_trade_rs=0.0)
+    before = [(r.symbol, r.action, r.quantity) for r in plan.rows]
+    orders.use_leftover(plan, ["B", "A"])  # B is held: never a leftover buy; A already bought
+    assert [(r.symbol, r.action, r.quantity) for r in plan.rows] == before

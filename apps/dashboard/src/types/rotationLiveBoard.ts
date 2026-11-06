@@ -111,6 +111,8 @@ export interface LiveBoardResponse {
 }
 
 export interface LiveBoardRefreshResponse {
-  status: 'requested' | 'started';
+  /** `no_picks`: before the day's 09:16 entry; nothing was read and no login was made. */
+  status: 'requested' | 'started' | 'no_picks';
   started_at?: string;
+  day?: string;
 }
