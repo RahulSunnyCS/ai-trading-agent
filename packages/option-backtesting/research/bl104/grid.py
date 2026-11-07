@@ -251,7 +251,9 @@ def valid_until_for(until: str, exit_time: str, minutes: int | None) -> str | No
     return value if value > until else None
 
 
-def strike_for(family: str, underlying: str, value: str) -> Strike:
+def strike_for(family: str, underlying: str, value: str | float) -> Strike:
+    if isinstance(value, (int, float)):  # an off-grid closest premium (day-type lists, 2026-10-15)
+        return Strike(closest_premium=value)
     if value in PREMIUM.get(family, {}).get(underlying, {}):
         return Strike(closest_premium=PREMIUM[family][underlying][value])
     return Strike(strike_type=value)
@@ -274,6 +276,10 @@ def build(
     if p is None:
         return LegwiseStrategy.model_validate(strategy.model_dump())
     underlying = cell.underlying
+    if set(p) == {"strike"}:  # the rotation file with only its strike changed (N_p80 from N_wide, …)
+        for leg in strategy.legs:
+            leg.strike = strike_for(cell.family, underlying, p["strike"])
+        return LegwiseStrategy.model_validate(strategy.model_dump())
     scale = POINT_SCALE[underlying]
     # Stage-2 extras (off-grid controls, backlog/BL-104 Phase 2): exit for D and B,
     # square_off, Buy gap_percent and valid_until (minutes after the range end).
@@ -358,7 +364,7 @@ def params_from_row(family: str, row: dict[str, str]) -> dict[str, Any] | None:
 def params_to_row(family: str, params: dict[str, Any] | None) -> dict[str, str]:
     out = {"cell": TEMPLATE if params is None else "grid"}
     for axis in AXES[family]:
-        value = None if params is None else params[axis]
+        value = None if params is None else params.get(axis)  # a strike-only cell has no other axes
         out[f"p_{axis}"] = "" if value is None else json.dumps(value)
     extra = {} if params is None else {k: v for k, v in params.items() if k not in AXES[family]}
     out["p_extra"] = json.dumps(extra, sort_keys=True) if extra else ""

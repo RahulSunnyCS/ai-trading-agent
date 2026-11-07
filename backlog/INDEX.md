@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-06
+Last updated: 2026-11-07
 
 ## Open
 
@@ -80,7 +80,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-179](BL-179-momentum-journal-redesign.md) | Momentum Journal redesign (BL-051 Phase 6) and the deferred delay-0 estimates and "Since your 14:15 orders" card | P2 | Planned | feature | momentum |
 | [BL-202](BL-202-buy-sweep-at-slippage.md) | Buy-only sweep scored at 1 % slippage after brokerage: BL-104's Buy axes widened (premium to ₹100 / ₹300, 5-min window, SL 15–50 %, target 200 %, percent trail, no day stop) at one slot per band, then the axes BL-104 never moved (exit time, gap, valid-until, stop on close, one re-entry, peak trail), then when to take a Buy (expiry day, VIX band, gap open, weekday, the ranking's top N) against every day and never; fit 2024-10 → 2025-10-08, test after | P2 | Ready (Phase 0 written and answered: 1 % slippage, the split, the full 82k grid on three workers at night; nothing run) | research | options |
 | [BL-206](BL-206-dir-exits-scale-out.md) | Directional exits, wide: per-leg targets, profit lock and trail, and a two-lot scale-out, on the Dir settings Adaptive picks, at 0.5 % slippage (BL-105 killed the one-lot profit rules; the scale-out, leg targets, T1's settings and slippage are new) | P2 | Planned | research | options |
-| [BL-213](BL-213-tuned-walk-forward.md) | Walk-forward check of Adaptive Tuned: how much of its history gap to the base survives out of sample | P2 | Idea | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -95,6 +94,8 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-215](BL-215-annual-retune-walk-forward.md) | Annual re-tune of Adaptive Tuned: sweep a period, take the best, trade the next, over NIFTY-only folds at 12 and 6 months (absorbs BL-213) | Done, no evidence either way: re-tune − Core +₹4 [−41, +49] per lot-day after 0.5 % slippage (12-month, 2 of 4 folds) and +₹32 [−23, +90] (6-month, 6 of 9); lost before 2024-10, won after; deeper drawdowns; T1 not to be re-tuned on a schedule, a new set only via a paper track with a registered pass rule | 2026-11-07 |
+| [BL-213](BL-213-tuned-walk-forward.md) | Walk-forward check of Adaptive Tuned: how much of its history gap to the base survives out of sample | Dropped: absorbed into BL-215, whose folds include its tune-on-2025, test-2026 split | 2026-11-07 |
 | [BL-212](BL-212-dir-second-lot-gate.md) | Dir ×2 only when the Dir pick's own score is high: a causal gate on T1's fourth lot (confidence, rank, win rate at trailing top ½ / ⅓ / ¼; VIX ≤ 15), judged on the return kept and the drawdown shed | Done, killed: every scored gate was on for the worst Dir day and week; conf @ 50 % kept half the extra return but all the extra drawdown (a sixth on the test half) and all the worst day; rank is degenerate for a picked Dir; VIX ≤ 15 kept 73 % with a smaller drawdown than ×1 over all days but a deeper one than ×2 on the test half — a lead for its own item | 2026-11-05 |
 | [BL-210](BL-210-rotation-absolute-confidence.md) | An absolute 0–100 confidence beside the rotation rank (the picked basket's win rate and ₹/lot in the ranking's own windows), tested against the basket's same-day net | Done, killed: ρ +0.08 (Core) / +0.07 (T1) with the tercile spread's interval including zero on both books; the figure never read below 50, so the declared skip rule fired on no day; nothing shown | 2026-11-05 |
 | [BL-208](BL-208-t1-book-trail-and-lock.md) | T1's book stop with a 3:2 trail and a lock at break-even after +₹5,000 (Dir ×2 and 3-lot books) | Done, informative: the 3:2 trail is about neutral (+₹12 to +₹45 a day; the stepped ₹2k-per-₹3k trail clears zero on the 3-lot book only with today in) and trims the worst days a little; the lock at ₹0 after +₹5k costs ₹58–163 a day (47 % of Dir ×2 days reach +₹5k, 14 of them end below ₹0) | 2026-11-04 |
