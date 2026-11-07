@@ -314,7 +314,7 @@ Otherwise:
   `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming).
   The month-so-far lines (`rotation/month.py`, `messages.month_lines`) give each net as a share of its capital
   (owner 2026-10-29; `deliver.message_capital`): a list's is `automation_settings.book_capital` (the Settings ›
-  Automation `capital` of the broker accounts whose rows upload that list, each once; ₹8.5 lakh an account by
+  Automation `capital` of the broker accounts whose rows upload that list, each once, except T1 while `splitT1` is on, which counts one account (the larger: the two share one set of picks); ₹8.5 lakh an account by
   default, and `capital()` never raises, so `read` stays strict for the jobs), the account's real month every
   account's capital added up. A failure in any of these is echoed and leaves only its lines out. Sent markers are per
   destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`, `.group-t1-owed.sent`, `.group-t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still

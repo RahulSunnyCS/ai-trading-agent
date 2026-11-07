@@ -102,3 +102,7 @@ def test_capital_comes_from_the_accounts_that_upload_each_list():
     assert auto.book_capital(settings, "core") == 850_000
     settings["rows"]["algotest.angelone"].update(list="t1", upload=True)
     assert auto.book_capital(settings, "t1") == 1_750_000
+    settings["masters"]["uploads"] = True
+    settings["splitT1"] = True  # one set of picks shared by the two accounts: one account's money
+    assert auto.book_capital(settings, "t1") == 900_000
+    assert auto.book_capital(settings, "core") == 850_000
