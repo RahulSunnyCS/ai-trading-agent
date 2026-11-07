@@ -22,6 +22,12 @@ import daytype_lists as dl  # noqa: E402
 
 
 def configure(root: Path) -> None:
+    # the two runs, under the tag names the selection code reads (the link to the extra run was once missing and every
+    # cell then read as missing, so they are made here rather than by hand)
+    root.mkdir(parents=True, exist_ok=True)
+    for tag, target in (("stage1", "../bl215_stage1"), ("extra", "../bl215_extra")):
+        if not (root / tag).exists():
+            (root / tag).symlink_to(target)
     dl.RESULTS = root
     dl.TAGS = ("stage1", "extra")
     dl._SERIES.clear()
@@ -42,7 +48,11 @@ def main() -> None:
             return real(tag, f, slot, params)
         except (KeyError, FileNotFoundError):
             missing[json.dumps([f.fam, f.idx, slot, params], default=list, sort_keys=True)] = {
-                "family": f.fam, "index": f.idx, "slot": slot, "params": params}
+                "family": f.fam,
+                "index": f.idx,
+                "slot": slot,
+                "params": params,
+            }
             return days, np.zeros(len(days))
 
     real_has = dl._has
@@ -61,6 +71,7 @@ def main() -> None:
             dl.evaluate(f, slot, exp[dl.grid.INDICES[f.idx]])
     cells = list(missing.values())
     from collections import Counter
+
     print(len(cells), "missing cells;", dict(Counter((c["family"], c["slot"]) for c in cells)))
     if a.out:
         a.out.write_text(json.dumps(cells, default=list))

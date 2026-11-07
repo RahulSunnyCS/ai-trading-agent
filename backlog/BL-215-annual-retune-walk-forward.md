@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — it decides how T1 is kept up to date while real money trades it; heavy compute, and the 60-session forward read-out (BL-135) comes first |
-| **Status** | In progress |
+| **Status** | Done — no evidence either way: re-tuning every period did not reliably beat fixed Core Adaptive out of sample (12-month folds +₹4 [−41, +49] per lot-day after 0.5 % slippage, 2 of 4 folds won; 6-month folds +₹32 [−23, +90], 6 of 9), and neither book reliably beat the fixed base; T1 is not to be re-tuned on a schedule; see Log |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-07 |
@@ -161,3 +161,51 @@ for 2024-25 (checked in Phase 1); the pass fraction for the 6-month folds if a f
   so a second NIFTY run was started the same night for every cell it asks for and finds missing
   (`research/bl215/needed_cells.py` -> 57,975 cells, `--tag bl215_extra`). Nothing from any test window has been read.
   Owner (asleep) asked me to carry on without waiting.
+- 2026-11-07 — **Phase 2 done.** The `bl215_extra` run finished at 04:54 (36 of 36 cohorts, 57,975 cells, no failures). The
+  overnight driver then stopped on a setup slip of mine (the `results/bl215x/extra` link to the run had not been made, so
+  every cell read as missing); made it, `needed_cells.py` reported 0 missing, driver re-run at 11:20. Every fold's set was
+  selected from its tuning window only and **committed before any test window was read** (4a084acc,
+  `research/bl215/selected.json`: 12-month F1 6 settings, F2 8, F3 3, F4 7; 6-month H1-H9 6-11 each). F4 and H9 had been
+  selected and smoke-scored the night before (the anchor check); the other folds' selection is mechanical (no choice left to
+  make), so that early look could not steer them. Each selected setting re-simulated at all 25 entry times over
+  2021-11-01 → 2026-11-06 in `TRADING_DATA_ROOT=/Volumes/TradingData/_bl215` (`build_and_sim.py`; F4's settings match T1's
+  stored results on 173 of 173 variants). A partial score I ran mid-simulation (12:40) used 6-month folds whose later
+  settings were not yet simulated; its 6-month figures are wrong and superseded by the table below (the 12-month F1 and F2
+  figures were already complete and are unchanged).
+- 2026-11-07 — **Phase 3: scored and decided** (`research/bl215/score.py` -> `research/bl215/results/score.json`, git-ignored;
+  regenerate with the command in its docstring). NIFTY only, Adaptive list C, one lot a strategy, Buy add-on out, net per
+  lot-day after costs and 0.5 % slippage, 90 % circular 5-day block bootstrap (2,000 resamples). (a) re-tune each fold,
+  (b) freeze the first fold's set, (c) Core NIFTY Adaptive, (d) the fixed base.
+
+  12-month folds:
+
+  | Fold | Test | Days | (a) re-tune | (b) frozen | (c) Core | (d) base | a − c |
+  |---|---|---|---|---|---|---|---|
+  | F1 | 2022-11-01 → 2023-10-31 | 248 | 186 | 186 | 220 | 135 | −35 |
+  | F2 | 2023-11-01 → 2024-10-08 | 229 | 49 | −15 | 126 | 356 | −77 |
+  | F3 | 2024-10-09 → 2025-10-08 | 247 | 147 | 152 | 106 | 404 | +41 |
+  | F4 | 2025-10-09 → 2026-11-06 | 260 | 224 | 173 | 145 | 56 | +78 |
+  | Pooled | | 984 | 154 | 127 | 150 | 233 | **+4 [−41, +49]**, 2 of 4 won |
+
+  6-month folds (a − c per fold, H1 → H9, tests 2022-04-09 → 2026-11-06): −153, +49, +21, −33, −191, +230, +182, +44, +128;
+  (a) 60, 260, 228, 75, −48, 212, 410, 218, 250; (c) 213, 211, 207, 108, 142, −17, 228, 174, 121; (d) 445, 180, 97, 266, 402,
+  429, 379, 63, 51. Pooled over 1,121 days: (a) 186, (b) 157, (c) 154, (d) 254; **a − c +32 [−23, +90]**, 6 of 9 won.
+
+  Other lines: a − b after the first fold +36 [−6, +81] (12-month) and +32 [−46, +108] (6-month); a − d −79 [−173, +16] and
+  −68 [−167, +27]; c − d −83 [−177, +12] and −101 [−189, −18] (Core NIFTY Adaptive below the base over the 6-month test
+  span, 2022-04 → 2026-11). Deepest drawdown: re-tune −₹62.0k (12-month, F2) and −₹81.0k (6-month, H5) against Core's
+  −₹50.2k. Settings kept from one fold to the next: 0-29 % (F4 67 %), so each re-tune mostly replaces the set.
+
+  **Registered reading: no evidence either way at both lengths** (pooled mean above zero, so not killed; the range
+  includes zero and fewer than three quarters of the folds won, so not passed). The gap has a sign by era: before 2024-10 re-tuning lost
+  5 of 7 test periods to Core (F1, F2; H1, H4, H5; it won H2 and H3), and from 2024-10 on it won all 6 (F3, F4; H6-H9), the
+  same split BL-214 found for T1 itself. It agrees with BL-115's quarterly folds of 2025-10 → 2026-10
+  (+₹70 [−81, +215], 2 of 4). Not done from Phase 3's list: the share of random baskets beaten (BL-214 has it for Core
+  and T1 over 2021-24).
+
+  **Upkeep rule (Phase 3 deliverable).** T1 is not re-tuned on a schedule: a yearly (or half-yearly) re-run of the sweep
+  did not reliably earn more than leaving Core alone, swaps most of the settings each time, and had deeper drawdowns. The
+  live T1 set stays as it is, keeping its forward record. A new sweep may replace it only as a candidate run in paper as
+  its own track beside the incumbent (as the T1 track ran beside Core, BL-113), with a pass rule registered before it
+  starts (candidate − incumbent, 60 sessions at least, 90 % range above zero after 0.5 % slippage), and never on
+  backtest numbers alone.

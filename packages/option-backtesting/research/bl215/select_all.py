@@ -61,10 +61,19 @@ def select(start: date, half: date, end: date) -> list[dict]:
             for r in dec["picks"]:
                 if r.get("is_template"):
                     continue
-                out.append({"family": f.name, "fam": f.fam, "index": f.idx, "kind": kind,
-                            "status": dec["status"], "params": r["params"],
-                            "gain_first": r["gain_first"], "gain_confirm": r["gain_test"],
-                            "n_days": dec.get("n_days")})
+                out.append(
+                    {
+                        "family": f.name,
+                        "fam": f.fam,
+                        "index": f.idx,
+                        "kind": kind,
+                        "status": dec["status"],
+                        "params": r["params"],
+                        "gain_first": r["gain_first"],
+                        "gain_confirm": r["gain_test"],
+                        "n_days": dec.get("n_days"),
+                    }
+                )
     return out
 
 
@@ -84,8 +93,13 @@ def main() -> None:
             if key in res:
                 continue
             sel = select(start, half, end)
-            res[key] = {"fold": name, "length": kind, "tune": [str(start), str(half), str(end)],
-                        "test": [str(tstart), str(tend)], "settings": sel}
+            res[key] = {
+                "fold": name,
+                "length": kind,
+                "tune": [str(start), str(half), str(end)],
+                "test": [str(tstart), str(tend)],
+                "settings": sel,
+            }
             print(key, len(sel), "settings", flush=True)
             a.out.write_text(json.dumps(res, default=list, indent=1))
 

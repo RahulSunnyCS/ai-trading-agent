@@ -30,11 +30,19 @@ def select(start: date, half: date, end: date, max_picks: int | None = None) -> 
             allowed = dl.family_premiums(agg)[0] if f.is_premium else None
             dec = dl.decide(f, agg, kind, allowed)
             for r in dec["picks"]:
-                out.append({
-                    "family": f.name, "fam": f.fam, "index": f.idx, "kind": kind, "status": dec["status"],
-                    "is_template": bool(r.get("is_template")), "params": r.get("params"),
-                    "gain_first": r["gain_first"], "gain_test": r["gain_test"],
-                })
+                out.append(
+                    {
+                        "family": f.name,
+                        "fam": f.fam,
+                        "index": f.idx,
+                        "kind": kind,
+                        "status": dec["status"],
+                        "is_template": bool(r.get("is_template")),
+                        "params": r.get("params"),
+                        "gain_first": r["gain_first"],
+                        "gain_test": r["gain_test"],
+                    }
+                )
     return out
 
 
@@ -48,7 +56,14 @@ if __name__ == "__main__":
     res = select(date.fromisoformat(a.start), date.fromisoformat(a.half), date.fromisoformat(a.end))
     for w in res:
         if not w["is_template"]:
-            print(w["family"], w["kind"], w["status"], w["params"], round(w["gain_first"]), round(w["gain_test"]))
+            print(
+                w["family"],
+                w["kind"],
+                w["status"],
+                w["params"],
+                round(w["gain_first"]),
+                round(w["gain_test"]),
+            )
     print(sum(not w["is_template"] for w in res), "non-template settings of", len(res))
     if a.out:
         Path(a.out).write_text(json.dumps(res, default=list, indent=1))
