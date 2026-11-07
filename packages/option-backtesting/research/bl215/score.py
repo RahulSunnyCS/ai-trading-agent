@@ -132,7 +132,7 @@ def main() -> None:
     core_n = [n for n in variant_names() if n.startswith("N_")]
     last = END - timedelta(days=1)
     first_test = min(date.fromisoformat(v["test"][0]) for v in selected.values())
-    warm_note = "Adaptive needs ~63 earlier sessions of every variant in the root"  # noqa: F841
+    # Adaptive needs ~63 earlier sessions of every variant in the root (the root holds them from 2021-11-01)
     pk_core = picks_for(core_n, first_test, last)
     got = base.score_days(
         sorted(pk_core), ROOT, log=lambda _m: None
