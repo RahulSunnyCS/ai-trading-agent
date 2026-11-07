@@ -787,5 +787,1482 @@
     "n_days": null
    }
   ]
+ },
+ "12m:F1": {
+  "fold": "F1",
+  "length": "12m",
+  "tune": [
+   "2021-11-01",
+   "2022-05-01",
+   "2022-11-01"
+  ],
+  "test": [
+   "2022-11-01",
+   "2023-11-01"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": -98.63709167945079,
+    "gain_confirm": 161.98673395201183,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 60,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 113.24239416974724,
+    "gain_confirm": -19.121703326702114,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 100,
+     "range": 15,
+     "source": "instrument",
+     "sl": 30,
+     "target": 50,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 101.41657293759859,
+    "gain_confirm": 320.53485329587676,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 125,
+     "range": 15,
+     "source": "instrument",
+     "sl": 20,
+     "target": 50,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 97.19040498443138,
+    "gain_confirm": 280.0932019607474,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 125,
+     "range": 30,
+     "source": "instrument",
+     "sl": 40,
+     "target": null,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 135.69884227609467,
+    "gain_confirm": 57.695924600675,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 100,
+     "range": 30,
+     "source": "instrument",
+     "sl": 20,
+     "target": null,
+     "trail": [
+      3,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 89.30849278387096,
+    "gain_confirm": 26.940866582146302,
+    "n_days": null
+   }
+  ]
+ },
+ "12m:F2": {
+  "fold": "F2",
+  "length": "12m",
+  "tune": [
+   "2022-11-01",
+   "2023-05-01",
+   "2023-11-01"
+  ],
+  "test": [
+   "2023-11-01",
+   "2024-10-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 160.58210471578136,
+    "gain_confirm": -42.86779555754785,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "OTM1",
+     "sl": 120,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:10",
+     "reentry": null
+    },
+    "gain_first": 42.12508449962156,
+    "gain_confirm": 91.52599932531517,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (1 premium)",
+    "params": {
+     "strike": 60,
+     "sl": 100,
+     "trail": null,
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 182.13164762961557,
+    "gain_confirm": 89.13129915335237,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (1 premium)",
+    "params": {
+     "strike": 110,
+     "sl": 100,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:10",
+     "reentry": null
+    },
+    "gain_first": 61.65852257165695,
+    "gain_confirm": 130.54436050872627,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 125,
+     "range": 15,
+     "source": "instrument",
+     "sl": 30,
+     "target": 100,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 361.2451036358491,
+    "gain_confirm": 378.97092385781116,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 25,
+     "range": 15,
+     "source": "instrument",
+     "sl": 30,
+     "target": null,
+     "trail": [
+      3,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 195.35784777391177,
+    "gain_confirm": 366.9642458726198,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 125,
+     "range": 30,
+     "source": "instrument",
+     "sl": 40,
+     "target": 100,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 106.32277445515824,
+    "gain_confirm": 60.51623469571271,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 50,
+     "range": 30,
+     "source": "instrument",
+     "sl": 40,
+     "target": null,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 112.28938626446245,
+    "gain_confirm": 29.77158810228109,
+    "n_days": null
+   }
+  ]
+ },
+ "12m:F3": {
+  "fold": "F3",
+  "length": "12m",
+  "tune": [
+   "2023-11-01",
+   "2024-05-01",
+   "2024-10-09"
+  ],
+  "test": [
+   "2024-10-09",
+   "2025-10-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 182.16777294415692,
+    "gain_confirm": -115.06188097725745,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 60,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 69.2665573108598,
+    "gain_confirm": -5.248969023310861,
+    "n_days": null
+   },
+   {
+    "family": "N_dir",
+    "fam": "D",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen",
+    "params": {
+     "strike": "ATM",
+     "sl": 30,
+     "mtm": 2000,
+     "reentry": [
+      "cost",
+      2,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 170.68642401389585,
+    "gain_confirm": 75.26831877317981,
+    "n_days": null
+   }
+  ]
+ },
+ "6m:H1": {
+  "fold": "H1",
+  "length": "6m",
+  "tune": [
+   "2021-11-01",
+   "2022-01-19",
+   "2022-04-09"
+  ],
+  "test": [
+   "2022-04-09",
+   "2022-10-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "owner to choose",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": -46.69737009568649,
+    "gain_confirm": -128.2712004052268,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "OTM1",
+     "sl": 40,
+     "trail": null,
+     "mtm": 3000,
+     "exit": "15:10",
+     "reentry": null
+    },
+    "gain_first": 319.6642718386959,
+    "gain_confirm": 223.12226021728773,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 180,
+     "sl": 40,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 436.0362759075424,
+    "gain_confirm": 303.9352409774943,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 135,
+     "sl": 40,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 2000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 370.07511696935626,
+    "gain_confirm": 176.64460571191105,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 110,
+     "sl": 60,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 3000,
+     "exit": "15:10",
+     "reentry": null
+    },
+    "gain_first": 340.92163429750025,
+    "gain_confirm": 90.12322294440611,
+    "n_days": null
+   },
+   {
+    "family": "N_ditm1",
+    "fam": "D",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "ITM1",
+     "sl": 10,
+     "mtm": 4000,
+     "reentry": [
+      "cost",
+      2,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 188.97273872804269,
+    "gain_confirm": 28.223789380502343,
+    "n_days": null
+   }
+  ]
+ },
+ "6m:H2": {
+  "fold": "H2",
+  "length": "6m",
+  "tune": [
+   "2022-04-09",
+   "2022-07-09",
+   "2022-10-09"
+  ],
+  "test": [
+   "2022-10-09",
+   "2023-04-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen",
+    "params": {
+     "strike": "OTM1",
+     "sl": 120,
+     "trail": null,
+     "mtm": 2000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 154.42369484366512,
+    "gain_confirm": 56.04606590515528,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "OTM1",
+     "sl": 100,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 4000,
+     "exit": "15:10",
+     "reentry": null
+    },
+    "gain_first": 70.2382553858543,
+    "gain_confirm": 16.183937463805904,
+    "n_days": null
+   },
+   {
+    "family": "N_dir",
+    "fam": "D",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "ATM",
+     "sl": 40,
+     "mtm": 3000,
+     "reentry": [
+      "cost",
+      1,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 79.35582506251174,
+    "gain_confirm": 49.92993376631703,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 100,
+     "range": 30,
+     "source": "instrument",
+     "sl": 30,
+     "target": null,
+     "trail": null,
+     "mtm": 1000
+    },
+    "gain_first": 1363.972365035461,
+    "gain_confirm": 185.1136511885203,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 30,
+     "range": 15,
+     "source": "instrument",
+     "sl": 40,
+     "target": null,
+     "trail": [
+      3,
+      1
+     ],
+     "mtm": 2000
+    },
+    "gain_first": 774.6196117760278,
+    "gain_confirm": 275.0884678547199,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (1 premium)",
+    "params": {
+     "strike": 25,
+     "range": 30,
+     "source": "instrument",
+     "sl": 20,
+     "target": 50,
+     "trail": [
+      3,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 97.96395682802006,
+    "gain_confirm": 14.42339279295669,
+    "n_days": null
+   }
+  ]
+ },
+ "6m:H3": {
+  "fold": "H3",
+  "length": "6m",
+  "tune": [
+   "2022-10-09",
+   "2023-01-08",
+   "2023-04-09"
+  ],
+  "test": [
+   "2023-04-09",
+   "2023-10-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 166.41429764185196,
+    "gain_confirm": 207.44167042542722,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 60,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 26.608918358274057,
+    "gain_confirm": -157.5864644673065,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (1 premium)",
+    "params": {
+     "strike": 80,
+     "sl": 150,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:10",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 21.63969762567558,
+    "gain_confirm": 33.91766389942867,
+    "n_days": null
+   },
+   {
+    "family": "N_dir",
+    "fam": "D",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen",
+    "params": {
+     "strike": "ATM",
+     "sl": 40,
+     "mtm": 3000,
+     "reentry": [
+      "asap",
+      1,
+      null
+     ],
+     "trail": null
+    },
+    "gain_first": 295.9642484004681,
+    "gain_confirm": 95.63223623618101,
+    "n_days": null
+   },
+   {
+    "family": "N_dir",
+    "fam": "D",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "ATM",
+     "sl": 15,
+     "mtm": 4000,
+     "reentry": [
+      "cost",
+      1,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 141.1710559502751,
+    "gain_confirm": 72.30381161143593,
+    "n_days": null
+   },
+   {
+    "family": "N_ditm1",
+    "fam": "D",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "ITM1",
+     "sl": 15,
+     "mtm": 4000,
+     "reentry": [
+      "cost",
+      1,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 156.58320317584642,
+    "gain_confirm": 26.219191004198507,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 125,
+     "range": 30,
+     "source": "instrument",
+     "sl": 20,
+     "target": 50,
+     "trail": [
+      3,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 133.66743113110667,
+    "gain_confirm": 120.89093686080149,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 50,
+     "range": 30,
+     "source": "instrument",
+     "sl": 40,
+     "target": 100,
+     "trail": null,
+     "mtm": 2000
+    },
+    "gain_first": 162.2618550118946,
+    "gain_confirm": 111.28754829451549,
+    "n_days": null
+   }
+  ]
+ },
+ "6m:H4": {
+  "fold": "H4",
+  "length": "6m",
+  "tune": [
+   "2023-04-09",
+   "2023-07-09",
+   "2023-10-09"
+  ],
+  "test": [
+   "2023-10-09",
+   "2024-04-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": -83.32989422174599,
+    "gain_confirm": 28.596475964937454,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 3000,
+     "exit": "15:10",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 112.87213388946998,
+    "gain_confirm": 164.28187258227342,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (1 premium)",
+    "params": {
+     "strike": 90,
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:10",
+     "reentry": null
+    },
+    "gain_first": 151.84629883186346,
+    "gain_confirm": 125.65852818480965,
+    "n_days": null
+   },
+   {
+    "family": "N_dir",
+    "fam": "D",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "ATM",
+     "sl": 15,
+     "mtm": 2000,
+     "reentry": null,
+     "trail": null
+    },
+    "gain_first": 60.66571700208041,
+    "gain_confirm": 129.63261418926473,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 100,
+     "range": 30,
+     "source": "underlying",
+     "sl": 30,
+     "target": 100,
+     "trail": null,
+     "mtm": 2000
+    },
+    "gain_first": 877.9887854838984,
+    "gain_confirm": 487.46979334415533,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (2 premiums)",
+    "params": {
+     "strike": 90,
+     "range": 30,
+     "source": "underlying",
+     "sl": 20,
+     "target": 100,
+     "trail": [
+      3,
+      1
+     ],
+     "mtm": 2000
+    },
+    "gain_first": 720.484747651296,
+    "gain_confirm": 261.16713066590137,
+    "n_days": null
+   }
+  ]
+ },
+ "6m:H5": {
+  "fold": "H5",
+  "length": "6m",
+  "tune": [
+   "2023-10-09",
+   "2024-01-08",
+   "2024-04-09"
+  ],
+  "test": [
+   "2024-04-09",
+   "2024-10-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "default (owner setting)",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 25.544541695179078,
+    "gain_confirm": 493.2029917179009,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "OTM1",
+     "sl": 100,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 2000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 74.17085082973871,
+    "gain_confirm": 14.009906141294374,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 150,
+     "sl": 60,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 2000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 167.52389783056506,
+    "gain_confirm": 231.96351579223605,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 80,
+     "sl": 40,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 156.8785635542978,
+    "gain_confirm": 298.27345837362935,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 180,
+     "sl": 60,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 142.72624894476033,
+    "gain_confirm": 350.1380366200788,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (1 premium)",
+    "params": {
+     "strike": 125,
+     "range": 10,
+     "source": "instrument",
+     "sl": 20,
+     "target": null,
+     "trail": [
+      3,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 205.7540796868917,
+    "gain_confirm": 398.59741200527384,
+    "n_days": null
+   }
+  ]
+ },
+ "6m:H6": {
+  "fold": "H6",
+  "length": "6m",
+  "tune": [
+   "2024-04-09",
+   "2024-07-09",
+   "2024-10-09"
+  ],
+  "test": [
+   "2024-10-09",
+   "2025-04-09"
+  ],
+  "settings": [
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "owner to choose",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      25,
+      15
+     ],
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": -333.8373673542952,
+    "gain_confirm": -33.322228101583654,
+    "n_days": null
+   },
+   {
+    "family": "N_wide",
+    "fam": "W",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "OTM1",
+     "sl": 150,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 2000,
+     "exit": "15:28",
+     "reentry": null
+    },
+    "gain_first": 47.95333058191529,
+    "gain_confirm": 30.50415061950684,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 120,
+     "sl": 40,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 2000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 920.3951522998321,
+    "gain_confirm": 526.3913919620026,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 110,
+     "sl": 40,
+     "trail": null,
+     "mtm": 4000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 818.0131322787357,
+    "gain_confirm": 323.85504627839117,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Widesl_premium",
+    "fam": "W",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 90,
+     "sl": 60,
+     "trail": [
+      15,
+      10
+     ],
+     "mtm": 3000,
+     "exit": "15:28",
+     "reentry": [
+      "cost",
+      1,
+      null
+     ]
+    },
+    "gain_first": 630.2200747758915,
+    "gain_confirm": 226.31744571832508,
+    "n_days": null
+   },
+   {
+    "family": "N_dir",
+    "fam": "D",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "ATM",
+     "sl": 10,
+     "mtm": 2000,
+     "reentry": [
+      "cost",
+      1,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 93.19273475552284,
+    "gain_confirm": 48.51686496655147,
+    "n_days": null
+   },
+   {
+    "family": "N_ditm1",
+    "fam": "D",
+    "index": "N",
+    "kind": "expiry",
+    "status": "chosen",
+    "params": {
+     "strike": "ITM1",
+     "sl": 15,
+     "mtm": 3000,
+     "reentry": [
+      "cost",
+      2,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 224.27222538605716,
+    "gain_confirm": 187.22821617890622,
+    "n_days": null
+   },
+   {
+    "family": "N_ditm1",
+    "fam": "D",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen",
+    "params": {
+     "strike": "ITM1",
+     "sl": 15,
+     "mtm": 2000,
+     "reentry": [
+      "asap",
+      1,
+      null
+     ],
+     "trail": [
+      10,
+      5
+     ]
+    },
+    "gain_first": 239.83093408035472,
+    "gain_confirm": 103.64620866497357,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 125,
+     "range": 15,
+     "source": "instrument",
+     "sl": 30,
+     "target": 50,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 184.97511232237446,
+    "gain_confirm": 61.04219669719537,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 60,
+     "range": 30,
+     "source": "instrument",
+     "sl": 40,
+     "target": 100,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 142.99923823150337,
+    "gain_confirm": 84.2803893876076,
+    "n_days": null
+   },
+   {
+    "family": "NIFTY_Buy_premium",
+    "fam": "B",
+    "index": "N",
+    "kind": "other",
+    "status": "chosen (3 premiums)",
+    "params": {
+     "strike": 50,
+     "range": 30,
+     "source": "instrument",
+     "sl": 40,
+     "target": 100,
+     "trail": [
+      1,
+      1
+     ],
+     "mtm": 1000
+    },
+    "gain_first": 136.9999105139827,
+    "gain_confirm": 56.30813985784848,
+    "n_days": null
+   }
+  ]
  }
 }
