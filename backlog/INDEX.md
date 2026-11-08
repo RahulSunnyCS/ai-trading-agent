@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-07
+Last updated: 2026-11-08
 
 ## Open
 
@@ -89,6 +89,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-163](BL-163-kronos-forecast-trigger.md) | Kronos hour-ahead forecast as an intraday trigger: two fixed rules (direction → Dir, contraction → Widesl) through the rule tester, zero-shot, NIFTY, sessions after the weights were published only | P3 | Planned | research | options |
 | [BL-171](BL-171-finvasia-capital-auto.md) | Finvasia's capital read automatically for the Trade book (typed by hand meanwhile) | P3 | Idea | improvement | contract-notes / broker-login / scheduler |
 | [BL-178](BL-178-options-lab-polish-leftovers.md) | Options Lab polish left from BL-102: Correlation / Regimes run bar and drawer, Builder arrow keys, "View as YAML", lot size, round-trip test, unused code removed | P3 | Planned | improvement | dashboard |
+| [BL-216](BL-216-range-band-fit-poc.md) | Range-band fit in Adaptive's ranking: the last-5-day range band added to list C's composite like the VIX band, a POC on T1 and Core over the last one and two years | P3 | In progress | research | options |
 
 ## Done / Dropped
 
