@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P3 — the owner's question; the descriptive look (BL-111 Log, 2026-11-07) found no money link to the range known at 09:17 |
-| **Status** | In progress |
+| **Status** | Done — killed: the range fit lowered both books |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-08 |
@@ -86,3 +86,21 @@ them before the run).
 ## Log
 
 - 2026-11-08 — created at the owner's request; Phase 0 registered before any run.
+- 2026-11-08 — **Run (Phase 1). Killed: adding the range lowered both books.** `research/bl216/range_fit.py`,
+  results `range_fit_2026-11-08.json`. The base arm reproduced the journals' list C on every recorded day (T1 14 of 14,
+  Core 19 of 19); the look-ahead assert passed. Bands over the 505 store days (NIFTY): calm 207, mid 110, wide 188
+  (the trailing 250-session cuts: the last two years ran calmer and wider than the year before them). Per day, one lot
+  a pick, after costs and 0.5 % slippage; arm − base mean with the 90 % block-bootstrap interval:
+
+  | Book | Window | Base avg / win / max DD | R20 − base | R10 − base | Days R20 changed |
+  |---|---|---|---|---|---|
+  | T1 | 2 years (442 d) | +1,343 / 64 % / −32,386 | **−257 [−460, −43]** | −110 [−275, +51] | 67 % |
+  | T1 | 1 year (240 d) | +1,263 / 65 % / −32,386 | −296 [−564, −37] | −196 [−395, −4] | 69 % |
+  | Core | 2 years | +730 / 56 % / −38,991 | −150 [−353, +44] | −183 [−344, −19] | 65 % |
+  | Core | 1 year | +702 / 57 % / −38,991 | −107 [−347, +126] | −200 [−377, −14] | 62 % |
+
+  Pass rule (R20): T1 fails (2-year lower bound −460, 1-year mean −296; drawdown −33,497 within 10 %); Core fails
+  (lower bound −353, 1-year mean −107, drawdown −48,118 deeper than 10 %). R10 was worse too. The range fit changed
+  the picks on two days in three and moved them to worse ones: T1's two-year total +₹5.94 L → +₹4.80 L, win share
+  64 % → 60 %. Reading: the range band known at 09:17 carries no information the ranking can use beyond what
+  weekday, days to expiry and VIX already give; adding it dilutes those. Not added; no forward track.
