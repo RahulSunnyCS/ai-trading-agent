@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-07
+Last updated: 2026-11-08
 
 ## Open
 
@@ -94,6 +94,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-216](BL-216-range-band-fit-poc.md) | Range-band fit in Adaptive's ranking: the last-5-day range band added to list C's composite like the VIX band, replayed on T1 and Core | Killed: at 20 % weight T1 −₹257 [−460, −43] a day over two years and −₹296 over one, Core −₹150 [−353, +44] with a deeper drawdown, after 0.5 % slippage; 10 % worse too; picks changed on two days in three | 2026-11-08 |
 | [BL-215](BL-215-annual-retune-walk-forward.md) | Annual re-tune of Adaptive Tuned: sweep a period, take the best, trade the next, over NIFTY-only folds at 12 and 6 months (absorbs BL-213) | Done, no evidence either way: re-tune − Core +₹4 [−41, +49] per lot-day after 0.5 % slippage (12-month, 2 of 4 folds) and +₹32 [−23, +90] (6-month, 6 of 9); lost before 2024-10, won after; deeper drawdowns; T1 not to be re-tuned on a schedule, a new set only via a paper track with a registered pass rule | 2026-11-07 |
 | [BL-213](BL-213-tuned-walk-forward.md) | Walk-forward check of Adaptive Tuned: how much of its history gap to the base survives out of sample | Dropped: absorbed into BL-215, whose folds include its tune-on-2025, test-2026 split | 2026-11-07 |
 | [BL-212](BL-212-dir-second-lot-gate.md) | Dir ×2 only when the Dir pick's own score is high: a causal gate on T1's fourth lot (confidence, rank, win rate at trailing top ½ / ⅓ / ¼; VIX ≤ 15), judged on the return kept and the drawdown shed | Done, killed: every scored gate was on for the worst Dir day and week; conf @ 50 % kept half the extra return but all the extra drawdown (a sixth on the test half) and all the worst day; rank is degenerate for a picked Dir; VIX ≤ 15 kept 73 % with a smaller drawdown than ×1 over all days but a deeper one than ×2 on the test half — a lead for its own item | 2026-11-05 |
