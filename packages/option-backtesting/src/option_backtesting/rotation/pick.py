@@ -1,6 +1,13 @@
-"""The 09:16 entry: score every list from the results through the previous trading day plus today's
+"""The day's entry: score every list from the results through the previous trading day plus today's
 weekday, VIX band and days to expiry, and write one hash-chained entry before the first entry
-time."""
+time.
+
+Since 2026-11-09 (owner) the evening's list is the source of truth: the entry ranks with the VIX
+the evening message ranked with (the previous session's close, `evening_vix`), not a live 09:15
+read, so it is the list last evening sent and the evening upload put on the platforms. When the
+list that message saved for the day (`result.read_tentative`) still differs (the stored results
+changed overnight, say), the saved list is recorded and the re-score is kept beside it under
+`rescored`. Nothing is sent."""
 
 from __future__ import annotations
 
@@ -19,7 +26,7 @@ from . import expiry, journal, messages, sl150_cap, store
 from .attrs import last_collected_before
 from .dte import DTE_BASIS
 from .lists import LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
-from .live import listed_dte_labels, vix_open_with_source
+from .live import listed_dte_labels
 from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
 from .variants import track_names, variant_names
 
@@ -46,6 +53,21 @@ def previous_data_day(root: Path, day: date) -> date:
     if prev is None:
         raise PickError(f"no collected trading day in the 14 days before {day}")
     return prev
+
+
+def evening_vix(root: Path, last_day: date) -> tuple[float | None, str]:
+    """(VIX, where it came from) the evening ranks the next session with: `last_day`'s India VIX
+    close in the lake, else that day's stored open; (None, "none") when neither is there. The one
+    stand-in both the evening message (`tomorrow.expected_picks`) and the day's entry use."""
+    from . import attrs as attrs_mod
+
+    vix = attrs_mod.vix_close_from_lake(root, last_day)
+    if vix is not None:
+        return float(vix), f"close {last_day.isoformat()}"
+    stored = (store.read_days(root).get(last_day) or {}).get("vix_open")
+    if stored not in (None, ""):
+        return float(stored), f"open {last_day.isoformat()}"
+    return None, "none"
 
 
 def code_commit() -> str:
@@ -155,6 +177,39 @@ def _rank(hist: History, day: date, vix_open: float | None, dte: dict[str, str])
         yield key, cols, comp, select(comp, cols)
 
 
+def list_composites(
+    hist: History,
+    day: date,
+    vix_open: float | None,
+    dte: dict[str, str],
+    key: str,
+    names: list[str],
+) -> dict[str, float]:
+    """{name: composite} of list `key` for `names`, as `score_history` rounds them."""
+    for k, cols, comp, _ in _rank(hist, day, vix_open, dte):
+        if k == key:
+            at = {c: i for i, c in enumerate(cols)}
+            return {n: round(float(comp[at[n]]), 4) for n in names if n in at}
+    return {}
+
+
+#: the list the evening message saves per journal (`result.save_tentative`'s keys)
+EVENING_KEY = {None: "adaptive", "t1": "t1"}
+#: the list in an entry the evening's saved list stands for (Adaptive)
+EVENING_LIST = "C"
+
+
+def _evening_list(day: date, root: Path, track: str | None) -> dict | None:
+    from . import result
+
+    doc = result.read_tentative(day, root).get(EVENING_KEY.get(track, track or "adaptive"))
+    if not isinstance(doc, dict) or doc.get("day") != day.isoformat():
+        return None
+    if not isinstance(doc.get("core"), list) or not isinstance(doc.get("buy"), list):
+        return None
+    return doc
+
+
 def _check_expiry_only(expiry_only: str | None) -> None:
     if expiry_only is not None and expiry_only not in expiry.INDICES:
         raise ValueError(
@@ -255,27 +310,25 @@ def record(
     track: str | None = None,
     vix_source: str | None = None,
 ) -> PickResult:
-    """Score and append today's entry. `track` (e.g. "t1") records a parallel track instead:
-    Core-298 plus its extra variants, only its own lists, in its own journal; the live journal is
-    never touched by a track run. `vix_open` given (the live entry's own read, handed to the track
-    so the two never poll twice) is recorded as read from `vix_source` when that is also given,
-    else as "given"."""
+    """Score and append today's entry from the evening's list (module docstring). `track` (e.g.
+    "t1") records a parallel track instead: Core-298 plus its extra variants, only its own lists,
+    in its own journal; the live journal is never touched by a track run. `vix_open` given (tests,
+    a run by hand) is used instead of the evening's VIX, recorded as read from `vix_source` when
+    that is also given, else as "given"."""
     root = root or data_dir()
     if not dry_run and day != now_fn().astimezone(IST).date():
         raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
     if not dry_run and any(
         e["day"] == day.isoformat() for e in journal.read(store.journal_path(root, track))
     ):
-        # a retry after a success: answer before any network read can fail and raise a false alert
+        # a retry after a success: answer before anything slow
         raise journal.AlreadyRecorded(f"{day.isoformat()} is already in the journal")
-    # everything slow and VIX-independent first: the 09:15 bar is served a few seconds after the
-    # job starts, and only the band depends on it
     names = variant_names() + (track_names(track) if track else [])
     dte, dte_source = listed_dte_labels(day)
     # BL-122: from 2026-10-19, on a day exactly one index expires, Adaptive takes only its
-    # strategies. Read before any network wait, so a bad kill-switch value fails at once, loudly.
+    # strategies. A bad kill-switch value fails here, loudly.
     rule = expiry.rule_index(day, dte)
-    sl150_cap.effective_from()  # BL-192: a bad kill-switch value fails here, before any wait
+    sl150_cap.effective_from()  # BL-192: a bad kill-switch value fails here too
     commit = code_commit()
     try:
         hist = load_history(day, root, names)
@@ -294,14 +347,37 @@ def record(
                 f"(first {', '.join(d.isoformat() for d in missing[:3])}): "
                 f"run `obt rotation update --track {track}`"
             )
-    source = vix_source or "given"
     if vix_open is None:
-        vix_open, source = vix_open_with_source(day)
+        vix_open, source = evening_vix(root, hist.days[-1])
+    else:
+        source = vix_source or "given"
     if vix_open is None:
-        raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
+        raise PickError(
+            f"no India VIX close or open is stored for {hist.days[-1]}, the evening's stand-in "
+            f"for {day}; nothing recorded"
+        )
     lists = score_history(hist, day, vix_open, dte, expiry_only=rule)
     if track:
         lists = {k: v for k, v in lists.items() if k in TRACK_LISTS[track]}
+    # The evening's list is the source of truth (owner, 2026-11-09).
+    evening = _evening_list(day, root, track)
+    block = lists.get(EVENING_LIST)
+    if evening is None:
+        evening_status = "not saved"
+    elif block is not None and (block["core"], block["buy"]) == (evening["core"], evening["buy"]):
+        evening_status = "matched"
+    elif block is not None:
+        evening_status = "replaced"
+        picked = [*evening["core"], *evening["buy"]]
+        lists[EVENING_LIST] = {
+            "core": list(evening["core"]),
+            "buy": list(evening["buy"]),
+            "overridden": [],
+            "composite": list_composites(hist, day, vix_open, dte, EVENING_LIST, picked),
+            "rescored": {"core": block["core"], "buy": block["buy"]},
+        }
+    else:
+        evening_status = "not saved"
     fields = {
         "v": 3,
         "day": day.isoformat(),
@@ -318,6 +394,11 @@ def record(
         "inputs_sha": hist.digest,
         "inputs_days": len(hist.days),
         "lots_per_strategy": LOTS_PER,
+        "picks_from": "evening",
+        "evening_list": {
+            "status": evening_status,
+            "sent_on": (evening or {}).get("sent_on"),
+        },
     }
     if track:
         fields["track"] = track

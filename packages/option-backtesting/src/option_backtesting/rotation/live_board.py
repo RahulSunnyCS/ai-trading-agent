@@ -1,6 +1,9 @@
 """The live board (BL-203): today's Adaptive picks, Classic and Tuned, run through the backtest
 engine on the session so far, read from Angel One while the market is open.
 
+The picks are the list last evening's message sent for today (`result.read_tentative`), the source
+of truth since 2026-11-09 (owner); the day's journal entry only when no evening list was saved.
+
 Every refresh reads the day's 1-minute bars of what the picks need and nothing else: the index and
 India VIX, and for each index a pick trades, its picked expiry's strikes from `BAND` below the
 day's low to `BAND` above its high. That is about 70 requests a refresh for one index. The bars stay
@@ -145,19 +148,53 @@ class BookPicks:
     dte: dict[str, str] | None
     late: bool
     expiry_only: str | None
+    #: where the picks came from: `evening` (last evening's list) or `journal` (the day's entry)
+    source: str = "journal"
+
+
+#: book -> the key of its list in the evening's saved lists (`result.save_tentative`)
+EVENING_KEYS = {"core": "adaptive", "t1": "t1"}
+
+
+def _evening(day: date, root: Path | None, book: str) -> dict | None:
+    from . import result
+
+    doc = result.read_tentative(day, root).get(EVENING_KEYS[book])
+    if not isinstance(doc, dict) or doc.get("day") != day.isoformat():
+        return None
+    if not isinstance(doc.get("core"), list) or not doc["core"]:
+        return None
+    return doc
 
 
 def todays_picks(day: date, root: Path | None = None) -> list[BookPicks]:
-    """Each book's journal entry for `day` (Classic's live journal, Tuned's T1 track); a book with
-    no entry for the day is left out."""
+    """Each book's picks for `day` (Classic, Tuned): last evening's list for it, else the day's
+    journal entry (Classic's live journal, Tuned's T1 track); a book with neither is left out. The
+    days to expiry and the expiry rule come from the entry when there is one (an evening list saved
+    before 2026-11-09 has neither), else from the evening list."""
     out: list[BookPicks] = []
     for book, track, name in BOOKS:
         try:
             entries = journal.read(store.journal_path(root, track))
         except OSError:
+            entries = []
+        entry = next((e for e in entries if e.get("day") == day.isoformat()), None) or {}
+        evening = _evening(day, root, book)
+        if evening is not None:
+            out.append(
+                BookPicks(
+                    book=book,
+                    name=name,
+                    core=[str(n) for n in evening["core"]],
+                    buy=[str(n) for n in evening.get("buy") or []],
+                    dte=entry.get("dte") or evening.get("dte"),
+                    late=False,  # fixed the evening before the session
+                    expiry_only=entry.get("expiry_only", evening.get("expiry_only")),
+                    source="evening",
+                )
+            )
             continue
-        entry = next((e for e in entries if e.get("day") == day.isoformat()), None)
-        block = (entry or {}).get("lists", {}).get(LIST_KEY)
+        block = entry.get("lists", {}).get(LIST_KEY)
         if not block:
             continue
         out.append(
@@ -507,6 +544,7 @@ def build_board(
                 "book": b.book,
                 "name": b.name,
                 "late": b.late,
+                "picks_from": b.source,
                 "expiry_only": b.expiry_only,
                 "dte": b.dte,
                 "accounts": accounts,

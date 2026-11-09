@@ -1,7 +1,7 @@
 /**
  * The Today page's baskets with what the platforms hold (dashboard review, 2026-10-28):
  * `PlanPickLine` is the line under a recorded pick (its settings and its state on each account
- * that uploads its book); `RotationTomorrow` is the next session's tentative list (the 16:00
+ * that uploads its book); `RotationTomorrow` is the next session's list (the 16:00
  * message's), each pick with the same line, so the evening's uploads can be checked here.
  * Read through `/legwise/rotation/plan`; nothing here computes a figure.
  */
@@ -46,13 +46,12 @@ export function RotationTomorrow({ plan }: { plan: RotationPlan }) {
   if (!s) return null;
   const books = (['core', 't1'] as const).filter((b) => (s.books[b]?.length ?? 0) > 0);
   return (
-    <section aria-label="Next session, tentative" className="space-y-2 border-t border-border pt-3">
+    <section aria-label="Next session" className="space-y-2 border-t border-border pt-3">
       <p className="flex flex-wrap items-baseline gap-x-3 text-xs text-muted">
-        <span className="font-medium text-foreground">{formatDay(s.day)} · tentative</span>
+        <span className="font-medium text-foreground">{formatDay(s.day)} · next session</span>
         <span>
           The list the 16:00 message sent{s.sent_on ? ` on ${formatDay(s.sent_on)}` : ''}, from the
-          evening's VIX close; the 09:16 entry confirms or changes it, and the morning top-up
-          uploads any change.
+          evening's VIX close: the list that session records and trades (there is no 09:16 re-pick).
         </span>
       </p>
       {plan.paused_until ? (

@@ -149,11 +149,13 @@ describe('live board (BL-203)', () => {
 });
 
 describe('T1 parallel track', () => {
-  it('records the live and the track pick in one step, so one message can carry both', () => {
+  it('records the live and the track entry in one step at 08:45, before the first entry', () => {
     const pick = JOBS.find((job) => job.id === 'options-rotation-pick');
     expect(pick?.steps).toEqual([['uv', 'run', 'obt', 'rotation', 'pick', '--with-t1']]);
     expect(pick?.alertsItself).toBe(true);
-    expect(pick?.catchUpHours).toBe(0);
+    expect(pick?.schedule).toMatchObject({ at: '08:45' });
+    // caught up only while it can still record before the 09:17 first entry
+    expect(pick?.catchUpHours).toBe(0.5);
   });
 
   it('keeps a 21:00 catch-up that stores missing T1 days and delivers a late T1 result', () => {

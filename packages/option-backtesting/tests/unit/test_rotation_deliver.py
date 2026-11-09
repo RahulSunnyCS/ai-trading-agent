@@ -1,10 +1,9 @@
-"""When the rotation messages are sent (BL-125): one morning message that T1 can never delay or
-lose Adaptive from, and an evening message whose sent markers make a retry safe and a late T1
-result deliverable."""
+"""When the rotation messages are sent (BL-125): the morning records the day's entries and sends
+nothing (owner, 2026-11-09: the evening's list is the source of truth), and the evening message's
+sent markers make a retry safe and a late T1 result deliverable."""
 
 from __future__ import annotations
 
-import json
 import time as clock
 from datetime import date, datetime, time
 
@@ -70,22 +69,15 @@ def _entry(core, track=None, **extra):
 class Recorder:
     """A stand-in for `pick.record`: returns a result per track or raises what it was given."""
 
-    def __init__(self, live=None, t1=None, delay_t1=0.0, events=None):
-        self.events = events if events is not None else []
-        self.live = live if live is not None else _entry(LIVE_CORE)
-        self.t1 = t1
-        self.calls: list[dict] = []
-        self.delay_t1 = delay_t1
+    def __init__(self, live=None, t1=None):
+        self.live_outcome = live if live is not None else _entry(LIVE_CORE)
         #: queue of outcomes for T1 calls: an entry (success) or an exception to raise
-        self.t1_outcomes = [self.t1 if self.t1 is not None else _entry(T1_CORE, track="t1")]
-        self.live_outcome = self.live
+        self.t1_outcomes = [t1 if t1 is not None else _entry(T1_CORE, track="t1")]
+        self.calls: list[dict] = []
 
     def __call__(self, day, **kw):
         self.calls.append({"day": day, **kw})
-        track = kw.get("track")
-        self.events.append(("record", track))
-        if track:
-            clock.sleep(self.delay_t1)
+        if kw.get("track"):
             outcome = self.t1_outcomes.pop(0) if len(self.t1_outcomes) > 1 else self.t1_outcomes[0]
         else:
             outcome = self.live_outcome
@@ -94,56 +86,46 @@ class Recorder:
         return pick_mod.PickResult(outcome, pick_mod.render(outcome, None), None)
 
 
-def _run(recorder, sent, alerts=None, catch_up=None, **kw):
+def _run(recorder, alerts=None, catch_up=None, printed=None, **kw):
     alerts = alerts if alerts is not None else []
     kw.setdefault("with_t1", True)
-    return deliver.pick_and_send(
+    return deliver.record_day(
         DAY,
         record_fn=recorder,
-        send=sent,
         alert=lambda title, body: alerts.append((title, body)),
         catch_up=catch_up or (lambda t, root=None: (0, 0)),
-        echo=lambda m: None,
+        echo=(printed.append if printed is not None else lambda m: None),
         err=lambda m: None,
         **kw,
     )
 
 
-def test_adaptive_and_t1_go_out_as_one_message_the_same_for_the_owner_and_the_group():
-    sent, alerts, rec = Sent(), [], Recorder()
-    assert _run(rec, sent, alerts) == 0
-    assert len(sent.messages) == 2 and alerts == []
-    private, group = sent.to(None)[0], sent.to("-456")[0]
-    assert (
-        "🎯 ADAPTIVE · Tue 20 Oct" in private and "🧪 Tuned Adaptive (In Testing phase)" in private
+@pytest.fixture
+def no_telegram(monkeypatch):
+    """Fails the test if anything in the morning reaches Telegram's sender."""
+    from option_backtesting import notify
+
+    monkeypatch.setattr(
+        notify, "send", lambda *a, **k: pytest.fail("the morning must send no message")
     )
-    assert private.index("ADAPTIVE") < private.index("━━━") < private.index("Tuned Adaptive")
-    assert private.endswith("🔒 f1a77247 · 09:16")
-    assert group == private
-    # T1 is given the live entry's VIX read: one poll, one value, the same recorded source
-    live_call, t1_call = rec.calls
-    assert live_call["track"] is None and t1_call["track"] == "t1"
-    assert (t1_call["vix_open"], t1_call["vix_source"]) == (14.01, "fyers")
 
 
-def test_an_identical_group_id_sends_once(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_ROTATION_CHAT_ID", "123")
-    sent = Sent()
-    assert _run(Recorder(), sent) == 0
-    assert [c for c, _ in sent.messages] == [None]
+def test_the_morning_records_adaptive_then_t1_and_sends_no_message(no_telegram):
+    rec, alerts, printed = Recorder(), [], []
+    assert _run(rec, alerts, printed=printed) == 0
+    assert [c["track"] for c in rec.calls] == [None, "t1"] and alerts == []
+    # printed for the job log only
+    assert printed[0].startswith("🎯 ADAPTIVE · Tue 20 Oct")
+    assert printed[1].startswith("🧪 Tuned Adaptive (In Testing phase) · Tue 20 Oct")
+    # each list ranks with its own evening VIX: no live read is handed from one to the other
+    assert all(c["vix_open"] is None for c in rec.calls)
 
 
-def test_a_failed_t1_never_delays_or_loses_adaptive_and_still_alerts_the_owner():
+def test_a_failed_t1_alerts_the_owner_and_the_job_retries(no_telegram):
     rec = Recorder()
     rec.t1_outcomes = [pick_mod.PickError("the t1 track lacks results for 1 day(s)")]
-    sent, alerts = Sent(), []
-    assert _run(rec, sent, alerts) == 2  # the job retries
-    private = sent.to(None)[0]
-    assert private.splitlines()[0] == "🎯 ADAPTIVE · Tue 20 Oct"
-    assert (
-        "🧪 Tuned Adaptive (In Testing phase) · not recorded today" in private
-        and len(sent.messages) == 2
-    )
+    alerts = []
+    assert _run(rec, alerts) == 2
     assert alerts == [
         (
             "T1 TRACK Rotation pick NOT recorded for 2026-10-20",
@@ -152,131 +134,68 @@ def test_a_failed_t1_never_delays_or_loses_adaptive_and_still_alerts_the_owner()
     ]
 
 
-def test_an_unexpected_t1_failure_alerts_as_failed():
+def test_an_unexpected_t1_failure_alerts_as_failed(no_telegram):
     rec = Recorder()
     rec.t1_outcomes = [KeyError("dte")]
-    sent, alerts = Sent(), []
-    assert _run(rec, sent, alerts) == 2
+    alerts = []
+    assert _run(rec, alerts) == 2
     assert alerts[0][0] == "T1 TRACK Rotation pick FAILED for 2026-10-20"
-    assert len(sent.messages) == 2  # Adaptive went out anyway
 
 
-def test_missing_t1_results_are_stored_then_t1_follows_as_its_own_message():
+def test_missing_t1_results_are_stored_then_t1_is_recorded(no_telegram):
     rec = Recorder()
     rec.t1_outcomes = [
         pick_mod.PickError("lacks results: run `obt rotation update --track t1`"),
-        _entry(T1_CORE, track="t1", before_first_entry=False),
+        _entry(T1_CORE, track="t1"),
     ]
-    sent, alerts, caught = Sent(), [], []
+    alerts, caught = [], []
     catch = lambda t, root=None: caught.append(t) or (1, 0)  # noqa: E731
-    assert _run(rec, sent, alerts, catch_up=catch) == 0
+    assert _run(rec, alerts, catch_up=catch) == 0
     assert caught == ["t1"] and alerts == []
-    first, follow = sent.to(None)[0], sent.to(None)[-1]
-    # Adaptive did not wait for the catch-up, and says T1 is coming rather than "not recorded"
-    assert "🧪 Tuned Adaptive (In Testing phase) · follows in a separate message" in first
-    assert follow.startswith("⚠️ LATE · not a forward entry\n🧪 Tuned Adaptive (In Testing phase)")
-    assert "ADAPTIVE" not in follow
-    assert sent.to("-456") == sent.to(None)  # the group hears both, as the owner does
+    assert [c["track"] for c in rec.calls] == [None, "t1", "t1"]
+
+
+def test_a_dry_run_never_stores_missing_t1_results_and_alerts_nothing(no_telegram):
+    rec = Recorder()
+    rec.t1_outcomes = [pick_mod.PickError("lacks results: run `obt rotation update --track t1`")]
+    alerts, caught = [], []
+    catch = lambda t, root=None: caught.append(t) or (1, 0)  # noqa: E731
+    assert _run(rec, alerts, catch_up=catch, dry_run=True) == 2
+    assert caught == [] and alerts == []
+    assert all(call["dry_run"] for call in rec.calls)
+
+
+def test_a_failed_adaptive_entry_alerts_and_t1_is_not_tried(no_telegram):
+    rec = Recorder(live=pick_mod.PickError("no India VIX close or open"))
+    alerts = []
+    assert _run(rec, alerts) == 2
+    assert alerts == [("Rotation pick NOT recorded for 2026-10-20", "no India VIX close or open")]
+    assert [c["track"] for c in rec.calls] == [None]
+
+
+def test_a_retry_completes_only_what_is_missing(no_telegram):
+    rec = Recorder(live=AlreadyRecorded("done"))
+    printed = []
+    assert _run(rec, printed=printed) == 0
+    assert printed[0].startswith("already recorded")
+    rec = Recorder(live=AlreadyRecorded("done"), t1=AlreadyRecorded("done"))
+    assert _run(rec) == 0
+
+
+def test_no_telegram_turns_the_failure_alert_off(no_telegram):
+    rec = Recorder(live=RuntimeError("boom"))
+    alerts = []
+    assert _run(rec, alerts, telegram=False) == 2 and alerts == []
+
+
+def test_a_track_entry_on_its_own_records_only_that_track(no_telegram):
+    rec = Recorder()
+    assert _run(rec, track="t1", with_t1=False) == 0
+    assert [c["track"] for c in rec.calls] == ["t1"]
 
 
 def _at(hh, mm, ss, micro=0):
     return lambda: datetime(2026, 10, 20, hh, mm, ss, micro, tzinfo=IST)
-
-
-def test_a_slow_t1_does_not_hold_adaptive_back_past_the_clock_deadline():
-    rec = Recorder(delay_t1=0.4)
-    sent = Sent()
-    # Adaptive written at 09:16:49.9: T1 may hold the owner's message for 0.1 s at most
-    assert _run(rec, sent, now_fn=_at(9, 16, 49, 900_000)) == 0
-    owner = sent.to(None)
-    # Adaptive first; T1 is only slow, so it says it follows (it is not "not recorded")
-    assert "🧪 Tuned Adaptive (In Testing phase) · follows in a separate message" in owner[0]
-    assert "not recorded today" not in owner[0]
-    assert owner[-1].startswith("🧪 Tuned Adaptive (In Testing phase) · Tue 20 Oct")
-    assert sent.to("-456") == owner
-
-
-def test_the_owner_waits_for_t1_until_09_16_50_or_20_seconds_whichever_is_sooner():
-    def at(*t):
-        return datetime(2026, 10, 19, *t, tzinfo=IST)
-
-    assert deliver.t1_deadline(at(9, 16, 7)) == at(9, 16, 27)  # 20 s cap
-    assert deliver.t1_deadline(at(9, 16, 40)) == at(9, 16, 50)  # the clock deadline
-    assert deliver.t1_deadline(at(9, 16, 55)) == at(9, 17, 15)  # a late run: 20 s
-    assert deliver.t1_deadline(at(14, 0, 0)) == at(14, 0, 20)  # a run by hand
-
-
-def test_the_message_waits_for_t1_then_goes_to_the_owner_first_and_the_group():
-    events: list = []
-    rec, sent = Recorder(events=events), Sent(events=events)
-    assert _run(rec, sent) == 0
-    assert events == [
-        ("record", None),
-        ("record", "t1"),
-        ("send", None),  # Adaptive and T1 together, the owner first
-        ("send", "-456"),
-    ]
-
-
-def test_a_dry_run_never_stores_missing_t1_results():
-    rec = Recorder()
-    rec.t1_outcomes = [pick_mod.PickError("lacks results: run `obt rotation update --track t1`")]
-    sent, caught = Sent(), []
-    catch = lambda t, root=None: caught.append(t) or (1, 0)  # noqa: E731
-    assert _run(rec, sent, catch_up=catch, dry_run=True) == 2
-    assert caught == [] and sent.messages == []
-    assert all(call["dry_run"] for call in rec.calls)
-
-
-def test_a_failed_adaptive_pick_alerts_and_sends_no_message():
-    rec = Recorder()
-    rec.live_outcome = pick_mod.PickError("missing VIX")
-    sent, alerts = Sent(), []
-    assert _run(rec, sent, alerts) == 2
-    assert sent.messages == []
-    assert alerts == [("Rotation pick NOT recorded for 2026-10-20", "missing VIX")]
-    assert [c["track"] for c in rec.calls] == [None]  # T1 is not tried without Adaptive
-
-
-def test_a_retry_after_adaptive_was_recorded_sends_only_the_t1_message():
-    rec = Recorder()
-    rec.live_outcome = AlreadyRecorded("done")
-    sent = Sent()
-    assert _run(rec, sent) == 0
-    assert [c for c, _ in sent.messages] == [None, "-456"]
-    assert sent.messages[0][1].startswith("🧪 Tuned Adaptive (In Testing phase) · Tue 20 Oct")
-    assert sent.messages[1][1] == sent.messages[0][1]
-
-
-def test_a_retry_when_both_are_recorded_sends_nothing():
-    rec = Recorder()
-    rec.live_outcome = AlreadyRecorded("done")
-    rec.t1_outcomes = [AlreadyRecorded("done")]
-    sent = Sent()
-    assert _run(rec, sent) == 0 and sent.messages == []
-
-
-def test_a_dry_run_sends_nothing_and_alerts_nothing():
-    rec = Recorder()
-    rec.t1_outcomes = [RuntimeError("boom")]
-    sent, alerts = Sent(), []
-    assert _run(rec, sent, alerts, dry_run=True, telegram=True) == 2
-    assert sent.messages == [] and alerts == []
-
-
-def test_a_track_pick_on_its_own_is_private_and_uses_the_t1_layout():
-    rec = Recorder()
-    sent = Sent()
-    assert _run(rec, sent, track="t1", with_t1=False) == 0
-    assert [c for c, _ in sent.messages] == [None]
-    assert sent.messages[0][1].startswith("🧪 Tuned Adaptive (In Testing phase) · Tue 20 Oct")
-
-
-def test_without_t1_adaptive_goes_to_the_owner_and_the_group():
-    sent = Sent()
-    assert _run(Recorder(), sent, with_t1=False) == 0
-    assert [c for c, _ in sent.messages] == [None, "-456"]
-    assert sent.messages[0][1] == sent.messages[1][1]
 
 
 # -- evening ------------------------------------------------------------------------------------
@@ -655,7 +574,7 @@ def test_result_soft_fail_alerts_and_exits_zero(monkeypatch):
     assert soft.exit_code == 0 and len(alerts) == 2
 
 
-def test_the_evening_keeps_its_tentative_lists_and_the_morning_compares_with_them(evening):
+def test_the_evening_keeps_its_lists_for_the_next_mornings_entry(evening):
     _t1_ready(evening)
     assert _send(evening, Sent()) == 0
     saved = rotation_result.read_tentative("2026-10-21", evening)
@@ -665,22 +584,6 @@ def test_the_evening_keeps_its_tentative_lists_and_the_morning_compares_with_the
     rotation_result.tentative_path("2026-10-21", evening).unlink()
     assert _send(evening, Sent(), telegram=False) == 0
     assert rotation_result.read_tentative("2026-10-21", evening) == {}
-
-
-def test_the_morning_says_whether_each_list_changed_since_the_evening(tmp_path):
-    previous = {
-        "adaptive": {"day": DAY.isoformat(), "sent_on": "2026-10-19", "core": LIVE_CORE, "buy": []},
-        "t1": {"day": DAY.isoformat(), "sent_on": "2026-10-19", "core": T1_CORE[:2], "buy": []},
-    }
-    path = rotation_result.tentative_path(DAY.isoformat(), tmp_path)
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(previous))
-    sent = Sent()
-    assert _run(Recorder(), sent, root=tmp_path) == 0
-    private, group = sent.to(None)[0], sent.to("-456")[0]
-    assert group == private
-    assert "✅ No change from yesterday's list" in private.split("━")[0]
-    assert "🔄 Changed from yesterday's list: ➕ 13:17  N_widesl_p150" in private
 
 
 def test_the_margin_block_goes_to_the_owner_only_and_never_holds_the_message(evening, monkeypatch):

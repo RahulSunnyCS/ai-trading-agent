@@ -1,4 +1,5 @@
-"""Group copies contain picks only; operational alerts keep the private destination."""
+"""Group copies contain results and picks only; operational alerts keep the private
+destination; the morning entry sends nothing (2026-11-09)."""
 
 import json
 from datetime import date
@@ -36,27 +37,14 @@ def telegram(monkeypatch, tmp_path):
     return requests
 
 
-@pytest.mark.parametrize(
-    ("group", "flags", "targets"),
-    [
-        ("-456", [], ["123", "-456"]),
-        ("", [], ["123"]),
-        (" 123 ", [], ["123"]),
-        ("-456", ["--dry-run"], []),
-        ("-456", ["--no-telegram"], []),
-    ],
-)
-def test_pick_destinations(telegram, monkeypatch, group, flags, targets):
-    monkeypatch.setenv("TELEGRAM_ROTATION_CHAT_ID", group)
+@pytest.mark.parametrize("flags", [[], ["--with-t1"], ["--dry-run"], ["--no-telegram"]])
+def test_the_morning_entry_sends_nothing_to_any_chat(telegram, flags):
+    """Owner, 2026-11-09: no 09:16 message. The entry is recorded and printed; Telegram is not
+    called, for the owner or the friends' group."""
     result = CliRunner().invoke(rotation_app, ["pick", "--day", "2026-10-13", *flags])
     assert result.exit_code == 0
-    assert [r["chat_id"] for r in telegram] == targets
-    for request in telegram:
-        assert "fake-token-1234" not in request["text"]
-        assert "***REDACTED***" in request["text"]
-        assert "parse_mode" not in request
-    if len(telegram) == 2:
-        assert telegram[0]["text"] == telegram[1]["text"]
+    assert telegram == []
+    assert "Example picks" in result.output
 
 
 @pytest.mark.parametrize(
@@ -73,20 +61,6 @@ def test_failures_stay_private_and_retries_send_nothing(telegram, monkeypatch, e
     else:
         assert result.exit_code == 2
         assert [r["chat_id"] for r in telegram] == ["123"]
-
-
-def test_private_delivery_failure_does_not_prevent_group_copy(telegram, monkeypatch):
-    def urlopen(request, timeout):
-        payload = json.loads(request.data)
-        telegram.append(payload)
-        if payload["chat_id"] == "123":
-            raise OSError("private delivery failed")
-        return SimpleNamespace(read=lambda: b'{"ok": true}')
-
-    monkeypatch.setattr(notify.urllib.request, "urlopen", urlopen)
-    result = CliRunner().invoke(rotation_app, ["pick", "--day", "2026-10-13"])
-    assert result.exit_code == 0
-    assert [r["chat_id"] for r in telegram] == ["123", "-456"]
 
 
 def test_explicit_group_does_not_need_private_chat(telegram, monkeypatch):

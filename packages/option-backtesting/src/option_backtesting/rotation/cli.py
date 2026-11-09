@@ -125,22 +125,20 @@ def update(
 def pick(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
     vix_open: float = typer.Option(
-        None, "--vix-open", help="Override the live 09:15 VIX open (testing)."
+        None, "--vix-open", help="Rank with this VIX instead of the evening's (testing)."
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Score and print; write nothing."),
-    telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
-    track: str = typer.Option(
-        None, "--track", help="A parallel track (t1): its own journal, private Telegram only."
+    telegram: bool = typer.Option(
+        True, "--telegram/--no-telegram", help="Alert the owner if it fails (nothing else is sent)."
     ),
+    track: str = typer.Option(None, "--track", help="A parallel track (t1): its own journal."),
     with_t1: bool = typer.Option(
-        False,
-        "--with-t1",
-        help="Also record the T1 track and send ONE message with both (the 09:16 job). "
-        "Adaptive is never held back by T1.",
+        False, "--with-t1", help="Also record the T1 track (the morning job)."
     ),
 ) -> None:
-    """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
-    from .deliver import pick_and_send
+    """Record today's entry for every list (before 09:17), hash-chained, from last evening's list:
+    the evening is the source of truth (owner, 2026-11-09). Sends no message."""
+    from .deliver import record_day
     from .variants import TRACK_DIRS
 
     if track and track not in TRACK_DIRS:
@@ -149,7 +147,7 @@ def pick(
     if track and with_t1:
         typer.echo("--with-t1 and --track are different modes: use one", err=True)
         raise typer.Exit(2)
-    code = pick_and_send(
+    code = record_day(
         _day(day),
         vix_open=vix_open,
         dry_run=dry_run,

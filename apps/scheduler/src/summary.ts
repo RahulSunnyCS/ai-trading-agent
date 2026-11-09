@@ -270,8 +270,8 @@ function algotestCheck(ctx: BuiltinContext): Check {
 }
 
 /**
- * BL-143 item 7: is there a Fyers token Fyers accepts today (the 09:16 pick and the evening run
- * need one)? `mbt token-status --probe` also asks Fyers (a read-only profile call), so a stale
+ * BL-143 item 7: is there a Fyers token Fyers accepts today (the evening run needs one; the
+ * morning entry no longer reads Fyers' VIX since 2026-11-09)? `mbt token-status --probe` also asks Fyers (a read-only profile call), so a stale
  * `.env` token with no known expiry is not passed as "ok". The one Fyers check of the morning:
  * its line in this summary is the reminder, with what to do.
  */
@@ -288,7 +288,7 @@ export function fyersLine(output: string): Check {
   return {
     ok: false,
     label: 'Fyers token',
-    detail: `${why} → log in today: Dashboard › Broker logins › Fyers (before the 09:16 pick)`,
+    detail: `${why} → log in today: Dashboard › Broker logins › Fyers (before the evening collection)`,
   };
 }
 

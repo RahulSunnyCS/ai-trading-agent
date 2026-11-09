@@ -1,8 +1,8 @@
 # Rotation
 
 The Rotation page shows how the **Adaptive** list is doing on days nobody had seen. Each morning
-at 09:16 the forward journal records the strategies the list would trade that day, before anything
-is known. Each evening the day is scored from the collected data. This page reads that journal; it
+at 08:45 the forward journal records the strategies the list trades that day (last evening's list,
+since 9 November 2026), before anything is known. Each evening the day is scored from the collected data. This page reads that journal; it
 never changes a list, a weight or an entry.
 
 ## Adaptive and what it ranks
@@ -12,10 +12,11 @@ Dir ATM, Dir ITM1 and Buy at each start time, on NIFTY and SENSEX). The top of t
 variants)". It mixes five criteria; the numbers are the weights in percent. From Monday 19 October
 2026, on a day when exactly one of NIFTY and SENSEX expires, Adaptive takes only that index's
 strategies: the same ranking with the other index left out, and a Buy add-on kept only when it is
-on the expiring index (the expiry rule; the 09:16 message says so in one line).
-The 09:16 Telegram message lists Adaptive's strategies with their settings, then the T1 track as "Tuned Adaptive
-(In Testing phase)"; the 16:00 message gives the day's result for both and tomorrow's strategies in full. The
-friends' group gets the same messages. Your 16:00 copy (never the group's) also says how the real trades did against paper, per platform and list, per lot: "AlgoTest ·
+on the expiring index (the expiry rule; the 16:00 message says so in one line for the next session).
+The 16:00 Telegram message gives the day's result for Adaptive and the T1 track ("Tuned Adaptive (In Testing
+phase)") and the next session's strategies in full, with their settings. That list is what the next session
+records and trades: since 9 November 2026 there is no 09:16 re-pick and no morning message, and the list is no
+longer labelled tentative. The friends' group gets the same message. Your 16:00 copy (never the group's) also says how the real trades did against paper, per platform and list, per lot: "AlgoTest ·
 Shoonya T1  +₹910 vs +₹790 · slip +₹120 (+0.6%)" means live made ₹120 a lot more than paper, 0.6% of the
 premium at entry ([slippage](glossary:slippage)). A copy deployed at another time than its entry minute is listed
 as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). A copy that did not trade, or whose legs were still open when read, is
@@ -178,7 +179,7 @@ latest stored data; nothing is sent to Telegram yet. The registered verdict stay
 live test. A 60-session read-out catches a bad loss or a large edge, not a moderate one: the daily gap
 swings about ₹2,300, so a 60-session average is uncertain by about ±₹300.
 
-The Adaptive names are the table's only: the 09:16 and 16:00 Telegram messages and the rest of the page
+The Adaptive names are the table's only: the 16:00 Telegram message and the rest of the page
 still say Adaptive and T1. Forward days only: a late entry or a day not yet scored is left out.
 Before a day is scored every figure is a dash, not a zero, and Adaptive Tuned says why it is
 waiting.
@@ -206,15 +207,15 @@ time, the strategy and its composite score. "Widesl min" marks a day where the r
 higher-ranked Dir pick. The line under the basket says what changed since the entry before, which
 is the work list for re-setting AlgoTest by hand.
 
-Under each pick, its settings in words (stop loss, trail, re-entry, overall stop, as the 09:16
+Under each pick, its settings in words (stop loss, trail, re-entry, overall stop, as the 16:00
 message gives them) and one chip per account that Settings › Automation has uploading that book:
 *on* (*was on* for a past session: switched on, by the tool or by hand), *uploaded* (uploaded,
 not switched on), *not uploaded* (the uploader's ledger has no upload of it for that session),
 or *no ledger* when the account's ledger cannot be read. The chips come from the uploaders' own
 ledgers; nothing here asks AlgoTest or Quantiply.
 
-**Next session, tentative.** Under the baskets: the next session's list as the 16:00 message sent
-it (worked out from the evening's VIX close; the 09:16 entry confirms or changes it), each pick
+**Next session.** Under the baskets: the next session's list as the 16:00 message sent it (worked
+out from the evening's VIX close; the next morning's entry records exactly this list), each pick
 with its settings and the same chips, so the evening upload can be checked here. A line names any
 algo an account holds for that weekday that nobody picked (it trades only if switched on), and a
 pause set in Settings › Automation is said.
