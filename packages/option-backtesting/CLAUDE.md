@@ -381,6 +381,12 @@ Otherwise:
   SL limit 1, a 3 s exit delay). One algo per weekday, so a body carries the session's weekday only. A trail in points
   is `PER_POSITION_POINT` (confirmed by the owner's `test1`). `Export.unconfirmed` lists any mapping never seen
   saved, which the uploader refuses; none is left. Anything else that is set raises `Unmappable`.
+- `tests/unit/test_export_roundtrip.py` — every strategy the rotation can pick (Core-298, the T1 track's, the base's
+  Dir leg) exported to BOTH `.algtst` and Quantiply and decoded back by a reader written from the fixtures' format
+  (it imports nothing from the exporters), then compared with the YAML: side, option type, lots, strike, leg SL,
+  trail, re-entry, range breakout, entry / exit and the overall MTM SL. A mapping change that drops, swaps or
+  mis-scales a setting for any strategy fails here by name. It proves the export says what the YAML says, not that a
+  platform executes it as the engine does (that is `live_compare`'s slippage, per strategy and day).
 - `rotation/plan.py` + `api/rotation_plan_routes.py` — the Today page's baskets with what the platforms hold
   (dashboard review, 2026-10-28; `GET /legwise/rotation/plan`, read-only): each Adaptive book's picks for the
   latest recorded session and the next session's tentative list (`result.read_tentative`), with `labels.label`
