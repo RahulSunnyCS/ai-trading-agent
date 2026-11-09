@@ -332,6 +332,7 @@ def test_a_day_before_the_rule_records_exactly_as_before(rule_store):
         "v", "day", "weekday", "vix_open", "vix_source", "vix_band", "dte", "dte_source",
         "dte_basis", "lists", "commit", "universe", "inputs_sha", "inputs_days",
         "lots_per_strategy", "recorded_at", "before_first_entry", "prev", "hash",
+        "picks_from", "evening_list",  # 2026-11-09: where the picks came from
     }  # fmt: skip
 
 

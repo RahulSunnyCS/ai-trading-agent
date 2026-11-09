@@ -19,7 +19,8 @@ from datetime import date
 from pathlib import Path
 
 from ..fyers.daily import data_dir
-from . import journal, result, slippage, store
+from . import result, slippage
+from .entries import read as read_entries
 
 MONTH_FROM = date(2026, 11, 1)
 
@@ -65,7 +66,7 @@ def paper(
     days = sorted(
         {
             date.fromisoformat(e["day"])
-            for e in journal.read(store.journal_path(root, track))
+            for e in read_entries(root, track)
             if start.isoformat() <= str(e.get("day", "")) <= day.isoformat()
         }
     )

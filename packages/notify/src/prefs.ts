@@ -34,7 +34,6 @@ export const NOTIFICATION_TYPES = {
   'scheduler.recovered': 'Scheduler: a job that failed ran fine again',
   'scheduler.missed': 'Scheduler: jobs missed while the laptop slept (one message per wake-up)',
   'scheduler.failure': 'Scheduler: a job failed (its alert)',
-  'options.pick': 'Options rotation: the 09:16 picks (Adaptive and T1)',
   'options.result': "Options rotation: the 16:00 result and tomorrow's strategies",
   'quantiply.switch_off': "Quantiply: the 15:40 switch-off of the tool's algos",
 } as const;

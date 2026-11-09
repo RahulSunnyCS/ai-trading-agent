@@ -93,8 +93,8 @@ Otherwise:
   underlying/expiry/strike/side; instruments keep their Fyers identity), `client.py` (volume
   lots->quantity, no-trade minutes carried forward, OI from `getOIData` for NFO only, the index
   gap 15:15-15:28 flagged not filled; what was missing lands in `ingest_runs.details.flags`).
-  `check.py` + `api/angel_routes.py` — the one guard every Angel One login goes through except
-  the 09:16 VIX fallback in `rotation/live.py`: the dashboard's Test connection (`POST
+  `check.py` + `api/angel_routes.py` — the one guard every Angel One login goes through (the
+  09:16 VIX fallback in `rotation/live.py` that bypassed it was removed on 2026-11-09): the dashboard's Test connection (`POST
   /legwise/angel/test`: `begin` takes the lock and passes the guard, then the login runs in a
   background thread and the route answers 202 at once; the card reads the result from `GET
   /legwise/angel/status`), the 08:00 job (`obt angel test --scheduled`), and the collector
@@ -121,8 +121,8 @@ Otherwise:
   ranking, numpy only; `scripts/rotation-parity.py` must print PARITY OK), `update.py` (nightly one-day
   run of the 298 variant files in `strategies/rotation/` (the 248 original plus 50 Dir ITM1, BL-080), loading each index's day once), `store.py`
   (per-variant CSVs and `days.csv` under `TRADING_DATA_ROOT/rotation/`, not the catalog),
-  `journal.py` (insert-only SHA-256 chain, one entry per day), `pick.py` / `live.py` (the 09:16 entry
-  from the 09:15 VIX open read live from Fyers, polled, with Angel One as the unattended fallback, and the days to expiry of the listed contracts from Fyers' symbol master, calendar as fallback; the entry records `vix_source` / `dte_source`, the universe size + hash and `inputs_sha`, a digest of the stored results and day rows it was scored on), `series.py` (BL-090:
+  `journal.py` (insert-only SHA-256 chain, one entry per day), `pick.py` / `live.py` (the day's entry,
+  recorded at 08:45 from last evening's list since 2026-11-09 (owner: the evening is the source of truth): ranked with the evening's VIX stand-in, `pick.evening_vix` (the previous session's close in the lake, else its stored open; no live 09:15 read), and the days to expiry of the listed contracts from Fyers' symbol master, calendar as fallback; when the list the evening message saved for the day (`result.read_tentative`) differs from that ranking, the saved list is recorded in list C with the re-score under `rescored` (`evening_list.status`: matched / replaced / not saved); the entry records `vix_source` / `dte_source`, the universe size + hash and `inputs_sha`, a digest of the stored results and day rows it was scored on), `series.py` (BL-090:
   which strategies have daily results now — variant CSVs plus saved legwise results at the file's current
   version — and the selectors `slot:` / `family:` / `index:` / `kind:` / globs / `a+b` that name them; nothing
   is a fixed list, so a new strategy is found once it has results), `cli.py`
@@ -131,6 +131,25 @@ Otherwise:
   failure never fails it, and `obt rotation triggers|triggers-show`;
   `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as
   in the research (the Budget Sunday once shifted every later pick).
+- `rotation/entries.py` — the journal as its readers see it (owner, 2026-11-09: the evening's list is the
+  source of truth, and whoever reads a day's picks reads the evening's). `entries.read(root, track)` returns each entry
+  with, from `EVENING_FROM` (2026-11-09), the list the evening message saved for that day (`result.read_tentative`,
+  `entries.evening_list`) in list C when it differs from the recorded one and the entry was recorded before the rule (no
+  `picks_from: evening`; in practice only 2026-11-09), the block keeping `overridden` (False) and `expiry_only`, the recorded block under
+  `evening_override.recorded` and composites kept only for the names both lists share; the journal file is never
+  changed, and `entries.raw` gives the entry back exactly (daylog's chain check and re-score use it). Every reader of
+  picks goes through it (the evening result, month, standing, readout, daylog, candles, beats via candles, lot plans,
+  overview, plan, basket, shadow, explain, matrix overlay, placements, track readout, the AlgoTest export and the
+  morning rule, `obt rotation show`); a new reader of a day's picks must too. A cache over it adds
+  `entries.evening_stamp` (the beats and pulse routes do); lot plans' re-derivation cache keys the picks. The live
+  board reads the evening list directly (it also works before the day's entry exists). `result.save_tentative` never
+  rewrites a list whose session already has an entry, and the evening exports (`algtst_export.preview_picks`, both
+  platforms) read the saved list, re-ranking only when there is none (or one saved without its DTE). A `replaced`
+  entry's re-score (daylog `_rescore`) is checked against its `rescored` block. Lot plans mark a day unverified when a core
+  Widesl has no recorded composite (Duo's W1 is never chosen from incomplete scores), and the regime card reads an
+  entry ranked on the evening's VIX (`vix_source` `close <day>` / `open <day>`) at the collected day's opening VIX,
+  unknown until collected. A re-derivation of today's
+  ranking (Why this pick?, lot plans' Dir Boost check) says the picks differ, never guesses.
 - `rotation/base.py`, `rotation/readout.py` — the owner's fixed base reference (BL-058 amendment 2026-10-10: 2 x
   Widesl OTM1 09:17 = the variant `N_wide_0917`, plus 1 x Dir ATM 09:24 from `strategies/rotation_base/`, outside
   the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,
@@ -273,11 +292,9 @@ Otherwise:
   in `rotation/messages.py`; strategy names come from `rotation/labels.py` (`label(name)` -> head `N_widesl_OTM1` +
   params `SL115% · TSL15%/10% · REnone · MTMSL2500`, read from the variant's own YAML; an id with no file is shown
   raw, never an error) and `rotation/list_names.json` (also imported by the dashboard) for list names. `rotation/deliver.py`
-  decides when they go: `pick_and_send` (the 09:16 job: Adaptive recorded first, T1 right after reusing its VIX read; the
-  message carries both if T1 is in by `t1_deadline` (09:16:50 IST, or 20 s after Adaptive's entry), else Adaptive alone
-  with `· follows in a separate message` (or `· not recorded today` when T1 failed) and T1 follows; the owner and the
-  friends' group get every message alike (2026-10-28), alerts stay private; a dry run writes nothing, not even the T1
-  catch-up)
+  decides when they go: `record_day` (the 08:45 entry job, `obt rotation pick --with-t1`: Adaptive recorded, then T1,
+  storing T1's missing results first when that is why it cannot be ranked; since 2026-11-09 it sends no message, only a
+  private alert when it fails; a dry run writes nothing, not even the T1 catch-up)
   and `send_result` (the evening message, under `result.sending_lock`, a per-day `flock`; any error reading T1 degrades
   to `result not ready`, alerts the owner and never stops Adaptive's result; the owner's message goes first and a
   failing group copy is retried on its own, never holding back the owner's T1 follow-up; the group's copy is the owner's
@@ -326,11 +343,13 @@ Otherwise:
   New entries carry `dte_basis: weekdays`. The Options Lab anatomy `dte` and the YAML engine's `days_to_expiry`
   stay calendar days.
   `rotation/tomorrow.py` supplies the evening message's "tomorrow" part (`--no-tomorrow` drops it; a failure in it never
-  blocks the result): `next_session_picks(today, root, track=)` is the 09:16 ranking re-run on the stored results with
-  tonight's VIX close standing in for the open, under the BL-122 rule for that session and with that session's days to
+  blocks the result): `next_session_picks(today, root, track=)` is the pick's ranking run on the stored results with
+  tonight's VIX close standing in for the open (`pick.evening_vix`, the same stand-in the next morning's entry records with), under the BL-122 rule for that session and with that session's days to
   expiry from the listed contracts (`live.listed_dte_labels`, read once per session date in a process, calendar as fallback; `NextPicks.dte_source` says which and the heading then ends `· calendar DTE`;
   2026-11-04: the calendar put a holiday-moved NIFTY expiry one bucket off and the evening's list disagreed with the
-  morning's pick), for Core-298 or Core-298 plus a track's variants; the message lists those strategies in full. The old
+  morning's pick), for Core-298 or Core-298 plus a track's variants; the message lists those strategies in full under
+  `➡️ <day>` (not "(Tentative)" since 2026-11-09: it is the list that session records and trades), and
+  `result.save_tentative` keeps them, with their DTE and expiry rule, for that session's entry and the live board. The old
   history tables, probabilities and likely changes are no longer sent (`build`/`Tomorrow` are kept, tested, unused by
   the message).
 - `realised/` — BL-168 Phase 4: the contract-notes store (`TRADING_DATA_ROOT/contract-notes/`, written by

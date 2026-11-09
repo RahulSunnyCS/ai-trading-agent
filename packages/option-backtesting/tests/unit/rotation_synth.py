@@ -119,28 +119,21 @@ def record_entry(
         key: a[key] if stored else from_calendar_label(a[key], day) for key in ("dte_n", "dte_s")
     }
     vix = vix_open if vix_open is not None else float(a["vix_open"])
-    saved = (
-        pick.variant_names,
-        pick.listed_dte_labels,
-        pick.code_commit,
-        pick.vix_open_with_source,
-    )
+    saved = (pick.variant_names, pick.listed_dte_labels, pick.code_commit)
     pick.variant_names = lambda: names or NAMES
     pick.listed_dte_labels = lambda d: (labels, dte_source)
     pick.code_commit = lambda: "synth01"
-    pick.vix_open_with_source = lambda d: (vix, vix_source)
     try:
         stamp = datetime(day.year, day.month, day.day, *at, tzinfo=IST)
         return pick.record(
             day,
             root,
-            vix_open=None,
+            vix_open=vix,
+            vix_source=vix_source,
             now_fn=lambda: stamp,
         ).entry
     finally:
-        pick.variant_names, pick.listed_dte_labels, pick.code_commit, pick.vix_open_with_source = (
-            saved
-        )
+        pick.variant_names, pick.listed_dte_labels, pick.code_commit = saved
 
 
 #: The forward scenario's events, by position among the trading days from 2026-10-12 on.

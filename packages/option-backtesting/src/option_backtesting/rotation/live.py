@@ -1,108 +1,26 @@
-"""What the 09:16 pick can know: the 09:15 India VIX open (read live, because the lake only has
-it after the evening collection: Fyers first, Angel One when Fyers has no usable token) and each
-index's days to the nearest listed expiry (Fyers' symbol master, the reference calendar as the
-fallback)."""
+"""What the day's entry reads at run time: each index's days to the nearest listed expiry
+(Fyers' public symbol master, the reference calendar as the fallback). The 09:15 India VIX read
+(Fyers, then Angel One) was removed on 2026-11-09: the entry now ranks with the evening's VIX
+(`pick.evening_vix`)."""
 
 from __future__ import annotations
 
 import sys
-import time
-from collections.abc import Callable
 from datetime import date
 from functools import lru_cache
 
 from ..data.reference.loader import default_reference_data
-from ..fyers.auth import FyersCredentialsError, resolve_credentials
-from ..fyers.client import FyersClient
-from ..fyers.daily import VIX_SYMBOL
 from ..fyers.symbols import download_master, parse_master
 from ..legwise.anatomy import dte_for
-from .attrs import vix_bar_epoch
 from .dte import from_calendar_label
 from .score import dte_label
-
-
-def _fyers_attempt(day: date, client: FyersClient | None = None) -> float | None:
-    """One read of the 09:15 bar from Fyers: the open, or None when the bar is not served yet.
-    Raises FyersCredentialsError when there is no usable token (not worth polling) and lets
-    network / API errors through (the caller treats them as transient)."""
-    client = client or FyersClient(resolve_credentials())
-    return _open_at_0915(client.minute_candles(VIX_SYMBOL, day), day)
-
-
-def _open_at_0915(candles, day: date) -> float | None:
-    first = vix_bar_epoch(day)
-    for candle in candles:
-        if candle.epoch == first:
-            return float(candle.open)
-    return None
-
-
-def vix_open_angel(day: date) -> float | None:
-    """The same quantity from Angel One, which logs in unattended (client code, PIN, TOTP): the
-    fallback for a morning with no Fyers login. None when its module or credentials are missing or
-    any step fails (the reason goes to stderr, scrubbed by that module)."""
-    try:
-        from ..angelone.auth import load_credentials, login
-        from ..angelone.check import current_env, refusal_hold
-        from ..angelone.client import AngelClient
-        from ..angelone.symbols import build_targets, download_master
-    except ImportError:
-        return None
-    try:
-        env = current_env()  # the .env file's ANGELONE_* values, as the guarded checks use
-        held = refusal_hold(env=env)
-        if held:  # a wrong attempt counts toward a lockout: never repeat a refused login
-            print(f"Angel One VIX fallback skipped: {held}", file=sys.stderr)
-            return None
-        client = AngelClient(login(load_credentials(env)))
-        client.targets = build_targets(download_master(), [], {VIX_SYMBOL: "INDIAVIX"})
-        return _open_at_0915(client.minute_candles(VIX_SYMBOL, day), day)
-    except Exception as error:  # noqa: BLE001 - a fallback must never raise into the pick
-        print(
-            f"Angel One VIX fallback failed: {type(error).__name__}: {str(error)[:160]}",
-            file=sys.stderr,
-        )
-    return None
-
-
-def vix_open_with_source(
-    day: date,
-    wait_s: float = 40.0,
-    poll_s: float = 5.0,
-    sleep: Callable[[float], None] = time.sleep,
-    monotonic: Callable[[], float] = time.monotonic,
-) -> tuple[float | None, str]:
-    """(value, source). Fyers is polled for up to `wait_s` seconds (the 09:15 bar is served a few
-    seconds after 09:16:00); no usable token skips the polling at once. Angel One is tried once
-    after that."""
-    deadline = monotonic() + wait_s
-    while True:
-        try:
-            value = _fyers_attempt(day)
-        except FyersCredentialsError as error:
-            print(f"Fyers: {str(error)[:120]}", file=sys.stderr)
-            break
-        except Exception as error:  # noqa: BLE001 - network / API hiccup: retry until the deadline
-            print(
-                f"Fyers VIX read failed: {type(error).__name__}: {str(error)[:120]}",
-                file=sys.stderr,
-            )
-            value = None
-        if value is not None:
-            return value, "fyers"
-        if monotonic() >= deadline:
-            break
-        sleep(poll_s)
-    value = vix_open_angel(day)
-    return (value, "angelone") if value is not None else (None, "")
 
 
 @lru_cache(maxsize=8)
 def listed_labels(day: date) -> dict[str, str]:
     """Days to the nearest listed expiry per index from Fyers' public symbol master (two multi-MB
-    downloads), kept per session date for the process: the 09:16 job ranks Adaptive and T1 in one
-    process and the evening message asks for both lists' tentative picks, so each pays once.
+    downloads), kept per session date for the process: the morning entry records Adaptive and T1
+    in one process and the evening message asks for both lists' picks, so each pays once.
     Raises when the master cannot be read; only a read that succeeded is kept."""
     out = {}
     for key, segment, name in (("dte_n", "NSE_FO", "NIFTY"), ("dte_s", "BSE_FO", "SENSEX")):

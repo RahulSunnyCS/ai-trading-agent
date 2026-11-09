@@ -125,14 +125,15 @@ def test_backfill_covers_exactly_the_core_days_the_track_lacks(tmp_path, monkeyp
     ]
 
 
-def test_a_retry_after_a_recorded_day_answers_before_reading_the_vix(track_seeded, monkeypatch):
+def test_a_retry_after_a_recorded_day_answers_before_reading_anything(track_seeded, monkeypatch):
     root, target = track_seeded
     record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16))
 
-    def no_network(day):
-        raise AssertionError("the VIX must not be read on a retry")
+    def no_read(*args):
+        raise AssertionError("nothing slow may be read on a retry")
 
-    monkeypatch.setattr(pick, "vix_open_with_source", no_network)
+    monkeypatch.setattr(pick, "evening_vix", no_read)
+    monkeypatch.setattr(pick, "listed_dte_labels", no_read)
     with pytest.raises(journal.AlreadyRecorded):
         record(target, root, now_fn=_at(target, 9, 16))
 

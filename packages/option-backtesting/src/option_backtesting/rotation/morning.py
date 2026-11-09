@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from .algtst_export import BOOKS, DayPicks, recorded_picks
+from .entries import read as read_entries
 from .lists import MIN_WIDE_N, N_CORE
 from .variants import is_buy, is_dir, is_wide, parts, underlying_of
 
@@ -197,7 +198,6 @@ def morning_list(day: date, book: str, evening: DayPicks, root: Path | None = No
     """The day's list for `book`: the owner's rule over the recorded 09:16 entry, or the evening's
     list unchanged when the ranking cannot be rebuilt to it."""
     from ..fyers.daily import data_dir
-    from . import journal, store
     from .algtst_export import LIST_KEY
 
     root = root or data_dir()
@@ -206,7 +206,7 @@ def morning_list(day: date, book: str, evening: DayPicks, root: Path | None = No
         raise LookupError(f"no recorded {book} entry for {day}")
     if {*recorded.core, *recorded.buy} == {*evening.core, *evening.buy}:
         return Morning(picks=recorded, evening=evening)
-    entries = journal.read(store.journal_path(root, BOOKS[book][0]))
+    entries = read_entries(root, BOOKS[book][0])
     entry = next(e for e in entries if e.get("day") == day.isoformat())
     try:
         names, comp = _ranking(day, book, entry, root)

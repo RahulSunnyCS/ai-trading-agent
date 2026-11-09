@@ -72,9 +72,7 @@ def test_sums_net_across_multiple_sessions_in_the_same_regime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(regime_mod, "regime_data_available", lambda: True)
-    monkeypatch.setattr(
-        regime_mod, "fetch_regimes", lambda *a, **k: {date(2026, 8, 17): "RANGING"}
-    )
+    monkeypatch.setattr(regime_mod, "fetch_regimes", lambda *a, **k: {date(2026, 8, 17): "RANGING"})
     sessions = [
         _session(date(2026, 8, 18), 100.0),
         _session(date(2026, 8, 19), -30.0),

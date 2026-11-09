@@ -1,6 +1,7 @@
-"""The "tomorrow" part of the evening message: the strategies the 09:16 job would pick for the
-next session if tonight's conditions stand, listed in full (`NextPicks`, `next_session_picks`).
-Read-only.
+"""The "tomorrow" part of the evening message: the next session's strategies, listed in full
+(`NextPicks`, `next_session_picks`). Read-only. Since 2026-11-09 (owner) this list is the source of
+truth: the next morning's journal entry records it (`pick.record` ranks with the same VIX stand-in,
+`pick.evening_vix`, and keeps the saved list when the two differ); there is no 09:16 re-pick.
 
 `expected_picks` re-runs the 09:16 ranking on the stored results with the market's last close
 standing in for the opening VIX, under the expiring-index rule (BL-122) for that session, for the
@@ -233,21 +234,18 @@ def vix_transitions(root: Path, last_day: date | None = None) -> dict[str, dict[
 def expected_picks(
     day: date, root: Path, dte_n: str, dte_s: str, last_day: date, track: str | None = None
 ) -> Expected | None:
-    """Re-run the 09:16 ranking for `day` from the stored results: with the market's last close
+    """Run the pick's ranking for `day` from the stored results: with the market's last close
     standing in for tomorrow's opening conditions, and for each band the open could land in.
     `track` ranks over Core-298 plus that parallel track's variants, as `pick --track` does."""
-    from . import attrs as attrs_mod
-    from . import expiry, pick, score, store
+    from . import expiry, pick, score
     from .variants import track_names, variant_names
 
     dte = {"dte_n": dte_n, "dte_s": dte_s}
-    # the rule the 09:16 job will apply to that session (BL-122), so every figure below is for
-    # the picks it would actually record
+    # the rule that session's entry applies (BL-122), so every figure below is for the picks it
+    # records
     rule = expiry.rule_index(day, dte)
-    vix = attrs_mod.vix_close_from_lake(root, last_day)
-    if vix is None:  # no close in the lake: the last stored open is the next best
-        vix = (store.read_days(root).get(last_day) or {}).get("vix_open")
-        vix = float(vix) if vix not in (None, "") else None
+    # the same stand-in the next morning's entry records with (`pick.evening_vix`)
+    vix, _ = pick.evening_vix(root, last_day)
     if vix is None:
         return None
     names = variant_names() + (track_names(track) if track else [])

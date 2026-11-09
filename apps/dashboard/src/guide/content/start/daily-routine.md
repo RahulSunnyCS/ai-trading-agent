@@ -9,7 +9,7 @@ says what runs when, and when it is worth looking.
 | 08:00 | The broker accounts are logged into [AlgoTest](glossary:algotest) automatically. | [Jobs](app:/jobs) |
 | 08:05 | Nothing runs for Fyers: log in from [Broker logins](app:/brokerLogins) when you want Fyers data. Without a login, the evening run collects from Angel One. | [Broker logins](app:/brokerLogins) |
 | 09:00 | One Telegram message: did the logins work, is the data current. | Telegram |
-| 09:16 | The rotation picks are recorded, then one Telegram message: Adaptive's three strategies (with their settings), then the T1 track as "Tuned Adaptive (In Testing phase)". The friends' group gets the same message. | [Today](app:/optionslab/rotation) |
+| 08:45 | The day's rotation entry is recorded from last evening's list (the 16:00 message's next-session strategies), Adaptive and then the T1 track. No message is sent; you get an alert only if it fails. There is no 09:16 pick any more. | [Today](app:/optionslab/rotation) |
 | 15:40 | The live results are read off AlgoTest and Quantiply: every strategy that ran today, the tool's and your own. Read-only. | [Jobs](app:/jobs) |
 | 15:45 | The [evening run](glossary:evening-run): today's 1-minute option data is collected and every saved options strategy is run over it, and the rotation and T1 results are stored. A summary goes to Telegram. | [Today](app:/optionslab/rotation) |
 | 16:00 | One short Telegram message: the day's result for Adaptive and T1, then (your copy only) live against paper per platform and list with the [slippage](glossary:slippage), and your [discretionary](glossary:discretionary-trade) trades on their own line, tomorrow's strategies in full and (your copy only) whether tomorrow's lots fit each account's margin. | Telegram |

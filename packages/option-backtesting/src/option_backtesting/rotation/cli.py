@@ -125,22 +125,20 @@ def update(
 def pick(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
     vix_open: float = typer.Option(
-        None, "--vix-open", help="Override the live 09:15 VIX open (testing)."
+        None, "--vix-open", help="Rank with this VIX instead of the evening's (testing)."
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Score and print; write nothing."),
-    telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
-    track: str = typer.Option(
-        None, "--track", help="A parallel track (t1): its own journal, private Telegram only."
+    telegram: bool = typer.Option(
+        True, "--telegram/--no-telegram", help="Alert the owner if it fails (nothing else is sent)."
     ),
+    track: str = typer.Option(None, "--track", help="A parallel track (t1): its own journal."),
     with_t1: bool = typer.Option(
-        False,
-        "--with-t1",
-        help="Also record the T1 track and send ONE message with both (the 09:16 job). "
-        "Adaptive is never held back by T1.",
+        False, "--with-t1", help="Also record the T1 track (the morning job)."
     ),
 ) -> None:
-    """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
-    from .deliver import pick_and_send
+    """Record today's entry for every list (before 09:17), hash-chained, from last evening's list:
+    the evening is the source of truth (owner, 2026-11-09). Sends no message."""
+    from .deliver import record_day
     from .variants import TRACK_DIRS
 
     if track and track not in TRACK_DIRS:
@@ -149,7 +147,7 @@ def pick(
     if track and with_t1:
         typer.echo("--with-t1 and --track are different modes: use one", err=True)
         raise typer.Exit(2)
-    code = pick_and_send(
+    code = record_day(
         _day(day),
         vix_open=vix_open,
         dry_run=dry_run,
@@ -181,12 +179,14 @@ def standing_cmd(
     """T1's drawdown now against the last two years, as the 16:00 message says it, and its daily
     series (net, running total and high, drawdown, picks) written to rotation/track_t1/standing.csv
     (owner, 2026-11-04). Paper, one lot per strategy, the message's slippage."""
-    from . import journal, messages, standing, store
+    from . import messages, standing
 
     if day:
         d = _day(day)
     else:
-        entries = journal.read(store.journal_path(None, standing.TRACK))
+        from .entries import read as read_entries
+
+        entries = read_entries(None, standing.TRACK)
         if not entries:
             typer.echo("no T1 journal entry yet")
             raise typer.Exit(2)
@@ -1004,11 +1004,12 @@ def verify(
 @rotation_app.command()
 def show(last: int = typer.Option(5, "--last", help="How many recent entries.")) -> None:
     """Print the recent entries and each list's P&L where the day is scored."""
-    from . import journal, store
+    from . import store
+    from .entries import read as read_entries
     from .lists import LOTS_PER
     from .variants import variant_names
 
-    entries = journal.read(store.journal_path())[-last:]
+    entries = read_entries()[-last:]
     m = store.load_matrix(variant_names()) if entries else None
     for e in entries:
         typer.echo(

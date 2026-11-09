@@ -136,7 +136,7 @@ function fyersReminder(
     id,
     description:
       when === 'morning'
-        ? 'Fyers: remind to log in (link to the hosted Broker logins page) before the 09:16 pick'
+        ? 'Fyers: remind to log in (link to the hosted Broker logins page) for the day'
         : 'Fyers: remind again before the evening collection if still not logged in',
     schedule: { at, on: tradingDays, label: `trading days ${at}` },
     steps: [['uv', 'run', 'mbt', 'token-remind', '--send', '--when', when]],
@@ -491,8 +491,8 @@ const BASE_JOBS: Job[] = [
     // step is a no-op once everything has been sent. Steps: first `result --soft-fail` sends
     // anything still owed (a T1 problem must never cost the day's Adaptive result, and it never
     // fails the job), then the update is strict, so a T1 failure fails the job and its 22:00 /
-    // 23:00 retries try again, and the last `result` sends the T1 part once it is in. The 09:16
-    // job repeats the update as a catch-up before the track pick.
+    // 23:00 retries try again, and the last `result` sends the T1 part once it is in. The 08:45
+    // entry job repeats the update as a catch-up before the track's entry.
     schedule: { at: '21:00', on: tradingDays, label: 'trading days 21:00' },
     steps: [
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result', '--soft-fail'],
@@ -511,30 +511,31 @@ const BASE_JOBS: Job[] = [
   {
     id: 'options-rotation-pick',
     description:
-      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 (BL-058) and the T1 parallel track's Adaptive pick in its own journal, and Telegram ONE message, to the owner and the friends' group alike: Adaptive, then T1 as Tuned Adaptive (In Testing phase) (BL-125). Adaptive waits for T1 until 09:16:50 at most (20 s after its entry on a later run)",
-    // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the evening
-    // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
-    // and a missed slot is not caught up: it would not be forward.
-    schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
-    // One step: the live pick first, then the track in the same process, so one message can carry
-    // both. A failed track step still alerts and fails the run (exit 2), and the retry finds the
-    // live entry already recorded and only completes the track (its own message). The command
-    // stores any missing T1 results itself when that is why the track cannot be ranked.
+      "Record the day's rotation entry (lists A, B, C, REF) and the T1 parallel track's Adaptive entry from last evening's list, before 09:17 (BL-058). The evening list is the source of truth (owner, 2026-11-09): no 09:16 re-pick and no morning Telegram message; only a failure alerts the owner, privately",
+    // Was the 09:16 pick on the 09:15 VIX open until 2026-11-09. It now ranks with the evening's
+    // VIX (the previous close) and records last evening's saved list when the two differ, so it no
+    // longer waits for the open. 08:45: after the 08:11 activation, before the 09:04 monitor and
+    // the 09:18 live board, both of which read the entry. Caught up until 09:15, so a missed run
+    // still records before the first entry minute.
+    schedule: { at: '08:45', on: tradingDays, label: 'trading days 08:45' },
+    // One step: the live entry first, then the track's (it stores any missing T1 results itself
+    // when that is why the track cannot be ranked). A retry finds the live entry recorded and only
+    // completes the track.
     steps: [['uv', 'run', 'obt', 'rotation', 'pick', '--with-t1']],
     cwd: OPTIONS,
-    timeoutMinutes: 5,
+    timeoutMinutes: 10,
     retries: 2,
-    retryDelayMinutes: 1,
-    catchUpHours: 0,
+    retryDelayMinutes: 5,
+    catchUpHours: 0.5,
     alertsItself: true,
     fixHint:
-      'cd packages/option-backtesting && uv run obt rotation pick --with-t1  (a late entry is flagged, not forward)',
+      "cd packages/option-backtesting && uv run obt rotation pick --with-t1  (records last evening's list; a run after 09:17 is flagged late)",
   },
   {
     id: 'rotation-live-board',
     description:
       "The Rotation page's Live board (BL-203): today's Adaptive picks, Classic and Tuned, run through the backtest engine on Angel One's 1-minute bars so far, every 5 minutes until 15:31 and whenever the card's Refresh button asks (`obt rotation live-board run`). One Angel One login for the day; nothing written to the lake, nothing sent, nothing traded",
-    // After the 09:16 pick (the board reads its journal entries). One process all session, so the
+    // After the 08:45 entry (the board reads last evening's list, else the entry). One process all session, so the
     // day takes one Angel One login: the session stays in memory and the login guard's lock is held
     // only while a refresh reads (angelone/check.py `held`), so the 15:45 collection, a connection
     // test or `obt angel funds` are never refused for long. A refresh Angel One throttles keeps the
@@ -743,9 +744,9 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-topup',
     description:
-      "After the 09:16 pick, create on each Quantiply account any pick of its list (dashboard settings, BL-140) that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172: the evening's 09:17 strategy stays, a new 09:17 pick is not made, the rest is chosen again by the 09:16 score); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
-    // 09:19, not 09:18: a minute clear of the pick's own Angel One work, so two logins never type
-    // codes from one TOTP window. A changed 09:17 pick is too late either way. Not caught up.
+      "Create on each Quantiply account any pick of today's entry that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172); deletes nothing and names the algos that are not today's. Since 2026-11-09 the entry is last evening's list, so this normally finds nothing to add. Does nothing until QUANTIPLY_UPLOAD=on",
+    // 09:19: was a minute after the 09:16 pick (retired 2026-11-09; the entry is now recorded at
+    // 08:45 from the evening's list). A changed 09:17 pick is too late either way. Not caught up.
     schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
     steps: [
       [
@@ -803,7 +804,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-deploy-topup',
     description:
-      "After the 09:19 top-up, enable on each Quantiply account today's recorded picks that are not enabled yet (a pick 09:16 changed) and switch off an enabled algo 09:16 dropped, if it has not started (BL-139 Phase 4). Never an algo within 90 s of its start (TOO LATE, reported). Same gates as quantiply-deploy",
+      "After the 09:19 top-up, enable on each Quantiply account today's recorded picks that are not enabled yet (the 08:10 switch-on's net) and switch off an enabled algo the day's entry does not have, if it has not started (BL-139 Phase 4). Never an algo within 90 s of its start (TOO LATE, reported). Same gates as quantiply-deploy",
     // 09:21: after quantiply-topup (same group). A 09:17 pick that changed is too late either way.
     // Caught up for 3 hours: later picks (12:02, 13:17) still have time; the 90 s rule protects
     // each one.
