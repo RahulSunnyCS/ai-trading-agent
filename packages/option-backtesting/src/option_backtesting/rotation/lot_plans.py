@@ -446,6 +446,13 @@ def day_row(
     malformed = len(core) != 3 or top is None
     if malformed:
         notes.append("the entry does not hold three core picks with a Widesl")
+    # the evening's list laid over an entry (`entries.effective`) has no composite for a pick the
+    # entry's ranking did not make: W1 cannot be chosen from it, so Duo is not guessed
+    unscored = [n for n in core if is_wide(n) and n not in composite]
+    if not malformed and unscored:
+        notes.append(
+            "no recorded composite for " + ", ".join(unscored) + ", so Duo's W1 cannot be chosen"
+        )
     need = needs_runner_up(core, expiry)
     if not malformed and any(need.values()):
         runner = rederive_runner_up(entry, root, names, book, sources, stamp)
@@ -461,7 +468,7 @@ def day_row(
     for plan in PLANS:
         lots = (
             None
-            if malformed
+            if malformed or (plan == "duo" and unscored)
             else plan_lots(plan, core, composite, expiry, (runner or {}).get("dir"))
         )
         if lots is None:

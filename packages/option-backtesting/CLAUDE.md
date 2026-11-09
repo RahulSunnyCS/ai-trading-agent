@@ -145,7 +145,10 @@ Otherwise:
   board reads the evening list directly (it also works before the day's entry exists). `result.save_tentative` never
   rewrites a list whose session already has an entry, and the evening exports (`algtst_export.preview_picks`, both
   platforms) read the saved list, re-ranking only when there is none (or one saved without its DTE). A `replaced`
-  entry's re-score (daylog `_rescore`) is checked against its `rescored` block. A re-derivation of today's
+  entry's re-score (daylog `_rescore`) is checked against its `rescored` block. Lot plans mark a day unverified when a core
+  Widesl has no recorded composite (Duo's W1 is never chosen from incomplete scores), and the regime card reads an
+  entry ranked on the evening's VIX (`vix_source` `close <day>` / `open <day>`) at the collected day's opening VIX,
+  unknown until collected. A re-derivation of today's
   ranking (Why this pick?, lot plans' Dir Boost check) says the picks differ, never guesses.
 - `rotation/base.py`, `rotation/readout.py` — the owner's fixed base reference (BL-058 amendment 2026-10-10: 2 x
   Widesl OTM1 09:17 = the variant `N_wide_0917`, plus 1 x Dir ATM 09:24 from `strategies/rotation_base/`, outside

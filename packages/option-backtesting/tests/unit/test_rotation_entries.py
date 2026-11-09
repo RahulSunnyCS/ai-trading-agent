@@ -208,3 +208,51 @@ def test_without_a_saved_list_with_its_dte_the_exports_rank_again(tmp_path, monk
     _evening(tmp_path, DAY, EVENING)  # an old-format list: no dte
     assert algtst_export.preview_picks(DAY, "t1", tmp_path) is None
     assert asked == ["t1"]
+
+
+# --- Codex review of PR #443 --------------------------------------------------------------------
+
+
+def test_lot_plans_never_choose_duos_w1_without_a_recorded_composite(tmp_path):
+    from option_backtesting.rotation import lot_plans
+
+    entry = {
+        "day": DAY.isoformat(),
+        "weekday": "Mon",
+        "before_first_entry": True,
+        "dte": {"NIFTY": "2", "SENSEX": "3"},
+        "lists": {
+            "C": {
+                "core": ["N_wide_0917", "N_wide_1017", "N_dir_0947"],
+                "buy": [],
+                # the evening's N_wide_1017 was never scored by this entry's ranking
+                "composite": {"N_wide_0917": 0.4, "N_dir_0947": 0.6},
+            }
+        },
+    }
+    results = {n: {} for n in ("N_wide_0917", "N_wide_1017", "N_dir_0947")}
+    row = lot_plans.day_row(entry, "core", tmp_path, [], results)
+    assert row["status"] == "unverified"
+    assert row["plans"]["duo"]["status"] == "unverified"
+    assert "N_wide_1017" in row["note"]
+
+
+def test_the_regime_card_reads_an_evening_entrys_open_from_the_collected_day():
+    from option_backtesting.rotation import regime
+
+    entries_ = [
+        # recorded with the previous evening's close: its own vix fields are not the open
+        {"day": "2026-11-10", "before_first_entry": True, "vix_source": "close 2026-11-09",
+         "vix_open": 18.4, "vix_band": "18+", "dte": {"NIFTY": "1", "SENSEX": "3"}},
+        {"day": "2026-11-11", "before_first_entry": True, "vix_source": "open 2026-11-10",
+         "vix_open": 18.4, "vix_band": "18+", "dte": {"NIFTY": "0", "SENSEX": "2"}},
+        # recorded at 09:16 on the observed open: read as before
+        {"day": "2026-11-06", "before_first_entry": True, "vix_source": "fyers",
+         "vix_open": 12.1, "vix_band": "11.5-13", "dte": {"NIFTY": "2", "SENSEX": "0"}},
+    ]  # fmt: skip
+    attrs = {date(2026, 11, 10): {"vix_open": 14.2, "vix_band": "13-15"}}
+    rows = regime._forward_rows(entries_, attrs)
+    assert rows[date(2026, 11, 10)]["vix_open"] == 14.2
+    assert rows[date(2026, 11, 10)]["vix_band"] == "13-15"
+    assert rows[date(2026, 11, 11)]["vix_open"] is None  # not collected yet: unknown
+    assert rows[date(2026, 11, 6)]["vix_band"] == "11.5-13"
