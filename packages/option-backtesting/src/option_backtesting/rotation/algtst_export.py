@@ -28,7 +28,8 @@ from pathlib import Path
 
 from ..legwise.algtst import Export, to_algtst
 from ..legwise.schema import load_legwise
-from . import journal, live_lots, store
+from . import live_lots
+from .entries import read as read_entries
 from .live_lots import manifest_block, manifest_field
 from .variants import strategy_path
 
@@ -111,7 +112,7 @@ def _previous_session(day: date) -> date:
 
 def recorded_picks(day: date, book: str, root: Path | None = None) -> DayPicks | None:
     track = BOOKS[book][0]
-    entries = journal.read(store.journal_path(root, track))
+    entries = read_entries(root, track)
     entry = next((e for e in entries if e.get("day") == day.isoformat()), None)
     if entry is None:
         return None

@@ -24,7 +24,8 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from ..fyers.daily import data_dir
-from . import journal, result, slippage, store
+from . import result, slippage, store
+from .entries import read as read_entries
 
 #: how far back the comparison reaches (owner: "in the last 2 years")
 WINDOW_DAYS = 730
@@ -187,7 +188,7 @@ def t1(
     start = day - timedelta(days=WINDOW_DAYS)
     entries = {
         date.fromisoformat(e["day"]): e
-        for e in journal.read(store.journal_path(root, TRACK))
+        for e in read_entries(root, TRACK)
         if start.isoformat() <= str(e.get("day", "")) <= day.isoformat()
     }
     recorded_from = min(entries) if entries else None

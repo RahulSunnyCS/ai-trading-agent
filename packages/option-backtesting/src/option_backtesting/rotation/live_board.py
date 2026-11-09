@@ -61,6 +61,7 @@ from ..legwise.market import (
 from ..legwise.schema import LegwiseStrategy, load_legwise
 from . import journal, labels, live_lots, slip_store, store
 from .automation_settings import BROKERS, PLATFORMS, paused_for, read_for_session
+from .entries import evening_list
 from .lists import SIZING_DATE
 from .variants import strategy_path, underlying_of
 
@@ -152,21 +153,6 @@ class BookPicks:
     source: str = "journal"
 
 
-#: book -> the key of its list in the evening's saved lists (`result.save_tentative`)
-EVENING_KEYS = {"core": "adaptive", "t1": "t1"}
-
-
-def _evening(day: date, root: Path | None, book: str) -> dict | None:
-    from . import result
-
-    doc = result.read_tentative(day, root).get(EVENING_KEYS[book])
-    if not isinstance(doc, dict) or doc.get("day") != day.isoformat():
-        return None
-    if not isinstance(doc.get("core"), list) or not doc["core"]:
-        return None
-    return doc
-
-
 def todays_picks(day: date, root: Path | None = None) -> list[BookPicks]:
     """Each book's picks for `day` (Classic, Tuned): last evening's list for it, else the day's
     journal entry (Classic's live journal, Tuned's T1 track); a book with neither is left out. The
@@ -179,7 +165,7 @@ def todays_picks(day: date, root: Path | None = None) -> list[BookPicks]:
         except OSError:
             entries = []
         entry = next((e for e in entries if e.get("day") == day.isoformat()), None) or {}
-        evening = _evening(day, root, book)
+        evening = evening_list(day, root, track)
         if evening is not None:
             out.append(
                 BookPicks(

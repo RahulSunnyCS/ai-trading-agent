@@ -193,21 +193,14 @@ def list_composites(
     return {}
 
 
-#: the list the evening message saves per journal (`result.save_tentative`'s keys)
-EVENING_KEY = {None: "adaptive", "t1": "t1"}
 #: the list in an entry the evening's saved list stands for (Adaptive)
 EVENING_LIST = "C"
 
 
 def _evening_list(day: date, root: Path, track: str | None) -> dict | None:
-    from . import result
+    from .entries import evening_list
 
-    doc = result.read_tentative(day, root).get(EVENING_KEY.get(track, track or "adaptive"))
-    if not isinstance(doc, dict) or doc.get("day") != day.isoformat():
-        return None
-    if not isinstance(doc.get("core"), list) or not isinstance(doc.get("buy"), list):
-        return None
-    return doc
+    return evening_list(day, root, track)
 
 
 def _check_expiry_only(expiry_only: str | None) -> None:

@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from . import journal, store, triggers
+from .entries import read as read_entries
 from .lists import LISTS, LOTS_PER, MIN_WIDE_N
 from .variants import is_wide, parts
 
@@ -501,7 +502,7 @@ def _journal(root: Path) -> tuple[list[dict], dict]:
         "chain_intact": None, "error": None,
     }  # fmt: skip
     try:
-        entries = journal.read(path)
+        entries = read_entries(root, None, path)
     except journal.JournalCorrupt as error:
         info["error"] = str(error)
         return [], info

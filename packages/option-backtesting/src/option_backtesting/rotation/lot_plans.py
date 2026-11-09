@@ -41,6 +41,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import journal, pick, store
 from .dte import entry_basis, entry_labels, recorded_labels
+from .entries import read as read_entries
 from .lists import WARMUP
 from .live_lots import dir_pick, is_expiry
 from .readout import block_bootstrap_mean, max_drawdown
@@ -351,7 +352,17 @@ def rederive_runner_up(
     labels and rule. Verified only when the inputs digest, the universe, the picks, list C's
     recorded composites and the VIX band all equal the entry's."""
     stamp = stamp if stamp is not None else _stamp(root, names)
-    key = (str(root), book, entry.get("day"), entry.get("hash"), stamp)
+    # the evening's list laid over an entry (`entries.effective`) keeps its hash: key the picks
+    picks = (entry.get("lists") or {}).get(LIST_KEY) or {}
+    key = (
+        str(root),
+        book,
+        entry.get("day"),
+        entry.get("hash"),
+        tuple(picks.get("core") or ()),
+        tuple(picks.get("buy") or ()),
+        stamp,
+    )
     with _rederive_lock:
         hit = _rederive_cache.get(key)
     if hit is not None:
@@ -643,7 +654,7 @@ def build(
     path = store.journal_path(root, track)
     entries = [
         e
-        for e in journal.read(path)
+        for e in read_entries(root, track, path)
         if date.fromisoformat(str(e.get("day"))) >= FORWARD_FROM
         and LIST_KEY in (e.get("lists") or {})
     ]

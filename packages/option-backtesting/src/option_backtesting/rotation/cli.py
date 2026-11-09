@@ -179,12 +179,14 @@ def standing_cmd(
     """T1's drawdown now against the last two years, as the 16:00 message says it, and its daily
     series (net, running total and high, drawdown, picks) written to rotation/track_t1/standing.csv
     (owner, 2026-11-04). Paper, one lot per strategy, the message's slippage."""
-    from . import journal, messages, standing, store
+    from . import messages, standing
 
     if day:
         d = _day(day)
     else:
-        entries = journal.read(store.journal_path(None, standing.TRACK))
+        from .entries import read as read_entries
+
+        entries = read_entries(None, standing.TRACK)
         if not entries:
             typer.echo("no T1 journal entry yet")
             raise typer.Exit(2)
@@ -1002,11 +1004,12 @@ def verify(
 @rotation_app.command()
 def show(last: int = typer.Option(5, "--last", help="How many recent entries.")) -> None:
     """Print the recent entries and each list's P&L where the day is scored."""
-    from . import journal, store
+    from . import store
+    from .entries import read as read_entries
     from .lists import LOTS_PER
     from .variants import variant_names
 
-    entries = journal.read(store.journal_path())[-last:]
+    entries = read_entries()[-last:]
     m = store.load_matrix(variant_names()) if entries else None
     for e in entries:
         typer.echo(

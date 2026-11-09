@@ -11,7 +11,8 @@ from datetime import date
 from pathlib import Path
 
 from ..fyers.daily import data_dir
-from . import journal, messages, store
+from . import messages, store
+from .entries import read as read_entries
 from .lists import DISPLAY_NAMES, PUBLIC_KEYS
 
 RESULT_KEYS = PUBLIC_KEYS
@@ -49,8 +50,7 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
     parallel track's journal (its variants' results live in its own folder, `store.result_path`)."""
     root = root or data_dir()
     where = f"{track.upper()} track " if track else ""
-    path = store.journal_path(root, track)
-    entries = [e for e in journal.read(path) if e.get("day") == day.isoformat()]
+    entries = [e for e in read_entries(root, track) if e.get("day") == day.isoformat()]
     if not entries:
         raise NoEntry(f"no {where}rotation picks were recorded for {day}")
     entry = entries[0]

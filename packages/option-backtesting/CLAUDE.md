@@ -131,6 +131,18 @@ Otherwise:
   failure never fails it, and `obt rotation triggers|triggers-show`;
   `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as
   in the research (the Budget Sunday once shifted every later pick).
+- `rotation/entries.py` — the journal as its readers see it (owner, 2026-11-09: the evening's list is the
+  source of truth, and whoever reads a day's picks reads the evening's). `entries.read(root, track)` returns each entry
+  with, from `EVENING_FROM` (2026-11-09), the list the evening message saved for that day (`result.read_tentative`,
+  `entries.evening_list`) in list C when it differs from the recorded one, the recorded block under
+  `evening_override.recorded` and composites kept only for the names both lists share; the journal file is never
+  changed, and `entries.raw` gives the entry back exactly (daylog's chain check and re-score use it). Every reader of
+  picks goes through it (the evening result, month, standing, readout, daylog, candles, beats via candles, lot plans,
+  overview, plan, basket, shadow, explain, matrix overlay, placements, track readout, the AlgoTest export and the
+  morning rule, `obt rotation show`); a new reader of a day's picks must too. A cache over it adds
+  `entries.evening_stamp` (the beats and pulse routes do); lot plans' re-derivation cache keys the picks. The live
+  board reads the evening list directly (it also works before the day's entry exists). A re-derivation of today's
+  ranking (Why this pick?, lot plans' Dir Boost check) says the picks differ, never guesses.
 - `rotation/base.py`, `rotation/readout.py` — the owner's fixed base reference (BL-058 amendment 2026-10-10: 2 x
   Widesl OTM1 09:17 = the variant `N_wide_0917`, plus 1 x Dir ATM 09:24 from `strategies/rotation_base/`, outside
   the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,

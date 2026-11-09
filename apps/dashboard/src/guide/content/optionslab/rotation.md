@@ -16,7 +16,9 @@ on the expiring index (the expiry rule; the 16:00 message says so in one line fo
 The 16:00 Telegram message gives the day's result for Adaptive and the T1 track ("Tuned Adaptive (In Testing
 phase)") and the next session's strategies in full, with their settings. That list is what the next session
 records and trades: since 9 November 2026 there is no 09:16 re-pick and no morning message, and the list is no
-longer labelled tentative. The friends' group gets the same message. Your 16:00 copy (never the group's) also says how the real trades did against paper, per platform and list, per lot: "AlgoTest ·
+longer labelled tentative. From 9 November every card on this page reads a day's Adaptive picks as that
+evening list, including 9 November itself, which was still picked at 09:16; the journal keeps what was recorded
+beside it, and *Why this pick?* says the picks differ from the ranking rather than explain a list it did not pick. The friends' group gets the same message. Your 16:00 copy (never the group's) also says how the real trades did against paper, per platform and list, per lot: "AlgoTest ·
 Shoonya T1  +₹910 vs +₹790 · slip +₹120 (+0.6%)" means live made ₹120 a lot more than paper, 0.6% of the
 premium at entry ([slippage](glossary:slippage)). A copy deployed at another time than its entry minute is listed
 as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). A copy that did not trade, or whose legs were still open when read, is

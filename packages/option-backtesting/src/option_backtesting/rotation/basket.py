@@ -31,6 +31,7 @@ from ..analytics import correlation as corr
 from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import daylog, journal, store
+from .entries import read as read_entries
 from .lists import LISTS, LOTS_PER
 from .matrix import NAMED
 
@@ -167,7 +168,7 @@ def build(
         raise BasketError(422, f"window must be one of {', '.join(WINDOWS)}")
     root = root or data_dir()
     try:
-        entries = journal.read(store.journal_path(root))
+        entries = read_entries(root)
     except journal.JournalCorrupt as error:
         raise BasketError(500, f"the journal cannot be read: {error}") from error
     forward = _forward_days(entries)

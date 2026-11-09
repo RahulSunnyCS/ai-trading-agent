@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from ..rotation import daylog, pulse, store
+from ..rotation import daylog, entries, pulse, store
 from ..rotation import explain as ex
 from ..rotation import matrix as mx
 from ..rotation.lists import LISTS
@@ -45,7 +45,8 @@ def _journal_stat(root: Path) -> tuple[int, int] | None:
         st = store.journal_path(root).stat()
     except OSError:
         return None
-    return (st.st_mtime_ns, st.st_size)
+    # the evening's lists are what the journal is read as (`entries.read`, 2026-11-09)
+    return (st.st_mtime_ns, st.st_size, entries.evening_stamp(root))
 
 
 def _snapshot(root: Path, cube: mx.Cube) -> ex.Snapshot:
