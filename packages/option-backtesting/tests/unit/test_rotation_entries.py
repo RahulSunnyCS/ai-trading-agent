@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 from datetime import date
 
+import pytest
+
 from option_backtesting.rotation import entries, journal, result, store
 
 DAY = date(2026, 11, 9)
@@ -113,3 +115,96 @@ def test_the_stamp_follows_the_saved_lists_from_the_rule_on(tmp_path):
     _evening(tmp_path)
     first = entries.evening_stamp(tmp_path)
     assert [name for name, *_ in first] == ["2026-11-09.tentative.json"]
+
+
+# --- review of PR #443 ---------------------------------------------------------------------------
+
+
+def test_an_entry_recorded_from_the_evening_list_never_changes_with_a_later_save(tmp_path):
+    """From 2026-11-10 the entry itself is the evening's list (`picks_from: evening`): a list saved
+    afterwards (a `result --force` resend re-ranks the session) must not move it."""
+    later = date(2026, 11, 10)
+    written = journal.append(
+        store.journal_path(tmp_path),
+        {
+            "day": later.isoformat(),
+            "picks_from": "evening",
+            "lists": {"C": {"core": RECORDED, "buy": [], "overridden": False, "composite": {}}},
+        },
+    )
+    _evening(tmp_path, later, EVENING)
+    assert entries.read(tmp_path) == [written]
+
+
+def test_the_overlaid_block_keeps_the_entrys_shape_and_rule(tmp_path):
+    journal.append(
+        store.journal_path(tmp_path),
+        {
+            "day": DAY.isoformat(),
+            "expiry_only": "NIFTY",
+            "lists": {
+                "C": {
+                    "core": RECORDED,
+                    "buy": [],
+                    "overridden": True,
+                    "composite": {},
+                    "expiry_only": "NIFTY",
+                    "unfiltered": {"core": ["S_wide_0917"], "buy": []},
+                }
+            },
+        },
+    )
+    _evening(tmp_path)
+    (e,) = entries.read(tmp_path)
+    block = e["lists"]["C"]
+    assert block["overridden"] is False and block["expiry_only"] == "NIFTY"
+    assert "unfiltered" not in block  # it described the recorded ranking, kept under the override
+    assert e[entries.OVERRIDE]["recorded"]["unfiltered"]["core"] == ["S_wide_0917"]
+
+
+def test_a_resend_never_rewrites_the_list_of_a_session_already_recorded(tmp_path):
+    from option_backtesting.rotation import tomorrow
+
+    def picks(core):
+        return tomorrow.NextPicks(DAY, "Mon", core, [], None, None, {"NIFTY": "1", "SENSEX": "3"})
+
+    result.save_tentative(date(2026, 11, 6), picks(EVENING), None, tmp_path)
+    _record(tmp_path)  # the session's entry is written
+    result.save_tentative(date(2026, 11, 8), picks(RECORDED), picks(["N_wide-t1s4_0917"]), tmp_path)
+    doc = result.read_tentative(DAY, tmp_path)
+    assert doc["adaptive"]["core"] == EVENING and doc["adaptive"]["sent_on"] == "2026-11-06"
+    # T1 had no saved list and no entry: it is saved as before
+    assert doc["t1"]["core"] == ["N_wide-t1s4_0917"]
+    assert doc["adaptive"]["dte"] == {"NIFTY": "1", "SENSEX": "3"}
+
+
+def test_the_evening_exports_read_the_list_the_message_saved(tmp_path, monkeypatch):
+    from option_backtesting.rotation import algtst_export, tomorrow
+
+    monkeypatch.setattr(
+        tomorrow, "next_session_picks", lambda *a, **k: pytest.fail("must not re-rank")
+    )
+    _evening(tmp_path, DAY, EVENING, buy=["N_buy_0917"])
+    path = result.tentative_path(DAY, tmp_path)
+    doc = json.loads(path.read_text())
+    doc["adaptive"]["dte"] = {"NIFTY": "1", "SENSEX": "3"}
+    path.write_text(json.dumps(doc))
+    p = algtst_export.preview_picks(DAY, "core", tmp_path)
+    assert (p.source, p.core, p.buy, p.dte) == (
+        "preview",
+        EVENING,
+        ["N_buy_0917"],
+        {"NIFTY": "1", "SENSEX": "3"},
+    )
+
+
+def test_without_a_saved_list_with_its_dte_the_exports_rank_again(tmp_path, monkeypatch):
+    from option_backtesting.rotation import algtst_export, tomorrow
+
+    asked = []
+    monkeypatch.setattr(
+        tomorrow, "next_session_picks", lambda *a, **k: asked.append(k.get("track")) or None
+    )
+    _evening(tmp_path, DAY, EVENING)  # an old-format list: no dte
+    assert algtst_export.preview_picks(DAY, "t1", tmp_path) is None
+    assert asked == ["t1"]

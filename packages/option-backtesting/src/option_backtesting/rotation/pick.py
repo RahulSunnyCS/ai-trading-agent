@@ -365,9 +365,15 @@ def record(
         lists[EVENING_LIST] = {
             "core": list(evening["core"]),
             "buy": list(evening["buy"]),
-            "overridden": [],
+            "overridden": False,  # unknown for the evening's list: `score.select`'s flag is a bool
             "composite": list_composites(hist, day, vix_open, dte, EVENING_LIST, picked),
-            "rescored": {"core": block["core"], "buy": block["buy"]},
+            # the rule tag stays (the evening ranked that session under the same rule)
+            **({"expiry_only": block["expiry_only"]} if "expiry_only" in block else {}),
+            "rescored": {
+                "core": block["core"],
+                "buy": block["buy"],
+                "overridden": block["overridden"],
+            },
         }
     else:
         evening_status = "not saved"

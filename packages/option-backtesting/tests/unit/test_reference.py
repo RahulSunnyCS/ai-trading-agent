@@ -93,9 +93,7 @@ class TestMargin:
     def test_nifty_short_straddle_current_month(self, rd: ReferenceData) -> None:
         assert rd.margin_per_lot("NIFTY", "short-straddle", date(2026, 9, 1)) == 140000
 
-    def test_effective_dating_uses_most_recent_month_on_or_before(
-        self, rd: ReferenceData
-    ) -> None:
+    def test_effective_dating_uses_most_recent_month_on_or_before(self, rd: ReferenceData) -> None:
         # A date within the same effective month still resolves.
         assert rd.margin_per_lot("NIFTY", "short-straddle", date(2026, 8, 17)) == 140000
 
@@ -119,9 +117,7 @@ class TestHolidays:
     def test_ordinary_trading_day(self, rd: ReferenceData) -> None:
         assert not rd.is_holiday(date(2026, 9, 1))
 
-    def test_weekend_is_not_a_trading_day_even_without_holiday_row(
-        self, rd: ReferenceData
-    ) -> None:
+    def test_weekend_is_not_a_trading_day_even_without_holiday_row(self, rd: ReferenceData) -> None:
         # 2026-09-06 is a Sunday and is not in holidays.csv — is_trading_day
         # must still be False.
         assert not rd.is_trading_day(date(2026, 9, 6))
@@ -170,9 +166,7 @@ class TestCurrentExpiry:
         # September 2026's last Tuesday is the 29th.
         assert rd.current_expiry("BANKNIFTY", date(2026, 9, 1)) == date(2026, 9, 29)
 
-    def test_banknifty_rolls_to_next_month_after_last_tuesday(
-        self, rd: ReferenceData
-    ) -> None:
+    def test_banknifty_rolls_to_next_month_after_last_tuesday(self, rd: ReferenceData) -> None:
         assert rd.current_expiry("BANKNIFTY", date(2026, 9, 30)) == date(2026, 10, 27)
 
 
@@ -225,7 +219,9 @@ class TestRiskFreeRate:
         assert rd.risk_free_rate(date(2013, 5, 3)) == pytest.approx(0.0725)
         assert rd.risk_free_rate(date(2016, 4, 5)) == pytest.approx(0.065)
         assert rd.risk_free_rate(date(2020, 1, 1)) == pytest.approx(0.0515)
-        assert rd.risk_free_rate(date(2021, 6, 1)) == pytest.approx(0.04)  # unchanged 2020-05 .. 2022-05
+        assert rd.risk_free_rate(date(2021, 6, 1)) == pytest.approx(
+            0.04
+        )  # unchanged 2020-05 .. 2022-05
         assert rd.risk_free_rate(date(2022, 12, 7)) == pytest.approx(0.0625)
 
     def test_before_the_table_raises(self, rd: ReferenceData) -> None:

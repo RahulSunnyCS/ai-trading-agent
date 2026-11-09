@@ -130,8 +130,23 @@ def recorded_picks(day: date, book: str, root: Path | None = None) -> DayPicks |
 
 
 def preview_picks(day: date, book: str, root: Path | None = None) -> DayPicks | None:
+    """The evening's picks for session `day`: the list the 16:00 message saved for it, which is
+    what that session records and trades (owner, 2026-11-09), else the same ranking run again
+    (`tomorrow.next_session_picks`) when the message has not saved one (or saved it without its
+    days to expiry, before 2026-11-09)."""
+    from .entries import evening_list
     from .tomorrow import next_session_picks
 
+    saved = evening_list(day, root, BOOKS[book][0])
+    if saved is not None and isinstance(saved.get("dte"), dict):
+        return DayPicks(
+            day,
+            book,
+            "preview",
+            [str(n) for n in saved["core"]],
+            [str(n) for n in saved.get("buy") or []],
+            dte=dict(saved["dte"]),
+        )
     picks = next_session_picks(_previous_session(day), root, track=BOOKS[book][0])
     if picks is None or picks.day != day:
         return None

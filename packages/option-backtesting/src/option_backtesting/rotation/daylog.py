@@ -752,12 +752,14 @@ def _rescore(entry: dict, root: Path, names: list[str] | None) -> dict:
         # the expiring-index rule as the entry recorded it (BL-122), so a rule day is no mismatch
         expiry_only=entry.get("expiry_only"),
     )
+    # a list the evening's saved list replaced (`pick.record`, 2026-11-09) keeps the ranking's own
+    # output under `rescored`: that is what a re-run must give
     differs = [
         k
         for k, p in (entry.get("lists") or {}).items()
-        if again.get(k, {}).get("core") != p.get("core")
-        or again.get(k, {}).get("buy") != p.get("buy")
-        or again.get(k, {}).get("overridden") != p.get("overridden")
+        if again.get(k, {}).get("core") != (p.get("rescored") or p).get("core")
+        or again.get(k, {}).get("buy") != (p.get("rescored") or p).get("buy")
+        or again.get(k, {}).get("overridden") != (p.get("rescored") or p).get("overridden")
     ]
     return {
         "checked": True,

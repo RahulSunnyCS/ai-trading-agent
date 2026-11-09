@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 from ..fyers.daily import data_dir
-from . import messages, store
+from . import journal, messages, store
 from .entries import read as read_entries
 from .lists import DISPLAY_NAMES, PUBLIC_KEYS
 
@@ -185,12 +185,26 @@ def save_tentative(sent_on: date, adaptive=None, t1=None, root: Path | None = No
         doc = read_tentative(first.day, root)
         for key, picks in (("adaptive", adaptive), ("t1", t1)):
             part = _picks_doc(picks, sent_on)
-            if part is not None:
-                doc[key] = part
+            if part is None:
+                continue
+            if key in doc and _recorded(first.day, root, None if key == "adaptive" else key):
+                # the session's entry was recorded from the saved list: a resend never rewrites it
+                continue
+            doc[key] = part
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(doc, indent=2) + "\n")
     except Exception:  # noqa: BLE001 - the message is already out; the morning re-ranks
         pass
+
+
+def _recorded(day: date, root: Path | None, track: str | None) -> bool:
+    """Whether `track`'s journal has an entry for `day` (an unreadable journal: not known, so
+    False, and the list is saved as before)."""
+    try:
+        path = store.journal_path(root or data_dir(), track)
+        return any(e.get("day") == day.isoformat() for e in journal.read(path))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def read_tentative(day: date | str, root: Path | None = None) -> dict:

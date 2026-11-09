@@ -134,14 +134,18 @@ Otherwise:
 - `rotation/entries.py` — the journal as its readers see it (owner, 2026-11-09: the evening's list is the
   source of truth, and whoever reads a day's picks reads the evening's). `entries.read(root, track)` returns each entry
   with, from `EVENING_FROM` (2026-11-09), the list the evening message saved for that day (`result.read_tentative`,
-  `entries.evening_list`) in list C when it differs from the recorded one, the recorded block under
+  `entries.evening_list`) in list C when it differs from the recorded one and the entry was recorded before the rule (no
+  `picks_from: evening`; in practice only 2026-11-09), the block keeping `overridden` (False) and `expiry_only`, the recorded block under
   `evening_override.recorded` and composites kept only for the names both lists share; the journal file is never
   changed, and `entries.raw` gives the entry back exactly (daylog's chain check and re-score use it). Every reader of
   picks goes through it (the evening result, month, standing, readout, daylog, candles, beats via candles, lot plans,
   overview, plan, basket, shadow, explain, matrix overlay, placements, track readout, the AlgoTest export and the
   morning rule, `obt rotation show`); a new reader of a day's picks must too. A cache over it adds
   `entries.evening_stamp` (the beats and pulse routes do); lot plans' re-derivation cache keys the picks. The live
-  board reads the evening list directly (it also works before the day's entry exists). A re-derivation of today's
+  board reads the evening list directly (it also works before the day's entry exists). `result.save_tentative` never
+  rewrites a list whose session already has an entry, and the evening exports (`algtst_export.preview_picks`, both
+  platforms) read the saved list, re-ranking only when there is none (or one saved without its DTE). A `replaced`
+  entry's re-score (daylog `_rescore`) is checked against its `rescored` block. A re-derivation of today's
   ranking (Why this pick?, lot plans' Dir Boost check) says the picks differ, never guesses.
 - `rotation/base.py`, `rotation/readout.py` — the owner's fixed base reference (BL-058 amendment 2026-10-10: 2 x
   Widesl OTM1 09:17 = the variant `N_wide_0917`, plus 1 x Dir ATM 09:24 from `strategies/rotation_base/`, outside

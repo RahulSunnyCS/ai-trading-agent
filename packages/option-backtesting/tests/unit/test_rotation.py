@@ -314,7 +314,12 @@ def test_the_evening_list_saved_for_the_day_is_what_the_entry_records(seeded):
     e = record(target, root, vix_open=14.2, now_fn=_at(target, 8, 45)).entry
     assert e["evening_list"]["status"] == "replaced"
     assert (e["lists"]["C"]["core"], e["lists"]["C"]["buy"]) == (other, [])
-    assert e["lists"]["C"]["rescored"] == {"core": c["core"], "buy": c["buy"]}
+    assert e["lists"]["C"]["rescored"] == {
+        "core": c["core"],
+        "buy": c["buy"],
+        "overridden": c["overridden"],
+    }
+    assert e["lists"]["C"]["overridden"] is False
     assert sorted(e["lists"]["C"]["composite"]) == sorted(other)
     assert {k: v for k, v in e["lists"].items() if k != "C"} == {
         k: v for k, v in ranked["lists"].items() if k != "C"

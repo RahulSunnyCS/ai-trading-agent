@@ -8,9 +8,10 @@ from the entry's list C, `read` returns the entry with that list in list C and t
 under `evening_override.recorded`; `raw` gives back the entry exactly as written, for anything that
 checks a hash. Composites are kept for the names the two lists share (the evening's other picks
 were never scored by that entry's ranking, so a reader that re-derives the ranking says the picks
-differ, never guesses). From 2026-11-09 the morning entry already records the evening's list
-(`pick.record`), so this changes only a day recorded before that rule (2026-11-09 itself, picked
-at 09:16) or one whose saved list changed after its entry.
+differ, never guesses). From 2026-11-10 the morning entry already records the evening's list
+(`pick.record`, `picks_from: evening`) and is read exactly as recorded, so in practice this changes
+only 2026-11-09, picked at 09:16 before the rule; a list saved after an entry (a resend) changes
+nothing.
 
 Days before `EVENING_FROM` read exactly as recorded: the 09:16 pick was the list of record then.
 """
@@ -60,6 +61,10 @@ def effective(entry: dict, root: Path | None, track: str | None) -> dict:
         return entry
     if day < EVENING_FROM:
         return entry
+    if entry.get("picks_from") == "evening":
+        # recorded from the evening's list at the time (`pick.record`): a list saved later (a
+        # `result --force` resend re-ranks the next session) must never change it
+        return entry
     block = (entry.get("lists") or {}).get(LIST_KEY)
     if not isinstance(block, dict):
         return entry
@@ -72,7 +77,13 @@ def effective(entry: dict, root: Path | None, track: str | None) -> dict:
     out = copy.deepcopy(entry)
     recorded = copy.deepcopy(block)
     composite = {n: v for n, v in (block.get("composite") or {}).items() if n in {*core, *buy}}
-    out["lists"][LIST_KEY] = {"core": core, "buy": buy, "overridden": [], "composite": composite}
+    out["lists"][LIST_KEY] = {
+        "core": core,
+        "buy": buy,
+        "overridden": False,  # unknown for the evening's list: `score.select`'s flag is a bool
+        "composite": composite,
+        **({"expiry_only": block["expiry_only"]} if "expiry_only" in block else {}),
+    }
     out[OVERRIDE] = {"sent_on": evening.get("sent_on"), "recorded": recorded}
     return out
 
