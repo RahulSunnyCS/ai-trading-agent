@@ -298,7 +298,8 @@ def _prefetch(
                 params,
                 body,
             )
-            retry_streak[0] = 0
+            with lock:
+                retry_streak[0] = 0
         elif state in ("rate_limited", "blocked"):
             progress.errors.append(f"{contract.symbol}: {body.get('message') or body}")
             stop.append(state)

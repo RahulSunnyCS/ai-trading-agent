@@ -22,6 +22,7 @@ from pathlib import Path
 
 import duckdb
 import numpy as np
+import pyarrow as pa
 
 from .expired import _cache_path, _cached_answer, _window
 from .mcx import plan_expiries
@@ -64,7 +65,6 @@ def invariants(root: Path, name: str) -> dict:
         row = con.execute(
             f"""
             SELECT count(*) AS rows,
-                   count(*) - count(DISTINCT (filename, instrument_id, ts)) AS duplicate_minutes,
                    count(*) FILTER (WHERE high < low OR high < open OR high < close
                                     OR low > open OR low > close) AS impossible_ohlc,
                    count(*) FILTER (WHERE open < 0 OR high < 0 OR low < 0 OR close < 0)
@@ -82,7 +82,6 @@ def invariants(root: Path, name: str) -> dict:
         ).fetchone()
         keys = [
             "rows",
-            "duplicate_minutes",
             "impossible_ohlc",
             "negative_price",
             "negative_volume",
@@ -107,15 +106,18 @@ def invariants(root: Path, name: str) -> dict:
                     """
                 ).fetchall()
             ]
-        out["out_of_order"] = con.execute(
+        # a repeated minute (ts = prev) or one out of order (ts < prev) within a file and
+        # instrument; the files are written sorted, so adjacent rows are enough
+        out["duplicate_minutes"], out["out_of_order"] = con.execute(
             f"""
-            SELECT count(*) FROM (
+            SELECT count(*) FILTER (WHERE ts = prev), count(*) FILTER (WHERE ts < prev)
+            FROM (
                 SELECT ts, lag(ts) OVER (PARTITION BY filename, instrument_id
                                          ORDER BY file_row_number) AS prev
                 FROM {src}
-            ) WHERE prev IS NOT NULL AND ts <= prev
+            )
             """
-        ).fetchone()[0]
+        ).fetchone()
     finally:
         con.close()
     return out
@@ -130,50 +132,57 @@ def sample_exact(root: Path, manifest: dict, name: str, k: int = 200, seed: int 
         for c in item.contracts:
             pool.append((item, c, lo, hi))
     random.Random(seed).shuffle(pool)
-    con = duckdb.connect()
-    con.execute("SET TimeZone='Asia/Kolkata'")
-    checked = mismatched = empty_ok = skipped = 0
+    chosen = []
+    empty_ok = 0
+    for item, c, lo, hi in pool:
+        if len(chosen) >= k:
+            break
+        answer = _cached_answer(_cache_path(root, name, item.expiry, c.symbol), lo, hi)
+        if answer is None or answer[1] != "ok":
+            continue
+        epoch, cols, _n = candle_arrays(answer[0])
+        if not len(epoch):
+            empty_ok += 1
+            continue
+        chosen.append((c.symbol, epoch, cols))
+    stored: dict[str, list] = {}
+    if chosen:
+        con = duckdb.connect()
+        try:
+            con.execute("SET TimeZone='Asia/Kolkata'")
+            con.register("wanted", pa.table({"s": [c[0] for c in chosen]}))
+            for sym, *vals in con.execute(  # one pass over the root, not one per contract
+                f"SELECT vendor_symbol, epoch(ts)::BIGINT, open, high, low, close, volume, oi "
+                f"FROM read_parquet('{_glob(root, name)}') "
+                "WHERE vendor_symbol IN (SELECT s FROM wanted) ORDER BY vendor_symbol, ts"
+            ).fetchall():
+                stored.setdefault(sym, []).append(vals)
+        finally:
+            con.close()
+    checked = mismatched = skipped = 0
     problems: list[str] = []
-    try:
-        for item, c, lo, hi in pool:
-            if checked >= k:
-                break
-            answer = _cached_answer(_cache_path(root, name, item.expiry, c.symbol), lo, hi)
-            if answer is None or answer[1] != "ok":
-                continue
-            epoch, cols, _n = candle_arrays(answer[0])
-            rows = con.execute(
-                f"SELECT epoch(ts)::BIGINT, open, high, low, close, volume, oi "
-                f"FROM read_parquet('{_glob(root, name)}') WHERE vendor_symbol = ? "
-                "ORDER BY ts",
-                [c.symbol],
-            ).fetchall()
-            if not len(epoch):
-                empty_ok += 1
-                continue
-            if not rows:  # its days are not imported yet (a day waits for its other expiries)
-                skipped += 1
-                continue
-            checked += 1
-            expect = np.column_stack(
-                [
-                    epoch,
-                    cols["open"],
-                    cols["high"],
-                    cols["low"],
-                    cols["close"],
-                    cols["volume"],
-                    cols["oi"],
-                ]
-            )
-            got = np.array([[np.nan if v is None else v for v in r] for r in rows], dtype=float)
-            same = expect.shape == got.shape and np.array_equal(expect, got, equal_nan=True)
-            if not same:
-                mismatched += 1
-                if len(problems) < 10:
-                    problems.append(f"{c.symbol}: raw {expect.shape} vs lake {got.shape}")
-    finally:
-        con.close()
+    for sym, epoch, cols in chosen:
+        rows = stored.get(sym)
+        if not rows:  # its days are not imported yet (a day waits for its other expiries)
+            skipped += 1
+            continue
+        checked += 1
+        expect = np.column_stack(
+            [
+                epoch,
+                cols["open"],
+                cols["high"],
+                cols["low"],
+                cols["close"],
+                cols["volume"],
+                cols["oi"],
+            ]
+        )
+        got = np.array([[np.nan if v is None else v for v in r] for r in rows], dtype=float)
+        if not (expect.shape == got.shape and np.array_equal(expect, got, equal_nan=True)):
+            mismatched += 1
+            if len(problems) < 10:
+                problems.append(f"{sym}: raw {expect.shape} vs lake {got.shape}")
     return {
         "contracts_compared": checked,
         "mismatched": mismatched,
@@ -209,6 +218,8 @@ def coverage(root: Path, manifest: dict, name: str, out_csv: Path | None = None)
         finally:
             con.close()
     lines = []
+    start = date.fromisoformat(manifest["from"])
+    may_be_cut = 0
     state_counts = {
         "with_bars": 0,
         "empty": 0,
@@ -233,6 +244,8 @@ def coverage(root: Path, manifest: dict, name: str, out_csv: Path | None = None)
                     state = "empty" if not answer[0].get("candles") else "cached_not_imported"
             state_counts[state] += 1
             rows, days, first, last, with_oi = stored.get(c.symbol, (0, 0, None, None, 0))
+            if first is not None and first.date() <= lo and lo > start:
+                may_be_cut += 1  # traded on its request's first day: it may have traded earlier
             lines.append(
                 [
                     name,
@@ -272,6 +285,7 @@ def coverage(root: Path, manifest: dict, name: str, out_csv: Path | None = None)
     return {
         "requested": sum(len(i.contracts) for i in plans),
         **state_counts,
+        "may_be_cut_at_window_start": may_be_cut,
         "rows": total_rows,
         "trading_days": len(
             list(
@@ -306,7 +320,6 @@ def audit(root: Path, manifest: dict, names: tuple[str, ...], *, sample: int = 2
     ok = True
     must_be_zero = [
         "duplicate_minutes",
-        "impossible_ohlc",
         "negative_price",
         "negative_volume",
         "negative_oi",

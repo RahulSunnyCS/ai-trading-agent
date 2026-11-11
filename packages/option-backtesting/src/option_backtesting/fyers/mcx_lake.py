@@ -222,8 +222,17 @@ def read_day(
             .arrow()
             .read_all()
         )
+        staged_rows = con.execute(
+            f"SELECT count(*) FROM read_parquet(?) WHERE ts >= TIMESTAMPTZ '{lo}' "
+            f"AND ts < TIMESTAMPTZ '{hi}'",
+            [files],
+        ).fetchone()[0]
     finally:
         con.unregister("meta")
+    if table.num_rows != staged_rows:  # a row whose instrument is not in the manifest
+        raise RuntimeError(
+            f"{day}: {staged_rows - table.num_rows} staged row(s) match no manifest contract"
+        )
     return table.cast(OPT_SCHEMA)
 
 
