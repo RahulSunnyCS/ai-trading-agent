@@ -245,4 +245,23 @@ Answered by the owner on 2026-11-11 (Fyers Prime active):
   bullion strikes are not CRUDEOIL's, so a GOLD and a SILVER expiry should be pulled before the
   bulk run. Not yet done: the lake write, instrument registration and the MCX session bounds
   (Phase 2 and 3). The Phase 1 "done when" is met.
+- **2026-11-11 (bulk pull, import, audit):** pulled all 92,356 contracts in about 3 h 15 min
+  (87,544 requests, 20 threads on one paced client, 8/s cap; no refusal, 429 or retry; the resume
+  pass asked for nothing). Imported with `mcx-import --roots all`: **277,003,032 one-minute bars**
+  in the lake under `asset=option/underlying=<ROOT>` (1.3 GB of Parquet, 513-524 session days per
+  root), raw rows = lake rows for every root, 0 duplicates dropped. Only 29,127 of 92,356 contracts
+  (32%) have any bars; the rest answered `no_data` (GOLD 2,681 of 21,396, SILVER 2,691 of 18,156).
+  `mcx-audit --roots all` **passed**: 0 repeated minutes, 0 out of order, 0 negative price, volume
+  or open interest, 0 bars after expiry, 0 missing open interest, and 200 of 200 sampled
+  contracts per root identical to the raw cache. Rows by root: CRUDEOIL 44.0M, CRUDEOILM 35.0M,
+  NATURALGAS 36.5M, NATGASMINI 27.0M, GOLD 20.4M, GOLDM 40.1M, SILVER 21.6M, SILVERM 37.8M,
+  COPPER 11.7M, ZINC 2.8M. Vendor facts, listed and not repaired: 54-248 bars per root whose
+  high/low cannot hold their open or close (e.g. `MCX:CRUDEOIL24DEC6050PE` on 2024-12-12 09:00: high 124.8 below open 143.6); 0.1-0.3% of bars outside 09:00-23:55 IST (bars at 23:55 and, on 2026-07-03 and
+  07-07, after midnight); 0.4-0.5% of rows on a Saturday or Sunday IST date (not yet explained:
+  special sessions? unchecked). `may_be_cut_at_window_start`: 10 SILVERM contracts, 0 elsewhere.
+  Quality verdicts: 2 excluded days per root (the Diwali evening session, `short_session`),
+  COPPER 5, **ZINC 278 of 513** (`thin_chain`: few contracts trade) so ZINC is mostly unusable as a
+  chain. Not done: Phase 4 (daily collector and scheduler job; owner deferred it), the comparison
+  of `/data/history` active contracts against the expired API after they expire, the weekend-row
+  explanation.
 
