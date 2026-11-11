@@ -324,3 +324,16 @@ Answered by the owner on 2026-11-11 (Fyers Prime active):
   fidelity, measured on 24 live contracts for 10 Nov: 14% of minutes identical on every field, total
   volume within 4%; for illiquid GOLD options Angel One returns only the minutes that traded where
   Fyers returns a continuous flat series; so it is a stopgap, not an equivalent source.
+- **2026-11-11 (first full nightly run, session 10 Nov):** `mcx-daily --roots all --no-wait` over
+  5,632 contracts (ten roots, nearest two expiries), 5,632 requests, no refusal or rate limit,
+  **9,653,991 rows** from the live contracts (CRUDEOIL 2.11M, CRUDEOILM 1.97M, NATURALGAS 1.12M,
+  NATGASMINI 0.99M, GOLD 0.32M, GOLDM 1.01M, SILVER 0.52M, SILVERM 1.21M, COPPER 0.39M, ZINC 2.4k),
+  each root's first day back to the start of its live contracts (late Aug to Oct), last bar 23:54.
+  The lake now holds **286.7M bars**; audit invariants on all ten roots: 0 repeated minutes, 0 out of
+  order, 0 negative price, volume or OI, 0 bars after expiry, 0 missing OI; the vendor's own
+  high/low-cannot-hold-open/close bars rose to 55-326 a root (the History API has them too). The
+  status was `partial`: 13 ZINC requests failed with `Invalid input` because the stray Angel One
+  rows for 11 Nov (see above) put those contracts' last stored day after the session; the run
+  predated the skip rule, which the collector now has. Only about a third of the contracts have
+  any bars, as in the backfill (CRUDEOIL 215 of 770, GOLD 77 of 754).
+
