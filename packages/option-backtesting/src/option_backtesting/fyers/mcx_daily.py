@@ -144,11 +144,21 @@ def last_stored(root: Path, name: str, symbols: set[str], since: date) -> dict[s
     return out
 
 
-def request_start(session: date, stored: date | None) -> date:
+def request_start(
+    session: date,
+    stored: date | None,
+    *,
+    inclusive: bool = True,
+    lookback: int = MAX_REQUEST_DAYS,
+) -> date:
     """Where a contract's request begins: its last stored day (kept, so a day stored part-way
-    is completed), else as far back as one request reaches, never before the history start."""
-    floor = max(DEFAULT_START, session - timedelta(days=MAX_REQUEST_DAYS - 1))
-    return max(floor, stored) if stored else floor
+    is completed), else as far back as `lookback` days (one request's reach), never before the
+    history start.  `inclusive=False` starts the day after the last stored one: the fallback
+    source never replaces a day another source stored."""
+    floor = max(DEFAULT_START, session - timedelta(days=lookback - 1))
+    if not stored:
+        return floor
+    return max(floor, stored if inclusive else stored + timedelta(days=1))
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +221,7 @@ class RootResult:
     name: str
     contracts: int = 0
     requests: int = 0
+    skipped: int = 0  # already stored for the session by the other source
     with_bars: int = 0
     rows: int = 0
     rows_kept: int = 0
@@ -222,6 +233,7 @@ class RootResult:
         return {
             "contracts": self.contracts,
             "requests": self.requests,
+            "skipped_already_stored": self.skipped,
             "with_bars": self.with_bars,
             "rows_written": self.rows,
             "rows_kept": self.rows_kept,
@@ -243,6 +255,10 @@ def collect_root(
     raw: lake.RawSink,
     current: dict,
     log: Callable[[str], None],
+    *,
+    source: str = "fyers",
+    inclusive: bool = True,
+    lookback: int = MAX_REQUEST_DAYS,
 ) -> RootResult:
     result = RootResult(name, contracts=len(contracts))
     if not contracts:
@@ -252,7 +268,7 @@ def collect_root(
         root, name, {c.symbol for c in contracts}, session - timedelta(days=MAX_REQUEST_DAYS)
     )
     with connect(root, views=()) as con:
-        run_id = ingest.start_run(con, "fyers", "mcx_options_daily", session, name)
+        run_id = ingest.start_run(con, source, "mcx_options_daily", session, name)
     calls_before = client.calls
     failed = False
     last_epoch = 0
@@ -261,11 +277,18 @@ def collect_root(
             current["name"] = f"mcx-{name}-{expiry}"
             batch: list[tuple[Contract, int, list[Candle]]] = []
             todo = [c for c in contracts if c.expiry == expiry]
-            for n, contract in enumerate(todo, 1):
-                start = request_start(session, stored.get(contract.symbol))
+            for contract in todo:
+                start = request_start(
+                    session, stored.get(contract.symbol), inclusive=inclusive, lookback=lookback
+                )
+                if start > session:  # another source already stored the session: nothing to ask
+                    result.skipped += 1
+                    continue
                 try:
                     candles = client.minute_candles_range(contract.symbol, start, session)
                 except FyersCredentialsError:
+                    if batch:  # what was already fetched this expiry is kept
+                        _flush(root, name, batch, result)
                     raise
                 except RuntimeError as error:  # one refused symbol must not lose the night
                     result.errors.append(str(error)[:200])
@@ -274,9 +297,11 @@ def collect_root(
                     result.with_bars += 1
                     last_epoch = max(last_epoch, candles[-1].epoch)
                     batch.append((contract, ids[contract.symbol], candles))
-                if len(batch) >= BATCH or (n == len(todo) and batch):
+                if len(batch) >= BATCH:
                     _flush(root, name, batch, result)
                     batch = []
+            if batch:  # the rest, also when the last contracts had no bars or were refused
+                _flush(root, name, batch, result)
             raw.flush(current["name"])
             log(
                 f"{name} {expiry}: {len(todo)} contracts, {result.with_bars} with bars so far, "
@@ -355,15 +380,20 @@ def run(
     sleep: Callable[[float], None] = _time.sleep,
     master_loader: Callable[[], str] = lambda: download_master(MASTER_SEGMENT),
     dry_run: bool = False,
+    source: str = "fyers",
+    inclusive: bool = True,
+    lookback: int = MAX_REQUEST_DAYS,
     log: Callable[[str], None] = print,
 ) -> dict:
     """Collect `session` for the chosen roots.  The result's `status` is `ok`, `partial` (some
     requests failed, within the allowed share) or `no_session` (every request answered, none
-    with a bar: the exchange did not trade)."""
+    with a bar: the exchange did not trade).  The Angel One fallback passes `source="angelone"`,
+    `inclusive=False` (a day another source stored is never replaced) and a short `lookback`."""
     selected = select_contracts(parse_master(master_loader(), set(roots)), roots, session, expiries)
     out: dict = {
         "session": session.isoformat(),
         "close_ist": f"{session_close(session):%H:%M}",
+        "source": source,
         "dry_run": dry_run,
         "roots": {},
     }
@@ -377,13 +407,19 @@ def run(
         return out
     if wait:
         out["waited_s"] = round(wait_for_close(session, now=now, sleep=sleep, log=log))
-    raw = lake.RawSink(root, "fyers", session)
+    bind = getattr(client, "bind_mcx", None)  # the Angel One client maps Fyers contracts to its own
+    if bind is not None:
+        log(f"matched {bind([c for cs in selected.values() for c in cs])} contracts to {source}")
+    raw = lake.RawSink(root, source, session)
     current = {"name": "mcx"}
     client.on_response = lambda symbol, params, body: raw.add(current["name"], symbol, params, body)
     results = [
-        collect_root(client, root, name, contracts, session, raw, current, log)
+        collect_root(
+            client, root, name, contracts, session, raw, current, log,
+            source=source, inclusive=inclusive, lookback=lookback,
+        )
         for name, contracts in selected.items()
-    ]
+    ]  # fmt: skip
     out["roots"] = {r.name: r.summary() for r in results}
     out["requests"] = sum(r.requests for r in results)
     out["rows_written"] = sum(r.rows for r in results)
@@ -393,7 +429,7 @@ def run(
         out["status"] = "failed"
     elif errors:
         out["status"] = "partial"
-    elif not out["rows_written"] and not any(r.with_bars for r in results):
+    elif not out["rows_written"] and not any(r.with_bars or r.skipped for r in results):
         out["status"] = "no_session"
     else:
         out["status"] = "ok"
