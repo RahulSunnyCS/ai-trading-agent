@@ -818,7 +818,7 @@ def fyers_mcx_daily(
     wait: bool = typer.Option(
         True,
         "--wait/--no-wait",
-        help="Wait until a minute after the session's close (23:30 summer, 23:55 winter, IST).",
+        help="Wait for the session to end: 23:31 IST, then 23:56 if a future still trades.",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="List what would be asked; ask nothing."),
     source: str = typer.Option(
@@ -918,7 +918,9 @@ def fyers_mcx_compare(
     from .fyers.mcx_compare import compare_expiry, write_report
 
     root, manifest = data_dir(), load_manifest(data_dir())
-    today = datetime.now(timezone.utc).date()  # noqa: UP017
+    from .fyers.symbols import IST
+
+    today = datetime.now(IST).date()
     wanted = {date.fromisoformat(e) for e in expiry}
     floor = date.fromisoformat(from_expiry) if from_expiry else None
     if not wanted and floor is None:

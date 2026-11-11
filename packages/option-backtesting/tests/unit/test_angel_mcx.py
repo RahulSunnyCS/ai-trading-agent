@@ -281,3 +281,16 @@ def test_dry_run_never_logs_in_to_either_source(monkeypatch, tmp_path):
         )  # fmt: skip
         assert result.exit_code == 0, result.output
         assert '"dry_run": true' in result.output and f'"source": "{source}"' in result.output
+
+
+def test_a_fallback_that_matches_most_contracts_to_nothing_fails_instead_of_looking_closed(root):
+    empty_master = []  # Angel One's master changed shape: nothing matches
+    client = AngelMcxClient(
+        Session("jwt", "key"),
+        min_interval_s=0.0,
+        post=FakeApi(),
+        master_loader=lambda: empty_master,
+    )
+    out = _run(root, client, source="angelone", inclusive=False, lookback=3)
+    assert out["status"] == "failed" and "no match at Angel One" in out["reason"]
+    assert out["unmatched_contracts"] == 2 and out["matched_contracts"] == 0

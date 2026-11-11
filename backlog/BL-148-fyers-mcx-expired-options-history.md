@@ -152,7 +152,7 @@ MCXBULLDEX and any other commodity index are excluded.
 ### Phase 4 — Nightly collection of live contracts (built 2026-11-11)
 
 Owner decisions (2026-11-11): collect the **nearest two expiries** of all ten roots (every strike);
-**run at the MCX close, 23:30 IST on US summer time and 23:55 on winter time** (expiring options
+**run at the MCX close (23:30 or 23:55 IST, read from the data)** (expiring options
 trade to the close and vanish from `/data/history` after expiry); **write nightly into the lake,
 compare later**; **Angel One** completes the run after midnight when Fyers cannot be used; Prime is
 dropped about a month after the backfill, so the live collector is the only source then.
@@ -161,7 +161,7 @@ dropped about a month after the backfill, so the live collector is the only sour
   - `fyers/mcx_daily.py` + `obt fyers mcx-daily`: select the nearest two expiries from the live
     `MCX_COM` master (expiring first), one `/data/history` request per contract from its last stored
     day (else 99 days back, so the first run fills a live contract's whole life), 1-minute bars with
-    OI, wait for the close (`session_close`), replace only the rows of the contracts fetched, never
+    OI, wait for the close, replace only the rows of the contracts fetched, never
     touch an expired contract, one ingest run per root (`mcx_options_daily`), days judged.
   - Angel One fallback (`angelone/mcx.py`, `--source angelone`; automatic when Fyers has no usable
     token): contracts matched by root, expiry, strike (÷100) and side; OI divided by the lot size
@@ -169,7 +169,7 @@ dropped about a month after the backfill, so the live collector is the only sour
     most 3 days, so it never replaces a Fyers day; the next Fyers run overwrites its days for any
     contract still listed.
   - Scheduler job `mcx-collect` (weekdays 23:31, one job: the command waits for the close, so the
-    season rule lives only in `session_close`; group `catalog`, retries 2, exit 2 not retried,
+    the close is read from the nearest future's last bar at 23:31; group `catalog`, retries 2, exit 2 not retried,
     catch-up until 05:30).
   - Prime is documented as needed for the bulk rebuild and the Phase 5 comparison only; the stored
     history stays usable without it.
@@ -304,7 +304,7 @@ Answered by the owner on 2026-11-11 (Fyers Prime active):
   of `/data/history` active contracts against the expired API after they expire, the weekend-row
   explanation.
 - **2026-11-11 (Phases 4-5 built, first live run):** owner answers: nearest two expiries; run at the
-  MCX close (23:30 summer / 23:55 winter) with Angel One completing after midnight; write nightly,
+  MCX close (23:30 or 23:55) with Angel One completing after midnight; write nightly,
   compare later; Prime dropped in about a month. Probes first: `/data/history` returns MCX option
   bars with OI and a contract's whole life in one request (CRUDEOIL, GOLD, ZINC); Angel One serves
   MCX candles and OI, OI in units (Fyers' lots times 100 for CRUDEOIL), volume in the same units,
@@ -313,3 +313,14 @@ Answered by the owner on 2026-11-11 (Fyers Prime active):
   byte of any day file and no row of the backfill. A `--dry-run` with `--source angelone` once ran a
   real Angel One collection (ZINC, 11 Nov so far: 90 rows) because that branch ignored the flag; fixed
   and covered by a test; those Angel rows belong to live contracts and the next Fyers run replaces them.
+- **2026-11-11 (review of PR 446, three corrections):** (1) MCX's close is not a function of the US
+  clock change: the lake's last bar of each CRUDEOIL day shows 23:29/23:30 in summer and 23:54/23:55
+  in winter, switching on 10 Mar and 3 Nov in 2025 but on 18 Mar and 30 Oct in 2026; the collector
+  therefore waits to 23:31, looks at the nearest future's last bar, and waits on to 23:56 only if the
+  session is still trading. (2) A run is now `failed` (exit 1, retried, alerted) when a contract
+  expiring by the session is refused, since tomorrow cannot fetch it, and when most contracts find no
+  match at Angel One, or no option answers on a day the futures traded; it was `partial` or
+  `no_session` with exit 0. (3) The raw responses of an aborted run are archived. Angel One
+  fidelity, measured on 24 live contracts for 10 Nov: 14% of minutes identical on every field, total
+  volume within 4%; for illiquid GOLD options Angel One returns only the minutes that traded where
+  Fyers returns a continuous flat series; so it is a stopgap, not an equivalent source.

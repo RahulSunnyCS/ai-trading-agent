@@ -111,34 +111,85 @@ def _rows(root, name, day):
 # -- session and close -----------------------------------------------------------------------
 
 
-def test_the_close_follows_us_summer_time_from_the_monday_after():
-    assert mcx_daily.summer_hours(date(2026, 3, 9)) and not mcx_daily.summer_hours(date(2026, 3, 6))
-    assert mcx_daily.summer_hours(date(2026, 11, 2)) is False  # first Monday after 1 Nov
-    assert mcx_daily.summer_hours(date(2026, 10, 30))
-    assert mcx_daily.session_close(date(2026, 11, 11)).strftime("%H:%M") == "23:55"
-    assert mcx_daily.session_close(date(2026, 7, 1)).strftime("%H:%M") == "23:30"
-
-
 def test_after_midnight_the_session_is_still_yesterdays():
     assert mcx_daily.default_session(datetime(2026, 11, 12, 0, 20, tzinfo=IST)) == SESSION
     assert mcx_daily.default_session(datetime(2026, 11, 11, 23, 40, tzinfo=IST)) == SESSION
     assert mcx_daily.default_session(datetime(2026, 11, 11, 9, 0, tzinfo=IST)) == SESSION
 
 
-def test_wait_for_close_sleeps_until_a_minute_after_and_not_at_all_when_late():
-    clock = {"t": datetime(2026, 11, 11, 23, 31, tzinfo=IST)}
-    slept = []
+class _Clock:
+    def __init__(self, hour, minute):
+        self.t = datetime(2026, 11, 11, hour, minute, tzinfo=IST)
+        self.slept = []
 
-    def sleep(seconds):
-        slept.append(seconds)
-        clock["t"] += timedelta(seconds=seconds)
+    def now(self):
+        return self.t
 
-    waited = mcx_daily.wait_for_close(
-        SESSION, now=lambda: clock["t"], sleep=sleep, log=lambda _m: None
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.t += timedelta(seconds=seconds)
+
+
+def _wait(clock, last_bar):
+    return mcx_daily.wait_for_close(
+        SESSION, now=clock.now, sleep=clock.sleep, last_bar=last_bar, log=lambda _m: None
     )
-    assert waited == 25 * 60 and clock["t"] == datetime(2026, 11, 11, 23, 56, tzinfo=IST)
-    assert all(s <= 60 for s in slept)
-    assert mcx_daily.wait_for_close(SESSION, now=lambda: clock["t"], sleep=sleep) == 0.0
+
+
+def _bar(hour, minute):
+    return lambda: datetime(2026, 11, 11, hour, minute, tzinfo=IST)
+
+
+def test_a_session_whose_future_stopped_at_23_29_has_closed_so_nothing_more_is_waited_for():
+    clock = _Clock(23, 31)
+    assert _wait(clock, _bar(23, 29)) == 0.0 and clock.slept == []  # the summer close
+
+
+def test_a_future_still_trading_at_23_31_waits_on_to_23_56():
+    clock = _Clock(23, 31)
+    assert _wait(clock, _bar(23, 30)) == 25 * 60  # the winter close: 23:55 + a minute
+    assert clock.t == datetime(2026, 11, 11, 23, 56, tzinfo=IST) and all(
+        s <= 60 for s in clock.slept
+    )
+
+
+def test_before_23_31_it_first_waits_to_23_31_and_then_looks():
+    clock = _Clock(21, 0)
+    looked = []
+
+    def last_bar():
+        looked.append(clock.t)
+        return datetime(2026, 11, 11, 23, 29, tzinfo=IST)
+
+    _wait(clock, last_bar)
+    assert looked == [datetime(2026, 11, 11, 23, 31, tzinfo=IST)]
+
+
+def test_without_a_probe_the_angel_one_path_waits_to_the_latest_close():
+    clock = _Clock(23, 31)
+    assert _wait(clock, None) == 25 * 60
+
+
+def test_a_session_already_past_waits_for_nothing_and_asks_nothing():
+    clock = _Clock(23, 57)
+
+    def boom():
+        raise AssertionError("probed a finished session")
+
+    assert _wait(clock, boom) == 0.0
+    late = _Clock(0, 20)  # after midnight the evening's session (yesterday's) has long ended
+    late.t += timedelta(days=1)
+    assert mcx_daily.wait_for_close(SESSION, now=late.now, sleep=late.sleep, last_bar=boom) == 0.0
+
+
+def test_the_future_probe_asks_the_nearest_future_and_reports_its_last_bar(root):
+    client = FakeClient(
+        bars=lambda symbol, *_a: [Candle(_epoch(SESSION, 23, 54), 1, 1, 1, 1, 0, 1)]
+    )
+    master = mcx_daily.parse_master(MASTER_TEXT, {"CRUDEOIL"})
+    probe = mcx_daily.future_last_bar(client, master, ("CRUDEOIL",), SESSION)
+    assert probe() == datetime(2026, 11, 11, 23, 54, tzinfo=IST)
+    assert [r[0] for r in client.requests] == ["MCX:CRUDEOIL26NOVFUT"]
 
 
 # -- which contracts and where a request starts -----------------------------------------------
@@ -298,3 +349,61 @@ def test_the_run_records_one_ingest_row_and_judges_the_day(root):
             "SELECT count(*) FROM data_quality WHERE asset = 'option' AND name = 'CRUDEOIL'"
         ).fetchone()[0]
     assert runs == [("fyers", "ok", 8, 16)] and judged >= 1
+
+
+# -- what each outcome is called (review findings on PR 446) ------------------------------------
+
+
+def test_an_expiring_contract_that_is_refused_fails_the_run_because_tomorrow_is_too_late(root):
+    contracts = mcx_daily.select_contracts(
+        mcx_daily.parse_master(MASTER_TEXT, {"CRUDEOIL"}), ("CRUDEOIL",), E1
+    )["CRUDEOIL"]
+    expiring = next(c for c in contracts if c.expiry == E1)
+    out = _run(root, FakeClient(refuse={expiring.symbol}), session=E1)  # E1 expires that day
+    assert out["status"] == "failed" and "expiring" in out["reason"]
+    assert out["roots"]["CRUDEOIL"]["errors_on_expiring"] == 1
+
+
+def test_a_refusal_of_a_contract_expiring_later_stays_partial_within_the_share(root):
+    n = 41
+    contracts = [
+        Contract(f"MCX:CRUDEOIL26DEC{s}CE", "CRUDEOIL", E2, float(s), "CE", 1)
+        for s in range(7000, 7000 + n)
+    ]
+    text = _master(
+        [_master_row(c.symbol, "CRUDEOIL", c.expiry, c.strike, c.option_type) for c in contracts]
+    )
+    out = mcx_daily.run(
+        FakeClient(refuse={contracts[0].symbol}), root, session=SESSION, roots=("CRUDEOIL",),
+        wait=False, master_loader=lambda: text, log=lambda _m: None,
+    )  # fmt: skip
+    assert out["status"] == "partial" and out["roots"]["CRUDEOIL"]["errors_on_expiring"] == 0
+
+
+def test_options_that_answer_nothing_on_a_day_the_futures_traded_is_a_failure_not_no_session(root):
+    def bars(symbol, start, end):
+        if symbol.endswith("FUT"):
+            return [Candle(_epoch(SESSION, 23, 54), 1, 1, 1, 1, 0, 1)]
+        return []
+
+    out = _run(root, FakeClient(bars=bars))
+    assert out["status"] == "failed" and "futures traded" in out["reason"]
+
+
+def test_a_day_the_exchange_was_shut_is_no_session_when_the_futures_have_no_bars_either(root):
+    assert _run(root, FakeClient(bars=lambda *_a: []))["status"] == "no_session"
+
+
+def test_the_raw_responses_of_an_aborted_run_are_still_archived(root):
+    class Dies(FakeClient):
+        def minute_candles_range(self, symbol, start, end):
+            candles = super().minute_candles_range(symbol, start, end)
+            self.on_response(symbol, {"symbol": symbol}, {"s": "ok", "candles": []})
+            if symbol.endswith("8000PE"):
+                raise FyersCredentialsError("Fyers rejected the token: expired")
+            return candles
+
+    with pytest.raises(FyersCredentialsError):
+        _run(root, Dies())
+    archived = list((root / "raw" / "fyers" / f"date={SESSION}").glob("mcx-CRUDEOIL-*.jsonl.gz"))
+    assert archived  # the buffered responses were written before the run stopped

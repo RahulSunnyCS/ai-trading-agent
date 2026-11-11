@@ -879,14 +879,15 @@ const BASE_JOBS: Job[] = [
     fixHint: 'bun run --filter @ata/scheduler jobs run morning-summary',
   },
   {
-    // BL-148 Phase 4: the nightly MCX option collection. One job, not one per season: the command
-    // waits until a minute after the session's close (23:30 IST on US summer time, 23:55 on
-    // winter time), so 23:31 is right all year and the season rule lives in one place, Python's
-    // `mcx_daily.session_close`. Expiring contracts trade to the close and cannot be fetched after
-    // they expire, so a run that fired early would lose their last 30-55 minutes for good.
+    // BL-148 Phase 4: the nightly MCX option collection. One job, not one per season: MCX's close
+    // is 23:30 or 23:55 IST and the switch dates follow no calendar rule (10 Mar / 3 Nov in 2025,
+    // 18 Mar / 30 Oct in 2026), so the command waits for 23:31, looks at the nearest future's last
+    // bar and waits on to 23:56 only if the session is still trading. Expiring contracts trade to
+    // the close and cannot be fetched after they expire, so a run that fired early would lose
+    // their last 25 minutes for good.
     id: 'mcx-collect',
     description:
-      "Collect the MCX session's 1-minute option bars with open interest (`obt fyers mcx-daily`): every strike of each commodity's nearest two expiries from Fyers' /data/history, from each contract's last stored day, into the lake (BL-148). Waits for the MCX close, replaces only the rows of the contracts it fetches, never touches an expired contract",
+      "Collect the MCX session's 1-minute option bars with open interest (`obt fyers mcx-daily`): every strike of each commodity's nearest two expiries from Fyers' /data/history, from each contract's last stored day, into the lake (BL-148). Waits for the MCX close (23:30 or 23:55, read from the data), replaces only the rows of the contracts it fetches, never touches an expired contract",
     // Weekdays, holidays included: MCX trades its evening session on most NSE holidays, and a
     // day it is shut gives "no session" (exit 0). The Fyers token from the morning login lasts
     // until 06:00, so a run that crosses midnight needs no new login.

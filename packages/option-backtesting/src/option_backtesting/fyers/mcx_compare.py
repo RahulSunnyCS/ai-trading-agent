@@ -98,14 +98,17 @@ def _lake_rows(
         con.close()
     out: dict[str, tuple[np.ndarray, dict[str, np.ndarray]]] = {}
     symbol_col = table.column("vendor_symbol").to_numpy(zero_copy_only=False)
+    if not len(symbol_col):
+        return out
     t = table.column("t").to_numpy()
     arrays = {
         f: np.asarray(table.column(f).to_numpy(zero_copy_only=False), dtype=np.float64)
         for f in FIELDS
     }
-    for sym in np.unique(symbol_col):
-        mask = symbol_col == sym
-        out[str(sym)] = (t[mask], {f: arrays[f][mask] for f in FIELDS})
+    # the query orders by symbol, so each contract is one slice: split at the changes, once
+    edges = np.concatenate(([0], np.flatnonzero(symbol_col[1:] != symbol_col[:-1]) + 1, [len(t)]))
+    for lo, hi in zip(edges[:-1], edges[1:], strict=True):
+        out[str(symbol_col[lo])] = (t[lo:hi], {f: arrays[f][lo:hi] for f in FIELDS})
     return out
 
 

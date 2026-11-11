@@ -13,10 +13,12 @@ What it writes, and what it never touches:
 * expired contracts are never fetched, so the backfill's rows are never rewritten;
 * nothing is filled forward or repaired: a bar is stored as Fyers delivered it.
 
-`session_close` follows MCX's commodity hours: 23:30 IST while the US is on summer time, 23:55
-otherwise, the change taking effect on the Monday after the US one.  `run` waits until a minute
-after the close so no day is stored part-way; a wrong season only shortens a day, and the next
-night's run (which starts from the last stored day) completes it for contracts still listed.
+The session's close is read from the data, not from a calendar: MCX's commodity session ends at
+23:30 or at 23:55 IST (the lake shows the switch on 10 Mar and 3 Nov in 2025, but on 18 Mar and
+30 Oct in 2026, so no rule from the US clock change holds).  `run` waits for 23:31, looks at the
+last bar of the nearest future, and waits on to 23:56 only when that bar shows the session still
+trading; no day is stored part-way, and a night that ran early is completed by the next night's
+run, which starts from the last stored day, for any contract still listed.
 """
 
 from __future__ import annotations
@@ -38,7 +40,7 @@ from trading_data.db import connect
 
 from .auth import FyersCredentialsError
 from .client import Candle, FyersClient
-from .daily import options_table, symbols_table
+from .daily import options_table, write_symbol_master
 from .mcx import DEFAULT_START, MASTER_SEGMENT, MAX_REQUEST_DAYS, MCX_ROOTS
 from .mcx_lake import MASTER_VENDOR, register_contracts
 from .symbols import IST, Contract, download_master, parse_master
@@ -51,6 +53,8 @@ BATCH = 100
 MAX_ERROR_SHARE = 0.05
 #: a minute past the close, so the last bar has formed
 SETTLE = timedelta(minutes=1)
+#: the two session closes MCX uses for commodities, IST (hour, minute)
+EARLIEST_CLOSE, LATEST_CLOSE = (23, 30), (23, 55)
 
 
 # ---------------------------------------------------------------------------
@@ -58,22 +62,14 @@ SETTLE = timedelta(minutes=1)
 # ---------------------------------------------------------------------------
 
 
-def _nth_sunday(year: int, month: int, n: int) -> date:
-    first = date(year, month, 1)
-    return first + timedelta(days=(6 - first.weekday()) % 7 + 7 * (n - 1))
+def session_start_of_close(day: date) -> datetime:
+    """The earliest MCX close (23:30 IST) plus a minute: when the close is first looked at."""
+    return datetime(day.year, day.month, day.day, *EARLIEST_CLOSE, tzinfo=IST) + SETTLE
 
 
-def summer_hours(day: date) -> bool:
-    """MCX's commodity session ends 23:30 while US daylight saving applies and 23:55 otherwise;
-    the exchange switches on the Monday after the US clocks change."""
-    start = _nth_sunday(day.year, 3, 2) + timedelta(days=1)
-    end = _nth_sunday(day.year, 11, 1) + timedelta(days=1)
-    return start <= day < end
-
-
-def session_close(day: date) -> datetime:
-    """The IST instant the session of `day` closes."""
-    return datetime(day.year, day.month, day.day, 23, 30 if summer_hours(day) else 55, tzinfo=IST)
+def session_latest_end(day: date) -> datetime:
+    """The latest MCX close (23:55 IST) plus a minute: every session has ended by then."""
+    return datetime(day.year, day.month, day.day, *LATEST_CLOSE, tzinfo=IST) + SETTLE
 
 
 def default_session(now: datetime) -> date:
@@ -184,18 +180,6 @@ def merge_day(path: Path, fresh: pa.Table) -> tuple[int, int]:
     return fresh.num_rows, kept_rows
 
 
-def _write_master(root: Path, day: date, contracts: list[Contract]) -> None:
-    """Merge the day's contracts into its symbol master (lot size 0: no source states one)."""
-    path = lake.symbol_master_path(root, MASTER_VENDOR, day)
-    table = symbols_table([dataclasses.replace(c, lot_size=0) for c in contracts])
-    if path.exists():
-        new = set(table.column("vendor_symbol").to_pylist())
-        old = pq.read_table(path).cast(table.schema)
-        keep = old.filter(pa.array([s not in new for s in old.column("vendor_symbol").to_pylist()]))
-        table = pa.concat_tables([keep, table]) if keep.num_rows else table
-    lake.write_parquet(table, path)
-
-
 def _by_day(
     batch: list[tuple[Contract, int, list[Candle]]],
 ) -> dict[date, list[tuple[Contract, int, list[Candle]]]]:
@@ -222,6 +206,7 @@ class RootResult:
     contracts: int = 0
     requests: int = 0
     skipped: int = 0  # already stored for the session by the other source
+    expiring_errors: int = 0  # refused contracts that expire by the session: lost if not now
     with_bars: int = 0
     rows: int = 0
     rows_kept: int = 0
@@ -242,6 +227,7 @@ class RootResult:
             "last_day": max(self.days).isoformat() if self.days else None,
             "last_bar_ist": self.last_bar,
             "errors": len(self.errors),
+            "errors_on_expiring": self.expiring_errors,
             "error_examples": self.errors[:5],
         }
 
@@ -277,32 +263,37 @@ def collect_root(
             current["name"] = f"mcx-{name}-{expiry}"
             batch: list[tuple[Contract, int, list[Candle]]] = []
             todo = [c for c in contracts if c.expiry == expiry]
-            for contract in todo:
-                start = request_start(
-                    session, stored.get(contract.symbol), inclusive=inclusive, lookback=lookback
-                )
-                if start > session:  # another source already stored the session: nothing to ask
-                    result.skipped += 1
-                    continue
-                try:
-                    candles = client.minute_candles_range(contract.symbol, start, session)
-                except FyersCredentialsError:
-                    if batch:  # what was already fetched this expiry is kept
+            try:
+                for contract in todo:
+                    start = request_start(
+                        session, stored.get(contract.symbol), inclusive=inclusive, lookback=lookback
+                    )
+                    if start > session:  # another source already stored the session
+                        result.skipped += 1
+                        continue
+                    try:
+                        candles = client.minute_candles_range(contract.symbol, start, session)
+                    except FyersCredentialsError:
+                        if batch:  # what was already fetched this expiry is kept
+                            _flush(root, name, batch, result)
+                            batch = []
+                        raise
+                    except RuntimeError as error:  # one refused symbol must not lose the night
+                        result.errors.append(str(error)[:200])
+                        if contract.expiry <= session:  # it cannot be fetched again tomorrow
+                            result.expiring_errors += 1
+                        continue
+                    if candles:
+                        result.with_bars += 1
+                        last_epoch = max(last_epoch, candles[-1].epoch)
+                        batch.append((contract, ids[contract.symbol], candles))
+                    if len(batch) >= BATCH:
                         _flush(root, name, batch, result)
-                    raise
-                except RuntimeError as error:  # one refused symbol must not lose the night
-                    result.errors.append(str(error)[:200])
-                    continue
-                if candles:
-                    result.with_bars += 1
-                    last_epoch = max(last_epoch, candles[-1].epoch)
-                    batch.append((contract, ids[contract.symbol], candles))
-                if len(batch) >= BATCH:
+                        batch = []
+                if batch:  # the rest, also when the last contracts had no bars or were refused
                     _flush(root, name, batch, result)
-                    batch = []
-            if batch:  # the rest, also when the last contracts had no bars or were refused
-                _flush(root, name, batch, result)
-            raw.flush(current["name"])
+            finally:
+                raw.flush(current["name"])  # the verbatim responses survive an aborted run
             log(
                 f"{name} {expiry}: {len(todo)} contracts, {result.with_bars} with bars so far, "
                 f"{result.rows} rows written"
@@ -347,7 +338,43 @@ def _flush(
         result.rows_kept += kept
         if day not in result.days:
             result.days.append(day)
-        _write_master(root, day, [c for c, _i, _cs in rows])
+        write_symbol_master(
+            root,
+            day,
+            [dataclasses.replace(c, lot_size=0) for c, _i, _cs in rows],  # no source states a lot
+            vendor=MASTER_VENDOR,
+        )
+
+
+def _sleep_until(target: datetime, now: Callable[[], datetime], sleep: Callable[[float], None]):
+    while (left := (target - now()).total_seconds()) > 0:
+        sleep(min(left, 60.0))
+
+
+def future_last_bar(
+    client: FyersClient, master: list[Contract], roots: tuple[str, ...], session: date
+) -> Callable[[], datetime | None]:
+    """A probe for the session's last bar: the nearest future of each root (at most three asked)
+    answers until one has bars; None when none has (a day the exchange is shut)."""
+    nearest: dict[str, Contract] = {}
+    for c in master:
+        if (
+            c.option_type == "FUT"
+            and c.expiry >= session
+            and c.underlying in roots
+            and (c.underlying not in nearest or c.expiry < nearest[c.underlying].expiry)
+        ):
+            nearest[c.underlying] = c
+    futures = [nearest[r] for r in roots if r in nearest][:3]
+
+    def probe() -> datetime | None:
+        for future in futures:
+            candles = client.minute_candles_range(future.symbol, session, session)
+            if candles:
+                return datetime.fromtimestamp(candles[-1].epoch, IST)
+        return None
+
+    return probe
 
 
 def wait_for_close(
@@ -355,17 +382,35 @@ def wait_for_close(
     *,
     now: Callable[[], datetime],
     sleep: Callable[[float], None] = _time.sleep,
+    last_bar: Callable[[], datetime | None] | None = None,
     log: Callable[[str], None] = print,
 ) -> float:
-    """Sleep until a minute after the session closes; returns the seconds waited."""
-    target = session_close(session) + SETTLE
-    wait = (target - now()).total_seconds()
-    if wait <= 0:
+    """Wait until the session has ended; returns the seconds waited.
+
+    A session already past waits for nothing.  Otherwise: until 23:31 (the earlier close plus a
+    minute), then `last_bar()` (the last bar of the nearest future) decides: before 23:30 the
+    session closed at 23:30 (or there was none), and the run goes on; later, it is still
+    trading and the wait goes on to 23:56.  Without a probe (the Angel One fallback) the wait
+    is to 23:56."""
+    started = now()
+    first, last = session_start_of_close(session), session_latest_end(session)
+    if started >= last:
         return 0.0
-    log(f"waiting {int(wait // 60)} min for the {session_close(session):%H:%M} IST close")
-    while (left := (target - now()).total_seconds()) > 0:
-        sleep(min(left, 60.0))
-    return wait
+    if started < first:
+        log(f"waiting for {first:%H:%M} IST to look at the close")
+        _sleep_until(first, now, sleep)
+    if last_bar is not None:
+        bar = last_bar()
+        if bar is None or (bar.hour, bar.minute) < EARLIEST_CLOSE:
+            log(
+                f"the session has closed (last future bar {bar:%H:%M})" if bar else "no future bars"
+            )
+            return (now() - started).total_seconds()
+        log(f"still trading (future bar {bar:%H:%M}); waiting for {last:%H:%M} IST")
+    else:
+        log(f"waiting for {last:%H:%M} IST, the latest close")
+    _sleep_until(last, now, sleep)
+    return (now() - started).total_seconds()
 
 
 def run(
@@ -386,17 +431,15 @@ def run(
     log: Callable[[str], None] = print,
 ) -> dict:
     """Collect `session` for the chosen roots.  The result's `status` is `ok`, `partial` (some
-    requests failed, within the allowed share) or `no_session` (every request answered, none
-    with a bar: the exchange did not trade).  The Angel One fallback passes `source="angelone"`,
+    requests failed, none of them on a contract that expires by the session), `no_session` (every
+    request answered, none with a bar, and the futures traded no bar either: the exchange was
+    shut) or `failed`: an expiring contract was refused (it cannot be fetched tomorrow), more than
+    5% of requests failed, most contracts found no match at Angel One, or the options answered
+    nothing on a day the futures traded.  The Angel One fallback passes `source="angelone"`,
     `inclusive=False` (a day another source stored is never replaced) and a short `lookback`."""
-    selected = select_contracts(parse_master(master_loader(), set(roots)), roots, session, expiries)
-    out: dict = {
-        "session": session.isoformat(),
-        "close_ist": f"{session_close(session):%H:%M}",
-        "source": source,
-        "dry_run": dry_run,
-        "roots": {},
-    }
+    master = parse_master(master_loader(), set(roots))
+    selected = select_contracts(master, roots, session, expiries)
+    out: dict = {"session": session.isoformat(), "source": source, "dry_run": dry_run, "roots": {}}
     if dry_run:
         for name, contracts in selected.items():
             out["roots"][name] = {
@@ -405,11 +448,19 @@ def run(
             }
         out["status"] = "dry_run"
         return out
+    probe = future_last_bar(client, master, roots, session) if source == "fyers" else None
     if wait:
-        out["waited_s"] = round(wait_for_close(session, now=now, sleep=sleep, log=log))
+        out["waited_s"] = round(
+            wait_for_close(session, now=now, sleep=sleep, last_bar=probe, log=log)
+        )
+    asked = sum(len(cs) for cs in selected.values())
     bind = getattr(client, "bind_mcx", None)  # the Angel One client maps Fyers contracts to its own
+    unmatched = 0
     if bind is not None:
-        log(f"matched {bind([c for cs in selected.values() for c in cs])} contracts to {source}")
+        matched = bind([c for cs in selected.values() for c in cs])
+        unmatched = asked - matched
+        out["matched_contracts"], out["unmatched_contracts"] = matched, unmatched
+        log(f"matched {matched} of {asked} contracts to {source}")
     raw = lake.RawSink(root, source, session)
     current = {"name": "mcx"}
     client.on_response = lambda symbol, params, body: raw.add(current["name"], symbol, params, body)
@@ -424,13 +475,27 @@ def run(
     out["requests"] = sum(r.requests for r in results)
     out["rows_written"] = sum(r.rows for r in results)
     errors = sum(len(r.errors) for r in results)
-    asked = sum(r.contracts for r in results)
-    if errors and errors > MAX_ERROR_SHARE * max(asked, 1):
+    expiring = sum(r.expiring_errors for r in results)
+    if expiring or (errors and errors > MAX_ERROR_SHARE * max(asked, 1)):
         out["status"] = "failed"
+        out["reason"] = (
+            f"{expiring} contract(s) expiring by the session were refused"
+            if expiring
+            else f"{errors} of {asked} requests failed"
+        )
+    elif bind is not None and unmatched > asked / 2:
+        out["status"] = "failed"
+        out["reason"] = f"{unmatched} of {asked} contracts have no match at Angel One"
     elif errors:
         out["status"] = "partial"
     elif not out["rows_written"] and not any(r.with_bars or r.skipped for r in results):
-        out["status"] = "no_session"
+        if (
+            probe is not None and probe() is not None
+        ):  # the futures traded: the options did not answer
+            out["status"] = "failed"
+            out["reason"] = "the options answered no data on a day the futures traded"
+        else:
+            out["status"] = "no_session"
     else:
         out["status"] = "ok"
     return out
