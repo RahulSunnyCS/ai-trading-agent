@@ -808,6 +808,53 @@ def fyers_mcx_pull(
         raise typer.Exit(2)
 
 
+@fyers_app.command("mcx-futures")
+def fyers_mcx_futures(
+    roots: str = typer.Option(..., help="Comma-separated MCX option roots, e.g. CRUDEOILM."),
+    pull_only: bool = typer.Option(
+        False, "--pull-only", help="Fill the raw cache only; write nothing to the catalog or lake."
+    ),
+) -> None:
+    """BL-218: the future each MCX option settles on (its symbol's month), one request per
+    option expiry of the frozen manifest, cached under raw/fyers-expired/mcx-futures/ and
+    written to lake/bars_1m/asset=future/underlying=<ROOT>. Resumable; a rerun asks nothing
+    already cached and rewrites only these futures' rows."""
+    from .fyers.auth import FyersCredentialsError
+    from .fyers.daily import data_dir
+    from .fyers.mcx import load_manifest, reference_futures
+    from .fyers.mcx_futures import (
+        futures_expiries,
+        listed_futures,
+        plan,
+        pull,
+        register_futures,
+        write_lake,
+    )
+
+    names = _mcx_roots(roots)
+    root = data_dir()
+    manifest = load_manifest(root)
+    try:
+        client = _mcx_client()
+        lo, hi = date.fromisoformat(manifest["from"]), date.fromisoformat(manifest["to"])
+        expiries = futures_expiries(client, reference_futures(names, date.today()), lo, hi)
+        for name, live in listed_futures(names, date.today()).items():
+            expiries[name] = sorted(set(expiries.get(name, [])) | set(live))
+        plans = plan(manifest, names, expiries)
+        result = pull(client, root, plans, log=typer.echo)
+        out: dict = {"plans": len(plans), "pull": result}
+        if result["stopped"] is None and not pull_only:
+            for name in names:
+                mine = [p for p in plans if p.root == name]
+                out[name] = write_lake(root, mine, register_futures(root, mine))
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(json.dumps(out, indent=2, default=str))
+    if result["stopped"] is not None:
+        raise typer.Exit(1 if result["stopped"] == "credentials" else 2)
+
+
 @fyers_app.command("mcx-import")
 def fyers_mcx_import(
     roots: str = typer.Option(..., help="Comma-separated MCX option roots, e.g. CRUDEOIL."),
