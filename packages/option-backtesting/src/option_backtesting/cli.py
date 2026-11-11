@@ -808,6 +808,52 @@ def fyers_mcx_pull(
         raise typer.Exit(2)
 
 
+@fyers_app.command("mcx-daily")
+def fyers_mcx_daily(
+    session: str | None = typer.Option(
+        None, "--session", help="The session to collect, YYYY-MM-DD (default: the one last held)."
+    ),
+    roots: str = typer.Option("all", help="Comma-separated MCX option roots, or all."),
+    expiries: int = typer.Option(2, help="How many of each root's nearest expiries to collect."),
+    wait: bool = typer.Option(
+        True,
+        "--wait/--no-wait",
+        help="Wait until a minute after the session's close (23:30 summer, 23:55 winter, IST).",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List what would be asked; ask nothing."),
+) -> None:
+    """BL-148 Phase 4: collect the session's 1-minute bars (with open interest) of every strike of
+    each MCX root's nearest expiries from Fyers' /data/history, from each contract's last stored
+    day, into the lake. Idempotent: it replaces only the rows of the contracts it fetched and
+    never touches an expired contract. Exit 0 done (or no session), 1 failed, 2 Fyers token
+    missing or refused (the scheduler then tries Angel One)."""
+    from .fyers.auth import FyersCredentialsError, resolve_credentials
+    from .fyers.client import FyersClient
+    from .fyers.daily import data_dir
+    from .fyers.mcx_daily import default_session, run
+    from .fyers.symbols import IST
+
+    day = date.fromisoformat(session) if session else default_session(datetime.now(IST))
+    try:
+        client = None if dry_run else FyersClient(resolve_credentials())
+        result = run(
+            client,
+            data_dir(),
+            session=day,
+            roots=_mcx_roots(roots),
+            expiries=expiries,
+            wait=wait,
+            dry_run=dry_run,
+            log=typer.echo,
+        )
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(2) from None
+    typer.echo(json.dumps(result, indent=2, default=str))
+    if result["status"] == "failed":
+        raise typer.Exit(1)
+
+
 @fyers_app.command("mcx-import")
 def fyers_mcx_import(
     roots: str = typer.Option(..., help="Comma-separated MCX option roots, e.g. CRUDEOIL."),
