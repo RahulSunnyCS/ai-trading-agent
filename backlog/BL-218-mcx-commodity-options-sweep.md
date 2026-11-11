@@ -202,3 +202,5 @@ None open: the owner's answers are in the Log.
   PBO 0.55, already above the 0.5 pass line (rule 3). **Waiting on the owner**: confirm the
   finalist list (or a dated rule changing it) so it can be committed before the test half is
   read; the 0% / 0.5% sensitivity runs follow.
+- 2026-11-11 — **Owner confirmed the 8 proposed finalists** ("Yes, commit and test"), committed
+  unchanged as `research/bl218/finalists_2026-11-11.json` before the test half is read.
