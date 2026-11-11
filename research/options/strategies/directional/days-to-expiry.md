@@ -25,6 +25,7 @@ two largest weights. See [rotation ranking](../../common/rotation-ranking.md).
 | BL-056 | DTE 0–6, NIFTY and SENSEX Dir **ATM**, family mean over the 11 start times 09:17–11:47 | 2025-09-01 → 2026-10-08, about 53 days a cell, 1 lot, ₹ per day, **before charges** | Descriptive, no verdict | [BL-056][bl056] |
 | BL-059 | Same tables for start times 12:02–15:02 | same | Descriptive; morning patterns agree with BL-056 | [BL-059][bl059] |
 | BL-159 read 8 (monthly-expiry week) | The five trading days ending on the month's last NIFTY weekly expiry vs the other days, the base Dir ATM 09:24 (stored rotation results, gross per lot) | NIFTY, 2024-10-09 → 2026-10-08 | Screen, **no lead**: not a skip for both base strategies (bar: mean in group minus out of group of −₹500 or worse with t ≤ −2 for both) | [BL-159][bl159] |
+| BL-218 (MCX minis) | expiry week (last 5 sessions) vs the week before | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | Expiry week passed on GOLDM; the week before failed on GOLDM and SILVERM | [MCX page](mcx-commodities.md) |
 
 BL-056's Result prints the Dir row by weekday only. Mapped to days to expiry, ₹ per day per lot:
 

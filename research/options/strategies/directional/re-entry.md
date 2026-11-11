@@ -18,6 +18,7 @@ fixed base and every rotation Dir file.
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-096 secondary | none, COST ×1, COST ×2, ASAP ×1, ASAP ×2; cut-off none / 11:00 / 12:00 / 13:00 (not crossed with everything) | 4,400 rows on four primary settings; holdout 2025-10-09 → 2026-10-09, before and **after charges** | Descriptive; exploratory (shortlist chosen after viewing the holdout) | [BL-096][bl096] |
+| BL-218 (MCX minis) | none / cost×1 | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | Only GOLDM expiry week passed (cost×1) | [MCX page](mcx-commodities.md) |
 
 Mean of the 100 bases, holdout, before charges: 25% / ₹4,000 with COST ×2 ₹83,541 (₹348 a day, drawdown
 −₹17,242, Ulcer ₹5,384) against COST ×1 ₹81,783 (₹341 a day, −₹18,650, ₹5,967) ([BL-096][bl096]).

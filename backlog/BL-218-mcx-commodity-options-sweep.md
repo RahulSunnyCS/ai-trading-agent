@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked for it; a new market for the workbench, not on the month's Momentum path |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options / trading-data |
 | **Created** | 2026-11-11 |
@@ -204,3 +204,31 @@ None open: the owner's answers are in the Log.
   read; the 0% / 0.5% sensitivity runs follow.
 - 2026-11-11 — **Owner confirmed the 8 proposed finalists** ("Yes, commit and test"), committed
   unchanged as `research/bl218/finalists_2026-11-11.json` before the test half is read.
+- 2026-11-11 — **Test half and verdict** (`score.py --half test --only
+  research/bl218/finalists_2026-11-11.json`; sensitivity tags `sens0`, `sens0.5`;
+  `results/main/verdict.json`). Pass rules: (1) test LB > 0, (2) fit net > 0, (3) cohort PBO
+  ≤ 0.5, (4) no expiry > 50% of the test net, (5) test net > 0 at 0.5% slippage.
+
+  | Finalist | Test net ₹ (1%) | ₹/session | PF | LB | Top expiry | 0.5% | 0% | Rules failed |
+  |---|---|---|---|---|---|---|---|---|
+  | **GOLDM Dir expiry week** — 18:00 ITM1 SL21 cost×1, to close | **96,369** | **1,606** | 2.80 | **+653** | 28% | 120,279 | 135,980 | **none — PASS** |
+  | GOLDM Dir week before — 19:00 ATM SL21 | −26,732 | −446 | 0.51 | −831 | — | −7,665 | 11,395 | 1, 3, 4, 5 |
+  | GOLDM Widesl expiry week — 17:05 OTM1 SL115 trail 15/10 | 32,861 | 548 | 1.66 | −138 | 56% | 41,579 | 50,311 | 1, 3, 4 |
+  | GOLDM Widesl week before — 17:05 OTM1 SL115, out 22:00 | −61,402 | −1,023 | 0.32 | −1,779 | — | −39,944 | −18,484 | 1, 4, 5 |
+  | GOLDM evening breakout expiry week | −25,016 | −417 | 0.70 | −1,081 | — | −11,967 | −4,888 | 1, 4, 5 |
+  | SILVERM Dir expiry week — 17:05 ITM1 SL30 cost×1 | −37,572 | −626 | 0.76 | −1,224 | — | −23,151 | −8,525 | 1, 4, 5 |
+  | SILVERM Dir week before — 17:05 ATM SL21 | 26,536 | 442 | 1.39 | −513 | 72% | 44,784 | 63,223 | 1, 4 |
+  | NATGASMINI Dir expiry week — 18:00 ATM SL30 | −6,966 | −116 | 0.58 | −260 | — | 1,764 | 3,425 | 1, 4 |
+
+  **Verdict:** one root × family × week works on this evidence — **GOLDM Dir in the expiry
+  week** (sell ITM1 CE + PE at 18:00, 21% leg stops, one re-entry at cost, held to 15 minutes
+  before the close). Every other cohort does not: crude (all killed on the fit year), natural gas,
+  silver, Widesl and both Buys. The passing cell made money in 10 of 12 fit and 9 of 12 test
+  expiries; after the verdict, descriptively, 6 of its 7 neighbouring cells and 66% of the 96 Dir
+  expiry-week cells were positive on the test year (median ₹11,048). Caveats: both years were a
+  gold bull run and the test-year gain leans on Jan–Mar 2026 (₹70,895 of ₹96,369); ~60 sessions a
+  year; one pass among 8 finalists drawn from 48 cohorts; option margin per lot and the real
+  bid-ask spread on gold mini options were not measured. A lead for a forward paper test, not
+  for live money. Findings pages: `research/options/strategies/{directional,widesl,buy-breakout}/
+  mcx-commodities.md`, and a BL-218 row on every variable page the grid tested.
+
