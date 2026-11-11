@@ -1,11 +1,15 @@
 """BL-218: the registered grid's size and SHA, and that every cell builds a valid strategy."""
 
+import importlib.util
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "research" / "bl218"))
-
-import grid  # noqa: E402
+# loaded under its own name: other items' tests import a different `grid` module
+_PATH = Path(__file__).resolve().parents[2] / "research" / "bl218" / "grid.py"
+_SPEC = importlib.util.spec_from_file_location("bl218_grid", _PATH)
+grid = importlib.util.module_from_spec(_SPEC)
+sys.modules["bl218_grid"] = grid  # dataclasses look their module up here
+_SPEC.loader.exec_module(grid)
 
 
 def test_registered_counts_and_sha():

@@ -47,13 +47,15 @@ def load(tag: str, root: str) -> tuple[dict, dict]:
 
 
 def _lb(net: np.ndarray, groups: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-    """5th percentile of the mean a session, resampling whole expiries (rows of `net` are
-    sessions, columns cells; NaN = not run, counted as no session)."""
+    """5th percentile of the mean a session run, resampling whole expiries (rows of `net` are
+    sessions, columns cells; NaN = not run, left out of both sum and count, as in `mean`)."""
     labels = np.unique(groups)
+    ran = ~np.isnan(net)
     sums = np.stack([np.nansum(net[groups == g], axis=0) for g in labels])
-    counts = np.array([(groups == g).sum() for g in labels], float)
+    counts = np.stack([ran[groups == g].sum(axis=0) for g in labels]).astype(float)
     pick = rng.integers(0, len(labels), size=(RESAMPLES, len(labels)))
-    means = sums[pick].sum(axis=1) / counts[pick].sum(axis=1)[:, None]
+    n = counts[pick].sum(axis=1)
+    means = sums[pick].sum(axis=1) / np.where(n > 0, n, 1)
     return np.percentile(means, 5, axis=0)
 
 
@@ -73,7 +75,7 @@ def score_cohort(meta: dict, mats: dict, family: str, week: str, half: str, cell
     losses = -np.where(filled < 0, filled, 0).sum(axis=0)
     by_expiry = np.stack([filled[expiry == e].sum(axis=0) for e in np.unique(expiry)])
     top_share = np.where(total > 0, by_expiry.max(axis=0) / np.where(total > 0, total, 1), np.inf)
-    lb = _lb(filled, expiry, np.random.default_rng(SEED))
+    lb = _lb(net, expiry, np.random.default_rng(SEED))
     run_n = ran.sum(axis=0)
     out = {}
     for j, cid in enumerate(ids):
@@ -140,7 +142,7 @@ def main() -> None:
     if args.half == "test":
         if not args.only:
             sys.exit("the test half is scored only for a committed finalists file (--only)")
-        path = Path(args.only)
+        path = Path(args.only).resolve()  # git runs from this folder, not the caller's
         tracked = subprocess.run(
             ["git", "ls-files", "--error-unmatch", str(path)],
             cwd=HERE,
@@ -170,7 +172,10 @@ def main() -> None:
                 res, extra = score_cohort(meta, mats, family, week, args.half, ids)
                 ranked = sorted(
                     res.values(),
-                    key=lambda m: (m.get("robust") is None, -(m.get("robust") or m["lb"])),
+                    key=lambda m: (
+                        m.get("robust") is None,
+                        -(m["robust"] if m.get("robust") is not None else m["lb"]),
+                    ),
                 )
                 best = [m for m in ranked if m.get("robust") is not None and m["robust"] > 0]
                 n_pass = sum(1 for m in res.values() if not m["fails"])

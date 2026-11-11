@@ -122,7 +122,10 @@ def listed_futures(roots: tuple[str, ...], today: date) -> dict[str, list[date]]
 def _live_answer(client: FyersClient, p: FuturePlan) -> tuple[dict, dict]:
     """A still-listed future through the ordinary history endpoint, shaped like an expired-API
     answer so the cache and the lake writer treat it alike."""
-    candles = client.minute_candles_range(p.symbol, p.start, p.end)
+    try:
+        candles = client.minute_candles_range(p.symbol, p.start, p.end)
+    except RuntimeError as error:  # a refusal or rate limit: classified like an expired answer
+        return {"s": "error", "message": str(error)}, {"symbol": p.symbol}
     body = {
         "s": "ok" if candles else "no_data",
         "columns": ["timestamp", "open", "high", "low", "close", "volume", "open_interest"],
@@ -178,6 +181,24 @@ def pull(
         tmp.replace(path)
         log(f"{p.symbol} {p.start}..{p.end}: {state}, {len(body.get('candles') or [])} bars")
     return {"asked": asked, "cached": cached, "states": dict(states), "stopped": None}
+
+
+def write_calendar(root: Path, manifest: dict, name: str, plans: list[FuturePlan]) -> Path:
+    """The contract calendar the legwise engine reads for an MCX root (`legwise.market.
+    mcx_calendar`): every option expiry of the manifest with the future it settles on (null
+    when none is known), and each future's own expiry."""
+    mine = [p for p in plans if p.root == name]
+    by_option = {p.option_expiry.isoformat(): p.symbol for p in mine}
+    body = {
+        "options": {e: by_option.get(e) for e in sorted(manifest["roots"][name]["expiries"])},
+        "futures": {p.symbol: p.future_expiry.isoformat() for p in mine},
+    }
+    path = root / "mcx" / f"calendar-{name}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(body, indent=1, sort_keys=True))
+    tmp.replace(path)
+    return path
 
 
 def register_futures(root: Path, plans: list[FuturePlan]) -> dict[str, int]:
@@ -284,6 +305,7 @@ __all__ = [
     "listed_futures",
     "settling_future",
     "plan",
+    "write_calendar",
     "pull",
     "register_futures",
     "write_lake",

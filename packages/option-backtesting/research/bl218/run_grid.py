@@ -23,6 +23,7 @@ import json
 import sys
 from concurrent.futures import ProcessPoolExecutor
 from datetime import date
+from functools import cache, lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -90,11 +91,30 @@ def season(root_dir: Path, root: str, day: date) -> str:
     return "winter" if last >= 23 * 60 + 30 else "summer"
 
 
+@lru_cache(maxsize=1)
+def _cells_by_id() -> dict:
+    return {c.id: c for c in grid.all_cells()}
+
+
+@lru_cache(maxsize=1)
+def _reference():
+    return default_reference_data()
+
+
+@cache
+def _strategy(cell_id: str, root: str, season: str, slippage: float | None):
+    """One worker builds each (cell, root, season, slippage) strategy once, not every session."""
+    strategy = grid.build(_cells_by_id()[cell_id], root, season)
+    if slippage is not None:
+        execution = strategy.execution.model_copy(update={"slippage_pct": slippage})
+        strategy = strategy.model_copy(update={"execution": execution})
+    return strategy
+
+
 def _run_day(job: tuple) -> dict:
     root_dir, root, day, cell_ids, slippage = job
-    by_id = {c.id: c for c in grid.all_cells()}
-    cells = [by_id[i] for i in cell_ids]
-    ref = default_reference_data()
+    cells = [_cells_by_id()[i] for i in cell_ids]
+    ref = _reference()
     n = len(cells)
     out = {
         "day": day,
@@ -111,13 +131,7 @@ def _run_day(job: tuple) -> dict:
         out["reason"] = f"load: {error}"
         return out
     for i, cell in enumerate(cells):
-        strategy = grid.build(cell, root, out["season"])
-        if slippage is not None:
-            strategy = strategy.model_copy(
-                update={
-                    "execution": strategy.execution.model_copy(update={"slippage_pct": slippage})
-                }
-            )
+        strategy = _strategy(cell.id, root, out["season"], slippage)
         result = simulate_day(strategy, data, ref, sizing_date=SIZING_DATE)
         charges = sum(mcx_charges.trade_charges(t) for t in result.trades)
         out["gross"][i] = result.gross

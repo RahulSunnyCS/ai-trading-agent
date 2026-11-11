@@ -817,8 +817,9 @@ def fyers_mcx_futures(
 ) -> None:
     """BL-218: the future each MCX option settles on (its symbol's month), one request per
     option expiry of the frozen manifest, cached under raw/fyers-expired/mcx-futures/ and
-    written to lake/bars_1m/asset=future/underlying=<ROOT>. Resumable; a rerun asks nothing
-    already cached and rewrites only these futures' rows."""
+    written to lake/bars_1m/asset=future/underlying=<ROOT>, plus the contract calendar the
+    legwise engine reads (mcx/calendar-<ROOT>.json). Resumable; a rerun asks nothing already
+    cached and rewrites only these futures' rows."""
     from .fyers.auth import FyersCredentialsError
     from .fyers.daily import data_dir
     from .fyers.mcx import load_manifest, reference_futures
@@ -828,6 +829,7 @@ def fyers_mcx_futures(
         plan,
         pull,
         register_futures,
+        write_calendar,
         write_lake,
     )
 
@@ -847,6 +849,7 @@ def fyers_mcx_futures(
             for name in names:
                 mine = [p for p in plans if p.root == name]
                 out[name] = write_lake(root, mine, register_futures(root, mine))
+                out[name]["calendar"] = str(write_calendar(root, manifest, name, mine))
     except FyersCredentialsError as error:
         typer.echo(f"stopped: {error}")
         raise typer.Exit(1) from None

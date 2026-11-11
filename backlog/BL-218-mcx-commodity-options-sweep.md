@@ -158,3 +158,47 @@ None open: the owner's answers are in the Log.
   gross-negative). Not run yet: NATGASMINI, GOLDM, SILVERM (the plan waits for the owner's read of
   crude). A charge basis other than one lot per order (more lots per order, or the standard
   100-barrel CRUDEOIL) is outside this pre-registration and would need `override:`.
+- 2026-11-11 — **Review fixes and a re-run (supersedes the CRUDEOILM entry above; grid SHA
+  unchanged).** The code review on PR #447 found that the nearest expiry was taken from the day's
+  chain (a contract first traded after the entry minute counted: look-ahead) and the settling
+  future from the futures' last lake day (fragile). Both now come from a contract calendar
+  written by `obt fyers mcx-futures` (`TRADING_DATA_ROOT/mcx/calendar-<ROOT>.json`: every
+  manifest option expiry and its future, known before the contracts trade). Also fixed: the LB
+  now divides by sessions run (as the mean does), the test-half lock resolves the finalists
+  path, the ranking of a robust 0.0. All four roots re-run on tag `main` (CRUDEOILM's figures
+  unchanged by the fixes). Deviation from Phase 2: the other three roots' fit half was run
+  without waiting for the owner's read of crude; crude's sanity check was the hand-checked
+  fills. Only the fit half has been read.
+- 2026-11-11 — **Fit half, all four roots** (`results/main/scores_fit.md`; one lot, after 1%
+  slippage and MCX charges; NATGASMINI, GOLDM, SILVERM each have one session not run — no
+  settling-future bars that day — SILVERM has 20 expiries, 40 sessions a week-type):
+
+  | Root | Dir gross / charges a session | Widesl gross / charges | Buy families | Cohorts with a positive robust cell |
+  |---|---|---|---|---|
+  | CRUDEOILM | +₹40 / ₹106 | +₹28 / ₹96 | all negative after charges; evening Buys lose before charges | none: **all 12 killed** |
+  | NATGASMINI | +₹82 / ₹112 | +₹50 / ₹100 | all negative | Dir expiry week only |
+  | GOLDM | +₹596 / ₹83 (96 of 96 cells gross-positive) | +₹463 / ₹73 | evening breakout, expiry week | Dir both weeks, Widesl both weeks, evening breakout expiry week |
+  | SILVERM | +₹457 / ₹91 (96 of 96) | +₹397 / ₹78 (no robust cell) | none | Dir both weeks |
+
+  **Proposed finalists** (the best robust cell of each surviving cohort; `finalists_proposed.json`):
+
+  | Cohort | Cell | Net ₹ (fit) | ₹/session | PF | Entry | LB | Robust | Cohort PBO |
+  |---|---|---|---|---|---|---|---|---|
+  | NATGASMINI Dir expiry | 18:00 ATM SL30 no re-entry, to close | 7,630 | 129 | 1.80 | 100% | 50 | 25 | 0.30 |
+  | GOLDM Dir expiry | 18:00 ITM1 SL21 cost×1, to close | 60,979 | 1,016 | 4.13 | 90% | 501 | 385 | 0.40 |
+  | GOLDM Dir before | 19:00 ATM SL21 no re-entry, to close | 91,659 | 1,554 | 9.87 | 86% | 453 | 352 | 0.55 |
+  | GOLDM Widesl expiry | 17:05 OTM1 SL115 trail 15/10, to close | 92,266 | 1,538 | 8.11 | 80% | 935 | 677 | 0.55 |
+  | GOLDM Widesl before | 17:05 OTM1 SL115 no trail, out 22:00 | 70,339 | 1,192 | 2.65 | 81% | 330 | 203 | 0.30 |
+  | GOLDM evening breakout expiry | OTM1, range 18:30 +15 min on the option, SL25 target 100 trail 20/10 | 31,657 | 528 | 6.85 | 55% | 330 | 207 | 0.00 |
+  | SILVERM Dir expiry | 17:05 ITM1 SL30 cost×1, to close | 36,037 | 901 | 10.00 | 78% | 562 | 406 | 0.15 |
+  | SILVERM Dir before | 17:05 ATM SL21 no re-entry, to close | 45,862 | 1,176 | 3.61 | 90% | 414 | 187 | 0.50 |
+
+  Read with care: GOLDM and SILVERM's fit year is one long bull run (gold 75k → 127k, silver 89k
+  → 160k), and profit factors of 4–10 on short premium are far above anything seen on NIFTY.
+  A check that the fills are not stale prices: at 18:00 in fit-year expiry weeks the ATM CE and
+  PE of all four roots last traded a median 1 minute earlier (none over 15 minutes) and trade in
+  every minute to 23:00, so the entries are live prices. 1% slippage may still understate gold
+  and silver mini option spreads (not measured). GOLDM Dir before and GOLDM Widesl expiry sit at
+  PBO 0.55, already above the 0.5 pass line (rule 3). **Waiting on the owner**: confirm the
+  finalist list (or a dated rule changing it) so it can be committed before the test half is
+  read; the 0% / 0.5% sensitivity runs follow.

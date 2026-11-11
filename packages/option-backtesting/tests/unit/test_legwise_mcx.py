@@ -2,9 +2,12 @@
 future as spot, per-root ticks, and the per-underlying session check. NSE behaviour is held by
 tests/golden/test_legwise_scenarios.py."""
 
+import json
 from datetime import date, datetime, timedelta, timezone
 
 import pyarrow as pa
+import pyarrow.compute as pc
+import pyarrow.parquet as pq
 import pytest
 from pydantic import ValidationError
 from trading_data import lake
@@ -59,7 +62,6 @@ def _flat(start: str, end: str, price: float):
 def root(tmp_path):
     """One CRUDEOILM day: the expiring Oct chain (5100/5150/5200, CE+PE), one Nov contract, the
     Oct future at 5164 and the Nov future at 5200 (the wrong one to read)."""
-    market._future_last_days.cache_clear()
     opt_rows, opt_extra = [], []
     prices = {
         (5100.0, "CE"): 100.0, (5150.0, "CE"): 70.0, (5200.0, "CE"): 45.0,
@@ -94,16 +96,24 @@ def root(tmp_path):
         _bars(fut_rows, BAR_SCHEMA, fut_extra),
         lake.bars_1m_path(tmp_path, "future", "CRUDEOILM", DAY),
     )
-    # the Oct future's last day in the lake is its expiry (20 Oct); the Nov future's later
-    for later, sym, p in ((date(2025, 10, 20), "OCT", 5164.0), (date(2025, 11, 19), "NOV", 5200.0)):
-        path = lake.bars_1m_path(tmp_path, "future", "CRUDEOILM", later)
-        rows = [(r[0], *r[1:]) for r in _flat("09:00", "09:01", p)]
-        lake.write_parquet(
-            _bars(rows, BAR_SCHEMA, [{"id": 1, "vendor_symbol": f"MCX:CRUDEOILM25{sym}FUT"}] * 2),
-            path,
+    # the contract calendar: the Oct options settle on the Oct future, Nov's on the Nov future
+    path = market.mcx_calendar_path(tmp_path, "CRUDEOILM")
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "options": {
+                    str(EXPIRY): "MCX:CRUDEOILM25OCTFUT",
+                    str(NEXT): "MCX:CRUDEOILM25NOVFUT",
+                },
+                "futures": {
+                    "MCX:CRUDEOILM25OCTFUT": "2025-10-20",
+                    "MCX:CRUDEOILM25NOVFUT": "2025-11-19",
+                },
+            }
         )
+    )
     yield tmp_path
-    market._future_last_days.cache_clear()
 
 
 def _strategy(**over):
@@ -133,7 +143,7 @@ def test_an_mcx_day_runs_on_the_09_00_grid_with_its_settling_future(root):
     d = load_day(root, "CRUDEOILM", DAY)
     assert (d.session_start, d.n_minutes) == (9 * 60, 895)
     assert d.vix is None and d.listed_expiries == [EXPIRY, NEXT]
-    # the Oct option settles on the Oct future (ends 20 Oct), not the Nov one at 5200
+    # the Oct option settles on the Oct future, not the Nov one at 5200
     assert d.spot.price_at(minute_index("18:00", 9 * 60)) == 5164.0
     assert minute_label(minute_index("23:54", 9 * 60), 9 * 60) == "23:54"
 
@@ -195,3 +205,14 @@ def test_a_day_without_its_settling_future_is_refused_by_name(root):
     lake.bars_1m_path(root, "future", "CRUDEOILM", DAY).unlink()
     with pytest.raises(FileNotFoundError, match="mcx-futures"):
         load_day(root, "CRUDEOILM", DAY)
+
+
+def test_the_nearest_expiry_comes_from_the_calendar_not_the_days_bars(root):
+    """An expiring contract with no bar that day is still the nearest expiry: its legs simply
+    do not trade, and the next month is never traded in its place."""
+    path = lake.bars_1m_path(root, "option", "CRUDEOILM", DAY)
+    t = pq.read_table(path)
+    lake.write_parquet(t.filter(pc.equal(t.column("expiry"), NEXT)).cast(OPT_SCHEMA), path)
+    d = load_day(root, "CRUDEOILM", DAY)
+    assert d.listed_expiries[0] == EXPIRY and d.spot.price_at(minute_index("18:00", 540)) == 5164.0
+    assert simulate_day(_strategy(), d, default_reference_data()).trades == []

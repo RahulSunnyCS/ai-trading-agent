@@ -12,13 +12,13 @@ nearest option expiry settles on (`lake/bars_1m/asset=future/underlying=<ROOT>`,
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
-import duckdb
 import pyarrow as pa
 import pyarrow.compute
 import pyarrow.parquet as pq
@@ -158,32 +158,25 @@ def _load_bars(
     return series.forward_fill()
 
 
+def mcx_calendar_path(root: Path, underlying: str) -> Path:
+    """The MCX contract calendar `obt fyers mcx-futures` writes: every option expiry of the
+    frozen manifest and the future each settles on (both known before the contracts trade)."""
+    return root / "mcx" / f"calendar-{underlying}.json"
+
+
 @lru_cache(maxsize=16)
-def _future_last_days(root: Path, underlying: str) -> dict[str, date]:
-    """{future symbol: the last day the lake holds it} for an MCX root. A future's bars run to
-    its expiry, so this is each future's expiry for the futures an option expiry needs (the
-    pull asks each up to its own expiry, or 10 days past the option's, whichever is first)."""
-    folder = root / "lake" / "bars_1m" / "asset=future" / f"underlying={underlying}"
-    if not folder.exists():
-        return {}
-    con = duckdb.connect()
-    try:
-        rows = con.execute(
-            "SELECT vendor_symbol, max(date) FROM read_parquet(?, hive_partitioning = true) "
-            "GROUP BY vendor_symbol",
-            [str(folder / "date=*" / "data.parquet")],
-        ).fetchall()
-    finally:
-        con.close()
-    return {sym: last for sym, last in rows}
+def _mcx_calendar(path: Path, mtime_ns: int) -> dict:
+    del mtime_ns  # part of the cache key only: a rewritten calendar is read again
+    return json.loads(path.read_text())
 
 
-def settling_future(root: Path, underlying: str, option_expiry: date) -> str | None:
-    """The future an MCX option expiry settles on: of the futures the lake holds, the one whose
-    bars end first on or after the option's expiry (`fyers.mcx_futures.settling_future`)."""
-    ends = _future_last_days(root, underlying)
-    after = sorted((last, sym) for sym, last in ends.items() if last >= option_expiry)
-    return after[0][1] if after else None
+def mcx_calendar(root: Path, underlying: str) -> dict:
+    """{"options": {option expiry: future symbol}, "futures": {future symbol: its expiry}}
+    (ISO dates); empty when the calendar has not been written."""
+    path = mcx_calendar_path(root, underlying)
+    if not path.exists():
+        return {"options": {}, "futures": {}}
+    return _mcx_calendar(path, path.stat().st_mtime_ns)
 
 
 def available_days(root: Path, underlying: str) -> list[date]:
@@ -273,16 +266,19 @@ def load_day(root: Path, underlying: str, day: date) -> DayData:
 
 def _load_mcx_day(root: Path, underlying: str, day: date) -> DayData:
     """An MCX day: the option chain on the 09:00..23:54 grid, and as spot the future the
-    nearest option expiry settles on. Listed expiries are the chain's (MCX has no Fyers
-    master in the lake; the expiring contract trades every day of its last weeks)."""
+    nearest option expiry settles on, both from the contract calendar (`mcx_calendar`)."""
     start, n = session(underlying)
     opt_path = lake.bars_1m_path(root, "option", underlying, day)
     if not opt_path.exists():
         raise FileNotFoundError(f"no option file for {underlying} on {day} under {root}")
     chain = _load_chain(opt_path, start, n)
-    listed = sorted({k[0] for k in chain})
+    calendar = mcx_calendar(root, underlying)
+    # expiries from the contract calendar, not from the day's bars: a contract that first
+    # trades after the entry minute must not decide which expiry is "nearest" (look-ahead), and
+    # an expiring contract with no bar that day is still the nearest (its legs then don't trade)
+    listed = sorted(date.fromisoformat(e) for e in calendar["options"])
     upcoming = [e for e in listed if e >= day]
-    future = settling_future(root, underlying, upcoming[0]) if upcoming else None
+    future = calendar["options"].get(upcoming[0].isoformat()) if upcoming else None
     spot = (
         _load_bars(lake.bars_1m_path(root, "future", underlying, day), start, n, symbol=future)
         if future
@@ -291,7 +287,7 @@ def _load_mcx_day(root: Path, underlying: str, day: date) -> DayData:
     if spot is None:
         raise FileNotFoundError(
             f"no future bars for {underlying} on {day} (settling future {future}) under {root}; "
-            "`obt fyers mcx-futures` writes them"
+            "`obt fyers mcx-futures` writes them and the contract calendar"
         )
     return DayData(
         day=day,
