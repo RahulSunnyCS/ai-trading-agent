@@ -104,6 +104,34 @@ describe('job registry', () => {
     expect(t1?.steps.at(-1)?.includes('--soft-fail')).toBe(false); // a failed result still alerts
   });
 
+  it('collects the MCX session after its close on weekdays, and a retry after midnight keeps that session', () => {
+    const mcx = JOBS.find((job) => job.id === 'mcx-collect');
+    expect(mcx?.schedule.at).toBe('23:31');
+    expect(mcx?.steps).toEqual([
+      ['uv', 'run', '--directory', 'packages/option-backtesting', 'obt', 'fyers', 'mcx-daily'],
+    ]);
+    // a missing or refused Fyers token (exit 2) is not retried: a retry cannot log in
+    expect(mcx?.noRetryExitCodes).toEqual([2]);
+    expect(mcx?.group).toBe('catalog');
+    // the command waits up to 25 minutes for the winter close, then asks for ~5,000 contracts
+    expect((mcx?.timeoutMinutes ?? 0) >= 90).toBe(true);
+    // Mon-Fri including NSE holidays (MCX trades most holiday evenings); never Saturday
+    const slot = mcx?.schedule;
+    expect(slot?.on('2026-10-02')).toBe(true); // Gandhi Jayanti: an NSE holiday
+    expect(slot?.on('2026-10-03')).toBe(false); // Saturday
+    // at 00:20 the slot still due is yesterday's 23:31, inside the catch-up window (to 05:30)
+    const after = istAt('2026-11-12', '00:20');
+    const due = slot ? previousDue(slot, after) : null;
+    expect(due?.toISOString()).toBe(istAt('2026-11-11', '23:31').toISOString());
+    expect((after.getTime() - (due?.getTime() ?? 0)) / 3_600_000).toBeLessThan(
+      mcx?.catchUpHours ?? 0,
+    );
+    // Friday night's slot is still caught up in the early hours of Saturday
+    expect(previousDue(slot!, istAt('2026-11-14', '01:00'))?.toISOString()).toBe(
+      istAt('2026-11-13', '23:31').toISOString(),
+    );
+  });
+
   it('sends the rotation result at 16:00, retrying every 5 minutes until 16:35', () => {
     const result = JOBS.find((job) => job.id === 'options-rotation-result');
     expect(result?.schedule.at).toBe('16:00');
@@ -198,7 +226,8 @@ describe('Angel One login check', () => {
     // BL-203: + rotation-live-board
     // BL-197 Phase 2: + algotest-activate, - algotest-deploy, - algotest-topup
     // owner 2026-11-05: + momentum-orders-tentative (Thu 18:30)
-    expect(JOBS).toHaveLength(50);
+    // BL-148 Phase 4: + mcx-collect (weekdays 23:31)
+    expect(JOBS).toHaveLength(51);
   });
 });
 

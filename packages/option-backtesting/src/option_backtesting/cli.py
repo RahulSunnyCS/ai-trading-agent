@@ -858,6 +858,145 @@ def fyers_mcx_futures(
         raise typer.Exit(1 if result["stopped"] == "credentials" else 2)
 
 
+@fyers_app.command("mcx-daily")
+def fyers_mcx_daily(
+    session: str | None = typer.Option(
+        None, "--session", help="The session to collect, YYYY-MM-DD (default: the one last held)."
+    ),
+    roots: str = typer.Option("all", help="Comma-separated MCX option roots, or all."),
+    expiries: int = typer.Option(2, help="How many of each root's nearest expiries to collect."),
+    wait: bool = typer.Option(
+        True,
+        "--wait/--no-wait",
+        help="Wait for the session to end: 23:31 IST, then 23:56 if a future still trades.",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List what would be asked; ask nothing."),
+    source: str = typer.Option(
+        "fyers",
+        "--source",
+        help="fyers (default) or angelone (go straight to Angel One, e.g. to test the fallback).",
+    ),
+    angel: bool = typer.Option(
+        True,
+        "--angel/--no-angel",
+        help="When Fyers cannot be used (no token, or a refused one), collect from Angel One "
+        "instead: up to 3 days back, never replacing a day already stored.",
+    ),
+) -> None:
+    """BL-148 Phase 4: collect the session's 1-minute bars (with open interest) of every strike of
+    each MCX root's nearest expiries from Fyers' /data/history, from each contract's last stored
+    day, into the lake. Idempotent: it replaces only the rows of the contracts it fetched and
+    never touches an expired contract. With no usable Fyers token it collects from Angel One
+    (one guarded login; its bars approximate Fyers' and are overwritten by the next Fyers run
+    for contracts still listed). Exit 0 done (or no session), 1 failed, 2 no source could log in."""
+    from .fyers.auth import FyersCredentialsError, resolve_credentials
+    from .fyers.client import FyersClient
+    from .fyers.daily import data_dir
+    from .fyers.mcx_daily import default_session, run
+    from .fyers.symbols import IST
+
+    if source not in ("fyers", "angelone"):
+        raise typer.BadParameter("--source must be fyers or angelone")
+    day = date.fromisoformat(session) if session else default_session(datetime.now(IST))
+    common = {
+        "session": day,
+        "roots": _mcx_roots(roots),
+        "expiries": expiries,
+        "wait": wait,
+        "log": typer.echo,
+    }
+
+    def from_angel_one() -> dict:
+        from .angelone import check
+        from .angelone.mcx import AngelMcxClient
+
+        with check.session() as sess:
+            return run(
+                AngelMcxClient(sess), data_dir(), source="angelone", inclusive=False,
+                lookback=3, **common,
+            )  # fmt: skip
+
+    fell_back = None
+    if dry_run:  # nothing is asked of either source, so nothing logs in
+        result = run(None, data_dir(), dry_run=True, source=source, **common)
+    elif source == "angelone":
+        try:
+            result = from_angel_one()
+        except FyersCredentialsError as angel_error:  # Angel One's errors subclass Fyers'
+            typer.echo(f"stopped: Angel One: {angel_error}")
+            raise typer.Exit(2) from None
+    else:
+        try:
+            result = run(FyersClient(resolve_credentials()), data_dir(), **common)
+        except FyersCredentialsError as error:
+            if not angel:
+                typer.echo(f"stopped: {error}")
+                raise typer.Exit(2) from None
+            fell_back = str(error)[:200]
+            typer.echo(f"Fyers cannot be used ({fell_back}); collecting from Angel One")
+            try:
+                result = from_angel_one()
+            except FyersCredentialsError as angel_error:
+                typer.echo(f"stopped: Fyers: {fell_back}; Angel One: {angel_error}")
+                raise typer.Exit(2) from None
+    if fell_back:
+        result["fell_back_from_fyers"] = fell_back
+    typer.echo(json.dumps(result, indent=2, default=str))
+    if result["status"] == "failed":
+        raise typer.Exit(1)
+
+
+@fyers_app.command("mcx-compare")
+def fyers_mcx_compare(
+    roots: str = typer.Option("all", help="Comma-separated MCX option roots, or all."),
+    expiry: list[str] = typer.Option(
+        [], "--expiry", help="One expired expiry, YYYY-MM-DD (repeat)."
+    ),
+    from_expiry: str | None = typer.Option(
+        None, "--from-expiry", help="Every expired expiry of the manifest on or after this day."
+    ),
+    since: str | None = typer.Option(
+        None, "--since", help="First day to compare (default: the first night the collector ran)."
+    ),
+) -> None:
+    """BL-148 Phase 5: for expired expiries whose raw expired-API answers are cached (`mcx-pull`,
+    NOT imported), compare them minute by minute and field by field with the bars the nightly
+    collector stored from /data/history (days from the Angel One fallback left out). Writes
+    compare-<root>-<expiry>.json/.csv beside the manifest; nothing goes into the lake."""
+    from .fyers.daily import data_dir
+    from .fyers.mcx import load_manifest, plan_expiries
+    from .fyers.mcx_compare import compare_expiry, write_report
+
+    root, manifest = data_dir(), load_manifest(data_dir())
+    from .fyers.symbols import IST
+
+    today = datetime.now(IST).date()
+    wanted = {date.fromisoformat(e) for e in expiry}
+    floor = date.fromisoformat(from_expiry) if from_expiry else None
+    if not wanted and floor is None:
+        raise typer.BadParameter("give --expiry D (repeatable) or --from-expiry D")
+    for name in _mcx_roots(roots):
+        for _n, item in plan_expiries(manifest, (name,)):
+            if item.expiry >= today or not (
+                item.expiry in wanted or (floor and item.expiry >= floor)
+            ):
+                continue
+            result = compare_expiry(
+                root,
+                manifest,
+                name,
+                item.expiry,
+                since=date.fromisoformat(since) if since else None,
+            )
+            path = write_report(root, result)
+            typer.echo(
+                f"{name} {item.expiry}: {result['contracts_compared']} contracts, "
+                f"{result['rows_both']} rows on both sides, {result['rows_only_lake']} only in "
+                f"History, {result['rows_only_expired']} only expired, identical "
+                f"{result['share_identical_rows']}  -> {path}"
+            )
+
+
 @fyers_app.command("mcx-import")
 def fyers_mcx_import(
     roots: str = typer.Option(..., help="Comma-separated MCX option roots, e.g. CRUDEOIL."),

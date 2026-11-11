@@ -879,6 +879,36 @@ const BASE_JOBS: Job[] = [
     fixHint: 'bun run --filter @ata/scheduler jobs run morning-summary',
   },
   {
+    // BL-148 Phase 4: the nightly MCX option collection. One job, not one per season: MCX's close
+    // is 23:30 or 23:55 IST and the switch dates follow no calendar rule (10 Mar / 3 Nov in 2025,
+    // 18 Mar / 30 Oct in 2026), so the command waits for 23:31, looks at the nearest future's last
+    // bar and waits on to 23:56 only if the session is still trading. Expiring contracts trade to
+    // the close and cannot be fetched after they expire, so a run that fired early would lose
+    // their last 25 minutes for good.
+    id: 'mcx-collect',
+    description:
+      "Collect the MCX session's 1-minute option bars with open interest (`obt fyers mcx-daily`): every strike of each commodity's nearest two expiries from Fyers' /data/history, from each contract's last stored day, into the lake (BL-148). Waits for the MCX close (23:30 or 23:55, read from the data), replaces only the rows of the contracts it fetches, never touches an expired contract",
+    // Weekdays, holidays included: MCX trades its evening session on most NSE holidays, and a
+    // day it is shut gives "no session" (exit 0). The Fyers token from the morning login lasts
+    // until 06:00, so a run that crosses midnight needs no new login.
+    schedule: {
+      at: '23:31',
+      on: onWeekdays(1, 2, 3, 4, 5),
+      label: 'weekdays 23:31 (after the MCX close)',
+    },
+    steps: [['uv', 'run', '--directory', OPTIONS, 'obt', 'fyers', 'mcx-daily']],
+    cwd: '.',
+    timeoutMinutes: 120, // per step: up to 25 min waiting for the close, then ~35 min of requests
+    retries: 2,
+    retryDelayMinutes: 15,
+    // exit 2 = no Fyers token (or a refused one): a retry cannot help before a login
+    noRetryExitCodes: [2],
+    catchUpHours: 6, // until 05:30: the token dies at 06:00 and a later day's run starts from the last stored day
+    group: 'catalog',
+    fixHint:
+      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt fyers mcx-daily (before 06:00 it takes the evening just held; the next night completes any days missed)',
+  },
+  {
     id: 'contract-notes',
     description:
       "Read the brokers' contract notes (BL-168): each account's new mail since its bookmark, the PDF kept and its figures stored under TRADING_DATA_ROOT/contract-notes/ (F&O for Finvasia and Angel One, equity for the Momentum account on Zerodha); sessions that can have no note are closed (no trade / no note). Never writes the Google Sheet (trade-analytics keeps it)",
