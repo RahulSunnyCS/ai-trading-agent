@@ -173,6 +173,12 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
   `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
   scheduler or laptop restart (reaped as interrupted, exit -2, by `startLoop` before its first tick) is
   started again while the session lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
+- `mcx-forward-spread` (BL-219, weekdays 18:00, `obt mcx-forward spread`) and `mcx-forward-score`
+  (Tue-Sat 01:30, `obt mcx-forward score`, group `catalog`, exit 2 not retried) run the gold Dir
+  forward paper test: the 18:00 job reads live quotes (read-only) and does nothing outside a gold
+  expiry window (the last five sessions before an option expiry from 2026-11-27); the 01:30 job
+  scores the evening just held (`default_session`: at 01:30 that is yesterday's) after the 23:31
+  collector, journaling it and sending one private Telegram line. Neither places an order.
 - `momentum-journal-score` (BL-024, Fri 20:30, `mbt journal score`) sits between the 19:30
   stock-ingest run (which records the week's journal rows and prices it scores against) and the
   21:00 journal check, in the `catalog` group so it waits for a late 19:30 run. It re-runs every

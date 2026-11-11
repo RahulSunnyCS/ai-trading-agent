@@ -227,7 +227,32 @@ describe('Angel One login check', () => {
     // BL-197 Phase 2: + algotest-activate, - algotest-deploy, - algotest-topup
     // owner 2026-11-05: + momentum-orders-tentative (Thu 18:30)
     // BL-148 Phase 4: + mcx-collect (weekdays 23:31)
-    expect(JOBS).toHaveLength(51);
+    // BL-219: + mcx-forward-spread (weekdays 18:00), mcx-forward-score (Tue-Sat 01:30)
+    expect(JOBS).toHaveLength(53);
+  });
+});
+
+describe('gold Dir forward test (BL-219)', () => {
+  it('reads the spread at 18:00 on weekdays and scores the evening just held at 01:30', () => {
+    const spread = JOBS.find((job) => job.id === 'mcx-forward-spread');
+    expect(spread?.schedule.at).toBe('18:00');
+    expect(spread?.steps).toEqual([
+      ['uv', 'run', '--directory', 'packages/option-backtesting', 'obt', 'mcx-forward', 'spread'],
+    ]);
+    expect(spread?.schedule.on('2026-11-23')).toBe(true); // a Monday
+    expect(spread?.schedule.on('2026-11-28')).toBe(false); // a Saturday
+    const score = JOBS.find((job) => job.id === 'mcx-forward-score');
+    expect(score?.schedule.at).toBe('01:30');
+    expect(score?.steps).toEqual([
+      ['uv', 'run', '--directory', 'packages/option-backtesting', 'obt', 'mcx-forward', 'score'],
+    ]);
+    // 01:30 Tuesday scores Monday's evening: Tue-Sat only, never Sunday or Monday morning
+    expect(score?.schedule.on('2026-11-24')).toBe(true);
+    expect(score?.schedule.on('2026-11-28')).toBe(true); // Saturday 01:30 = Friday's session
+    expect(score?.schedule.on('2026-11-29')).toBe(false);
+    expect(score?.schedule.on('2026-11-30')).toBe(false);
+    expect(score?.group).toBe('catalog'); // queues behind the collector
+    expect(score?.noRetryExitCodes).toEqual([2]);
   });
 });
 

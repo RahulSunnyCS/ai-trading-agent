@@ -25,6 +25,10 @@ ingest_app = typer.Typer(no_args_is_help=True)
 app.add_typer(ingest_app, name="ingest")
 fyers_app = typer.Typer(no_args_is_help=True, help="Daily 1-minute Fyers collector.")
 app.add_typer(fyers_app, name="fyers")
+mcx_forward_app = typer.Typer(
+    no_args_is_help=True, help="BL-219: forward paper test of GOLDM Dir in the expiry week."
+)
+app.add_typer(mcx_forward_app, name="mcx-forward")
 legwise_app = typer.Typer(no_args_is_help=True, help="AlgoTest-style leg-wise backtests.")
 app.add_typer(legwise_app, name="legwise")
 
@@ -1286,3 +1290,110 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def _forward_session(value: str | None):
+    from .fyers.mcx_daily import default_session
+    from .fyers.symbols import IST
+
+    return date.fromisoformat(value) if value else default_session(datetime.now(IST))
+
+
+@mcx_forward_app.command("score")
+def mcx_forward_score(
+    session: str | None = typer.Option(
+        None, "--session", help="The session just closed, YYYY-MM-DD (default: the last held)."
+    ),
+    no_telegram: bool = typer.Option(False, "--no-telegram"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Simulate and print; write no future bars and no journal line."
+    ),
+) -> None:
+    """BL-219: extend the GOLDM contract calendar, then score (journal) every window session that
+    has its option bars and no line yet. Exit 0 done / nothing due, 2 no Fyers token, 1 failed.
+    Nothing here places an order."""
+    from . import mcx_forward as mf
+    from .fyers.auth import FyersCredentialsError
+    from .fyers.daily import data_dir
+    from .notify import Notification, send
+    from .rotation import journal
+
+    root = data_dir()
+    last = _forward_session(session)
+    try:
+        client = _mcx_client()
+        cal = mf.extend_calendar(root, last)
+        typer.echo(f"calendar: {len(cal['expiries'])} GOLDM expiries, added {cal['added']}")
+        if dry_run:
+            for day, expiry in mf.sessions_to_score(root, last):
+                typer.echo(f"would score {day} (expiry {expiry})")
+            return
+        due = mf.sessions_to_score(root, last)
+        failed = 0
+        for day, expiry in due:
+            try:
+                entry = mf.score_session(root, client, day, expiry)
+            except journal.AlreadyRecorded:
+                continue
+            except RuntimeError as error:  # no future bars yet: a later night completes it
+                typer.echo(f"{day}: not scored: {error}")
+                failed += 1
+                continue
+            line = mf.telegram_line(entry, mf.summary(root))
+            typer.echo(line)
+            if not no_telegram:
+                send(Notification(source="mcx-forward", severity="info", title=line, plain=True))
+        missing = mf.expected_without_data(root, last)
+        if missing and not no_telegram:
+            send(
+                Notification(
+                    source="mcx-forward",
+                    severity="warn",
+                    title=f"Gold Dir paper: no GOLDM option bars for {missing} yet",
+                    body="A holiday, or the nightly collector has not delivered. A later night "
+                    "scores it if it is a session.",
+                )
+            )
+        if not due and not missing:
+            typer.echo("nothing due")
+        if failed:
+            raise typer.Exit(1)
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(2) from None
+
+
+@mcx_forward_app.command("spread")
+def mcx_forward_spread(
+    day: str | None = typer.Option(None, "--day", help="YYYY-MM-DD (default: today)."),
+) -> None:
+    """BL-219: the 18:00 read-only quotes of the future and the entry contracts (bid, ask, spread
+    %), written under mcx-forward/goldm-dir/spread/. Does nothing outside an expiry window."""
+    from . import mcx_forward as mf
+    from .fyers.auth import FyersCredentialsError
+    from .fyers.daily import data_dir
+    from .fyers.symbols import IST
+
+    today = date.fromisoformat(day) if day else datetime.now(IST).date()
+    try:
+        out = mf.spread_snapshot(data_dir(), _mcx_client(), today)
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(2) from None
+    typer.echo(json.dumps(out, indent=2) if out else f"{today}: not in a gold expiry window")
+
+
+@mcx_forward_app.command("status")
+def mcx_forward_status() -> None:
+    """BL-219: the running totals, by expiry, against the registered pass rule; verifies the
+    journal's hash chain."""
+    from . import mcx_forward as mf
+    from .fyers.daily import data_dir
+    from .rotation import journal
+
+    root = data_dir()
+    problems = journal.verify(mf.journal_path(root))
+    typer.echo(json.dumps(mf.summary(root), indent=2))
+    typer.echo("journal chain: " + ("intact" if not problems else "; ".join(problems)))
+    if problems:
+        raise typer.Exit(1)

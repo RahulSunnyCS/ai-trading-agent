@@ -909,6 +909,50 @@ const BASE_JOBS: Job[] = [
       'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt fyers mcx-daily (before 06:00 it takes the evening just held; the next night completes any days missed)',
   },
   {
+    // BL-219: the forward paper test of GOLDM Dir in the expiry week (BL-218's one pass). Read-only:
+    // nothing here places an order. At 18:00 on a window weekday it reads Fyers' live quotes for
+    // the future and the two entry contracts (bid, ask) and keeps them beside the journal; outside
+    // a gold expiry window (the last five sessions before an option expiry from 2026-11-27) the
+    // command prints that and exits 0.
+    id: 'mcx-forward-spread',
+    description:
+      "Gold Dir forward test (BL-219): at 18:00 on an expiry-window weekday, the live bid/ask of the gold future and the two entry options (`obt mcx-forward spread`), kept to compare the real spread with the backtest's 1% slippage. Read-only; does nothing outside a window",
+    schedule: { at: '18:00', on: onWeekdays(1, 2, 3, 4, 5), label: 'weekdays 18:00' },
+    steps: [['uv', 'run', '--directory', OPTIONS, 'obt', 'mcx-forward', 'spread']],
+    cwd: '.',
+    timeoutMinutes: 5,
+    retries: 1,
+    retryDelayMinutes: 2, // a retry past ~18:05 would read quotes after the entry minute
+    noRetryExitCodes: [2],
+    catchUpHours: 0.1,
+    fixHint:
+      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward spread (only meaningful at about 18:00 on a gold expiry-window weekday)',
+  },
+  {
+    // BL-219: after the nightly collector. Scores the session just closed (and any window session
+    // missed earlier whose bars are collected) into the hash-chained paper journal, one private
+    // Telegram line each. The session is the evening just held (default_session): at 01:30 that
+    // is yesterday's. Group `catalog`: it queues behind the 23:31 collector and the 21:00 T1 job.
+    id: 'mcx-forward-score',
+    description:
+      "Gold Dir forward test (BL-219): score the MCX session just closed (`obt mcx-forward score`): extend the gold contract calendar from the live master, fetch the settling future's day, simulate the frozen BL-218 rule on the collected option bars, append the session to the paper journal and send one private Telegram line. Nothing is ever ordered. Does nothing outside a gold expiry window",
+    schedule: {
+      at: '01:30',
+      on: onWeekdays(2, 3, 4, 5, 6),
+      label: 'Tue-Sat 01:30 (the evening before)',
+    },
+    steps: [['uv', 'run', '--directory', OPTIONS, 'obt', 'mcx-forward', 'score']],
+    cwd: '.',
+    timeoutMinutes: 20,
+    retries: 2,
+    retryDelayMinutes: 30,
+    noRetryExitCodes: [2], // no Fyers token: a retry cannot log in
+    catchUpHours: 4, // until 05:30, while the morning's Fyers token still holds
+    group: 'catalog',
+    fixHint:
+      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward score (before 06:00 it takes the evening just held; a later night completes any session missed while its bars are still collectable)',
+  },
+  {
     id: 'contract-notes',
     description:
       "Read the brokers' contract notes (BL-168): each account's new mail since its bookmark, the PDF kept and its figures stored under TRADING_DATA_ROOT/contract-notes/ (F&O for Finvasia and Angel One, equity for the Momentum account on Zerodha); sessions that can have no note are closed (no trade / no note). Never writes the Google Sheet (trade-analytics keeps it)",

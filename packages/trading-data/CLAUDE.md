@@ -162,7 +162,7 @@ table instead.
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
 - **`tdata backup` copies a file when its size or mtime differs at the destination**
-  (`backup.py`), for `lake/`, `raw/`, `contract-notes/` (BL-168) and `rotation/` alike. Most lake
+  (`backup.py`), for `lake/`, `raw/`, `contract-notes/` (BL-168), `rotation/`, `mcx/` (the MCX contract calendar) and `mcx-forward/` (BL-219's paper journal) alike. Most lake
   and raw files never change, but some are rewritten in place (the yearly `bars_1d` file,
   `lake/derived/`, a Fyers repair of a day), and contract-notes/rotation files are rewritten at
   the same size all the time. mtimes are compared in 10 ms ticks: the backup SSD is exFAT, which
