@@ -144,3 +144,17 @@ None open: the owner's answers are in the Log.
 - 2026-11-11 — smoke run before the SHA was recorded: 12 cells (2 a family) on CRUDEOILM, to test
   the runner and scorer; only row counts and two Dir rows of the fit table were looked at. Not a
   result.
+- 2026-11-11 — **CRUDEOILM fit half** (grid SHA 88bc794621b0ee32, tag `main`; 240 sessions, all
+  run; `results/main/scores_fit.md`): **no cohort has a positive robust cell — all 12 crude cohorts
+  are killed** on the registered rule. Only 2 cells pass the gates (Dir, expiry week). Best cells
+  by net (one lot, after 1% slippage and charges, 60 sessions): Dir expiry week 18:00 ITM1 SL21
+  to close ₹3,108 (₹52/session, PF 1.68, LB −₹25); Dir week before 20:00 ITM1 SL15 cost×1 ₹3,493
+  (LB −₹60); Widesl expiry week ₹742; every Buy cohort's best cell negative except the morning
+  timed CE at 12:45 in expiry week (₹420, PF 1.07). What drives it: **before charges the sellers
+  make money** — Dir averages +₹40 a session gross (91 of 96 cells gross-positive), Widesl +₹28
+  (83 of 96) — but the MCX charges on one mini lot average ₹96–106 a session (four orders at
+  ₹20 brokerage + GST is ~₹94 of it), so the flat per-order brokerage on a ₹10-a-point lot turns
+  them negative. The Buys lose before charges too (evening breakout and timed: all 612 cells
+  gross-negative). Not run yet: NATGASMINI, GOLDM, SILVERM (the plan waits for the owner's read of
+  crude). A charge basis other than one lot per order (more lots per order, or the standard
+  100-barrel CRUDEOIL) is outside this pre-registration and would need `override:`.
