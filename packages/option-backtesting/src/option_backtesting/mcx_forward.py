@@ -28,13 +28,20 @@ import pyarrow as pa
 import pyarrow.compute
 import pyarrow.parquet as pq
 from trading_data import lake
-from trading_data.lake import BAR_SCHEMA
 
+from .data.providers.base import Right
 from .data.reference.loader import default_reference_data
+from .data.resolver import resolve_strike
 from .fyers.client import DATA_API, FyersClient
 from .fyers.daily import bars_table
 from .fyers.mcx import MASTER_SEGMENT
-from .fyers.mcx_futures import FuturePlan, future_symbol, register_futures, settling_future
+from .fyers.mcx_futures import (
+    FuturePlan,
+    future_symbol,
+    merge_future_day,
+    register_futures,
+    settling_future,
+)
 from .fyers.symbols import IST, download_master, parse_master
 from .legwise.engine import simulate_day
 from .legwise.market import load_day, mcx_calendar, mcx_calendar_path, minute_label
@@ -170,7 +177,11 @@ def sessions_to_score(root_dir: Path, last_session: date) -> list[tuple[date, da
 
 def expected_without_data(root_dir: Path, last_session: date) -> date | None:
     """`last_session` when it falls in a window but has no option bars (a holiday, or the
-    collector has not delivered): the one session a night can alert about."""
+    collector has not delivered) and has not been alerted about yet: the one session a night can
+    alert about, once (the marker keeps retries and later nights quiet)."""
+    marker = forward_dir(root_dir) / "alerted" / f"{last_session}"
+    if marker.exists():
+        return None
     cal = mcx_calendar(root_dir, ROOT)["options"]
     collected = option_days(root_dir)
     if last_session in collected or last_session.weekday() >= 5:
@@ -180,6 +191,12 @@ def expected_without_data(root_dir: Path, last_session: date) -> date | None:
         if expiry >= START_EXPIRY and last_session in window(expiry, collected, last_session):
             return last_session
     return None
+
+
+def mark_alerted(root_dir: Path, day: date) -> None:
+    marker = forward_dir(root_dir) / "alerted" / f"{day}"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(datetime.now(IST).isoformat(timespec="seconds"))
 
 
 # -- the settling future's bars -------------------------------------------------------------
@@ -200,14 +217,42 @@ def ensure_future_day(root_dir: Path, client: FyersClient, day: date, expiry: da
         raise RuntimeError(f"no {symbol} bars for {day}: not a session, or not collectable yet")
     plan = FuturePlan(ROOT, expiry, symbol, day, day, date.fromisoformat(cal["futures"][symbol]))
     ids = register_futures(root_dir, [plan])
-    new = bars_table(ids[symbol], symbol, candles)
-    if path.exists():
-        old = pq.read_table(path).cast(BAR_SCHEMA)
-        keep = [s != symbol for s in old.column("vendor_symbol").to_pylist()]
-        new = pa.concat_tables([old.filter(pa.array(keep)), new])
-    new = new.sort_by([("ts", "ascending"), ("instrument_id", "ascending")])
+    new = merge_future_day(path, bars_table(ids[symbol], symbol, candles), {symbol})
     lake.write_parquet(new, path)
     return symbol
+
+
+class NotComplete(RuntimeError):
+    """The day's bars stop before the close: the collector has not finished (or failed). The
+    journal refuses edits, so such a session is left pending, never scored from a partial file."""
+
+
+#: the expiring contracts and the future trade to the close (23:29 / 23:54 last bar): a day
+#: whose latest bar is earlier than this is not whole
+COMPLETE_FROM_MIN = 23 * 60 + 25
+
+
+def _last_bar_min(table: pa.Table) -> int:
+    stamps = [t.astimezone(IST) for t in table.column("ts").to_pylist()]
+    return max((t.hour * 60 + t.minute for t in stamps), default=0)
+
+
+def check_complete(root_dir: Path, day: date, expiry: date, symbol: str) -> None:
+    """Raise NotComplete unless the settling future's and the expiring options' bars both reach
+    the close."""
+    fut = pq.read_table(
+        lake.bars_1m_path(root_dir, "future", ROOT, day), columns=["ts", "vendor_symbol"]
+    )
+    fut = fut.filter(pa.compute.equal(fut.column("vendor_symbol"), symbol))
+    opt = pq.read_table(lake.bars_1m_path(root_dir, "option", ROOT, day), columns=["ts", "expiry"])
+    opt = opt.filter(pa.compute.equal(opt.column("expiry"), pa.scalar(expiry)))
+    for name, table in (("future", fut), ("options", opt)):
+        last = _last_bar_min(table)
+        if last < COMPLETE_FROM_MIN:
+            raise NotComplete(
+                f"{day}: the {name} bars stop at {last // 60:02d}:{last % 60:02d}, before the "
+                "close: not scored (a later night completes it)"
+            )
 
 
 def season_of(root_dir: Path, symbol: str, day: date) -> str:
@@ -247,6 +292,7 @@ def score_session(
     """Simulate the frozen rule on `day`, charge it and append its journal line (raises
     `journal.AlreadyRecorded` for a recorded day). Returns the entry."""
     symbol = ensure_future_day(root_dir, client, day, expiry)
+    check_complete(root_dir, day, expiry, symbol)
     data = load_day(root_dir, ROOT, day)
     season = season_of(root_dir, symbol, day)
     ref = default_reference_data()
@@ -323,11 +369,16 @@ def summary(root_dir: Path) -> dict:
     }
 
 
+def _out(trade: dict) -> object:
+    return trade["out_price"] if trade["out_price"] is not None else "open"
+
+
 def telegram_line(entry: dict, totals: dict) -> str:
     """One short line a session for the owner's private chat."""
     day = date.fromisoformat(entry["day"])
     legs = " ".join(
-        f"{t['contract']} {t['in_price']}→{t['out_price']} {t['reason']}" for t in entry["trades"]
+        f"{t['contract']} {t['in_price']}→{_out(t)} {t['reason'] or 'open'}"
+        for t in entry["trades"]
     )
     k = entry["k"]
     return (
@@ -377,15 +428,17 @@ def spread_snapshot(
         for c in parse_master(text, {ROOT})
         if c.option_type in ("CE", "PE") and c.expiry == expiry
     }
-    ref = default_reference_data()
-    step = ref.strike_step(ROOT, today)
     ltp = _quotes(client, [future])[future]["lp"]
-    atm = round(ltp / step) * step
+
+    def strike(rule: str, right: Right) -> float:  # the engine's resolver: half-up, per right
+        return resolve_strike(ROOT, rule, right, ltp, as_of=today).strike
+
+    atm = strike("ATM", Right.CE)
     wanted = {
-        "ITM1_CE": (atm - step, "CE"),
-        "ITM1_PE": (atm + step, "PE"),
+        "ITM1_CE": (strike("ITM1", Right.CE), "CE"),
+        "ITM1_PE": (strike("ITM1", Right.PE), "PE"),
         "ATM_CE": (atm, "CE"),
-        "ATM_PE": (atm, "PE"),
+        "ATM_PE": (strike("ATM", Right.PE), "PE"),
     }
     symbols = {name: options.get(key) for name, key in wanted.items()}
     quotes = _quotes(client, [future] + [s for s in symbols.values() if s])

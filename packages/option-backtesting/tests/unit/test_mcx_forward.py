@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 from trading_data import lake
 from trading_data.lake import BAR_SCHEMA, OPT_SCHEMA
@@ -233,3 +234,126 @@ def test_an_expected_session_without_bars_is_named_for_the_alert(root):
     assert mf.expected_without_data(root, date(2026, 11, 25)) == date(2026, 11, 25)
     assert mf.expected_without_data(root, date(2026, 11, 28)) is None  # a Saturday
     assert mf.expected_without_data(root, date(2026, 11, 18)) is None  # not in a window
+
+
+def test_a_day_whose_bars_stop_before_the_close_is_not_journaled(root):
+    path = lake.bars_1m_path(root, "option", "GOLDM", DAY)
+    t = pq.read_table(path)
+    ts = t.column("ts").cast(pa.timestamp("s", tz="UTC")).cast(pa.int64()).to_pylist()
+    cut = int(datetime(2026, 11, 24, 21, 10, tzinfo=IST).timestamp())
+    keep = pa.array([x <= cut for x in ts])  # the collector died at 21:10
+    lake.write_parquet(t.filter(keep).cast(OPT_SCHEMA), path)
+    with pytest.raises(mf.NotComplete, match="options bars stop at 21:10"):
+        mf.score_session(root, NoClient(), DAY, EXPIRY)
+    assert journal.read(mf.journal_path(root)) == []
+    assert mf.sessions_to_score(root, DAY) == [(DAY, EXPIRY)]  # still pending for a later night
+
+
+def test_a_telegram_line_names_an_open_leg_instead_of_none(root):
+    entry = mf.score_session(root, NoClient(), DAY, EXPIRY)
+    entry["trades"][0]["out_price"], entry["trades"][0]["reason"] = None, ""
+    assert "990.0→open open" in mf.telegram_line(entry, mf.summary(root))
+
+
+def test_the_spread_strikes_use_the_engines_half_up_rounding(root, monkeypatch):
+    contracts = [
+        Contract(f"MCX:GOLDM26NOV{k}{s}", "GOLDM", EXPIRY, float(k), s, 0)
+        for k in (139500, 140000, 140500)
+        for s in ("CE", "PE")
+    ]
+    monkeypatch.setattr(mf, "parse_master", lambda text, names: contracts)
+    seen = []
+
+    def quotes(client, symbols):
+        seen.append(symbols)
+        return {FUT: {"lp": 140250.0}, **{s: {"bid": 1.0, "ask": 1.0} for s in symbols[1:]}}
+
+    monkeypatch.setattr(mf, "_quotes", quotes)
+    out = mf.spread_snapshot(root, object(), DAY, master_text="x")
+    # 140,250 / 500 = 280.5: half-up gives ATM 140,500 (Python's round() would give 140,000)
+    assert out["atm"] == 140500.0
+    assert out["contracts"]["ITM1_CE"]["symbol"] == "MCX:GOLDM26NOV140000CE"
+    assert out["contracts"]["ITM1_PE"]["symbol"] is None  # 141,000 is not in this small master
+
+
+def _cli(monkeypatch, root, **patches):
+    from typer.testing import CliRunner
+
+    from option_backtesting import cli
+
+    monkeypatch.setattr("option_backtesting.fyers.daily.data_dir", lambda: root)
+    monkeypatch.setattr(cli, "_mcx_client", lambda: object())
+    monkeypatch.setattr(cli, "_forward_session", lambda value: DAY)
+    for name, value in patches.items():
+        monkeypatch.setattr(mf, name, value)
+    return CliRunner().invoke(cli.app, ["mcx-forward", "score", "--no-telegram"])
+
+
+def test_score_survives_a_calendar_download_failure(root, monkeypatch):
+    def boom(*a, **k):
+        raise OSError("network down")
+
+    result = _cli(monkeypatch, root, extend_calendar=boom, score_session=lambda *a, **k: _stub())
+    assert "calendar not extended (network down)" in result.output
+    assert result.exit_code == 0 and "Gold Dir paper" in result.output
+
+
+def _stub():
+    return {
+        "day": "2026-11-24", "k": 3, "net": 5.0, "gross": 9.0, "charges": 4.0, "trades": [],
+    }  # fmt: skip
+
+
+def test_one_bad_session_does_not_stop_the_others_and_exits_1(root, monkeypatch):
+    sessions = [(date(2026, 11, 23), EXPIRY), (DAY, EXPIRY)]
+    calls = []
+
+    def score(root_dir, client, day, expiry, **kw):
+        calls.append(day)
+        if day == date(2026, 11, 23):
+            raise FileNotFoundError("no future bars for 2026-11-23")
+        return _stub()
+
+    result = _cli(
+        monkeypatch,
+        root,
+        extend_calendar=lambda *a, **k: {"expiries": [], "added": []},
+        sessions_to_score=lambda *a, **k: sessions,
+        score_session=score,
+    )
+    assert calls == [date(2026, 11, 23), DAY]  # the second was still scored
+    assert "FileNotFoundError: no future bars" in result.output and result.exit_code == 1
+
+
+def test_a_missing_credentials_error_exits_2(root, monkeypatch):
+    from option_backtesting.fyers.auth import FyersCredentialsError
+
+    def refused():
+        raise FyersCredentialsError("no token")
+
+    from option_backtesting import cli
+
+    result = _cli(monkeypatch, root)
+    monkeypatch.setattr(cli, "_mcx_client", refused)
+    from typer.testing import CliRunner
+
+    result = CliRunner().invoke(cli.app, ["mcx-forward", "score", "--no-telegram"])
+    assert result.exit_code == 2 and "no token" in result.output
+
+
+def test_the_no_data_alert_is_said_once(root, monkeypatch):
+    sent = []
+    monkeypatch.setattr("option_backtesting.notify.send", lambda n, **k: sent.append(n))
+    from typer.testing import CliRunner
+
+    from option_backtesting import cli
+
+    monkeypatch.setattr("option_backtesting.fyers.daily.data_dir", lambda: root)
+    monkeypatch.setattr(cli, "_mcx_client", lambda: object())
+    monkeypatch.setattr(cli, "_forward_session", lambda value: date(2026, 11, 25))
+    monkeypatch.setattr(mf, "extend_calendar", lambda *a, **k: {"expiries": [], "added": []})
+    mf.score_session(root, NoClient(), DAY, EXPIRY)  # the 24th is done: only the 25th is open
+    for _ in range(2):
+        CliRunner().invoke(cli.app, ["mcx-forward", "score"])
+    assert [n.severity for n in sent] == ["warn"]  # the second night stays quiet
+    assert (mf.forward_dir(root) / "alerted" / "2026-11-25").exists()

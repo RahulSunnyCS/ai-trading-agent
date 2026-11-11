@@ -99,3 +99,11 @@ None open: the owner's answers are in the Log.
 - 2026-11-12 — created. Owner's answers: scored by a nightly scheduler job; one private Telegram
   line a session; 6 expiries, pass = net > 0 and at least 4 of 6 expiries positive; an 18:00
   read-only spread snapshot.
+- 2026-11-12 — built (PR #448). Code-review fixes before the first session: a session is scored
+  only when the settling future's and the expiring options' bars reach the close (else left
+  pending: the journal cannot be edited, so a partial day must never be recorded); one bad
+  session or a failed master download no longer stops the night's scoring; the 18:00 spread uses
+  the engine's strike resolver (half-up); the "no option bars" alert is said once per day. A
+  dry run reproduced three BL-218 backtest sessions (24 Dec 2025, 25 Feb 2026, 27 Oct 2026) to
+  the paisa. Not yet live: waits for PRs #445-#448 and a scheduler restart.
+

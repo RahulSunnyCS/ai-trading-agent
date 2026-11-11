@@ -1322,21 +1322,26 @@ def mcx_forward_score(
     last = _forward_session(session)
     try:
         client = _mcx_client()
-        cal = mf.extend_calendar(root, last)
-        typer.echo(f"calendar: {len(cal['expiries'])} GOLDM expiries, added {cal['added']}")
+        try:
+            cal = mf.extend_calendar(root, last)
+            typer.echo(f"calendar: {len(cal['expiries'])} GOLDM expiries, added {cal['added']}")
+        except Exception as error:  # noqa: BLE001 - the calendar is only needed for new expiries
+            typer.echo(f"calendar not extended ({error}); scoring with the one on disk")
+        due = mf.sessions_to_score(root, last)
         if dry_run:
-            for day, expiry in mf.sessions_to_score(root, last):
+            for day, expiry in due:
                 typer.echo(f"would score {day} (expiry {expiry})")
             return
-        due = mf.sessions_to_score(root, last)
         failed = 0
         for day, expiry in due:
             try:
                 entry = mf.score_session(root, client, day, expiry)
             except journal.AlreadyRecorded:
                 continue
-            except RuntimeError as error:  # no future bars yet: a later night completes it
-                typer.echo(f"{day}: not scored: {error}")
+            except FyersCredentialsError:
+                raise
+            except Exception as error:  # noqa: BLE001 - one bad session must not stop the others
+                typer.echo(f"{day}: not scored: {type(error).__name__}: {error}")
                 failed += 1
                 continue
             line = mf.telegram_line(entry, mf.summary(root))
@@ -1344,16 +1349,19 @@ def mcx_forward_score(
             if not no_telegram:
                 send(Notification(source="mcx-forward", severity="info", title=line, plain=True))
         missing = mf.expected_without_data(root, last)
-        if missing and not no_telegram:
-            send(
-                Notification(
-                    source="mcx-forward",
-                    severity="warn",
-                    title=f"Gold Dir paper: no GOLDM option bars for {missing} yet",
-                    body="A holiday, or the nightly collector has not delivered. A later night "
-                    "scores it if it is a session.",
+        if missing:
+            if not no_telegram:
+                send(
+                    Notification(
+                        source="mcx-forward",
+                        severity="warn",
+                        title=f"Gold Dir paper: no GOLDM option bars for {missing}",
+                        body="A holiday, or the nightly collector has not delivered. Said once; a "
+                        "later night scores it if it was a session.",
+                    )
                 )
-            )
+                mf.mark_alerted(root, missing)
+            typer.echo(f"no GOLDM option bars for {missing} (a holiday, or not collected yet)")
         if not due and not missing:
             typer.echo("nothing due")
         if failed:
