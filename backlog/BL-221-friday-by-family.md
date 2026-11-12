@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — explains BL-220's pattern and tells which family carries it; descriptive, no rule |
-| **Status** | In progress |
+| **Status** | Done — descriptive: far from expiry, Friday earns about nothing; the gap is the SENSEX Dirs and the afternoon, under 2 SE |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-12 |
@@ -99,6 +99,74 @@ Descriptive only: no pass / kill rule, no verdict that changes a setting.
   citing this item, in the same commit as the item's close.
 - **Done when:** the pages cite this item and INDEX shows Done.
 
+## Findings (2026-11-12)
+
+Run: `research/bl221/replay.py` (every Core-298 and T1-extra strategy on every stored weekday session
+2024-10-09 → 2026-11-12, 0.5 % slippage, 402 s; 508 days, 264,147 strategy-days kept; 2026-11-06 left out
+whole: 405 of 521 not reproduced, its data changed after it was stored; no other day had a mismatch) and
+`research/bl221/analyse.py` (tables in `out/summary.md`, git-ignored). Means are per strategy-day at one
+lot, averaged within each session first, ± one standard error over sessions. Descriptive: no test, no rule.
+
+**1. When Friday was an expiry day it was a good day; far from expiry it is a flat one.** Core-298, net
+(before brokerage), Friday against the mean of the other weekdays:
+
+| Family | R-a Fri (SENSEX expiry, 11) | R-b Fri (31) | R-c Fri (56) | R-b + R-c other days (361) |
+|---|---|---|---|---|
+| Widesl NIFTY | 126 ± 387 | 189 ± 163 | −36 ± 151 | 97 ± 52 |
+| Widesl SENSEX | 373 ± 403 | 229 ± 170 | −185 ± 138 | 4 ± 54 |
+| Dir ATM NIFTY | 733 ± 302 | 16 ± 169 | 66 ± 131 | 98 ± 48 |
+| Dir ATM SENSEX | 826 ± 114 | 105 ± 171 | −55 ± 123 | 154 ± 47 |
+| Dir ITM1 NIFTY | 776 ± 312 | −15 ± 173 | 72 ± 147 | 108 ± 54 |
+| Dir ITM1 SENSEX | 885 ± 106 | 138 ± 180 | −74 ± 132 | 199 ± 53 |
+| Buy NIFTY | −9 ± 183 | −61 ± 68 | −11 ± 71 | −33 ± 28 |
+| Buy SENSEX | 107 ± 64 | −30 ± 21 | 32 ± 26 | −2 ± 9 |
+
+In R-a, Friday was the best weekday for every Dir row and above the other days for Widesl (11 sessions,
+so wide bands, but Dir SENSEX is +₹826 / +₹885 with bands near ±₹110). The same weekday far from expiry
+(R-b, R-c) is close to zero. That points at days to expiry, not at something about Fridays. NIFTY's Dir was
+also strong on R-a Fridays although NIFTY then expired on Thursday, so it is not only the expiring index.
+
+**2. The Friday shortfall is Dir, mostly SENSEX, and it is under two standard errors.** R-b + R-c, Friday
+minus other days: Dir ITM1 SENSEX −₹198 (about 1.7 SE), Dir ATM SENSEX −₹152 (1.4 SE), the NIFTY Dirs about
+−₹50 to −₹67 (under 0.5 SE); Widesl −₹41 to −₹53 (under 0.5 SE); Buy no difference. After brokerage
+(₹47.20 a trade) every family is negative on Fridays; on other days only the SENSEX Dirs stay positive.
+
+**3. Where the money goes: the afternoon.** Gross by session window, R-b + R-c (Friday | other days):
+09:15–10:00 about zero for every family both ways; 10:00–13:00 Friday as good or slightly better (Dir
+SENSEX +₹60 to +₹67 against +₹29 to +₹40); **13:00 to the close is where Friday falls behind**: Widesl NIFTY
++₹30 against +₹111, Widesl SENSEX −₹49 against +₹40, Dir ATM SENSEX −₹71 against +₹119, Dir ITM1 SENSEX −₹66
+against +₹152, the NIFTY Dirs +₹13 / +₹26 against +₹102 / +₹131. On other days (two of them expiry days) the
+afternoon is when the premium falls fastest; on a Friday far from expiry it does not.
+
+**4. Exits: Fridays are quieter, not more violent.** Sold legs hit their own SL less often on Fridays
+(Widesl 1–3 % of trades against 9 %; Dir 36–41 % against 49–54 %), more trades run to the time exit
+(Widesl 83–85 % against 79 %; Dir 52–57 % against 42–46 %), and Dir re-enters less (2.3–2.4 trades a day
+against 2.6–2.7). MTM stops are about as frequent (Widesl 15–16 % of days both ways; Dir 11–15 % against
+9–17 %). So Friday's weak result is slow decay held to 15:28, not more stop-outs.
+
+**5. Premium: more is sold, it does not decay more.** The first entry's premium is higher on Fridays (more
+time value: Dir ITM1 SENSEX median 998 points against 735, Dir ATM NIFTY 258 against 195, Widesl SENSEX 621
+against 524), and its value at exit is about the same share (median 0.98–1.00 for the sold families both
+ways). More premium sold for the same fractional decay, with a flat afternoon, nets about nothing.
+
+**6. Entry time.** R-b + R-c: the early Widesl (09:17–10:00 start) is the one cell clearly worse on Fridays
+(NIFTY −₹211 ± 227 against +₹213 ± 121; SENSEX −₹270 ± 230 against +₹137 ± 106), while early Dir was not worse
+(+₹239 to +₹366, above other days). Late starts (13:01 on) lose on Friday for Dir SENSEX (−₹152 / −₹156 against
++₹66 / +₹80). Wide bands; read as where the afternoon point above shows up, not as a separate effect.
+
+**7. The market itself is not different on Fridays.** Mean opening VIX on Fridays 14.3 / 14.5 / 13.5 (R-a /
+R-b / R-c) against 13.9–15.0 on other weekdays; the median absolute NIFTY opening gap 0.12 / 0.17 / 0.24 %
+against 0.10–0.31 %. Nothing marks Friday out except where it sits relative to expiry.
+
+**T1's extras** (in-sample, tuned on these days) show the same shape: R-a Fridays strong (Widesl SENSEX +₹942
+± 201, Dir ITM1 SENSEX +₹924 ± 159), R-c Fridays about zero (Widesl NIFTY +₹5, Widesl SENSEX −₹106, the Dirs
+−₹18 to +₹57), while T1's Widesl SENSEX earns +₹421 to +₹608 on R-c Tuesday to Thursday.
+
+**What this does and does not say.** It describes 87 far-from-expiry Fridays (R-b + R-c) already read in the
+weekday study; every gap is under two standard errors, and about 70 cells were looked at. It supports
+BL-220's mechanism (days to expiry, not the weekday), and it names where a Friday rule would act (the
+SENSEX Dirs and the afternoon). It is not evidence for a rule: BL-220 tests that on unseen days.
+
 ## Risks
 
 - About 90 Fridays over two regimes: cells split by family, window and regime get small. Report the
@@ -121,3 +189,5 @@ Answered 2026-11-12 (owner, at "start working on BL221"):
 
 - 2026-11-12 — created at the owner's request alongside BL-220. Nothing run.
 - 2026-11-12 — started; the four questions answered (above), Phase 0 updated with them before any run.
+- 2026-11-12 — Phases 1-3 done: full replay (508 days, 264,147 strategy-days, 2026-11-06 left out whole),
+  findings above, research weekday pages updated. Closed.
