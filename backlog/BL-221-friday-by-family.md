@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — explains BL-220's pattern and tells which family carries it; descriptive, no rule |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-12 |
 | **Depends on** | none. Shares its trigger with [BL-220](BL-220-friday-size-down.md) and must not read BL-220's hold-out |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.68 |
 
 ## Context
 
@@ -36,8 +36,8 @@ This item asks **how** each family loses its edge on Fridays, not **whether** to
 
 ## Goal
 
-A findings section per family (Widesl, Dir ATM / ITM1, Buy, and the premium-picked Widesl), stating for
-Fridays against the other days:
+A findings section per family (Widesl, closest-premium Widesl counted under it; Dir ATM / ITM1; Buy), per
+index, stating for Fridays against the other days:
 
 - where in the session the money is made or lost (09:17–10:00, 10:00–13:00, 13:00–15:28), from the stored
   per-day results and the minute paths;
@@ -45,7 +45,10 @@ Fridays against the other days:
 - the premium collected at entry and its decay by 15:28, by weekdays to expiry;
 - whether entry time changes the Friday picture (morning vs afternoon starts);
 - VIX band and opening gap on Fridays against other days, to rule out a Friday-specific market;
-- each of the above before and after the Sep 2025 expiry change.
+- each of the above in three regimes (owner, 2026-11-12): **R-a** the 11 Fridays 2024-10-11 → 2025-01-03 that were
+  SENSEX expiry days (10 labelled `0` in `days.csv`; 2024-10-25 labelled `unknown`, kept in R-a and named);
+  **R-b** 2025-01-10 → 2025-08-29, NIFTY 6 / SENSEX 4 weekdays to expiry; **R-c**
+  2025-09-05 → 2026-11-06, NIFTY 4 / SENSEX 6. The other weekdays are split by the same dates.
 
 ## Out of scope
 
@@ -60,8 +63,15 @@ Fridays against the other days:
 Descriptive only: no pass / kill rule, no verdict that changes a setting.
 - **Hypothesis (to describe, not test):** selling families earn less on Fridays because intraday decay is
   slow far from expiry, so the leg SLs take a larger share of the day's result.
-- **Universe:** the 298 stored strategies (Core-298) and T1's extra strategies, 2024-10-09 → 2026-11-12,
-  point-in-time expiries from `ref_expiries`.
+- **Universe:** the 298 stored strategies (Core-298) as the main table, and T1's 223 extra strategies
+  (`rotation/track_t1/results/`) as their own rows, flagged in-sample (they were tuned on these days);
+  2024-10-09 → 2026-11-12, point-in-time weekdays to expiry from `rotation/days.csv` (`store.read_days`).
+- **Figures:** net after costs at 0.5 % slippage (the dashboard's and the 16:00 message's basis) with gross
+  beside it; one lot per strategy-day; a mean always with its standard error and number of days.
+- **Source of the intraday splits:** each strategy-day replayed with the nightly update's own call
+  (`legwise.engine.simulate_day`, the strategy file, `SIZING_DATE`), as `rotation.portfolio._replay` does;
+  about 1 s for all 298 on one day (timed 2026-11-12), so the whole span runs, no sampling. A replay must
+  reproduce the stored net; a strategy-day that does not is reported and left out.
 - **Look-ahead check:** none needed for a description; every split uses only the day's own data.
 - **Hold-out:** none here, on purpose: BL-220's two hold-outs are not to be read.
 - **Will not run:** anything on 2022–24 NIFTY or after 2026-11-12; any rule test.
@@ -92,9 +102,16 @@ Descriptive only: no pass / kill rule, no verdict that changes a setting.
 
 ## Open questions
 
-1. Include the premium-picked Widesl (₹80 / ₹250 / ₹285 / ₹320) as its own family, or under Widesl?
-2. Any other split worth adding (Friday before a holiday, the monthly-expiry week)?
+Answered 2026-11-12 (owner, at "start working on BL221"):
+
+1. Closest-premium Widesl: **under Widesl**, not its own family.
+2. The SENSEX-expiry Fridays (Oct 2024 – Jan 2025; asked as 14, the store has 11): **their own regime row**
+   (R-a above).
+3. T1's 223 extra strategies: **yes, as their own rows**, flagged in-sample.
+4. Extra splits: no preference. Kept to the item's splits plus the entry-time bands already in the Goal;
+   Friday-before-a-holiday and the monthly-expiry week left out (cells would be too thin).
 
 ## Log
 
 - 2026-11-12 — created at the owner's request alongside BL-220. Nothing run.
+- 2026-11-12 — started; the four questions answered (above), Phase 0 updated with them before any run.
