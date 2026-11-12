@@ -75,7 +75,9 @@ def main() -> None:
 
     per_day: dict[str, dict[str, float]] = collections.defaultdict(dict)
     files = sorted(args.results.glob("*.csv"))
-    if len(files) != 124:  # the registered universe (BL-220 Phase 0): stop rather than test a subset
+    if (
+        len(files) != 124
+    ):  # the registered universe (BL-220 Phase 0): stop rather than test a subset
         raise SystemExit(f"expected BL-071's 124 NIFTY variants, found {len(files)}")
     for f in files:
         with open(f) as fh:

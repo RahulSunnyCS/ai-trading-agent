@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a possible cost saving on one day in five; the evidence so far is a post-hoc look, under the noise bar |
-| **Status** | In progress |
+| **Status** | In progress; Phase 1 passed (narrowly), Phase 2 waits for 20 Fridays (about 2 Apr 2027) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-12 |
@@ -119,6 +119,43 @@ A rule is never edited after a run: a new, dated rule supersedes it with a logge
   owner for a Settings › Automation rule.
 - **Done when:** the pages cite this item and INDEX shows Done or Dropped.
 
+## Results
+
+### Phase 1 — mechanism on hold-out A: **PASS** (2026-11-12)
+
+`research/bl220/mechanism.py` over BL-071's 124 NIFTY variants, 618 sessions 2022-04-05 → 2024-10-08 (no day
+excluded by quality; one result day without a BL-214 label dropped), gross at 0 % slippage, before
+brokerage, the session mean over the variants:
+
+| | Friday | other weekdays | gap | one-sided p | 90 % band of the gap |
+|---|---|---|---|---|---|
+| ₹ per strategy-day | 81 (125 sessions) | 192 (493) | **111** (bar 100) | **0.012** (bar 0.05) | 29 .. 190 |
+
+Descriptive beside it (not part of the verdict), mean ± SE over sessions:
+
+| | Mon | Tue | Wed | Thu (expiry) | Fri |
+|---|---|---|---|---|---|
+| All 124 | 103 ± 38 | 236 ± 38 | 137 ± 44 | 289 ± 45 | 81 ± 44 |
+| Widesl (OTM1, ₹80, ₹100) | 170 ± 72 | 318 ± 72 | 60 ± 79 | 286 ± 80 | 46 ± 81 |
+| Dir ATM | 2 ± 68 | 265 ± 85 | 361 ± 79 | 469 ± 52 | 214 ± 76 |
+| Buy | −1 ± 47 | −52 ± 44 | 142 ± 61 | 112 ± 61 | 53 ± 56 |
+
+By calendar days to the Thursday expiry: Friday (6 days) ₹88, Monday (3) ₹93, Tuesday (2) ₹229, Wednesday (1)
+₹114, Thursday (0) ₹289; holiday weeks are 5–6 sessions a cell. By year: 2022 Friday ₹116 against ₹226,
+2023 −₹3 against ₹154, 2024 ₹160 against ₹209.
+
+Reading. The pass is narrow (₹111 against a ₹100 bar) and the band reaches down to ₹29. Monday, also far
+from expiry, is about as weak as Friday, which fits days to expiry rather than the weekday. Unlike
+BL-221's 2025–26 days, on these NIFTY years the Friday shortfall is in Widesl, not Dir (NIFTY Dir on a
+Friday was mid-table). A first, defective read on 69 of the 124 variants (Log) printed a gap of ₹30; the
+registered universe is the 124. Phase 2 goes ahead.
+
+### Phase 2 — book rules on hold-out B: waiting
+
+`research/bl220/book.py` is built and checked on spent days (`--dev`, no verdict). Its registered read
+refuses to run until the T1 journal has 20 Fridays from 2026-11-13 (the 20th is about 2 April 2027) and
+every pick's stored result. Hold-out B is a single read then.
+
 ## Risks
 
 - 20 Fridays is thin; a 1.6-SE gap may not resolve in that time. The kill rule then decides by default.
@@ -149,3 +186,8 @@ Answered 2026-11-12 (owner, at "lets do BL220"):
   (`wide_0917.csv` …). On those 69 (later starts only) it printed Friday ₹122 against ₹152, gap ₹30,
   p 0.238. Fixed (all `*.csv`, a stop unless exactly 124 are found) and committed before the registered
   run; the registered verdict is the 124-variant run below, whatever it shows. Nothing else changed.
+- 2026-11-12 — Phase 1 read once on the 124 variants: Friday ₹81 against ₹192, gap ₹111, p 0.012: **pass**.
+  Phase 2's `book.py` built; its `--dev` check on spent days 2026-10-19 → 11-12 ran clean (no verdict).
+  Clarified before B exists: the "worst 20-session drawdown" is the largest peak-to-trough fall of the
+  cumulative net with the trough at most 20 sessions after the peak (`book.worst_drawdown`); the weeks of B
+  start Monday 2026-11-09 (Mon–Thu are the same under every rule).
