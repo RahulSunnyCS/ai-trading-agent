@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — a possible cost saving on one day in five; the evidence so far is a post-hoc look, under the noise bar |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-12 |
 | **Depends on** | none; [BL-221](BL-221-friday-by-family.md) is the descriptive companion and must not read this item's hold-out |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.69 |
 
 ## Context
 
@@ -54,47 +54,58 @@ T1's result per rupee of risk without giving up more than a set share of its net
 
 ## Plan
 
-### Phase 0 — Pre-register (DRAFT: the owner confirms or edits it at "Start BL-220", before any run)
-Filled in and committed **before any run**. A rule is never edited after a run: a new, dated rule
-supersedes it with a logged reason, and both stay here.
-- **Hypothesis:** on Fridays, when neither index is within 1 weekday of expiry, Adaptive's picks earn
-  about the universe mean (≈ zero), so trading fewer of them raises net per unit of drawdown.
+### Phase 0 — Pre-register (confirmed by the owner 2026-11-12, committed before any read of A or B)
+A rule is never edited after a run: a new, dated rule supersedes it with a logged reason, and both stay here.
+- **Hypothesis:** on Fridays far from expiry, the rotation's strategies earn less than on the other days
+  (the mechanism), and Tuned Adaptive's Friday picks add little, so trading fewer of them raises its net per
+  unit of drawdown (the book).
 - **Candidate rules (fixed now, no others):**
   - **R0** — as now: every pick, every Friday (the comparator).
-  - **R1** — Friday: drop the lowest-ranked pick (trade 2 of 3; Dir ×2 and the Buy add-on off).
+  - **R1** — Friday: drop the core pick with the lowest composite recorded in the journal (list C);
+    the Buy add-on and Dir ×2 off on Fridays.
   - **R2** — Friday: trade nothing.
-- **Universe:** T1's journal picks as recorded (forward), and for the mechanism test the 124 NIFTY
-  variants BL-071 ran over 2022–24, with the expiry list of that time (NIFTY Thursday), not today's.
-- **Look-ahead check:** the rule reads only the calendar date and the point-in-time expiry list
-  (`ref_expiries` in the trading-data catalog, holiday-shifted expiries included), both known the evening before. A
-  holiday-shifted week where Friday is within 1 weekday of an expiry is reported apart.
-- **Pass / kill rule (proposed numbers, owner to confirm):**
-  - *Mechanism (hold-out A):* the universe's Friday mean per variant-day is below its other-days mean by
-    ₹100 or more, one-sided p ≤ 0.05 by a 5-day block bootstrap with days as the unit. Fails → **killed**,
-    Phase 2 not run.
-  - *Book (hold-out B):* after 40 forward Fridays, R1 or R2 against R0 on the same weeks: net per lot-day
-    of the week not lower by more than 5 %, and the worst 20-day drawdown at least 10 % smaller. Neither
-    passes → **killed**. Both pass → the one with the higher net is proposed.
-- **Hold-out:**
-  - *A:* NIFTY 2022-04-05 → 2024-10-08, BL-071's per-day results. BL-071 read rankings there, never a
-    weekday split, so Friday is unseen. NIFTY only (no SENSEX in the lake for those years).
-  - *B:* T1 journal Fridays from 2026-11-13 (paper; the R1/R2 results are recorded as a shadow each week).
-  - Spent (never used for the verdict): everything from 2024-10-09 → 2026-11-12, including BL-221's reads.
-- **Will not run:** other weekdays, other drop counts, threshold tuning, any read of hold-out A or B
-  before this block is committed. Running one needs `override: <reason>` in the Log.
-- **Tests counted:** this item makes 3 (A; R1 vs R0; R2 vs R0), on top of the 15 cells that suggested it.
+  - **R3** — Friday: drop every pick whose entry is 13:00 or later (from BL-221: Friday falls behind
+    from 13:00 to the close).
+- **Hold-out A (mechanism):** BL-071's per-day results of the 124 NIFTY variants
+  (`research/bl071/results/`, Widesl OTM1, closest premium ₹80 / ₹100, Dir ATM, Buy at 25 start times),
+  sessions **2022-04-05 → 2024-10-08**, minus the days `data_quality` excludes. BL-071 read rankings
+  there, never a weekday split. NIFTY only. Read as stored: gross with costs 0 and **no slippage** (no
+  slippage copy exists for those days; Friday's premiums are higher, so this flatters Friday and makes
+  the test harder to pass).
+- **Hold-out B (book):** the T1 journal's recorded entries for the first **20 Fridays from 2026-11-13**
+  and every session in the same weeks (Monday of the first week to the 20th Friday), list C, one lot per
+  pick, the stored results after 0.5 % slippage and brokerage at ₹20 × 1.18 × 2 per trade
+  (`rotation/lot_plans.py`'s rule). Scored after the fact from the journal and the stored results; nothing
+  changes what trades.
+- **Spent (never used for the verdict):** everything from 2024-10-09 → 2026-11-12, including BL-221's reads.
+- **Look-ahead check:** every rule reads only the calendar date, the point-in-time expiry list
+  (`ref_expiries` in the trading-data catalog, holiday-shifted expiries included) and, for R1, the
+  composites the journal recorded before the open; all known before the first entry. A Friday within 1
+  weekday of a NIFTY expiry (a holiday-shifted week) is left out of the mechanism test and reported apart.
+- **Pass / kill rule:**
+  - *Mechanism (A):* per session, the mean of the variants' results that day; Friday sessions against
+    all other weekday sessions. **Pass** if the other-days mean minus the Friday mean is **₹100 or more**
+    and its one-sided p is **≤ 0.05**: the share of 2,000 circular 5-day block-bootstrap resamples of the
+    session series (weekday labels kept with their sessions, seed 20261112) in which the gap is 0 or
+    below. Fails → **killed**, Phase 2 not run.
+  - *Book (B), each of R1, R2, R3 against R0 on the same weeks:* **passes** if its net per session over
+    those weeks is **not more than 5 % lower** than R0's and its **worst 20-session drawdown is at least
+    10 % smaller**. None passes → **killed**. More than one passes → the one with the higher net is proposed.
+- **Will not run:** other weekdays, other drop counts or cut-off times, threshold tuning, SENSEX on A,
+  any read of A or B before this block is committed. Running one needs `override: <reason>` in the Log.
+- **Tests counted:** 4 (A; R1, R2, R3 against R0 on B), on top of the 15 weekday cells that suggested it
+  and BL-221's ~70 descriptive cells.
 
 ### Phase 1 — Mechanism on hold-out A (no engine runs)
-- **Tasks:** weekday table of the 124 NIFTY variants' per-day results over 2022-04-05 → 2024-10-08, by
-  family and by weekdays to expiry; the bootstrap test above; a NIFTY-only rotation book's Friday from
-  BL-071's best row, reported but not part of the verdict.
-- **Deliverables:** a short table in this file and the verdict on the mechanism.
+- **Tasks:** the test above; descriptive beside it (not part of the verdict): Friday against each other
+  weekday, by family, by NIFTY weekdays to expiry, and by calendar year.
+- **Deliverables:** `research/bl220/mechanism.py`, the numbers in this file.
 - **Done when:** the mechanism test is read and logged as pass or kill.
 
-### Phase 2 — Forward shadow (only if Phase 1 passes)
-- **Tasks:** each Friday record R0 / R1 / R2 for T1's recorded picks from the stored results (after
-  costs, 0.5 % slippage); nothing changes what trades.
-- **Deliverables:** a running table and, after 40 Fridays (about September 2027), the verdict.
+### Phase 2 — Forward book read (only if Phase 1 passes)
+- **Tasks:** after the 20th Friday from 2026-11-13 (about 2 April 2027) has its stored results, score R0–R3
+  over the weeks in hold-out B by the rule above.
+- **Deliverables:** `research/bl220/book.py`, the table and the verdict.
 - **Done when:** the book rule is read and logged as pass or kill.
 
 ### Phase 3 — Close
@@ -105,17 +116,19 @@ supersedes it with a logged reason, and both stay here.
 
 ## Risks
 
-- 40 Fridays is thin; a 1.6-SE gap may not resolve in that time. The kill rule then decides by default.
+- 20 Fridays is thin; a 1.6-SE gap may not resolve in that time. The kill rule then decides by default.
 - 2022–24 NIFTY had a different expiry weekday and rupee levels; hold-out A tests the mechanism, not
   today's book.
 - Another weekday item running at the same time would add tests; count them here.
 
 ## Open questions
 
-1. Are R1 and R2 the right candidates, or should one be "Friday at half lots" instead?
-2. Are the proposed thresholds (₹100 gap; −5 % net; −10 % drawdown) acceptable?
-3. Should Core be shadowed as well, or T1 only?
-4. Is 40 Fridays the right forward length, given it runs into late 2027?
+Answered 2026-11-12 (owner, at "lets do BL220"):
+
+1. Hold-out A: **BL-071's results, as drafted** (not BL-214's store), so A tests the mechanism only.
+2. Rules: **R1, R2 and R3** (R3, no Friday starts from 13:00, added from BL-221).
+3. Thresholds: **as drafted** (₹100 gap, p ≤ 0.05; net within −5 %, drawdown 10 % smaller).
+4. Forward: **20 Fridays**, T1 only.
 
 ## Log
 
@@ -124,3 +137,5 @@ supersedes it with a logged reason, and both stay here.
 - 2026-11-12 — corrected the Context: the Friday days-to-expiry figures quoted (6 / 4, 4 / 6) are calendar
   days, not weekdays (weekdays 4 / 2 and 2 / 4), and Oct 2024 – Jan 2025 Fridays were SENSEX expiry days.
   The draft hypothesis now reads "within 1 weekday of expiry". Still nothing run.
+- 2026-11-12 — started; the owner's answers recorded and Phase 0 confirmed (R3 added, 20 forward Fridays,
+  hold-out A read at 0 % slippage as stored). Committed before any read of A or B.
