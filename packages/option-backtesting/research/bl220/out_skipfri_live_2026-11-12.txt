@@ -1,0 +1,60 @@
+
+== T1 (Tuned Adaptive): 2025-01-10 -> 2026-11-12, 445 sessions, 88 Fridays (Friday average -279, 49% won)
+                                              as now   skip Friday
+Total net (₹)                                423,366       447,879
+Return on ₹8.5 lakh                           49.8 %        52.7 %
+  per year                                    28.0 %        29.6 %
+Net per session (₹)                              951         1,006
+Max drawdown (₹)                              45,112        30,926
+  as % of ₹8.5 lakh                            5.3 %         3.6 %
+  trough on                               2026-11-09    2026-11-09
+Longest time under water (sessions)               62            62
+Return ÷ max drawdown                           9.38         14.48
+Sharpe (daily, ×√250)                           2.61          3.02
+Win rate (days traded)                          59 %          62 %
+Profit factor                                   1.57          1.80
+Average win day (₹)                            4,443         4,572
+Average loss day (₹)                          -4,094        -4,073
+Worst day (₹)                                -14,406       -13,744
+Best day (₹)                                  44,447        44,447
+Days traded                                      445           357
+
+== Core (Classic Adaptive): 2025-01-10 -> 2026-11-12, 445 sessions, 88 Fridays (Friday average -257, 50% won)
+                                              as now   skip Friday
+Total net (₹)                                176,148       198,808
+Return on ₹8.5 lakh                           20.7 %        23.4 %
+  per year                                    11.6 %        13.1 %
+Net per session (₹)                              396           447
+Max drawdown (₹)                              52,921        46,173
+  as % of ₹8.5 lakh                            6.2 %         5.4 %
+  trough on                               2026-06-15    2026-06-08
+Longest time under water (sessions)              101           105
+Return ÷ max drawdown                           3.33          4.31
+Sharpe (daily, ×√250)                           1.20          1.48
+Win rate (days traded)                          53 %          54 %
+Profit factor                                   1.23          1.33
+Average win day (₹)                            4,049         4,184
+Average loss day (₹)                          -3,729        -3,664
+Worst day (₹)                                -11,357       -11,357
+Best day (₹)                                  29,876        29,876
+Days traded                                      445           357
+
+== Fixed base: 2025-01-10 -> 2026-11-12, 447 sessions, 88 Fridays (Friday average -137, 51% won)
+                                              as now   skip Friday
+Total net (₹)                                169,374       181,445
+Return on ₹8.5 lakh                           19.9 %        21.3 %
+  per year                                    11.1 %        11.9 %
+Net per session (₹)                              379           406
+Max drawdown (₹)                             155,422       150,907
+  as % of ₹8.5 lakh                           18.3 %        17.8 %
+  trough on                               2026-06-30    2026-07-08
+Longest time under water (sessions)              159           158
+Return ÷ max drawdown                           1.09          1.20
+Sharpe (daily, ×√250)                           0.91          1.04
+Win rate (days traded)                          52 %          53 %
+Profit factor                                   1.17          1.22
+Average win day (₹)                            4,986         5,234
+Average loss day (₹)                          -4,683        -4,752
+Worst day (₹)                                -11,497       -11,497
+Best day (₹)                                  38,616        38,616
+Days traded                                      447           359

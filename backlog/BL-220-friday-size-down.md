@@ -209,6 +209,31 @@ The days that suggested the idea and that T1 was tuned on, so an upper bound, no
 drawdown is the current one (Oct–Nov 2026; its three Fridays averaged −₹4,664), which is most of R2's cut.
 R3 again lowers net.
 
+### Skip Friday, book statistics side by side (owner, 2026-11-12; descriptive)
+
+`research/bl220/skip_friday_stats.py` (outputs `out_skipfri_*_2026-11-12.txt`, tracked): each book traded as now
+against the same book with Fridays left blank, one lot a strategy, 0.5 % slippage, after brokerage; the fixed
+base 2 × Widesl OTM1 09:17 + Dir ATM 09:24. Max drawdown here is the whole-period peak-to-trough (Phase 0's
+rule uses a 20-session window, so A2's figures above differ). Not a test: the first window is the in-sample
+read, the second is A2's data read again.
+
+| Jan 2025 – Nov 2026 | T1 now | T1 skip | Core now | Core skip | Base now | Base skip |
+|---|---|---|---|---|---|---|
+| Net (₹) | 4,23,366 | 4,47,879 | 1,76,148 | 1,98,808 | 1,69,374 | 1,81,445 |
+| Max drawdown (₹) | 45,112 | 30,926 | 52,921 | 46,173 | 1,55,422 | 1,50,907 |
+| Sharpe | 2.61 | 3.02 | 1.20 | 1.48 | 0.91 | 1.04 |
+| Profit factor | 1.57 | 1.80 | 1.23 | 1.33 | 1.17 | 1.22 |
+
+| NIFTY 2021-11 – 2024-10 | T1 now | T1 skip | Core now | Core skip | Base now | Base skip |
+|---|---|---|---|---|---|---|
+| Net (₹) | 1,37,680 | 1,65,701 | 1,47,221 | 1,49,972 | 4,53,408 | 4,19,169 |
+| Max drawdown (₹) | 87,685 | 66,352 | 40,659 | 38,033 | 55,419 | 41,011 |
+| Sharpe | 0.68 | 0.89 | 0.85 | 0.95 | 2.13 | 2.14 |
+| Profit factor | 1.12 | 1.18 | 1.15 | 1.19 | 1.44 | 1.52 |
+
+Skipping Friday raised T1's net and cut its drawdown in both windows; Core gained little on NIFTY 2021–24;
+the fixed base lost ₹34k of net on NIFTY 2021–24 (its Fridays averaged +₹238 there) while its drawdown fell.
+
 ### Phase 2 — book rules on hold-out B: waiting
 
 `research/bl220/book.py` is built and checked on spent days (`--dev`, no verdict). Its registered read
@@ -256,3 +281,4 @@ Answered 2026-11-12 (owner, at "lets do BL220"):
   S (no Friday after 2025-01-03, nor in 2021-11 → 2024-10, was an expiry day). The Context's fixed-base row
   drops 7 SENSEX-expiry Fridays (Nov 2024 – Jan 2025): Friday ₹85 → ₹87; T1 and Core start 2025-01-10 and
   are unchanged.
+- 2026-11-12 — owner: book statistics with Fridays skipped (`skip_friday_stats.py`, descriptive, above).
