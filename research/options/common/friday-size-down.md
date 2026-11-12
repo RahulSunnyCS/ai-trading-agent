@@ -27,8 +27,8 @@ None: every pick trades every day.
 
 - **Strategies earn less on Fridays far from expiry.** On NIFTY 2022–24 (Thursday expiry) the universe made
   ₹81 a strategy-day on Fridays against ₹192 on other days, a narrow registered pass; Monday, also far from
-  expiry, was nearly as weak (₹103). On 2025–26 the same shape (descriptive, [BL-221][bl221]); when Friday
-  was a SENSEX expiry day (Oct 2024 – Jan 2025) it was a strong day. Days to expiry, not the weekday.
+  expiry, was nearly as weak (₹103). On 2025–26 the same shape (descriptive, [BL-221][bl221]; expiry
+  Fridays left out). Days to expiry, not the weekday.
 - **For T1, skipping Fridays or dropping the weakest Friday pick helped on 2021–24 (A2, NIFTY only).** R0
   ₹191 a session, worst drawdown ₹50,764; R2 ₹230 and ₹39,761; R1 ₹195 and ₹43,275. T1's Fridays averaged
   −₹195 after brokerage there. Core's Fridays were about zero (−₹19), so no rule moved its drawdown enough.

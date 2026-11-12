@@ -36,8 +36,7 @@ SENSEX Mon 260, Tue 829, Wed 213, Thu 436, Fri 318.
   nets +₹1 ± 107 a strategy-day on Fridays against +₹199 ± 53 on other days (about 1.7 SE), Dir ATM SENSEX +₹2 against
   +₹154; the NIFTY Dirs about ₹50–67 lower (under 0.5 SE). It sits in 13:00 to the close (Dir ITM1 SENSEX −₹66
   against +₹152) and in late starts; early Dir (09:17–10:00) was not worse on Fridays. Friday Dir hits its leg SL
-  less (36–41 % of trades against 49–54 %) and re-enters less. When Friday was a SENSEX expiry day (Oct 2024 – Jan
-  2025) it was the best weekday for every Dir row (SENSEX +₹826 / +₹885, NIFTY +₹733 / +₹776). Descriptive,
+  less (36–41 % of trades against 49–54 %) and re-enters less. Descriptive,
   already-read days; BL-220 tests a Friday rule on unseen days.
 - Over two years a weekday mixes expiry regimes, so a weekday pattern from before Sep 2025 does not carry
   over; BL-056 kept one regime for that reason.

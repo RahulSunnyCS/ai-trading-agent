@@ -20,7 +20,7 @@ base 2024-11-12 → 2026-11-11, 486 days) gave Friday as the weakest day for all
 |---|---|---|---|---|---|
 | Tuned Adaptive (T1) | 1,071 | 2,992 | 971 | 1,510 | **64** |
 | Classic Adaptive (Core) | 537 | 1,924 | 22 | 999 | **58** |
-| Fixed base | 728 | 1,438 | 554 | 608 | **85** |
+| Fixed base | 728 | 1,438 | 554 | 608 | **87** |
 
 A follow-up read the same days three ways (scripts in the session scratchpad, not committed):
 
@@ -33,7 +33,7 @@ A follow-up read the same days three ways (scripts in the session scratchpad, no
   ₹6 a strategy-day on Friday (0.5 % slippage), against −₹78 on Wednesday, the universe's weakest day.
   Friday was +₹118 before Sep 2025 and −₹55 after.
 - **The ranking's edge vanishes on Fridays.** A T1 pick beats that day's universe mean by ₹300–800 on other
-  weekdays but by ₹32 (before Sep 2025) and ₹8 (after) on Fridays. Core: −₹294 / +₹178; the base +₹124 / +₹46.
+  weekdays but by ₹32 (before Sep 2025) and ₹8 (after) on Fridays. Core: −₹294 / +₹178 (the fixed base is not ranked, so it has no such edge).
 
 **This is a hint, not a result.** After Sep 2025 T1's Friday is −₹157 ± 649 a day against Monday's
 +₹1,233 ± 569, about 1.6 standard errors. Earlier items put the noise bar at about ₹700 a day
@@ -252,3 +252,7 @@ Answered 2026-11-12 (owner, at "lets do BL220"):
   start Monday 2026-11-09 (Mon–Thu are the same under every rule).
 - 2026-11-12 — Amendment 1 run once each: A2 (registered) T1 R1 and R2 pass, R3 fails, Core none; S
   (in-sample, descriptive) the same order. Research page `research/options/common/friday-size-down.md`.
+- 2026-11-12 — owner: expiry Fridays out of every table. None is in hold-outs A, A2, B or the in-sample read
+  S (no Friday after 2025-01-03, nor in 2021-11 → 2024-10, was an expiry day). The Context's fixed-base row
+  drops 7 SENSEX-expiry Fridays (Nov 2024 – Jan 2025): Friday ₹85 → ₹87; T1 and Core start 2025-01-10 and
+  are unchanged.

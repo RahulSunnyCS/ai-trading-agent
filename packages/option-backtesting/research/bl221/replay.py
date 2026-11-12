@@ -52,6 +52,8 @@ def family(name: str) -> str:
 
 
 def regime(day: date) -> str:
+    """R-a: 2024-10-09 -> 2025-01-03 (Fridays were SENSEX expiry days; analyse.py leaves it out);
+    R-b: Jan-Aug 2025; R-c: Sep 2025 on. analyse.py prints them by their dates."""
     if day <= date(2025, 1, 3):
         return "R-a"
     return "R-b" if day <= date(2025, 8, 31) else "R-c"

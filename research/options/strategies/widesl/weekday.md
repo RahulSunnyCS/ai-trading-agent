@@ -41,8 +41,7 @@ SENSEX Mon −204, Tue 426, Wed 51, Thu 264, Fri −191.
   one lot, 0.5 % slippage, before brokerage; under 0.5 SE). The gap sits in 13:00 to the close (NIFTY +₹30 against
   +₹111) and in early starts (09:17–10:00: −₹211 / −₹270 against +₹213 / +₹137, wide bands). Friday Widesl hits its
   leg SL less (1–3 % of trades against 9 %) and runs to the time exit more; more premium is sold (SENSEX median 621
-  against 524 points) for the same fractional decay. When Friday was a SENSEX expiry day (Oct 2024 – Jan 2025) it
-  was above the other days. Descriptive, already-read days.
+  against 524 points) for the same fractional decay. Descriptive, already-read days.
 - Over two years a weekday mixes expiry regimes (NIFTY Thursday → Tuesday, SENSEX Friday → Tuesday →
   Thursday), so a weekday pattern from before Sep 2025 does not carry over. That is why BL-056 restricted
   the tables to one regime.

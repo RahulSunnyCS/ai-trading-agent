@@ -23,6 +23,8 @@ BROKERAGE_PER_TRADE = 20 * 1.18 * 2  # rotation/lot_plans.py's rule
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
 FAMILIES = ["Widesl", "Dir ATM", "Dir ITM1", "Buy"]
 INDICES = ["NIFTY", "SENSEX"]
+JAN_AUG, SEP_ON = "Jan–Aug 2025", "Sep 2025 – Nov 2026"
+PERIOD = {"R-b": JAN_AUG, "R-c": SEP_ON}
 
 
 def band(entry: str) -> str:
@@ -69,6 +71,11 @@ def main() -> None:
     # left out whole, so a session mean never mixes the two (clarified 2026-11-12, before the full read).
     whole = {d for d, n in bad.items() if n >= 0.05 * per_day[d]}
     rows = [r for r in every if r["day"] not in whole and not r.get("_bad")]
+    # Owner, 2026-11-12: expiry Fridays out of every table. Every Friday from 2024-10-11 to 2025-01-03 was a
+    # SENSEX expiry day, so that period (labelled R-a by replay.py) is left out whole; no later Friday was an
+    # expiry day. Periods are named by their dates, not by letters.
+    expiry_period = {r["day"] for r in rows if r["regime"] == "R-a"}
+    rows = [dict(r, regime=PERIOD[r["regime"]]) for r in rows if r["regime"] != "R-a"]
     lines = [f"# BL-221 tables (from {src.name})", ""]
     lines.append(
         f"Strategy-days kept {len(rows):,}. Days left out whole (≥ 5 % not reproduced): "
@@ -76,6 +83,9 @@ def main() -> None:
         + ". Single strategy-days left out: "
         + (", ".join(f"{d} ({n})" for d, n in sorted(bad.items()) if d not in whole) or "none")
         + "."
+    )
+    lines.append(
+        f"Left out as the expiry-Friday period (2024-10-09 → 2025-01-09): {len(expiry_period)} sessions."
     )
     lines.append("")
     lines.append(
@@ -91,7 +101,7 @@ def main() -> None:
     for universe in ("core", "t1"):
         u = [r for r in rows if r["universe"] == universe]
         tag = "Core-298" if universe == "core" else "T1 extras (in-sample)"
-        for reg in ("R-a", "R-b", "R-c"):
+        for reg in (JAN_AUG, SEP_ON):
             body = []
             for fam in FAMILIES:
                 for idx in INDICES:
@@ -107,7 +117,7 @@ def main() -> None:
                         )
             emit(f"{tag}, {reg}: net by weekday", ["family"] + DAYS, body)
 
-    core = [r for r in rows if r["universe"] == "core" and r["regime"] in ("R-b", "R-c")]
+    core = [r for r in rows if r["universe"] == "core" and r["regime"] in (JAN_AUG, SEP_ON)]
     fri = [r for r in core if r["weekday"] == "Fri"]
     rest = [r for r in core if r["weekday"] != "Fri"]
 
@@ -120,7 +130,7 @@ def main() -> None:
                 [f"{fam} {idx}", cell(f, net), cell(o, net), cell(f, net_brk), cell(o, net_brk)]
             )
     emit(
-        "Core-298, R-b + R-c: Friday vs other days, before and after brokerage",
+        "Core-298, Jan 2025 – Nov 2026: Friday vs other days, before and after brokerage",
         ["family", "Fri net", "other net", "Fri after brokerage", "other after brokerage"],
         body,
     )
@@ -135,7 +145,7 @@ def main() -> None:
                     row.append(cell(c, lambda r, k=col: float(r[k])))
             body.append(row)
     emit(
-        "Core-298, R-b + R-c: gross by session window (Friday | other)",
+        "Core-298, Jan 2025 – Nov 2026: gross by session window (Friday | other)",
         [
             "family",
             "09:15-10:00 Fri",
@@ -170,7 +180,7 @@ def main() -> None:
                 )
             body.append(row)
     emit(
-        "Core-298, R-b + R-c: how trades exit (share of trades by reason)",
+        "Core-298, Jan 2025 – Nov 2026: how trades exit (share of trades by reason)",
         ["family", "Friday", "other days"],
         body,
     )
@@ -194,7 +204,7 @@ def main() -> None:
                 row.append(f"premium {prem:,.0f}, exit/entry {ratio:.2f}")
             body.append(row)
     emit(
-        "Core-298, R-b + R-c: first-entry premium (median, points) and its value at exit",
+        "Core-298, Jan 2025 – Nov 2026: first-entry premium (median, points) and its value at exit",
         ["family", "Friday", "other days"],
         body,
     )
@@ -213,13 +223,13 @@ def main() -> None:
                     row.append(cell(c, net))
             body.append(row)
     emit(
-        "Core-298, R-b + R-c: net by entry-time band (Friday | other)",
+        "Core-298, Jan 2025 – Nov 2026: net by entry-time band (Friday | other)",
         ["family", "09:17-10:00 Fri", "other", "10:01-13:00 Fri", "other", "13:01- Fri", "other"],
         body,
     )
 
     body = []
-    for reg in ("R-a", "R-b", "R-c"):
+    for reg in (JAN_AUG, SEP_ON):
         for d in DAYS:
             sess = {}
             for r in rows:
