@@ -101,6 +101,25 @@ A rule is never edited after a run: a new, dated rule supersedes it with a logge
 - **Tests counted:** 4 (A; R1, R2, R3 against R0 on B), on top of the 15 weekday cells that suggested it
   and BL-221's ~70 descriptive cells.
 
+### Amendment 1 (2026-11-12, owner: "both"; written and committed before either read)
+Two more reads of the book rules, neither replacing Phase 2. **Hold-out B stays the verdict for R1–R3.**
+- **A2 — the book rules on BL-214's NIFTY-only books (registered).** Root `TRADING_DATA_ROOT/_bl214`,
+  BL-214's scored window **2021-11-01 → 2024-10-08**. Core (the 149 NIFTY variants of Core-298 in that store) and T1
+  (those plus T1's 173 NIFTY variants), list C re-derived each day exactly as BL-214's
+  `research/bl214/score.py` `book_picks` does (`pick._rank` on earlier rows only, the expiry-only filter
+  where one index expires, the SL150 % cap on a day NIFTY does not expire), **core picks only, Buy left
+  out** (as BL-214), one lot a pick, its 0.5 % slippage copy, brokerage ₹20 × 1.18 × 2 per trade; a session where a pick has no stored result is left out for
+  every rule and counted. R1's
+  "lowest composite" is that day's list C composite. Rules R0–R3 and the pass rule as in Phase 0, judged
+  on **T1**; Core reported beside it. These sessions overlap hold-out A's (the mechanism read on BL-071's
+  strategy results), so A2 is not independent of A. Each rule's A2 pass or fail is reported with its
+  Phase 2 result; it does not kill or pass a rule on its own. Adds 3 tests (7 in all).
+- **S — the same scoring on the last two years, in-sample, descriptive only.** Live root, the first
+  re-derivable day from 2024-11-12 → 2026-11-12, T1 and Core, picks as the Rotation page's Day by day
+  takes them (`candles.picks_by_day`: the journal where recorded, re-derived before it), Buy add-on
+  included. These are the days that suggested the idea and that T1 was tuned on: no pass or fail is
+  printed, the figures are an upper bound on what a Friday rule could have added, never evidence.
+
 ### Phase 1 — Mechanism on hold-out A (no engine runs)
 - **Tasks:** the test above; descriptive beside it (not part of the verdict): Friday against each other
   weekday, by family, by NIFTY weekdays to expiry, and by calendar year.
