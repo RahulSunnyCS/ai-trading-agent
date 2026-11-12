@@ -156,6 +156,24 @@ Late starts (13:01 on) lose on Friday for Dir SENSEX (−₹152 / −₹156 agai
 13.5 (Sep 2025 on) against 14.0–15.0 on other weekdays; the median absolute NIFTY opening gap 0.17 / 0.24 %
 against 0.17–0.31 %.
 
+**8. By opening VIX (owner, 2026-11-12, descriptive; more cells looked at).** Core-298, Jan 2025 – Nov 2026,
+expiry Fridays out, the day's band from `days.csv`; Friday | other days, ₹ per strategy-day ± SE (sessions):
+
+| Family | VIX < 13 (43 Fri) | VIX 13–15 (18) | VIX 15–18 (16) | VIX 18+ (10) |
+|---|---|---|---|---|
+| Widesl NIFTY | −29 ± 148 \| 107 ± 66 | 114 ± 281 \| 55 ± 111 | 137 ± 290 \| 140 ± 136 | 81 ± 357 \| 84 ± 165 |
+| Widesl SENSEX | −122 ± 133 \| 68 ± 75 | 91 ± 287 \| −32 ± 95 | 143 ± 278 \| −19 ± 155 | −195 ± 364 \| −100 ± 170 |
+| Dir ATM NIFTY | 137 ± 95 \| 152 ± 64 | 39 ± 259 \| 91 ± 92 | −23 ± 297 \| 44 ± 119 | −200 ± 473 \| 12 ± 160 |
+| Dir ATM SENSEX | **27 ± 89 \| 251 ± 63** | 233 ± 249 \| 95 ± 92 | −14 ± 331 \| 91 ± 117 | −497 ± 353 \| 37 ± 156 |
+| Dir ITM1 NIFTY | 139 ± 111 \| 151 ± 79 | 43 ± 272 \| 110 ± 99 | −87 ± 327 \| 67 ± 128 | −181 ± 497 \| 28 ± 177 |
+| Dir ITM1 SENSEX | **18 ± 99 \| 298 ± 72** | 287 ± 260 \| 153 ± 104 | −66 ± 360 \| 123 ± 129 | −478 ± 364 \| 70 ± 169 |
+| Buy NIFTY | −87 ± 68 \| −39 ± 38 | 52 ± 112 \| 17 ± 76 | 80 ± 154 \| −11 ± 70 | −97 ± 119 \| −126 ± 45 |
+| Buy SENSEX | 25 ± 25 \| 0 ± 13 | −19 ± 22 \| −1 ± 21 | 14 ± 62 \| −4 ± 18 | −8 ± 56 \| −8 ± 19 |
+
+The SENSEX Dirs' Friday shortfall sits at VIX below 13 (half of the Fridays): ₹18–27 against ₹251–298, about
+2–2.3 SE; the SENSEX Widesl is also below there. At VIX 13–15 Friday was not worse (18 Fridays). The books
+(T1, Core, base, 8–22 Fridays a band) show no common VIX pattern. A lead for a registered test, not a finding.
+
 **T1's extras** (in-sample, tuned on these days): Sep 2025 on, Fridays about zero (Widesl NIFTY +₹5, Widesl
 SENSEX −₹106, the Dirs −₹18 to +₹57), while T1's Widesl SENSEX earns +₹421 to +₹608 Tuesday to Thursday.
 
@@ -192,3 +210,5 @@ Answered 2026-11-12 (owner, at "start working on BL221"):
   2025-01-09 (every Friday a SENSEX expiry day) is left out of every table; periods are named by their
   dates (`analyse.py` updated; the replay is unchanged). The findings above are rewritten on what remains;
   no number from Jan 2025 on changed.
+- 2026-11-12 — owner: "split friday by VIX". Finding 8 added (descriptive): the SENSEX Dirs' Friday shortfall
+  is at VIX below 13; the books show no common VIX pattern.
