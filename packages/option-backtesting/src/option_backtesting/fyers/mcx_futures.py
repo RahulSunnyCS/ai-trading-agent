@@ -221,6 +221,22 @@ def register_futures(root: Path, plans: list[FuturePlan]) -> dict[str, int]:
     return {s.vendor_symbol: ids[s.key] for s in specs}
 
 
+def merge_future_day(path: Path, new: pa.Table, replace: set[str]) -> pa.Table:
+    """`new` plus the rows an existing day file holds for other futures, sorted by time then
+    instrument: the rows of the futures in `replace` are the ones `new` supersedes."""
+    if path.exists():
+        old = pq.read_table(path).cast(BAR_SCHEMA)
+        keep = [sym not in replace for sym in old.column("vendor_symbol").to_pylist()]
+        new = pa.concat_tables([old.filter(pa.array(keep)), new])
+    order = np.lexsort(
+        (
+            np.asarray(new.column("instrument_id").to_numpy()),
+            new.column("ts").cast(pa.int64()).to_numpy(),
+        )
+    )
+    return new.take(pa.array(order))
+
+
 def write_lake(root: Path, plans: list[FuturePlan], ids: dict[str, int]) -> dict:
     """Write every cached future's bars into its days' future files.  Rows of the futures
     written here replace the same futures' rows in an existing file; any other row stays."""
@@ -267,18 +283,7 @@ def write_lake(root: Path, plans: list[FuturePlan], ids: dict[str, int]) -> dict
     written = 0
     for day, tables in sorted(by_day.items()):
         path = lake.bars_1m_path(root, "future", plans[0].root, day)
-        new = pa.concat_tables(tables)
-        if path.exists():
-            old = pq.read_table(path).cast(BAR_SCHEMA)
-            keep = [s not in mine for s in old.column("vendor_symbol").to_pylist()]
-            new = pa.concat_tables([old.filter(pa.array(keep)), new])
-        order = np.lexsort(
-            (
-                np.asarray(new.column("instrument_id").to_numpy()),
-                new.column("ts").cast(pa.int64()).to_numpy(),
-            )
-        )
-        lake.write_parquet(new.take(pa.array(order)), path)
+        lake.write_parquet(merge_future_day(path, pa.concat_tables(tables), mine), path)
         written += 1
     return {"rows": rows, "days_written": written}
 
