@@ -86,7 +86,9 @@ def main() -> None:
     root = data_dir()
     ref = default_reference_data()
     sizing = date.fromisoformat(SIZING_DATE)
-    names = [(n, "core") for n in sorted(variant_names())] + [(n, "t1") for n in sorted(track_names("t1"))]
+    names = [(n, "core") for n in sorted(variant_names())] + [
+        (n, "t1") for n in sorted(track_names("t1"))
+    ]
     specs = {}
     for name, _ in names:
         spec = load_legwise(strategy_file(name))
@@ -94,15 +96,40 @@ def main() -> None:
             update={"execution": spec.execution.model_copy(update={"slippage_pct": SLIP})}
         )
     stores = {name: stored(name, root) for name, _ in names}
-    days = sorted(d for d in store.read_days(root) if args.start <= d <= args.end and d.weekday() < 5)
+    days = sorted(
+        d for d in store.read_days(root) if args.start <= d <= args.end and d.weekday() < 5
+    )
 
     OUT.mkdir(exist_ok=True)
     out = OUT / f"rows_{args.start}_{args.end}.csv.gz"
     cols = [
-        "day", "weekday", "regime", "universe", "variant", "index", "family", "entry", "dte_n", "dte_s",
-        "vix_open", "gap_pct", "net", "stored_net", "stored_gross", "gross", "costs", "n_trades",
-        "w_0915_1000", "w_1000_1300", "w_1300_close", "worst_mtm", "best_mtm", "stopped_by",
-        "first_premium", "first_premium_exit", "exits",
+        "day",
+        "weekday",
+        "regime",
+        "universe",
+        "variant",
+        "index",
+        "family",
+        "entry",
+        "dte_n",
+        "dte_s",
+        "vix_open",
+        "gap_pct",
+        "net",
+        "stored_net",
+        "stored_gross",
+        "gross",
+        "costs",
+        "n_trades",
+        "w_0915_1000",
+        "w_1000_1300",
+        "w_1300_close",
+        "worst_mtm",
+        "best_mtm",
+        "stopped_by",
+        "first_premium",
+        "first_premium_exit",
+        "exits",
     ]
     attrs = store.read_days(root)
     prev_close: dict[str, float | None] = {}
@@ -139,18 +166,45 @@ def main() -> None:
                 first_trades = [t for t in result.trades if t.entry_min == start]
                 prem = sum(t.entry_price for t in first_trades)
                 prem_exit = sum(t.exit_price for t in first_trades if t.exit_price is not None)
-                writer.writerow([
-                    day, day.strftime("%a"), regime(day), universe, name, und, family(name), name[-4:],
-                    a.get("dte_n", ""), a.get("dte_s", ""), a.get("vix_open", ""), gap.get(und, ""),
-                    round(result.net, 2), net_store[day], gross_store.get(day, ""), round(result.gross, 2),
-                    round(result.costs, 2), len(result.trades),
-                    round(path[W1], 2), round(path[W2] - path[W1], 2), round(result.gross - path[W2], 2),
-                    round(result.worst_mtm, 2), round(result.best_mtm, 2), result.stopped_by or "",
-                    round(prem, 2), round(prem_exit, 2), ";".join(f"{k}:{v}" for k, v in sorted(exits.items())),
-                ])
+                writer.writerow(
+                    [
+                        day,
+                        day.strftime("%a"),
+                        regime(day),
+                        universe,
+                        name,
+                        und,
+                        family(name),
+                        name[-4:],
+                        a.get("dte_n", ""),
+                        a.get("dte_s", ""),
+                        a.get("vix_open", ""),
+                        gap.get(und, ""),
+                        round(result.net, 2),
+                        net_store[day],
+                        gross_store.get(day, ""),
+                        round(result.gross, 2),
+                        round(result.costs, 2),
+                        len(result.trades),
+                        round(path[W1], 2),
+                        round(path[W2] - path[W1], 2),
+                        round(result.gross - path[W2], 2),
+                        round(result.worst_mtm, 2),
+                        round(result.best_mtm, 2),
+                        result.stopped_by or "",
+                        round(prem, 2),
+                        round(prem_exit, 2),
+                        ";".join(f"{k}:{v}" for k, v in sorted(exits.items())),
+                    ]
+                )
             if n_day % 25 == 0:
-                print(f"{n_day}/{len(days)} days, {time.time() - started:.0f}s, mismatches {mismatches}", flush=True)
-    print(f"done: {len(days)} days -> {out}; mismatches {mismatches}, skipped {skipped}, {time.time() - started:.0f}s")
+                print(
+                    f"{n_day}/{len(days)} days, {time.time() - started:.0f}s, mismatches {mismatches}",
+                    flush=True,
+                )
+    print(
+        f"done: {len(days)} days -> {out}; mismatches {mismatches}, skipped {skipped}, {time.time() - started:.0f}s"
+    )
 
 
 if __name__ == "__main__":

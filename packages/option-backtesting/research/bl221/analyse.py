@@ -26,7 +26,9 @@ INDICES = ["NIFTY", "SENSEX"]
 
 
 def band(entry: str) -> str:
-    return "09:17-10:00" if entry <= "1000" else ("10:01-13:00" if entry <= "1300" else "13:01-15:17")
+    return (
+        "09:17-10:00" if entry <= "1000" else ("10:01-13:00" if entry <= "1300" else "13:01-15:17")
+    )
 
 
 def session_stats(rows, value) -> tuple[float, float, int]:
@@ -68,16 +70,22 @@ def main() -> None:
     whole = {d for d, n in bad.items() if n >= 0.05 * per_day[d]}
     rows = [r for r in every if r["day"] not in whole and not r.get("_bad")]
     lines = [f"# BL-221 tables (from {src.name})", ""]
-    lines.append(f"Strategy-days kept {len(rows):,}. Days left out whole (≥ 5 % not reproduced): "
-                 + (", ".join(f"{d} ({bad[d]}/{per_day[d]})" for d in sorted(whole)) or "none")
-                 + ". Single strategy-days left out: "
-                 + (", ".join(f"{d} ({n})" for d, n in sorted(bad.items()) if d not in whole) or "none") + ".")
+    lines.append(
+        f"Strategy-days kept {len(rows):,}. Days left out whole (≥ 5 % not reproduced): "
+        + (", ".join(f"{d} ({bad[d]}/{per_day[d]})" for d in sorted(whole)) or "none")
+        + ". Single strategy-days left out: "
+        + (", ".join(f"{d} ({n})" for d, n in sorted(bad.items()) if d not in whole) or "none")
+        + "."
+    )
     lines.append("")
-    lines.append("Cells: mean ± standard error (sessions), ₹ per strategy-day at 1 lot, 0.5 % slippage.")
+    lines.append(
+        "Cells: mean ± standard error (sessions), ₹ per strategy-day at 1 lot, 0.5 % slippage."
+    )
 
     def emit(title, header, body):
-        lines.extend(["", f"## {title}", "", "| " + " | ".join(header) + " |",
-                      "|" + "---|" * len(header)])
+        lines.extend(
+            ["", f"## {title}", "", "| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+        )
         lines.extend("| " + " | ".join(row) + " |" for row in body)
 
     for universe in ("core", "t1"):
@@ -87,9 +95,16 @@ def main() -> None:
             body = []
             for fam in FAMILIES:
                 for idx in INDICES:
-                    c = [r for r in u if r["family"] == fam and r["index"] == idx and r["regime"] == reg]
+                    c = [
+                        r
+                        for r in u
+                        if r["family"] == fam and r["index"] == idx and r["regime"] == reg
+                    ]
                     if c:
-                        body.append([f"{fam} {idx}"] + [cell([r for r in c if r["weekday"] == d], net) for d in DAYS])
+                        body.append(
+                            [f"{fam} {idx}"]
+                            + [cell([r for r in c if r["weekday"] == d], net) for d in DAYS]
+                        )
             emit(f"{tag}, {reg}: net by weekday", ["family"] + DAYS, body)
 
     core = [r for r in rows if r["universe"] == "core" and r["regime"] in ("R-b", "R-c")]
@@ -101,9 +116,14 @@ def main() -> None:
         for idx in INDICES:
             f = [r for r in fri if r["family"] == fam and r["index"] == idx]
             o = [r for r in rest if r["family"] == fam and r["index"] == idx]
-            body.append([f"{fam} {idx}", cell(f, net), cell(o, net), cell(f, net_brk), cell(o, net_brk)])
-    emit("Core-298, R-b + R-c: Friday vs other days, before and after brokerage",
-         ["family", "Fri net", "other net", "Fri after brokerage", "other after brokerage"], body)
+            body.append(
+                [f"{fam} {idx}", cell(f, net), cell(o, net), cell(f, net_brk), cell(o, net_brk)]
+            )
+    emit(
+        "Core-298, R-b + R-c: Friday vs other days, before and after brokerage",
+        ["family", "Fri net", "other net", "Fri after brokerage", "other after brokerage"],
+        body,
+    )
 
     body = []
     for fam in FAMILIES:
@@ -114,8 +134,19 @@ def main() -> None:
                     c = [r for r in part if r["family"] == fam and r["index"] == idx]
                     row.append(cell(c, lambda r, k=col: float(r[k])))
             body.append(row)
-    emit("Core-298, R-b + R-c: gross by session window (Friday | other)",
-         ["family", "09:15-10:00 Fri", "other", "10:00-13:00 Fri", "other", "13:00-close Fri", "other"], body)
+    emit(
+        "Core-298, R-b + R-c: gross by session window (Friday | other)",
+        [
+            "family",
+            "09:15-10:00 Fri",
+            "other",
+            "10:00-13:00 Fri",
+            "other",
+            "13:00-close Fri",
+            "other",
+        ],
+        body,
+    )
 
     body = []
     for fam in FAMILIES:
@@ -133,23 +164,40 @@ def main() -> None:
                         exits[k] += int(v)
                 total = sum(exits.values()) or 1
                 mtm = sum(1 for r in c if r["stopped_by"]) / (len(c) or 1)
-                row.append(", ".join(f"{k} {100 * v / total:.0f}%" for k, v in exits.most_common(4))
-                           + f"; MTM stop {100 * mtm:.0f}% of days; trades/day {st.mean(int(r['n_trades']) for r in c):.2f}")
+                row.append(
+                    ", ".join(f"{k} {100 * v / total:.0f}%" for k, v in exits.most_common(4))
+                    + f"; MTM stop {100 * mtm:.0f}% of days; trades/day {st.mean(int(r['n_trades']) for r in c):.2f}"
+                )
             body.append(row)
-    emit("Core-298, R-b + R-c: how trades exit (share of trades by reason)", ["family", "Friday", "other days"], body)
+    emit(
+        "Core-298, R-b + R-c: how trades exit (share of trades by reason)",
+        ["family", "Friday", "other days"],
+        body,
+    )
 
     body = []
     for fam in FAMILIES:
         for idx in INDICES:
             row = [f"{fam} {idx}"]
             for part in (fri, rest):
-                c = [r for r in part if r["family"] == fam and r["index"] == idx and float(r["first_premium"]) > 0]
+                c = [
+                    r
+                    for r in part
+                    if r["family"] == fam and r["index"] == idx and float(r["first_premium"]) > 0
+                ]
                 prem = st.median(float(r["first_premium"]) for r in c) if c else math.nan
-                ratio = st.median(float(r["first_premium_exit"]) / float(r["first_premium"]) for r in c) if c else math.nan
+                ratio = (
+                    st.median(float(r["first_premium_exit"]) / float(r["first_premium"]) for r in c)
+                    if c
+                    else math.nan
+                )
                 row.append(f"premium {prem:,.0f}, exit/entry {ratio:.2f}")
             body.append(row)
-    emit("Core-298, R-b + R-c: first-entry premium (median, points) and its value at exit",
-         ["family", "Friday", "other days"], body)
+    emit(
+        "Core-298, R-b + R-c: first-entry premium (median, points) and its value at exit",
+        ["family", "Friday", "other days"],
+        body,
+    )
 
     body = []
     for fam in FAMILIES:
@@ -157,11 +205,18 @@ def main() -> None:
             row = [f"{fam} {idx}"]
             for b in ("09:17-10:00", "10:01-13:00", "13:01-15:17"):
                 for part in (fri, rest):
-                    c = [r for r in part if r["family"] == fam and r["index"] == idx and band(r["entry"]) == b]
+                    c = [
+                        r
+                        for r in part
+                        if r["family"] == fam and r["index"] == idx and band(r["entry"]) == b
+                    ]
                     row.append(cell(c, net))
             body.append(row)
-    emit("Core-298, R-b + R-c: net by entry-time band (Friday | other)",
-         ["family", "09:17-10:00 Fri", "other", "10:01-13:00 Fri", "other", "13:01- Fri", "other"], body)
+    emit(
+        "Core-298, R-b + R-c: net by entry-time band (Friday | other)",
+        ["family", "09:17-10:00 Fri", "other", "10:01-13:00 Fri", "other", "13:01- Fri", "other"],
+        body,
+    )
 
     body = []
     for reg in ("R-a", "R-b", "R-c"):
@@ -172,10 +227,20 @@ def main() -> None:
                     sess[r["day"]] = r
             vix = [float(r["vix_open"]) for r in sess.values() if r["vix_open"]]
             gap = [abs(float(r["gap_pct"])) for r in sess.values() if r["gap_pct"]]
-            body.append([reg, d, str(len(sess)), f"{st.mean(vix):.1f}" if vix else "—",
-                         f"{st.median(gap):.2f}" if gap else "—"])
-    emit("Market context: sessions, mean opening VIX, median absolute NIFTY opening gap (%)",
-         ["regime", "weekday", "sessions", "VIX open", "|gap| %"], body)
+            body.append(
+                [
+                    reg,
+                    d,
+                    str(len(sess)),
+                    f"{st.mean(vix):.1f}" if vix else "—",
+                    f"{st.median(gap):.2f}" if gap else "—",
+                ]
+            )
+    emit(
+        "Market context: sessions, mean opening VIX, median absolute NIFTY opening gap (%)",
+        ["regime", "weekday", "sessions", "VIX open", "|gap| %"],
+        body,
+    )
 
     text = "\n".join(lines) + "\n"
     (OUT / "summary.md").write_text(text)
