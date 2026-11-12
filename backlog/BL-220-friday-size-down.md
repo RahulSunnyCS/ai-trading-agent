@@ -82,6 +82,11 @@ A rule is never edited after a run: a new, dated rule supersedes it with a logge
   (`ref_expiries` in the trading-data catalog, holiday-shifted expiries included) and, for R1, the
   composites the journal recorded before the open; all known before the first entry. A Friday within 1
   weekday of a NIFTY expiry (a holiday-shifted week) is left out of the mechanism test and reported apart.
+  Clarified 2026-11-12, before any result of A was read: the catalog's `ref_expiries` has no NIFTY expiry
+  before 2024-10, so A's weekday and days-to-expiry labels come from BL-214's
+  `TRADING_DATA_ROOT/_bl214/rotation/days.csv` (built from the lake's observed expiries, calendar days) and
+  its `quality/data_quality.parquet` for the excluded days. Its 125 Fridays in A are 6 (120) or 5 (5)
+  calendar days from expiry, so none is left out by the 1-weekday rule.
 - **Pass / kill rule:**
   - *Mechanism (A):* per session, the mean of the variants' results that day; Friday sessions against
     all other weekday sessions. **Pass** if the other-days mean minus the Friday mean is **₹100 or more**
