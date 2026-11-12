@@ -32,7 +32,7 @@ DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
 
 
 def family(stem: str) -> str:
-    token = re.match(r"N_([a-z]+\d*)", stem).group(1)
+    token = re.match(r"(?:N_)?([a-z]+\d*)_\d{4}$", stem).group(1)
     return {"wide": "Widesl", "dir": "Dir ATM", "buy": "Buy"}.get(
         token, "Widesl" if token.startswith("p") else token
     )
@@ -74,7 +74,9 @@ def main() -> None:
     excluded = excluded_days(root, "option", "NIFTY") or {}
 
     per_day: dict[str, dict[str, float]] = collections.defaultdict(dict)
-    files = sorted(args.results.glob("N_*.csv"))
+    files = sorted(args.results.glob("*.csv"))
+    if len(files) != 124:  # the registered universe (BL-220 Phase 0): stop rather than test a subset
+        raise SystemExit(f"expected BL-071's 124 NIFTY variants, found {len(files)}")
     for f in files:
         with open(f) as fh:
             for r in csv.DictReader(fh):

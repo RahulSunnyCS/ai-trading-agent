@@ -144,3 +144,8 @@ Answered 2026-11-12 (owner, at "lets do BL220"):
   The draft hypothesis now reads "within 1 weekday of expiry". Still nothing run.
 - 2026-11-12 — started; the owner's answers recorded and Phase 0 confirmed (R3 added, 20 forward Fridays,
   hold-out A read at 0 % slippage as stored). Committed before any read of A or B.
+- 2026-11-12 — **defective first read of A, not the registered test.** `mechanism.py` globbed `N_*.csv` and
+  so read 69 of the 124 variants: BL-071 saved the 55 morning-start files without the `N_` prefix
+  (`wide_0917.csv` …). On those 69 (later starts only) it printed Friday ₹122 against ₹152, gap ₹30,
+  p 0.238. Fixed (all `*.csv`, a stop unless exactly 124 are found) and committed before the registered
+  run; the registered verdict is the 124-variant run below, whatever it shows. Nothing else changed.
