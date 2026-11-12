@@ -47,8 +47,8 @@ index, stating for Fridays against the other days:
 - VIX band and opening gap on Fridays against other days, to rule out a Friday-specific market;
 - each of the above in three regimes (owner, 2026-11-12): **R-a** the 11 Fridays 2024-10-11 → 2025-01-03 that were
   SENSEX expiry days (10 labelled `0` in `days.csv`; 2024-10-25 labelled `unknown`, kept in R-a and named);
-  **R-b** 2025-01-10 → 2025-08-29, NIFTY 6 / SENSEX 4 weekdays to expiry; **R-c**
-  2025-09-05 → 2026-11-06, NIFTY 4 / SENSEX 6. The other weekdays are split by the same dates.
+  **R-b** 2025-01-10 → 2025-08-29, NIFTY 6 / SENSEX 4 calendar days to expiry on a Friday (4 / 2 weekdays);
+  **R-c** 2025-09-05 → 2026-11-06, NIFTY 4 / SENSEX 6 (2 / 4 weekdays). The other weekdays are split by the same dates.
 
 ## Out of scope
 
@@ -68,10 +68,16 @@ Descriptive only: no pass / kill rule, no verdict that changes a setting.
   2024-10-09 → 2026-11-12, point-in-time weekdays to expiry from `rotation/days.csv` (`store.read_days`).
 - **Figures:** net after costs at 0.5 % slippage (the dashboard's and the 16:00 message's basis) with gross
   beside it; one lot per strategy-day; a mean always with its standard error and number of days.
+  Clarified 2026-11-12, before the full run: the rotation strategy files carry no costs (stored `costs` is 0),
+  so "net" here is after 0.5 % slippage and before brokerage; a second figure subtracts brokerage the way
+  Lot plans does (₹20 × 1.18 × 2 per trade, `rotation/lot_plans.py`).
 - **Source of the intraday splits:** each strategy-day replayed with the nightly update's own call
   (`legwise.engine.simulate_day`, the strategy file, `SIZING_DATE`), as `rotation.portfolio._replay` does;
   about 1 s for all 298 on one day (timed 2026-11-12), so the whole span runs, no sampling. A replay must
-  reproduce the stored net; a strategy-day that does not is reported and left out.
+  reproduce the stored net; a strategy-day that does not is reported and left out. Clarified 2026-11-12
+  after a four-day smoke run (all 405 mismatches on 2026-11-06, the other days to the paisa) and before the
+  full read: a day where 5 % or more of its strategy-days are not reproduced had its data changed after
+  it was stored, and is left out whole, so no session mean mixes the two.
 - **Look-ahead check:** none needed for a description; every split uses only the day's own data.
 - **Hold-out:** none here, on purpose: BL-220's two hold-outs are not to be read.
 - **Will not run:** anything on 2022–24 NIFTY or after 2026-11-12; any rule test.

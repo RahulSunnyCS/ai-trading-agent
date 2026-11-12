@@ -24,8 +24,10 @@ base 2024-11-12 → 2026-11-11, 486 days) gave Friday as the weakest day for all
 
 A follow-up read the same days three ways (scripts in the session scratchpad, not committed):
 
-- **Friday is the one day far from both expiries in both expiry regimes.** Weekdays to expiry
-  (NIFTY / SENSEX) on a Friday were 6 / 4 before Sep 2025 and 4 / 6 after. Tuesday and Thursday hold an
+- **Friday is the one day far from both expiries in both expiry regimes** (from Jan 2025). Calendar days to
+  expiry (NIFTY / SENSEX) on a Friday were 6 / 4 from Jan to Aug 2025 and 4 / 6 after (weekdays: 4 / 2,
+  then 2 / 4); every other weekday is at most 1 day from one expiry. Oct 2024 – Jan 2025 Fridays were
+  SENSEX expiry days. Tuesday and Thursday hold an
   expiry in both regimes and carry 68 % of T1's total, 82 % of Core's, 60 % of the base's.
 - **The whole universe makes about nothing on Fridays, not a loss.** The 298 stored strategies average
   ₹6 a strategy-day on Friday (0.5 % slippage), against −₹78 on Wednesday, the universe's weakest day.
@@ -55,7 +57,7 @@ T1's result per rupee of risk without giving up more than a set share of its net
 ### Phase 0 — Pre-register (DRAFT: the owner confirms or edits it at "Start BL-220", before any run)
 Filled in and committed **before any run**. A rule is never edited after a run: a new, dated rule
 supersedes it with a logged reason, and both stay here.
-- **Hypothesis:** on Fridays, when neither index is within 4 weekdays of expiry, Adaptive's picks earn
+- **Hypothesis:** on Fridays, when neither index is within 1 weekday of expiry, Adaptive's picks earn
   about the universe mean (≈ zero), so trading fewer of them raises net per unit of drawdown.
 - **Candidate rules (fixed now, no others):**
   - **R0** — as now: every pick, every Friday (the comparator).
@@ -119,3 +121,6 @@ supersedes it with a logged reason, and both stay here.
 
 - 2026-11-12 — created from the weekday read (owner: "Yes, add it"). Phase 0 is a draft; nothing has been
   run on either hold-out.
+- 2026-11-12 — corrected the Context: the Friday days-to-expiry figures quoted (6 / 4, 4 / 6) are calendar
+  days, not weekdays (weekdays 4 / 2 and 2 / 4), and Oct 2024 – Jan 2025 Fridays were SENSEX expiry days.
+  The draft hypothesis now reads "within 1 weekday of expiry". Still nothing run.
