@@ -12,6 +12,7 @@ import {
   type Book,
   type Broker,
   algotestAddon,
+  algotestDeployBrokers,
   effectiveRow,
   pausedFor,
   readAutomation,
@@ -19,6 +20,7 @@ import {
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { automationForSession } from './day-type.js';
 import { istMinutes, morningPicks, parseLive } from './deploy-plan.js';
+import { placements } from './deploy-quantity.js';
 import { describe } from './diagnose.js';
 import {
   LockBusy,
@@ -341,6 +343,9 @@ class Monitor {
       day: string;
       source: string;
       strategies: { name: string; file: string; addon?: boolean }[];
+      split?: string;
+      accounts?: Record<string, string[]>;
+      alone?: Record<string, string[]>;
     };
     const picks: { name: string; legs: LegNeed[]; lots: number[]; addon: boolean }[] = [];
     for (const s of manifest.strategies) {
@@ -353,7 +358,7 @@ class Monitor {
         addon: Boolean(s.addon),
       });
     }
-    return { day: manifest.day, source: manifest.source, picks };
+    return { day: manifest.day, source: manifest.source, picks, manifest };
   }
 
   // --- logins --------------------------------------------------------------------------------
@@ -952,9 +957,18 @@ class Monitor {
           const m = morningPicks(p.picks, algotestAddon(this.automation, r.book));
           if (m.leftOut.length)
             notes.push(`add-on left out (Settings › Automation): ${m.leftOut.join(', ')}`);
+          // BL-209 Phase 3: under a split export each account deploys its own strategies (the
+          // one-lot ones, the quantity set on the Activate sheet), not every copy in the export
+          const place = placements(
+            p.manifest,
+            m.kept,
+            algotestDeployBrokers(this.automation, r.book),
+          );
           rows.push({
             broker: r.broker,
-            picks: m.kept.map((x) => x.name),
+            picks: place.problem
+              ? m.kept.map((x) => x.name)
+              : (place.byBroker.get(r.broker) ?? []).map((x) => x.name),
             multiplier: r.multiplier,
           });
         }

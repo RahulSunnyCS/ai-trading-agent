@@ -25,6 +25,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import journal, store
+from .entries import read as read_entries
 from .lists import LISTS, LOTS_PER, MIN_WIDE_N
 from .pick import TRACK_LISTS
 from .variants import is_buy, is_wide, track_names, variant_names
@@ -135,7 +136,7 @@ def build(
     lots_per = lots_per or LOTS_PER
     names = variant_names() + (track_names(track) if track else [])
     path = store.journal_path(root, track)
-    all_entries = journal.read(path)
+    all_entries = read_entries(root, track, path)
     chain_problems = journal.verify(path)
     entries = [
         e

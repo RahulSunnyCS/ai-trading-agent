@@ -1,7 +1,7 @@
 # Options research, by strategy and variable
 
 Intraday index-options strategies (NIFTY, SENSEX), backtested leg-wise on the collected 1-minute
-data. Status words and the page template: [`../README.md`](../README.md).
+data; since BL-218 also MCX commodity mini options (crude, natural gas, gold, silver). Status words and the page template: [`../README.md`](../README.md).
 
 ## Strategy × variable
 
@@ -27,6 +27,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | Breakout source | — | — | [D](strategies/buy-breakout/breakout-source.md) |
 | 30-min consolidation before breakout | — | — | [N](strategies/buy-breakout/consolidation-30m.md) |
 | Candle position near the breakout | — | — | [N](strategies/buy-breakout/candle-position.md) |
+| Market: MCX commodity minis (BL-218) | [T](strategies/widesl/mcx-commodities.md) | [T](strategies/directional/mcx-commodities.md) | [T](strategies/buy-breakout/mcx-commodities.md) |
 
 ## Across strategies ([`common/`](common/README.md))
 

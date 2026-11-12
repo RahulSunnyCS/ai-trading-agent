@@ -1,7 +1,8 @@
 ## What it is for
 
-The Live board shows how today's picks are doing while the market is open. It takes the picks
-recorded at 09:16, for Adaptive Classic and Adaptive Tuned, and runs them through the same backtest
+The Live board shows how today's picks are doing while the market is open. It takes last
+evening's list for today (the strategies the 16:00 message sent, which the platforms trade), for
+Adaptive Classic and Adaptive Tuned, and runs them through the same backtest
 that scores the day in the evening, on Angel One's 1-minute prices so far. If the evening's prices
 agree with Angel One's, the evening result will match the board's last figures.
 
@@ -13,8 +14,8 @@ the [Live vs paper](guide:optionslab/rotation-live) card measures that gap after
 - **Every 5 minutes**, from 09:18 to 15:31 on trading days, by the scheduler's `rotation-live-board` job.
 - **When you press Refresh.** With the 5-minute job running, it refreshes within a few seconds.
   Otherwise the dashboard logs in to Angel One once and refreshes itself, which takes about a minute.
-  Before the day's picks are recorded at 09:16 there is nothing to read, so the card only says so
-  and no Angel One login is made.
+  With no evening list and no entry for the day there is nothing to read, so the card only says
+  so and no Angel One login is made.
 - The card checks for new figures every minute, and every few seconds while a refresh runs.
 
 The header says how fresh the prices are ("Prices to 15:15") and when the next refresh is due.

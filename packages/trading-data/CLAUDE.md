@@ -136,6 +136,13 @@ table instead.
   written and regenerable with `tdata quality rebuild`; a day is never dropped from the lake
   for a bad verdict — the label says why, readers decide. Fetch timestamps from DuckDB as
   epoch seconds, not `TIMESTAMPTZ` (that import needs `pytz`, which is not a dependency).
+- **MCX commodity options share `asset=option` but not the NSE session (BL-148).** The names in
+  `lake.MCX_ROOTS` (CRUDEOIL, CRUDEOILM, NATURALGAS, NATGASMINI, GOLD, GOLDM, SILVER, SILVERM,
+  COPPER, ZINC; standard and mini are separate roots) count their bars over 09:00 up to 23:55 IST
+  (`MCX_IN_SESSION_SQL`, at most `MCX_FULL_DAY_BARS` = 895 a day; the close is 23:30 in the US
+  daylight-saving months), so a full MCX day is `usable`, a Diwali evening is `short_session:60`,
+  and anything over 895 is `duplicate_bars`. Code that lists every `underlying=*` folder must leave
+  these out (`heatmap build --stocks` does).
 - **The evening run judges one day with `quality.judge_day`** (one connection, ~20 s), not
   `rebuild(days=...)` (a connection per known name — minutes, and it waits on every one while the
   catalog is held).
@@ -155,7 +162,7 @@ table instead.
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
 - **`tdata backup` copies a file when its size or mtime differs at the destination**
-  (`backup.py`), for `lake/`, `raw/`, `contract-notes/` (BL-168) and `rotation/` alike. Most lake
+  (`backup.py`), for `lake/`, `raw/`, `contract-notes/` (BL-168), `rotation/`, `mcx/` (the MCX contract calendar) and `mcx-forward/` (BL-219's paper journal) alike. Most lake
   and raw files never change, but some are rewritten in place (the yearly `bars_1d` file,
   `lake/derived/`, a Fyers repair of a day), and contract-notes/rotation files are rewritten at
   the same size all the time. mtimes are compared in 10 ms ticks: the backup SSD is exFAT, which

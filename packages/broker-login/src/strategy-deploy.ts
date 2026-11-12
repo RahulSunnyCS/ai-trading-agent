@@ -3,7 +3,7 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
-import { type Locator, type Page, chromium } from 'playwright';
+import { type Page, chromium } from 'playwright';
 import { BASE_URL } from './algotest.js';
 import {
   type Automation,
@@ -16,6 +16,7 @@ import {
   readAutomation,
   uploadBooks,
 } from './automation-settings.js';
+import { tickBrokers } from './broker-sheet.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { automationForSession, sessionFor } from './day-type.js';
 import {
@@ -24,7 +25,6 @@ import {
   type LiveState,
   type Pick,
   SETUP_PENDING,
-  checkBrokerSheet,
   istMinutes,
   morningPicks,
   nothingOnAlgotest,
@@ -34,6 +34,7 @@ import {
   repeating,
   secondsUntil,
 } from './deploy-plan.js';
+import { deployList, placements, staleExport } from './deploy-quantity.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { hhmm, setupSheet } from './live-sheet.js';
 import { algotestLoginLocked } from './login-lock.js';
@@ -126,36 +127,13 @@ async function deployedState(page: Page, name: string, before: number): Promise<
       : `/live shows ${now} Deployed (was ${before}): not deployed`;
 }
 
-/**
- * Tick exactly the wanted brokers in the open broker sheet (BL-197). Each row's checkbox is
- * read-only and the row takes the click; every box is read back, so a click that missed stops.
- */
-async function tickBrokers(sheet: Locator, brokers: readonly Broker[]): Promise<void> {
-  const check = checkBrokerSheet(await sheet.innerText(), brokers);
-  if (check.missing.length) throw new Error(`broker sheet lists no ${check.missing.join(', ')}`);
-  if (check.notLoggedIn.length)
-    throw new Error(`${check.notLoggedIn.join(', ')} not LOGGED IN on the broker sheet`);
-  const wanted = new Set(brokers.map((b) => BROKER_LABELS[b] ?? b));
-  const boxes = sheet.locator('input[type=checkbox][readonly]');
-  for (let i = 0; i < (await boxes.count()); i++) {
-    const box = boxes.nth(i);
-    const row = box.locator('xpath=..');
-    const label = (await row.innerText()).trim();
-    const want = [...wanted].some((w) => label.startsWith(`${w} - `));
-    const checked = () => box.evaluate((e) => (e as HTMLInputElement).checked);
-    if ((await checked()) !== want) await row.click();
-    if ((await checked()) !== want)
-      throw new Error(`could not ${want ? 'tick' : 'untick'} "${label}" on the broker sheet`);
-  }
-  const ticked = await boxes.evaluateAll(
-    (els) => els.filter((e) => (e as HTMLInputElement).checked).length,
-  );
-  if (ticked !== wanted.size)
-    throw new Error(`${ticked} broker(s) ticked on the broker sheet, expected ${wanted.size}`);
-}
-
-async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Promise<string> {
+async function deployOne(
+  page: Page,
+  pick: Pick,
+  lots: ReadonlyMap<Broker, number>,
+): Promise<string> {
   const { name } = pick;
+  const brokers = [...lots.keys()];
   await setupSheet(page, pick);
 
   const before = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
@@ -178,7 +156,7 @@ async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Pr
       `Activate did not open the broker sheet: ${text}. ${await deployedState(page, name, before)}`,
     );
   }
-  await tickBrokers(sheet, brokers);
+  await tickBrokers(sheet, lots);
   if (secondsUntil(pick.entry) < ACTIVATE_LEAD_SECONDS) {
     await sheet.getByRole('button', { name: 'Cancel', exact: true }).click();
     await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
@@ -212,7 +190,9 @@ async function deployOne(page: Page, pick: Pick, brokers: readonly Broker[]): Pr
     throw new Error(
       `/live shows ${after} Deployed after Activate (was ${before}), expected ${before + brokers.length}: check it`,
     );
-  const on = brokers.map((b) => BROKER_LABELS[b] ?? b).join(' + ');
+  const on = brokers
+    .map((b) => `${BROKER_LABELS[b] ?? b}${(lots.get(b) ?? 1) > 1 ? ` ×${lots.get(b)}` : ''}`)
+    .join(' + ');
   return `deployed on ${on} (${after} Deployed)`;
 }
 
@@ -383,19 +363,6 @@ async function runDir(dir: string, values: Values, automation: Automation | null
     );
     return 1;
   }
-  // BL-209: a split export puts each copy on one account; activating or checking it here would tick
-  // every uploading broker for every copy (the ×2 copies on both accounts). Until Phase 3 builds
-  // the per-account activation, it is activated by hand. The evening setup is unaffected.
-  if (manifest.split && !values.setup) {
-    const accounts = Object.entries(manifest.accounts ?? {})
-      .map(([b, names]) => `${b}: ${names.join(', ')}`)
-      .join('; ');
-    const text = `⚠️ AlgoTest ${manifest.book.toUpperCase()} for ${manifest.day} is split across the accounts (BL-209): the tool does not ${values.check ? 'check' : 'activate'} a split list yet; ${values.check ? 'check' : 'activate'} by hand on /live, each copy on its own account only: ${accounts}`;
-    console.error(text);
-    if (values.morning && values.apply)
-      await sendText(readTelegramConfig(), text, 'broker.algotest').catch(() => undefined);
-    return 1;
-  }
   // BL-140: no login at all when the settings give AlgoTest nothing of the tool's to deploy or check.
   if (
     values.setup &&
@@ -453,8 +420,34 @@ async function runDir(dir: string, values: Values, automation: Automation | null
       : { kept: manifest.strategies, leftOut: [] as string[] };
   // ... and the other way round: an add-on switched on after the evening export is not in AlgoTest
   const addonMissing = addonWanted === true && !manifest.strategies.some((s) => s.addon);
+  // BL-209 Phase 3: an export older than the settings now in force is the wrong list for the
+  // accounts, and each account's quantity is set on the Activate sheet, so what to deploy is the
+  // one-lot strategy per account at its own quantity, not the pre-doubled copies.
+  const deploying = values.apply && !values.setup && !values.check;
+  const stale =
+    deploying && values.morning && automation && automation.version > 0
+      ? staleExport(manifest.settings_version, automation.version)
+      : null;
+  const place = placements(manifest, morning.kept, brokers);
+  const refusal = stale ?? (deploying ? place.problem : null);
+  if (refusal) {
+    const text = `⚠️ AlgoTest ${manifest.book.toUpperCase()} for ${manifest.day}: ${refusal}`;
+    console.error(text);
+    if (values.morning)
+      await sendText(readTelegramConfig(), text, 'broker.algotest').catch(() => undefined);
+    return 1;
+  }
+  if (place.problem) console.error(`split export not read: ${place.problem}`);
+  // a split export that cannot be read falls back to every strategy on every account at 1
+  const plan = deployList(
+    place.problem
+      ? placements({ strategies: manifest.strategies }, morning.kept, brokers).byBroker
+      : place.byBroker,
+  );
+  const lotsOf = (name: string): Map<Broker, number> =>
+    new Map(Object.entries(plan.lots.get(name) ?? {}) as Array<[Broker, number]>);
   const picks: Pick[] = [];
-  for (const s of morning.kept) {
+  for (const s of morning.kept.filter((k) => plan.names.includes(k.name))) {
     const doc = JSON.parse(await readFile(join(resolve(dir), s.file), 'utf8'));
     picks.push({ name: s.name, entry: entryOf(doc) });
   }
@@ -541,7 +534,16 @@ async function runDir(dir: string, values: Values, automation: Automation | null
       if (p.already.length) lines.push(`already deployed: ${p.already.join(', ')}`);
       if (p.deploy.length)
         lines.push(
-          `deploy: ${p.deploy.map((d) => d.name).join(', ')} on ${brokers.map((b) => BROKER_LABELS[b] ?? b).join(' + ') || '(no broker)'}`,
+          `deploy: ${p.deploy
+            .map(
+              (d) =>
+                `${d.name} on ${
+                  [...lotsOf(d.name)]
+                    .map(([b, n]) => `${BROKER_LABELS[b] ?? b}${n > 1 ? ` ×${n}` : ''}`)
+                    .join(' + ') || '(no broker)'
+                }`,
+            )
+            .join('; ')}`,
         );
       if (p.tooLate.length) lines.push(`TOO LATE, not deployed: ${p.tooLate.join(', ')}`);
       if (p.missing.length) lines.push(`NOT IN ALGOTEST, not deployed: ${p.missing.join(', ')}`);
@@ -552,7 +554,7 @@ async function runDir(dir: string, values: Values, automation: Automation | null
         const ledger = join(resolve(dir), '..', '..', 'deploy-ledger.jsonl');
         for (const pick of p.deploy) {
           try {
-            const verdict = await deployOne(page, pick, brokers);
+            const verdict = await deployOne(page, pick, lotsOf(pick.name));
             lines.push(`✅ ${pick.name}: ${verdict}`);
             await appendFile(
               ledger,

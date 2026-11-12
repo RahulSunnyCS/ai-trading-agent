@@ -75,3 +75,46 @@ def test_an_older_or_recorded_export_does_not_count(world):
     exported.clear()
     assert run("--preview", "--only-missing").exit_code == 0
     assert sorted(exported) == ["core", "t1"]
+
+
+def test_an_export_older_than_a_layout_change_is_exported_again(world, monkeypatch):
+    """2026-11-06: the owner turned the T1 split on after the evening export; the 08:11 catch-up
+    kept that export (nothing was "missing") and the activation put every strategy on both
+    accounts. An export now carries the settings version and layout it was made under."""
+    root, today, exported = world
+    state = {"version": 12, "dirBoost": False, "capital": 850000}
+
+    def settings(platform, session=None):
+        row = {"upload": True, "list": "t1", "dirBoost": state["dirBoost"], "multiplier": 1}
+        s = {
+            "version": state["version"],
+            "splitT1": False,
+            "capital": state["capital"],
+            "rows": {"algotest.finvasia": row},
+        }
+        return ["t1"], s
+
+    monkeypatch.setattr(cli, "_settings_books", settings)
+    assert run("--preview").exit_code == 0
+    path = root_manifest(root, today, "t1")
+    assert json.loads(path.read_text())["settings_version"] == 12
+    exported.clear()
+
+    same = run("--preview", "--only-missing")
+    assert same.exit_code == 3 and exported == []  # same settings: nothing to do
+
+    # a save that changes nothing the export reads: the picks stay, only the stamp moves
+    state.update(version=13, capital=900000)
+    quiet = run("--preview", "--only-missing")
+    assert quiet.exit_code == 3 and exported == []
+    assert json.loads(path.read_text())["settings_version"] == 13
+
+    state.update(version=14, dirBoost=True)  # a row's Dir x2: the export is exported again
+    changed = run("--preview", "--only-missing")
+    assert changed.exit_code == 0, changed.output
+    assert exported == ["t1"]
+    assert json.loads(path.read_text())["settings_version"] == 14
+
+
+def root_manifest(root, today, book):
+    return root / "rotation" / "algotest" / today.isoformat() / book / "manifest.json"

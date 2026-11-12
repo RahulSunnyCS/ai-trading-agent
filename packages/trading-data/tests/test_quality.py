@@ -285,3 +285,38 @@ def test_status_on_a_catalog_that_was_never_opened_read_write_since_008(root, mo
         con.execute("DELETE FROM schema_migrations WHERE version = '008_data_quality'")
     result = CliRunner().invoke(app, ["quality", "status"])
     assert result.exit_code == 0 and "no verdicts yet" in result.output
+
+
+def test_mcx_names_are_judged_against_the_mcx_session():
+    mcx = {"name": "CRUDEOIL", "max_bars": 870}  # a day closing 23:30
+    assert verdict(_stats(**mcx)) == ("usable", None)
+    assert verdict(_stats(name="CRUDEOIL", max_bars=895)) == ("usable", None)
+    assert verdict(_stats(name="CRUDEOIL", max_bars=896)) == ("excluded", "duplicate_bars:896")
+    assert verdict(_stats(name="CRUDEOIL", max_bars=390)) == ("usable", None)  # evening-only
+    assert verdict(_stats(name="CRUDEOIL", max_bars=250)) == ("excluded", "short_session:250")
+    # the same bar count on an NSE name is a duplicate
+    assert verdict(_stats(name="NIFTY", max_bars=870)) == ("excluded", "duplicate_bars:870")
+    assert quality.infer_source("MCX:CRUDEOIL24NOV6000CE") == "fyers"
+
+
+def test_rebuild_counts_mcx_bars_over_the_long_session(root):
+    make_day(
+        root, "option", "CRUDEOIL", FRIDAY, start=(9, 0), bars=895,
+        vendor_symbol="MCX:CRUDEOIL26OCT{i}CE",
+    )  # fmt: skip
+    make_day(
+        root, "option", "GOLD", date(2026, 9, 24), start=(9, 0), bars=895, extra_after=5,
+        vendor_symbol="MCX:GOLD26OCT{i}CE",
+    )  # fmt: skip
+    with connect(root):
+        pass
+    quality.rebuild(root, log=lambda _: None)
+    with connect(root, read_only=True) as con:
+        rows = con.execute(
+            "SELECT name, verdict, reason, max_bars, off_session_rows, source FROM data_quality "
+            "ORDER BY name"
+        ).fetchall()
+    assert rows == [
+        ("CRUDEOIL", "usable", None, 895, 0, "fyers"),
+        ("GOLD", "usable", None, 895, 12 * 5, "fyers"),
+    ]

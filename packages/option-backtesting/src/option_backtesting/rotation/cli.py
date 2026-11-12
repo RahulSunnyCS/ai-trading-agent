@@ -125,22 +125,20 @@ def update(
 def pick(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
     vix_open: float = typer.Option(
-        None, "--vix-open", help="Override the live 09:15 VIX open (testing)."
+        None, "--vix-open", help="Rank with this VIX instead of the evening's (testing)."
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Score and print; write nothing."),
-    telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
-    track: str = typer.Option(
-        None, "--track", help="A parallel track (t1): its own journal, private Telegram only."
+    telegram: bool = typer.Option(
+        True, "--telegram/--no-telegram", help="Alert the owner if it fails (nothing else is sent)."
     ),
+    track: str = typer.Option(None, "--track", help="A parallel track (t1): its own journal."),
     with_t1: bool = typer.Option(
-        False,
-        "--with-t1",
-        help="Also record the T1 track and send ONE message with both (the 09:16 job). "
-        "Adaptive is never held back by T1.",
+        False, "--with-t1", help="Also record the T1 track (the morning job)."
     ),
 ) -> None:
-    """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
-    from .deliver import pick_and_send
+    """Record today's entry for every list (before 09:17), hash-chained, from last evening's list:
+    the evening is the source of truth (owner, 2026-11-09). Sends no message."""
+    from .deliver import record_day
     from .variants import TRACK_DIRS
 
     if track and track not in TRACK_DIRS:
@@ -149,7 +147,7 @@ def pick(
     if track and with_t1:
         typer.echo("--with-t1 and --track are different modes: use one", err=True)
         raise typer.Exit(2)
-    code = pick_and_send(
+    code = record_day(
         _day(day),
         vix_open=vix_open,
         dry_run=dry_run,
@@ -181,12 +179,14 @@ def standing_cmd(
     """T1's drawdown now against the last two years, as the 16:00 message says it, and its daily
     series (net, running total and high, drawdown, picks) written to rotation/track_t1/standing.csv
     (owner, 2026-11-04). Paper, one lot per strategy, the message's slippage."""
-    from . import journal, messages, standing, store
+    from . import messages, standing
 
     if day:
         d = _day(day)
     else:
-        entries = journal.read(store.journal_path(None, standing.TRACK))
+        from .entries import read as read_entries
+
+        entries = read_entries(None, standing.TRACK)
         if not entries:
             typer.echo("no T1 journal entry yet")
             raise typer.Exit(2)
@@ -338,6 +338,40 @@ def _with_lots(picks, platform: str, book: str, settings: dict | None, flag: boo
     return replace(picks, lots=lots)
 
 
+def _settings_layout(settings: dict) -> str:
+    """What the AlgoTest export reads from Settings › Automation: the split switch, the uploads
+    master, each AlgoTest row's list / upload / Dir ×2 / add-on / multiplier and the day-type rules.
+    A save that changes none of it (capital, margin, a pause) leaves the export as it is."""
+    import hashlib
+    import json
+
+    rows = {
+        key: {k: row.get(k) for k in ("upload", "list", "dirBoost", "addon", "multiplier")}
+        for key, row in (settings.get("rows") or {}).items()
+        if key.startswith("algotest.")
+    }
+    layout = {
+        "split": bool(settings.get("splitT1")),
+        "uploads": (settings.get("masters") or {}).get("uploads"),
+        "rows": rows,
+        "rules": settings.get("rules") or [],
+    }
+    return hashlib.sha1(json.dumps(layout, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _stamp_settings(folder, settings: dict) -> None:
+    """Record the Settings › Automation version (and the layout it read) an export was made under
+    in its manifest, so the morning activation (and `--only-missing`) can tell an export older
+    than a change to what it holds."""
+    import json
+
+    path = folder / "manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["settings_version"] = settings.get("version")
+    manifest["settings_layout"] = _settings_layout(settings)
+    path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+
 def _with_split(picks, book: str, settings: dict | None):
     """BL-209: under --from-settings, T1 split across the two AlgoTest accounts when Settings ›
     Automation has the switch on and both AlgoTest rows upload T1 (`split_t1`); each account's
@@ -397,9 +431,19 @@ def _morning(picks, book: str, folder):
     return replace(m.picks, dte=picks.dte), extra
 
 
-def _has_export(book: str, day: str | None, next_session: bool, preview: bool) -> bool:
+def _has_export(
+    book: str,
+    day: str | None,
+    next_session: bool,
+    preview: bool,
+    settings: dict | None = None,
+) -> bool:
     """Whether `latest-<book>.json` already points at an existing export of that session's
-    expected picks (`--only-missing`)."""
+    expected picks (`--only-missing`). With `settings` (--from-settings), only one made under the
+    same layout of Settings › Automation: an export older than a change to what it holds (the
+    split, a row's list or Dir ×2, the add-on) is exported again, never kept (2026-11-06: the
+    08:11 activation used one made before the owner's split and put every strategy on both
+    accounts)."""
     import json
 
     from . import store
@@ -418,11 +462,27 @@ def _has_export(book: str, day: str | None, next_session: bool, preview: bool) -
         return False
     from pathlib import Path
 
-    return (
+    manifest = Path(str(record.get("dir", ""))) / "manifest.json"
+    if not (
         record.get("day") == d.isoformat()
         and record.get("source") == "preview"
-        and (Path(str(record.get("dir", ""))) / "manifest.json").exists()
-    )
+        and manifest.exists()
+    ):
+        return False
+    if not settings:
+        return True
+    try:
+        made = json.loads(manifest.read_text())
+    except (OSError, ValueError):
+        return False
+    if made.get("settings_layout") != _settings_layout(settings):
+        return False  # a change to what is exported: the split, a row's list, Dir x2, the add-on
+    if made.get("settings_version") != settings.get("version"):
+        # a save that changed nothing the export reads (capital, margin): the same picks stay,
+        # so the list uploaded at 16:40 is the list that trades; only the stamp moves
+        made["settings_version"] = settings.get("version")
+        manifest.write_text(json.dumps(made, indent=2) + "\n")
+    return True
 
 
 def _end_missing(missing: list[str], books: list[str]) -> None:
@@ -524,7 +584,9 @@ def algotest_export(
     missing = []
     skipped = []
     for b in books:
-        if only_missing and _has_export(b, day, next_session, preview):
+        if only_missing and _has_export(
+            b, day, next_session, preview, settings if from_settings else None
+        ):
             skipped.append(b)
             continue
         picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
@@ -545,6 +607,8 @@ def algotest_export(
         except FileExistsError as error:
             typer.echo(f"not exported: {error}")
             raise typer.Exit(1) from error
+        if from_settings and settings:
+            _stamp_settings(folder, settings)
         if not out:  # the uploader (BL-137) reads the newest default export through this pointer
             ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
         typer.echo(ax.render(picks, exports, zip_path))
@@ -940,11 +1004,12 @@ def verify(
 @rotation_app.command()
 def show(last: int = typer.Option(5, "--last", help="How many recent entries.")) -> None:
     """Print the recent entries and each list's P&L where the day is scored."""
-    from . import journal, store
+    from . import store
+    from .entries import read as read_entries
     from .lists import LOTS_PER
     from .variants import variant_names
 
-    entries = journal.read(store.journal_path())[-last:]
+    entries = read_entries()[-last:]
     m = store.load_matrix(variant_names()) if entries else None
     for e in entries:
         typer.echo(

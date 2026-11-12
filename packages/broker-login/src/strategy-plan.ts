@@ -36,6 +36,8 @@ export interface Manifest {
   /** BL-209: {broker: [names]} under the split, and each account's list trading alone */
   accounts?: Record<string, string[]>;
   alone?: Record<string, string[]>;
+  /** the Settings › Automation version the export was made under (`--from-settings`) */
+  settings_version?: number;
 }
 
 export interface LedgerRow {

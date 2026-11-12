@@ -235,6 +235,19 @@ week, until disabled.
   "Broker Login n/m" (rendered after the rows; also read split over lines); a count the page does not show is
   unread (`brokersLoggedIn: null`, `brokerRefusal`), refused as such, never as "0/0", and every refusal saves a
   `deploy-refused` screenshot and HTML (2026-11-03).
+  BL-209 Phase 3 (owner, 2026-11-06: "adjust the quantity also before activation"): a split export
+  (`manifest.split`) is activated per account by `deploy-quantity.ts` (`placements`): each account's list in the
+  manifest's `accounts` (`alone` when one account trades alone) names copies, `T1 · <variant> · ×N`; the tool
+  deploys the one-lot `T1 · <variant>` once, ticks only the accounts that trade it and sets each account's
+  Quantity Multiplier on the broker sheet to its N (`broker-sheet.ts` `tickBrokers`: the card's own Increase /
+  Decrease buttons, the number and the card's `= N` total read back; anything else stops before Activate). A copy
+  with no one-lot strategy is deployed as it is at 1. The morning run also refuses an export whose manifest
+  `settings_version` is not the settings' current version (`staleExport`; the exporter stamps it under
+  `--from-settings` with a `settings_layout` hash, and `--only-missing` exports again only when the layout moved, otherwise restamps the version, so a save of capital or margin never changes the traded list), with a Telegram message; a hand
+  `--latest` deploy is not held to it. Not verified live: whether AlgoTest scales a strategy's MTM stop with the
+  sheet's multiplier (the ×2 copies keep the one-lot figure and rely on leg lots), and the 09:25 check reads each
+  account's own strategies from the split (`placements`) but not their quantities. Tests: `deploy-quantity.test.ts`,
+  `broker-sheet.test.ts` (Chromium against a stand-in of the sheet).
   `--setup` (BL-197, the last step of `algotest-evening`) sets up the next session's picks instead: each
   sheet checked (multiplier 1, NRML, no day ticked, execution time = entry) and saved with Trade monitoring
   on Candle Close; it deploys nothing, so it needs `ALGOTEST_UPLOAD=on`, not `ALGOTEST_DEPLOY`.

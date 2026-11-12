@@ -101,7 +101,6 @@ from ..data.reference.loader import (
 from ..data.resolver import resolve_strike
 from .market import (
     BAR_SIZES,
-    N_MINUTES,
     ContractKey,
     DayData,
     Series,
@@ -123,10 +122,12 @@ _EPS = 1e-9
 #: does (BL-009 Phase 1: 512 of 515 untrailed stop exits across four exports equal the level
 #: rounded to the nearest 0.05; 88 equal it unrounded).
 TICK = 0.05
+#: MCX option ticks that differ from 0.05 (BL-218; Angel One's scrip master, 2026-11-11).
+TICKS = {"GOLDM": 0.5, "SILVERM": 0.5}
 
 
-def to_tick(price: float) -> float:
-    return round(round(price / TICK) * TICK, 2)
+def to_tick(price: float, tick: float = TICK) -> float:
+    return round(round(price / tick) * tick, 2)
 
 
 @dataclass
@@ -222,6 +223,10 @@ class _DaySim:
         self.reference = reference
         #: the date whose lot size "current" sizing uses (today unless a test pins it)
         self.sizing_date = sizing_date or date.today()
+        #: the day's minute grid (NSE 09:15 x 375, MCX 09:00 x 895) and the option tick
+        self.start = data.session_start
+        self.n = data.n_minutes
+        self.tick = TICKS.get(strategy.underlying, TICK)
         self.notes: list[str] = []
         # Quantity is set per leg in _select, once the leg's contract is known.
         self.legs = [_LegRun(leg, 0) for leg in strategy.legs]
@@ -233,8 +238,17 @@ class _DaySim:
         self.orders = 0
         self.stopped_by: str | None = None
         self.last_reentry_min = (
-            minute_index(strategy.no_reentry_after) if strategy.no_reentry_after else N_MINUTES
+            self._index(strategy.no_reentry_after) if strategy.no_reentry_after else self.n
         )
+
+    def _index(self, hhmm: str) -> int:
+        return minute_index(hhmm, self.start)
+
+    def _label(self, minute: int) -> str:
+        return minute_label(minute, self.start)
+
+    def _to_tick(self, price: float) -> float:
+        return to_tick(price, self.tick)
 
     # -- fills -------------------------------------------------------------
 
@@ -255,9 +269,11 @@ class _DaySim:
         stop = spec.stop_loss
         if run.roll_pending and spec.roll is not None and spec.roll.stop_loss_percent is not None:
             stop = Amount(percent=spec.roll.stop_loss_percent)  # the rolled leg's own stop (BL-105)
-        run.initial_sl = run.sl = to_tick(price - run.sign * stop.distance(price)) if stop else None
+        run.initial_sl = run.sl = (
+            self._to_tick(price - run.sign * stop.distance(price)) if stop else None
+        )
         run.target = (
-            to_tick(price + run.sign * spec.target.distance(price)) if spec.target else None
+            self._to_tick(price + run.sign * spec.target.distance(price)) if spec.target else None
         )
         run.fresh_intrabar = intrabar
         run.roll_pending = False  # only the roll's own entry takes the roll overrides
@@ -287,7 +303,7 @@ class _DaySim:
         if strike_rule.strike_type is not None:
             spot = self.data.spot.price_at(minute)
             if spot is None:
-                self.notes.append(f"{spec.id}: no index price at {minute_label(minute)}")
+                self.notes.append(f"{spec.id}: no index price at {self._label(minute)}")
                 return False
             strike = resolve_strike(
                 self.s.underlying,
@@ -316,7 +332,7 @@ class _DaySim:
             key = min(priced)[2]
         series = self.data.chain[key]
         if series.price_at(minute) is None:
-            self.notes.append(f"{spec.id}: {key} has not traded by {minute_label(minute)}")
+            self.notes.append(f"{spec.id}: {key} has not traded by {self._label(minute)}")
             return False
         contract_lot = self.reference.lot_size(self.s.underlying, key[0])
         historical = self.s.execution.lot_sizing == "historical"
@@ -344,9 +360,9 @@ class _DaySim:
             return
         if run.spec.range_breakout is not None:
             run.state = "range"
-            run.range_end = minute_index(run.spec.range_breakout.until)
+            run.range_end = self._index(run.spec.range_breakout.until)
             run.range_valid_until = (
-                minute_index(run.spec.range_breakout.valid_until)
+                self._index(run.spec.range_breakout.valid_until)
                 if run.spec.range_breakout.valid_until is not None
                 else None
             )
@@ -391,7 +407,7 @@ class _DaySim:
         low_trigger = run.range_lo * (1 - gap)  # type: ignore[operator]
         if gap and rb.source == "instrument":
             # an option premium trades on the 0.05 tick; a widened level is a fill price
-            high_trigger, low_trigger = to_tick(high_trigger), to_tick(low_trigger)
+            high_trigger, low_trigger = self._to_tick(high_trigger), self._to_tick(low_trigger)
         if rb.side == "high" and h > high_trigger + _EPS:  # type: ignore[operator]
             level = max(o, high_trigger)
         elif rb.side == "low" and lo < low_trigger - _EPS:  # type: ignore[operator]
@@ -464,7 +480,7 @@ class _DaySim:
         if tp is None or run.peak <= run.entry_price * tp.activate_percent / 100 + _EPS:
             return None
         level = run.peak * tp.exit_percent / 100
-        return to_tick(level) if tick else level
+        return self._to_tick(level) if tick else level
 
     def _update_trails(self, run: _LegRun, high: float, low: float) -> None:
         """After a bar's checks: the trail SL's best price and the peak trail's peak."""
@@ -474,7 +490,7 @@ class _DaySim:
             x, y = run.spec.trail_sl.step(run.entry_price)
             moved = run.sign * (run.best - run.entry_price)
             steps = math.floor(moved / x + _EPS) if moved > 0 else 0
-            trailed = to_tick(run.initial_sl + run.sign * steps * y)  # type: ignore[operator]
+            trailed = self._to_tick(run.initial_sl + run.sign * steps * y)  # type: ignore[operator]
             run.sl = max(run.sl, trailed) if buy else min(run.sl, trailed)  # type: ignore[type-var]
         if run.spec.trail_peak is not None:
             run.peak = max(run.peak, high)
@@ -504,7 +520,7 @@ class _DaySim:
                 return False
             contract, series = picked
             raw = (
-                series.price_at(minute + 1) if minute + 1 < N_MINUTES else None
+                series.price_at(minute + 1) if minute + 1 < self.n else None
             )  # the stop bar's close
             if raw is None:
                 self.notes.append(f"{spec.id}: reverse skipped, the {contract} has no price yet")
@@ -626,7 +642,7 @@ class _DaySim:
                 or run.state != "open"
                 or run.series is None
                 or run.rolls_done >= roll.max_rolls
-                or minute > minute_index(roll.not_after)
+                or minute > self._index(roll.not_after)
                 or run.trade is None
                 or run.trade.entry_min >= minute
             ):
@@ -668,8 +684,8 @@ class _DaySim:
         return total
 
     def run(self) -> DayResult:
-        start = minute_index(self.s.entry_time)
-        end = minute_index(self.s.exit_time)
+        start = self._index(self.s.entry_time)
+        end = self._index(self.s.exit_time)
         worst = best = 0.0
         curve: list[tuple[int, float]] = []
         for minute in range(start, end):
@@ -699,17 +715,17 @@ class _DaySim:
             overall = self.s.overall
             if overall.stop_loss_inr is not None and mtm <= -overall.stop_loss_inr:
                 self._close_all(minute, "close", "OVERALL_SL")
-                self.stopped_by = f"overall SL at {minute_label(minute)}"
+                self.stopped_by = f"overall SL at {self._label(minute)}"
                 break
             if overall.target_inr is not None and mtm >= overall.target_inr:
                 self._close_all(minute, "close", "OVERALL_TARGET")
-                self.stopped_by = f"overall target at {minute_label(minute)}"
+                self.stopped_by = f"overall target at {self._label(minute)}"
                 break
         else:
-            if end < N_MINUTES:
+            if end < self.n:
                 self._close_all(end, "at", "EXIT_TIME")
             else:
-                self._close_all(N_MINUTES - 1, "close", "EXIT_TIME")
+                self._close_all(self.n - 1, "close", "EXIT_TIME")
         gross = sum(t.pnl for t in self.trades)
         return DayResult(
             day=self.data.day,

@@ -41,6 +41,8 @@ from ..data.reference.loader import REFERENCE_DIR, default_reference_data
 from ..fyers.daily import data_dir
 from . import journal, pick, placements, store
 from .dte import entry_basis, entry_labels, recorded_labels
+from .entries import raw as raw_entry
+from .entries import read as read_entries
 from .lists import LISTS, LOTS_PER, WARMUP
 from .variants import UNDERLYING, is_buy, is_dir, is_wide, parts, variant_names
 
@@ -440,7 +442,7 @@ def recorded_row(
     chain_ok = (
         entry.get("prev") == prev_hash
         and bool(entry.get("hash"))
-        and journal.entry_hash(entry) == entry.get("hash")
+        and journal.entry_hash(raw_entry(entry)) == entry.get("hash")
     )
     return {
         **row,
@@ -653,7 +655,7 @@ def build_log(
     now = (now or now_ist()).astimezone(IST)
     today = now.date()
     path = store.journal_path(root, track)
-    entries = journal.read(path)
+    entries = read_entries(root, track, path)
     attrs = store.read_days(root)
     holidays = holiday_names()
     results = _Results(root)
@@ -731,7 +733,9 @@ def build_log(
 
 def _rescore(entry: dict, root: Path, names: list[str] | None) -> dict:
     """Re-run the ranking on the stored results the entry saw (the same `load_history` and
-    `score_history` calls the 09:16 job makes) and say whether it gives the entry's picks."""
+    `score_history` calls the pick job makes) and say whether it gives the entry's picks: the
+    entry as recorded (`entries.raw`), never the evening's list laid over it."""
+    entry = raw_entry(entry)
     day = date.fromisoformat(entry["day"])
     basis = entry_basis(entry)  # an entry recorded before BL-109 was scored on calendar days
     try:
@@ -748,12 +752,14 @@ def _rescore(entry: dict, root: Path, names: list[str] | None) -> dict:
         # the expiring-index rule as the entry recorded it (BL-122), so a rule day is no mismatch
         expiry_only=entry.get("expiry_only"),
     )
+    # a list the evening's saved list replaced (`pick.record`, 2026-11-09) keeps the ranking's own
+    # output under `rescored`: that is what a re-run must give
     differs = [
         k
         for k, p in (entry.get("lists") or {}).items()
-        if again.get(k, {}).get("core") != p.get("core")
-        or again.get(k, {}).get("buy") != p.get("buy")
-        or again.get(k, {}).get("overridden") != p.get("overridden")
+        if again.get(k, {}).get("core") != (p.get("rescored") or p).get("core")
+        or again.get(k, {}).get("buy") != (p.get("rescored") or p).get("buy")
+        or again.get(k, {}).get("overridden") != (p.get("rescored") or p).get("overridden")
     ]
     return {
         "checked": True,
@@ -778,7 +784,7 @@ def build_day(
     now = (now or now_ist()).astimezone(IST)
     today = now.date()
     path = store.journal_path(root, track)
-    entries = journal.read(path)
+    entries = read_entries(root, track, path)
     attrs = store.read_days(root)
     results = _Results(root)
     read = placements.Read([], 0) if track else placements.read(root)

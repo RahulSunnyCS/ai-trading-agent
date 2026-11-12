@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's idea; builds on BL-110; a close cousin of BL-053 (killed) |
-| **Status** | Planned; H3 (Amendment 1) run 2026-10-18: exploratory, positive but fragile |
+| **Status** | Planned; H3 (Amendment 1) run 2026-10-18: exploratory, positive but fragile; P3 read descriptively by range regime 2026-11-07 (see Log), so H2's confirmation is no longer blind |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -343,3 +343,19 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   A bug in the first draft of the "w/o top 3" check (sorting scrambled the date order the block bootstrap
   needs) was fixed before this entry; the main intervals were not affected.
 
+- 2026-11-07 — **Descriptive look, not a run of H1 / H2 (owner asked whether the day range should go into the
+  rotation's family / day-type rules).** Range = high − low from 09:17 to 15:29 as % of the 09:17 price; "last-5" =
+  the mean of the 5 sessions before (known at 09:17); terciles cut within each window (descriptive labels, not a
+  usable gate). Paper, one lot a strategy, after costs and 0.5 % slippage. Scripts:
+  `packages/option-backtesting/research/bl111/range_look/`. (1) The range persists (corr with last-5 0.61 on NIFTY 2016-26, 0.40 on the last two years), as BL-110
+  found. (2) The books earn on calm days by the day's own range (Core +2,885 / −93 / −618 by tercile, base +3,625 /
+  +416 / −2,158, T1 +2,179 / +881 / +965), as BL-144 found; by last-5 range the books' daily mean is flat (Core +592 /
+  +1,012 / +585, T1 +1,341 / +1,262 / +1,427, base +402 / +376 / +1,124), win share a little lower after wide weeks.
+  (3) By family, average one-lot net of the Core-298 variants by last-5 tercile (low / high): **Dir and Dir ITM1 earned
+  after calm weeks and about nothing after wide ones** in 2024-11 → 2025-10 (NIFTY +211 / +42, +251 / +21; SENSEX
+  +194 / −13, +286 / −3) and 2025-11 → 2026-11 (NIFTY +250 / −86, +220 / −56; SENSEX +326 / +16, +346 / +47), the
+  **opposite of H2's "more Dir when ranges expand"**; but on NIFTY (the `_bl214` store) it was flat in 2021-11 →
+  2023-10 (+77 / +132, +97 / +128) and **reversed** in 2023-11 → 2024-10 (+0 / +244, −64 / +217). The Widesl families
+  show no steady pattern. Reading: a lead that changes sign across eras, not a rule to add. **This look read P3
+  (2022-04-05 → 2024-10-08) by family and range regime, so H2's confirmation on P3 is no longer blind**; if H2 is
+  run, say so beside its result, or judge it forward only (Phase 3).

@@ -17,6 +17,7 @@ whose price is nearest ₹50 at the entry time) or a fixed moneyness (`strike: {
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-097 | ATM, OTM1, OTM2; closest ₹30, ₹40, ₹60, ₹75, ₹100 (base ₹50) | 48 files, fit 2024-10 → 2025-10, holdout 2025-10 → 2026-10, after charges | Screen only; no row in a top-three list | [BL-097][bl097], [report][bl097q] |
+| BL-218 (MCX minis) | ATM / OTM1 | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass | [MCX page](mcx-commodities.md) |
 
 Change against the baseline on the same file, ₹, mean over files ([how to read](README.md#how-to-read-the-bl-097-tables-on-these-pages)):
 

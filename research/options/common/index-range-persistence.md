@@ -1,6 +1,6 @@
 # Options: does NIFTY's daily range persist?
 
-**Status:** Tested · **Last updated:** 2026-10-22
+**Status:** Tested · **Last updated:** 2026-11-08
 
 ## What it is
 
@@ -102,6 +102,15 @@ On NIFTY the scaled opening range was the best of the forecasts tried at every c
 SENSEX the VIX-implied move was. A range forecast, not P&L: BL-081 found the morning range does not
 help pending picks.
 
+## As a ranking criterion (BL-216)
+
+[BL-216][bl216] (registered, in-sample) put the range known at 09:17 into list C's composite as a sixth fit:
+each variant's average result on past days whose last-5-session range was in the same band (calm / mid / wide,
+by the trailing 250 sessions of its own index), at 20 % or 10 % weight. Over 2025-01 → 2026-11, one lot a pick
+after 0.5 % slippage, it lowered both books: T1 −₹257 [−460, −43] a day at 20 % (−₹296 over the last year),
+Core −₹150 [−353, +44] with a deeper drawdown; 10 % was worse too. The range persists, but what persists does
+not tell the ranking which strategies will do well. Killed.
+
 ## Not yet tested
 
 - Whether any of this can time a strategy: BL-053 and BL-081 tried VIX and 14 intraday state
@@ -120,3 +129,4 @@ help pending picks.
 
 [bl110]: ../../../backlog/BL-110-nifty-range-persistence.md
 [bl022]: ../../../backlog/BL-022-analog-day-search.md
+[bl216]: ../../../backlog/BL-216-range-band-fit-poc.md

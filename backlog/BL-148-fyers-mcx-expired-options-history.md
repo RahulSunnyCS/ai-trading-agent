@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — set by the owner (2026-10-21): take Fyers Prime and do the two-year MCX options backfill next |
-| **Status** | Planned |
+| **Status** | In progress (started 2026-11-11; Phases 1-5 built, Phase 4's job waits for merge) |
 | **Type** | feature |
 | **Area** | options / trading-data |
 | **Created** | 2026-10-21 |
 | **Depends on** | [BL-034](BL-034-options-history-lake.md) (canonical lake and quality table); owner activates Fyers Prime; reuses the expired-F&O client, request limiter and raw cache of TODO 3.11.26 (`fyers/expired.py`) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.11.27 |
 
 ## Context
 
@@ -149,21 +149,60 @@ MCXBULLDEX and any other commodity index are excluded.
 - **Done when:** all manifest rows have a final verdict, sampled raw-to-lake checks are exact,
   duplicates are zero, and every excluded day has a named reason rather than a guessed fill.
 
-### Phase 4 — Active contracts and daily continuation
+### Phase 4 — Nightly collection of live contracts (built 2026-11-11)
 
-- **Tasks:**
-  - Generalize the existing daily collector's strike centre from spot index to the relevant MCX
-    future and add the selected commodity roots.
-  - While a contract is active, collect it with the old History API; after expiry, reconcile it
-    once with the expired-F&O endpoint and close its manifest entry.
-  - Add a post-MCX-close scheduler job with the shared job lock, token/source reporting and a
-    Telegram alert on failure. A next-login catch-up uses expired history, so a sleeping laptop
-    no longer permanently loses an expiry.
-  - Document Prime as required for bulk rebuild speed, not for the normal small daily increment;
-    the stored history remains usable if Prime is later cancelled.
-- **Deliverables:** daily MCX collection/reconciliation and scheduler entry.
-- **Done when:** five consecutive sessions append idempotently, one expired series reconciles
-  successfully, and the two-year coverage report advances without manual file work.
+Owner decisions (2026-11-11): collect the **nearest two expiries** of all ten roots (every strike);
+**run at the MCX close (23:30 or 23:55 IST, read from the data)** (expiring options
+trade to the close and vanish from `/data/history` after expiry); **write nightly into the lake,
+compare later**; **Angel One** completes the run after midnight when Fyers cannot be used; Prime is
+dropped about a month after the backfill, so the live collector is the only source then.
+
+- **Tasks (done):**
+  - `fyers/mcx_daily.py` + `obt fyers mcx-daily`: select the nearest two expiries from the live
+    `MCX_COM` master (expiring first), one `/data/history` request per contract from its last stored
+    day (else 99 days back, so the first run fills a live contract's whole life), 1-minute bars with
+    OI, wait for the close, replace only the rows of the contracts fetched, never
+    touch an expired contract, one ingest run per root (`mcx_options_daily`), days judged.
+  - Angel One fallback (`angelone/mcx.py`, `--source angelone`; automatic when Fyers has no usable
+    token): contracts matched by root, expiry, strike (÷100) and side; OI divided by the lot size
+    (Angel's is in units, Fyers' in lots); starts the day after the last stored day and looks back at
+    most 3 days, so it never replaces a Fyers day; the next Fyers run overwrites its days for any
+    contract still listed.
+  - Scheduler job `mcx-collect` (weekdays 23:31, one job: the command waits for the close, so the
+    the close is read from the nearest future's last bar at 23:31; group `catalog`, retries 2, exit 2 not retried,
+    catch-up until 05:30).
+  - Prime is documented as needed for the bulk rebuild and the Phase 5 comparison only; the stored
+    history stays usable without it.
+- **Probes before building (2026-11-11):** `/data/history` serves live MCX options with OI on every
+  row and one request returns a contract's whole life; Angel One serves MCX candles and OI (up to
+  about 8,000 rows a request); the two feeds agree on shape and close/high but not exactly (open and
+  low differ by a few ticks, volume by a few percent), and Angel's OI is Fyers' times the lot size.
+- **Deliverables:** `mcx-daily`, the fallback, the scheduler job, tests.
+- **Done when:** five consecutive sessions append idempotently, the Angel One fallback has been used
+  once, and the coverage report advances with no manual file work. **Not yet met: it runs only after
+  merge and a scheduler restart.**
+
+### Phase 5 — History API against the expired API (built 2026-11-11)
+
+While Prime lasts, the November expiries of all ten roots (CRUDEOIL and CRUDEOILM 17 Nov,
+NATURALGAS and NATGASMINI 20 Nov, SILVERM, COPPER and ZINC 23 Nov, GOLD, GOLDM and SILVER 27 Nov)
+are fetched from the expired API after they expire and compared with what the nightly collector
+stored while they were live.
+
+- **Run, per expired expiry:** `mcx-inventory --refresh --to <today>` (a new frozen manifest that
+  lists the new expiries), `mcx-pull --roots <root> --only-expiry <D>` (cache only: **do not run
+  `mcx-import` on it**, which would fill the lake's missing minutes and end the independence of the
+  two sides), then `mcx-compare --roots <root> --expiry <D>`.
+- **`fyers/mcx_compare.py` + `obt fyers mcx-compare`:** the lake's bars of each contract against the
+  expired raw answer, minute by minute: rows on both sides, rows only in History, only in expired,
+  every field that differs (open, high, low, close, volume, OI) with counts, largest gap and examples,
+  the share of rows identical; days the Angel One fallback stored are left out; writes
+  `raw/fyers-expired/mcx/compare-<root>-<expiry>.json/.csv`, nothing to the lake.
+- **After the comparison:** the owner picks the precedence rule (and whether to fill the lake's missing
+  minutes from the expired answers, which `mcx-import` already does without overwriting). Nothing is
+  replaced before then.
+- **Done when:** every November expiry is compared and the findings are in the log and in
+  `research/`'s data notes.
 
 ## Risks
 
@@ -205,14 +244,15 @@ MCX-specific is discovery (`MCX:` symbols, session bounds) and the instrument id
 
 ## Open questions
 
-To resolve when the owner says Prime is active and starts BL-148:
+Answered by the owner on 2026-11-11 (Fyers Prime active):
 
-1. Confirm **full chain** for all non-agricultural roots, rather than ATM ±N. The planned default
-   is full chain; the inventory gives the exact storage cost before download.
-2. Include both standard and mini roots (`CRUDEOIL`/`CRUDEOILM`, `NATURALGAS`/`NATGASMINI`,
-   `GOLD`/`GOLDM`, `SILVER`/`SILVERM`) plus `COPPER` and `ZINC`? Planned default: yes.
-3. Is the initial fixed start exactly 2024-10-21, or the earliest expiry on/after that date?
-   Planned default: include any contract rows on or after 2024-10-21, regardless of expiry date.
+1. **Universe:** all ten roots, full chain, standard and mini (`CRUDEOIL`, `CRUDEOILM`,
+   `NATURALGAS`, `NATGASMINI`, `GOLD`, `GOLDM`, `SILVER`, `SILVERM`, `COPPER`, `ZINC`), **after a
+   pilot**: pull CRUDEOIL for two expiries first, measure raw and Parquet bytes per contract, and
+   confirm the projected total against the free space before the bulk run.
+2. **Standard and mini both:** yes (same answer as 1).
+3. **Start rule:** any contract with rows on or after 2024-10-21 is included, whatever its
+   expiry; the fetch window starts at that date.
 
 ## Log
 
@@ -220,3 +260,80 @@ To resolve when the owner says Prime is active and starts BL-148:
   in one go. The local Standard-token smoke test proved the new expired API returns 1-minute MCX
   option OHLCV+OI; bulk ingestion waits only for Prime activation and the normal start-item
   questions above.
+- 2026-11-11 — started (owner: "I got Fyers Prime, let's start the commodity MCX data pull").
+  Read-only probe of the metadata endpoints with the Standard-era client (no candle requests):
+  Fyers lists **92,356 option symbols** across the ten roots for 2024-10-21 → 2026-11-10 (GOLD
+  21,396; SILVERM 18,362; SILVER 18,156; GOLDM 11,910; CRUDEOIL 5,770; CRUDEOILM 5,762;
+  NATURALGAS 3,304; NATGASMINI 3,304; COPPER 2,746; ZINC 1,646; 20-25 expiries each). One candle
+  request per contract is about 3.5 hours at 450 a minute, well inside Prime's 500,000 a day. The
+  `expiry_dates` window must be at most 366 days, so discovery loops over shorter windows. The
+  data volume (`/Volumes/TradingData`, a 200 GiB image) had 36 GiB free, so size is the gating
+  fact: the CRUDEOIL pilot decides it.
+- 2026-11-11 — Phase 1 built and run (`fyers/mcx.py`, `obt fyers mcx-inventory | mcx-pull |
+  mcx-report`, 12 tests). `mcx-inventory --to 2026-11-10 --refresh` froze the manifest
+  (`raw/fyers-expired/mcx/manifest-2024-10-21_2026-11-10-<hash>.json.gz`): **92,356 option
+  symbols, 0 undecodable**, the same list the probe found; discovery uses the reference future
+  from the live MCX master and 300-day expiry windows. **Prime confirmed**: the CRUDEOIL pilot
+  (the first two expiries, 2024-11-15 and 2024-12-16, plus 2025-06-16 as a full-life expiry)
+  made 434 candle requests with no refusal, no 429 and no retry (Standard stops at 10 a day).
+  Pilot figures: 28% of contracts answer `no_data`; the rest average 9,657 rows over all 434
+  (largest 29,705); raw cache 28.9 MB = **66 KB a contract**; no contract looked cut off at its
+  100-day window start. Projection if every root looks like CRUDEOIL: raw cache about 5.7 GiB and
+  about 890 million rows, Parquet about 7 GiB by the report's estimate (sorted by symbol, then time,
+  so the real per-day files will be larger; not yet measured). That fits the 36 GiB free, but
+  bullion strikes are not CRUDEOIL's, so a GOLD and a SILVER expiry should be pulled before the
+  bulk run. Not yet done: the lake write, instrument registration and the MCX session bounds
+  (Phase 2 and 3). The Phase 1 "done when" is met.
+- **2026-11-11 (bulk pull, import, audit):** pulled all 92,356 contracts in about 3 h 15 min
+  (87,544 requests, 20 threads on one paced client, 8/s cap; no refusal, 429 or retry; the resume
+  pass asked for nothing). Imported with `mcx-import --roots all`: **277,003,032 one-minute bars**
+  in the lake under `asset=option/underlying=<ROOT>` (1.3 GB of Parquet, 513-524 session days per
+  root), raw rows = lake rows for every root, 0 duplicates dropped. Only 29,127 of 92,356 contracts
+  (32%) have any bars; the rest answered `no_data` (GOLD 2,681 of 21,396, SILVER 2,691 of 18,156).
+  `mcx-audit --roots all` **passed**: 0 repeated minutes, 0 out of order, 0 negative price, volume
+  or open interest, 0 bars after expiry, 0 missing open interest, and 200 of 200 sampled
+  contracts per root identical to the raw cache. Rows by root: CRUDEOIL 44.0M, CRUDEOILM 35.0M,
+  NATURALGAS 36.5M, NATGASMINI 27.0M, GOLD 20.4M, GOLDM 40.1M, SILVER 21.6M, SILVERM 37.8M,
+  COPPER 11.7M, ZINC 2.8M. Vendor facts, listed and not repaired: 54-248 bars per root whose
+  high/low cannot hold their open or close (e.g. `MCX:CRUDEOIL24DEC6050PE` on 2024-12-12 09:00: high 124.8 below open 143.6); 0.1-0.3% of bars outside 09:00-23:55 IST (bars at 23:55 and, on 2026-07-03 and
+  07-07, after midnight); 0.4-0.5% of rows on a Saturday or Sunday IST date (not yet explained:
+  special sessions? unchecked). `may_be_cut_at_window_start`: 10 SILVERM contracts, 0 elsewhere.
+  Quality verdicts: 2 excluded days per root (the Diwali evening session, `short_session`),
+  COPPER 5, **ZINC 278 of 513** (`thin_chain`: few contracts trade) so ZINC is mostly unusable as a
+  chain. Not done: Phase 4 (daily collector and scheduler job; owner deferred it), the comparison
+  of `/data/history` active contracts against the expired API after they expire, the weekend-row
+  explanation.
+- **2026-11-11 (Phases 4-5 built, first live run):** owner answers: nearest two expiries; run at the
+  MCX close (23:30 or 23:55) with Angel One completing after midnight; write nightly,
+  compare later; Prime dropped in about a month. Probes first: `/data/history` returns MCX option
+  bars with OI and a contract's whole life in one request (CRUDEOIL, GOLD, ZINC); Angel One serves
+  MCX candles and OI, OI in units (Fyers' lots times 100 for CRUDEOIL), volume in the same units,
+  open and low a few ticks different. Built `mcx_daily.py`, `angelone/mcx.py`, `mcx_compare.py` and
+  the `mcx-collect` job. First real run, ZINC 10 Nov: 74,683 rows, last bar 23:54, a re-run changed no
+  byte of any day file and no row of the backfill. A `--dry-run` with `--source angelone` once ran a
+  real Angel One collection (ZINC, 11 Nov so far: 90 rows) because that branch ignored the flag; fixed
+  and covered by a test; those Angel rows belong to live contracts and the next Fyers run replaces them.
+- **2026-11-11 (review of PR 446, three corrections):** (1) MCX's close is not a function of the US
+  clock change: the lake's last bar of each CRUDEOIL day shows 23:29/23:30 in summer and 23:54/23:55
+  in winter, switching on 10 Mar and 3 Nov in 2025 but on 18 Mar and 30 Oct in 2026; the collector
+  therefore waits to 23:31, looks at the nearest future's last bar, and waits on to 23:56 only if the
+  session is still trading. (2) A run is now `failed` (exit 1, retried, alerted) when a contract
+  expiring by the session is refused, since tomorrow cannot fetch it, and when most contracts find no
+  match at Angel One, or no option answers on a day the futures traded; it was `partial` or
+  `no_session` with exit 0. (3) The raw responses of an aborted run are archived. Angel One
+  fidelity, measured on 24 live contracts for 10 Nov: 14% of minutes identical on every field, total
+  volume within 4%; for illiquid GOLD options Angel One returns only the minutes that traded where
+  Fyers returns a continuous flat series; so it is a stopgap, not an equivalent source.
+- **2026-11-11 (first full nightly run, session 10 Nov):** `mcx-daily --roots all --no-wait` over
+  5,632 contracts (ten roots, nearest two expiries), 5,632 requests, no refusal or rate limit,
+  **9,653,991 rows** from the live contracts (CRUDEOIL 2.11M, CRUDEOILM 1.97M, NATURALGAS 1.12M,
+  NATGASMINI 0.99M, GOLD 0.32M, GOLDM 1.01M, SILVER 0.52M, SILVERM 1.21M, COPPER 0.39M, ZINC 2.4k),
+  each root's first day back to the start of its live contracts (late Aug to Oct), last bar 23:54.
+  The lake now holds **286.7M bars**; audit invariants on all ten roots: 0 repeated minutes, 0 out of
+  order, 0 negative price, volume or OI, 0 bars after expiry, 0 missing OI; the vendor's own
+  high/low-cannot-hold-open/close bars rose to 55-326 a root (the History API has them too). The
+  status was `partial`: 13 ZINC requests failed with `Invalid input` because the stray Angel One
+  rows for 11 Nov (see above) put those contracts' last stored day after the session; the run
+  predated the skip rule, which the collector now has. Only about a third of the contracts have
+  any bars, as in the backfill (CRUDEOIL 215 of 770, GOLD 77 of 754).
+

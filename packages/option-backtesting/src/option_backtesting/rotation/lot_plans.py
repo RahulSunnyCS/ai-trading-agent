@@ -41,6 +41,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import journal, pick, store
 from .dte import entry_basis, entry_labels, recorded_labels
+from .entries import read as read_entries
 from .lists import WARMUP
 from .live_lots import dir_pick, is_expiry
 from .readout import block_bootstrap_mean, max_drawdown
@@ -351,7 +352,17 @@ def rederive_runner_up(
     labels and rule. Verified only when the inputs digest, the universe, the picks, list C's
     recorded composites and the VIX band all equal the entry's."""
     stamp = stamp if stamp is not None else _stamp(root, names)
-    key = (str(root), book, entry.get("day"), entry.get("hash"), stamp)
+    # the evening's list laid over an entry (`entries.effective`) keeps its hash: key the picks
+    picks = (entry.get("lists") or {}).get(LIST_KEY) or {}
+    key = (
+        str(root),
+        book,
+        entry.get("day"),
+        entry.get("hash"),
+        tuple(picks.get("core") or ()),
+        tuple(picks.get("buy") or ()),
+        stamp,
+    )
     with _rederive_lock:
         hit = _rederive_cache.get(key)
     if hit is not None:
@@ -435,6 +446,13 @@ def day_row(
     malformed = len(core) != 3 or top is None
     if malformed:
         notes.append("the entry does not hold three core picks with a Widesl")
+    # the evening's list laid over an entry (`entries.effective`) has no composite for a pick the
+    # entry's ranking did not make: W1 cannot be chosen from it, so Duo is not guessed
+    unscored = [n for n in core if is_wide(n) and n not in composite]
+    if not malformed and unscored:
+        notes.append(
+            "no recorded composite for " + ", ".join(unscored) + ", so Duo's W1 cannot be chosen"
+        )
     need = needs_runner_up(core, expiry)
     if not malformed and any(need.values()):
         runner = rederive_runner_up(entry, root, names, book, sources, stamp)
@@ -450,7 +468,7 @@ def day_row(
     for plan in PLANS:
         lots = (
             None
-            if malformed
+            if malformed or (plan == "duo" and unscored)
             else plan_lots(plan, core, composite, expiry, (runner or {}).get("dir"))
         )
         if lots is None:
@@ -643,7 +661,7 @@ def build(
     path = store.journal_path(root, track)
     entries = [
         e
-        for e in journal.read(path)
+        for e in read_entries(root, track, path)
         if date.fromisoformat(str(e.get("day"))) >= FORWARD_FROM
         and LIST_KEY in (e.get("lists") or {})
     ]
