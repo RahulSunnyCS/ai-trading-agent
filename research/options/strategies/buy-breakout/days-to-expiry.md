@@ -20,6 +20,7 @@ of the composite ([rotation ranking](../../common/rotation-ranking.md)).
 |---|---|---|---|---|
 | BL-056 | Days to expiry 0–6 (7+ pooled), from the lake's contract expiries | 2025-09-01 → 2026-10-08 (one expiry regime per index), 11 start times 09:17–11:47, before charges | Descriptive; about 1,100 cells looked at | [BL-056][bl056] |
 | BL-059 | Same tables for the 13 later start times | same window | Descriptive; agrees with BL-056 for morning starts | [BL-059][bl059] |
+| BL-218 (MCX minis) | expiry week vs the week before | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass in either week | [MCX page](mcx-commodities.md) |
 
 In this window NIFTY expired every Tuesday and SENSEX every Thursday, so weekday and days to expiry are
 the same split ([BL-056][bl056]). NIFTY Buy, family mean ₹ per day per lot, read from its weekday row

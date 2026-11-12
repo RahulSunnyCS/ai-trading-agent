@@ -19,6 +19,7 @@ triggers.
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-097 | underlying (`source_underlying`; base instrument) | 48 files, fit 2024-10 → 2025-10, holdout 2025-10 → 2026-10, after charges | Screen only; the worst non-re-entry row (below) | [BL-097][bl097] |
+| BL-218 (MCX minis) | instrument / underlying (the future) | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass | [MCX page](mcx-commodities.md) |
 
 Change against the baseline on the same file, ₹, mean over files ([how to read](README.md#how-to-read-the-bl-097-tables-on-these-pages)):
 

@@ -189,7 +189,7 @@ Otherwise:
   other value makes the pick fail loudly).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
-  (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
+  (a day on its exchange's minute grid: NSE/BSE 375, MCX 895), `engine.py` (the state machine — its docstring lists every
   1-minute-bar assumption), `report.py`, `daily.py` (the evening run's steps), `evening.py` (`run_daily` — the ONE evening
   routine, collect → `refresh_day` → run → summary/Telegram, called by both `obt daily` and the
   dashboard's `POST /legwise/daily` job; add a step here, never in one caller), `store.py` (strategies, versions and

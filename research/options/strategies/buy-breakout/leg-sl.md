@@ -19,6 +19,7 @@ rises. The stop is checked on 1-minute bars; a gap through it fills at the bar's
 | BL-097 | 15%, 20%, 30%, 35%, 40% (base 25%) | 48 files, fit 2024-10 → 2025-10, holdout 2025-10 → 2026-10, after charges | Screen only; 20% and 15% reach top-three lists | [BL-097][bl097], [report][bl097q] |
 | BL-070 | Overall stop removed (leg stop kept) | 2024-10 → 2026-10, before charges | Buy's ₹2,000 overall stop fired on about 1 day (NIFTY) and 0 (SENSEX) per variant; the leg stop acts first | [BL-070][bl070] |
 | BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹432 a day on the book (−₹591 to −₹272), in every half-year; Buy: −₹197 a pick (52 picks, descriptive) | [BL-156][bl156] |
+| BL-218 (MCX minis) | 25 / 40% | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass | [MCX page](mcx-commodities.md) |
 
 Change against the baseline on the same file, ₹, mean over files ([how to read](README.md#how-to-read-the-bl-097-tables-on-these-pages)):
 

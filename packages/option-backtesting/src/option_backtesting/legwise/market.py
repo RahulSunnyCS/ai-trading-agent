@@ -1,20 +1,30 @@
 """
-One trading day of Fyers 1-minute data on a fixed 375-minute grid
-(09:15..15:29, index 0..374). Bars after 15:29 (the F&O closing session Fyers
-also returns) are dropped. A minute with no trade repeats the previous close
-as O=H=L=C; minutes before a contract's first trade are None.
+One trading day of Fyers 1-minute data on a fixed minute grid: for NSE/BSE indices
+375 minutes (09:15..15:29, index 0..374; bars after 15:29, the F&O closing session Fyers
+also returns, are dropped); for MCX commodity options (BL-218) 895 minutes (09:00..23:54, the
+latest close MCX keeps; a summer day simply has no bars after 23:29). A minute with no trade
+repeats the previous close as O=H=L=C; minutes before a contract's first trade are None.
+
+MCX options settle on a future, so an MCX day's "spot" is the 1-minute bars of the future the
+nearest option expiry settles on (`lake/bars_1m/asset=future/underlying=<ROOT>`, written by
+`obt fyers mcx-futures`); there is no VIX.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.compute
 import pyarrow.parquet as pq
 from trading_data import derived, lake, quality
+
+from .schema import MCX_UNDERLYINGS
 
 log = logging.getLogger(__name__)
 
@@ -22,14 +32,32 @@ SESSION_START_MIN = 9 * 60 + 15
 N_MINUTES = 375
 IST_OFFSET_S = 5 * 3600 + 1800
 
+#: MCX commodity option roots the engine can run (BL-218, `schema.MCX_UNDERLYINGS`) and
+#: their session grid.
+MCX_SESSION_START_MIN = 9 * 60
+MCX_N_MINUTES = 895  # 09:00..23:54
 
-def minute_index(hhmm: str) -> int:
+
+def session(underlying: str) -> tuple[int, int]:
+    """(first minute of the day, minutes in the grid) for an underlying's exchange."""
+    if underlying in MCX_UNDERLYINGS:
+        return MCX_SESSION_START_MIN, MCX_N_MINUTES
+    return SESSION_START_MIN, N_MINUTES
+
+
+def session_bounds(underlying: str) -> tuple[str, str]:
+    """The first and last minute ("HH:MM") a strategy on this underlying may name."""
+    start, n = session(underlying)
+    return minute_label(0, start), minute_label(n - 1, start)
+
+
+def minute_index(hhmm: str, start: int = SESSION_START_MIN) -> int:
     hours, minutes = map(int, hhmm.split(":"))
-    return hours * 60 + minutes - SESSION_START_MIN
+    return hours * 60 + minutes - start
 
 
-def minute_label(index: int) -> str:
-    total = SESSION_START_MIN + index
+def minute_label(index: int, start: int = SESSION_START_MIN) -> str:
+    total = start + index
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
@@ -41,12 +69,12 @@ class Series:
     close: list[float | None]
 
     @classmethod
-    def empty(cls) -> Series:
-        return cls([None] * N_MINUTES, [None] * N_MINUTES, [None] * N_MINUTES, [None] * N_MINUTES)
+    def empty(cls, n: int = N_MINUTES) -> Series:
+        return cls([None] * n, [None] * n, [None] * n, [None] * n)
 
     def forward_fill(self) -> Series:
         last: float | None = None
-        for i in range(N_MINUTES):
+        for i in range(len(self.close)):
             if self.close[i] is None:
                 if last is not None:
                     self.open[i] = self.high[i] = self.low[i] = self.close[i] = last
@@ -79,39 +107,76 @@ class DayData:
     master_lot_size: int | None
     vix: Series | None = None
     notes: list[str] = field(default_factory=list)
+    #: the grid's first minute of the day (09:15 NSE/BSE, 09:00 MCX)
+    session_start: int = SESSION_START_MIN
+
+    @property
+    def n_minutes(self) -> int:
+        return len(self.spot.close)
 
     def collected_expiries(self) -> list[date]:
         return sorted({key[0] for key in self.chain})
 
 
-def _minutes(table: pa.Table) -> list[int]:
+def _minutes(table: pa.Table, start: int = SESSION_START_MIN) -> list[int]:
     # Parquet has no second-precision timestamp, so files written as
     # timestamp("s") come back as "ms" — normalise whatever unit is stored.
     ts = table.column("ts").cast(pa.timestamp("s", tz="UTC"))
     epochs = ts.cast(pa.int64()).to_pylist()
-    return [((e + IST_OFFSET_S) % 86400) // 60 - SESSION_START_MIN for e in epochs]
+    return [((e + IST_OFFSET_S) % 86400) // 60 - start for e in epochs]
 
 
 def _fill_series(
     series: Series, minutes: list[int], cols: dict[str, list], rows: list[int]
 ) -> None:
+    n = len(series.close)
     for r in rows:
         m = minutes[r]
-        if 0 <= m < N_MINUTES:
+        if 0 <= m < n:
             series.open[m] = cols["open"][r]
             series.high[m] = cols["high"][r]
             series.low[m] = cols["low"][r]
             series.close[m] = cols["close"][r]
 
 
-def _load_bars(path: Path) -> Series | None:
+def _load_bars(
+    path: Path, start: int = SESSION_START_MIN, n: int = N_MINUTES, symbol: str | None = None
+) -> Series | None:
+    """One instrument's bars from a bars_1m file (`symbol`: only that vendor_symbol's rows, for
+    a file that holds more than one future)."""
     if not path.exists():
         return None
-    table = pq.read_table(path, columns=["ts", "open", "high", "low", "close"])
+    columns = ["ts", "open", "high", "low", "close"] + (["vendor_symbol"] if symbol else [])
+    table = pq.read_table(path, columns=columns)
+    if symbol is not None:
+        table = table.filter(pa.compute.equal(table.column("vendor_symbol"), symbol))
+        if table.num_rows == 0:
+            return None
     cols = {name: table.column(name).to_pylist() for name in ("open", "high", "low", "close")}
-    series = Series.empty()
-    _fill_series(series, _minutes(table), cols, list(range(table.num_rows)))
+    series = Series.empty(n)
+    _fill_series(series, _minutes(table, start), cols, list(range(table.num_rows)))
     return series.forward_fill()
+
+
+def mcx_calendar_path(root: Path, underlying: str) -> Path:
+    """The MCX contract calendar `obt fyers mcx-futures` writes: every option expiry of the
+    frozen manifest and the future each settles on (both known before the contracts trade)."""
+    return root / "mcx" / f"calendar-{underlying}.json"
+
+
+@lru_cache(maxsize=16)
+def _mcx_calendar(path: Path, mtime_ns: int) -> dict:
+    del mtime_ns  # part of the cache key only: a rewritten calendar is read again
+    return json.loads(path.read_text())
+
+
+def mcx_calendar(root: Path, underlying: str) -> dict:
+    """{"options": {option expiry: future symbol}, "futures": {future symbol: its expiry}}
+    (ISO dates); empty when the calendar has not been written."""
+    path = mcx_calendar_path(root, underlying)
+    if not path.exists():
+        return {"options": {}, "futures": {}}
+    return _mcx_calendar(path, path.stat().st_mtime_ns)
 
 
 def available_days(root: Path, underlying: str) -> list[date]:
@@ -176,25 +241,13 @@ def listed_expiries(root: Path, underlying: str, day: date) -> list[date] | None
 
 
 def load_day(root: Path, underlying: str, day: date) -> DayData:
+    if underlying in MCX_UNDERLYINGS:
+        return _load_mcx_day(root, underlying, day)
     spot = _load_bars(lake.bars_1m_path(root, "index", underlying, day))
     opt_path = lake.bars_1m_path(root, "option", underlying, day)
     if spot is None or not opt_path.exists():
         raise FileNotFoundError(f"no Fyers data for {underlying} on {day} under {root}")
-
-    table = pq.read_table(opt_path)
-    minutes = _minutes(table)
-    cols = {name: table.column(name).to_pylist() for name in ("open", "high", "low", "close")}
-    expiries = table.column("expiry").to_pylist()
-    strikes = table.column("strike").to_pylist()
-    types = table.column("option_type").to_pylist()
-    rows_by_key: dict[ContractKey, list[int]] = {}
-    for r in range(table.num_rows):
-        rows_by_key.setdefault((expiries[r], strikes[r], types[r]), []).append(r)
-    chain: dict[ContractKey, Series] = {}
-    for key, rows in rows_by_key.items():
-        series = Series.empty()
-        _fill_series(series, minutes, cols, rows)
-        chain[key] = series.forward_fill()
+    chain = _load_chain(opt_path, SESSION_START_MIN, N_MINUTES)
 
     mine = master_options(root, underlying, day)
     listed = sorted({s["expiry"] for s in mine})
@@ -209,6 +262,61 @@ def load_day(root: Path, underlying: str, day: date) -> DayData:
         master_lot_size=lot,
         vix=_load_bars(lake.bars_1m_path(root, "index", "INDIAVIX", day)),
     )
+
+
+def _load_mcx_day(root: Path, underlying: str, day: date) -> DayData:
+    """An MCX day: the option chain on the 09:00..23:54 grid, and as spot the future the
+    nearest option expiry settles on, both from the contract calendar (`mcx_calendar`)."""
+    start, n = session(underlying)
+    opt_path = lake.bars_1m_path(root, "option", underlying, day)
+    if not opt_path.exists():
+        raise FileNotFoundError(f"no option file for {underlying} on {day} under {root}")
+    chain = _load_chain(opt_path, start, n)
+    calendar = mcx_calendar(root, underlying)
+    # expiries from the contract calendar, not from the day's bars: a contract that first
+    # trades after the entry minute must not decide which expiry is "nearest" (look-ahead), and
+    # an expiring contract with no bar that day is still the nearest (its legs then don't trade)
+    listed = sorted(date.fromisoformat(e) for e in calendar["options"])
+    upcoming = [e for e in listed if e >= day]
+    future = calendar["options"].get(upcoming[0].isoformat()) if upcoming else None
+    spot = (
+        _load_bars(lake.bars_1m_path(root, "future", underlying, day), start, n, symbol=future)
+        if future
+        else None
+    )
+    if spot is None:
+        raise FileNotFoundError(
+            f"no future bars for {underlying} on {day} (settling future {future}) under {root}; "
+            "`obt fyers mcx-futures` writes them and the contract calendar"
+        )
+    return DayData(
+        day=day,
+        underlying=underlying,
+        spot=spot,
+        chain=chain,
+        listed_expiries=listed,
+        master_lot_size=None,
+        vix=None,
+        session_start=start,
+    )
+
+
+def _load_chain(opt_path: Path, start: int, n: int) -> dict[ContractKey, Series]:
+    table = pq.read_table(opt_path)
+    minutes = _minutes(table, start)
+    cols = {name: table.column(name).to_pylist() for name in ("open", "high", "low", "close")}
+    expiries = table.column("expiry").to_pylist()
+    strikes = table.column("strike").to_pylist()
+    types = table.column("option_type").to_pylist()
+    rows_by_key: dict[ContractKey, list[int]] = {}
+    for r in range(table.num_rows):
+        rows_by_key.setdefault((expiries[r], strikes[r], types[r]), []).append(r)
+    chain: dict[ContractKey, Series] = {}
+    for key, rows in rows_by_key.items():
+        series = Series.empty(n)
+        _fill_series(series, minutes, cols, rows)
+        chain[key] = series.forward_fill()
+    return chain
 
 
 def pick_expiry(day: DayData, kind: str) -> date | None:

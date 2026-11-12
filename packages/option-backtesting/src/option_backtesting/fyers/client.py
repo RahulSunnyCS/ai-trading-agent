@@ -180,6 +180,13 @@ class FyersClient:
 
     def expired_expiries(self, symbol: str, start: date, end: date) -> list[date]:
         """Expired option expiry dates in the requested window."""
+        return self._expired_expiry_dates(symbol, start, end, "options")
+
+    def expired_futures_expiries(self, symbol: str, start: date, end: date) -> list[date]:
+        """Expired futures expiry dates in the requested window (the same call's other list)."""
+        return self._expired_expiry_dates(symbol, start, end, "futures")
+
+    def _expired_expiry_dates(self, symbol: str, start: date, end: date, kind: str) -> list[date]:
         body = self._get(
             {
                 "symbol": symbol,
@@ -190,7 +197,7 @@ class FyersClient:
             endpoint=EXPIRED_EXPIRIES_URL,
         )
         self._raise_for_error(body, f"{symbol} expiries {start}..{end}")
-        values = body.get("data", {}).get("expiry_dates", {}).get("options", [])
+        values = body.get("data", {}).get("expiry_dates", {}).get(kind, [])
         return [date.fromisoformat(value) for value in values]
 
     def expired_contracts(self, symbol: str, expiry: date) -> list[str]:
