@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a possible cost saving on one day in five; the evidence so far is a post-hoc look, under the noise bar |
-| **Status** | In progress; Phase 1 passed (narrowly), Phase 2 waits for 20 Fridays (about 2 Apr 2027) |
+| **Status** | In progress; Phase 1 passed (narrowly), A2: R1 and R2 passed on T1, R3 failed; Phase 2 waits for 20 Fridays (about 2 Apr 2027) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-12 |
@@ -169,6 +169,46 @@ BL-221's 2025–26 days, on these NIFTY years the Friday shortfall is in Widesl,
 Friday was mid-table). A first, defective read on 69 of the 124 variants (Log) printed a gap of ₹30; the
 registered universe is the 124. Phase 2 goes ahead.
 
+### Amendment 1 — A2: book rules on BL-214's NIFTY-only books (registered) (2026-11-12)
+
+`book.py a2` with `TRADING_DATA_ROOT=…/_bl214`: 722 sessions 2021-11-02 → 2024-10-08, 144 Fridays, none left
+out. One lot per core pick, 0.5 % slippage, after brokerage; ₹ per session.
+
+| T1 (judged) | net / session | total | Friday mean | worst drawdown | verdict |
+|---|---|---|---|---|---|
+| R0 as now | 191 | 1,37,680 | −195 | 50,764 | — |
+| R1 drop lowest | 195 | 1,40,562 | −175 | 43,275 | **pass** |
+| R2 skip Friday | 230 | 1,65,701 | 0 | 39,761 | **pass** |
+| R3 no starts from 13:00 | 155 | 1,12,018 | −373 | 50,512 | fail (net below the floor, drawdown not 10 % smaller) |
+
+| Core (beside) | net / session | Friday mean | worst drawdown | verdict |
+|---|---|---|---|---|
+| R0 | 204 | −19 | 28,636 | — |
+| R1 | 204 | −16 | 28,992 | fail (drawdown) |
+| R2 | 208 | 0 | 28,505 | fail (drawdown) |
+| R3 | 149 | −295 | 28,648 | fail (both) |
+
+Reading. On T1 both size-downs passed: Friday cost T1 about ₹195 a Friday after brokerage there, so leaving
+it out raised net and cut the worst drawdown by a fifth. Core's Fridays were about zero, so nothing changed
+its drawdown. R3 hurt: the books' afternoon Friday picks made money, unlike the universe's afternoon in
+BL-221. A2 shares its days with A and is NIFTY-only with a Thursday expiry; it does not decide (Phase 0:
+B does).
+
+### Amendment 1 — S: the last two years, in-sample (descriptive, 2026-11-12)
+
+`book.py insample`: 445 sessions 2025-01-10 → 2026-11-12, 88 Fridays, picks as Day by day takes them.
+
+| | T1 net / session | T1 Friday mean | T1 worst drawdown | Core net / session | Core Friday mean | Core worst drawdown |
+|---|---|---|---|---|---|---|
+| R0 | 951 | −279 | 45,112 | 396 | −257 | 52,780 |
+| R1 | 1,014 | 40 | 39,788 | 393 | −272 | 47,280 |
+| R2 | 1,006 | 0 | 30,926 | 447 | 0 | 36,661 |
+| R3 | 929 | −389 | 45,112 | 378 | −346 | 52,780 |
+
+The days that suggested the idea and that T1 was tuned on, so an upper bound, not evidence. T1's worst
+drawdown is the current one (Oct–Nov 2026; its three Fridays averaged −₹4,664), which is most of R2's cut.
+R3 again lowers net.
+
 ### Phase 2 — book rules on hold-out B: waiting
 
 `research/bl220/book.py` is built and checked on spent days (`--dev`, no verdict). Its registered read
@@ -210,3 +250,5 @@ Answered 2026-11-12 (owner, at "lets do BL220"):
   Clarified before B exists: the "worst 20-session drawdown" is the largest peak-to-trough fall of the
   cumulative net with the trough at most 20 sessions after the peak (`book.worst_drawdown`); the weeks of B
   start Monday 2026-11-09 (Mon–Thu are the same under every rule).
+- 2026-11-12 — Amendment 1 run once each: A2 (registered) T1 R1 and R2 pass, R3 fails, Core none; S
+  (in-sample, descriptive) the same order. Research page `research/options/common/friday-size-down.md`.
