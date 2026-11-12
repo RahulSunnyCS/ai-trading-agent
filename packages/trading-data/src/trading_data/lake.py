@@ -28,6 +28,22 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+#: MCX commodity-option underlyings stored under asset=option (BL-148). Standard and mini
+#: contracts are separate roots and never merged. The quality module judges these names
+#: against the MCX session, every other name against NSE/BSE's.
+MCX_ROOTS: tuple[str, ...] = (
+    "CRUDEOIL",
+    "CRUDEOILM",
+    "NATURALGAS",
+    "NATGASMINI",
+    "GOLD",
+    "GOLDM",
+    "SILVER",
+    "SILVERM",
+    "COPPER",
+    "ZINC",
+)
+
 PARTITION_KEY = {
     "option": "underlying",
     "future": "underlying",

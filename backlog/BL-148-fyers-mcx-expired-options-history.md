@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — set by the owner (2026-10-21): take Fyers Prime and do the two-year MCX options backfill next |
-| **Status** | Planned |
+| **Status** | In progress (started 2026-11-11, Phase 1) |
 | **Type** | feature |
 | **Area** | options / trading-data |
 | **Created** | 2026-10-21 |
 | **Depends on** | [BL-034](BL-034-options-history-lake.md) (canonical lake and quality table); owner activates Fyers Prime; reuses the expired-F&O client, request limiter and raw cache of TODO 3.11.26 (`fyers/expired.py`) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.11.27 |
 
 ## Context
 
@@ -205,14 +205,15 @@ MCX-specific is discovery (`MCX:` symbols, session bounds) and the instrument id
 
 ## Open questions
 
-To resolve when the owner says Prime is active and starts BL-148:
+Answered by the owner on 2026-11-11 (Fyers Prime active):
 
-1. Confirm **full chain** for all non-agricultural roots, rather than ATM ±N. The planned default
-   is full chain; the inventory gives the exact storage cost before download.
-2. Include both standard and mini roots (`CRUDEOIL`/`CRUDEOILM`, `NATURALGAS`/`NATGASMINI`,
-   `GOLD`/`GOLDM`, `SILVER`/`SILVERM`) plus `COPPER` and `ZINC`? Planned default: yes.
-3. Is the initial fixed start exactly 2024-10-21, or the earliest expiry on/after that date?
-   Planned default: include any contract rows on or after 2024-10-21, regardless of expiry date.
+1. **Universe:** all ten roots, full chain, standard and mini (`CRUDEOIL`, `CRUDEOILM`,
+   `NATURALGAS`, `NATGASMINI`, `GOLD`, `GOLDM`, `SILVER`, `SILVERM`, `COPPER`, `ZINC`), **after a
+   pilot**: pull CRUDEOIL for two expiries first, measure raw and Parquet bytes per contract, and
+   confirm the projected total against the free space before the bulk run.
+2. **Standard and mini both:** yes (same answer as 1).
+3. **Start rule:** any contract with rows on or after 2024-10-21 is included, whatever its
+   expiry; the fetch window starts at that date.
 
 ## Log
 
@@ -220,3 +221,47 @@ To resolve when the owner says Prime is active and starts BL-148:
   in one go. The local Standard-token smoke test proved the new expired API returns 1-minute MCX
   option OHLCV+OI; bulk ingestion waits only for Prime activation and the normal start-item
   questions above.
+- 2026-11-11 — started (owner: "I got Fyers Prime, let's start the commodity MCX data pull").
+  Read-only probe of the metadata endpoints with the Standard-era client (no candle requests):
+  Fyers lists **92,356 option symbols** across the ten roots for 2024-10-21 → 2026-11-10 (GOLD
+  21,396; SILVERM 18,362; SILVER 18,156; GOLDM 11,910; CRUDEOIL 5,770; CRUDEOILM 5,762;
+  NATURALGAS 3,304; NATGASMINI 3,304; COPPER 2,746; ZINC 1,646; 20-25 expiries each). One candle
+  request per contract is about 3.5 hours at 450 a minute, well inside Prime's 500,000 a day. The
+  `expiry_dates` window must be at most 366 days, so discovery loops over shorter windows. The
+  data volume (`/Volumes/TradingData`, a 200 GiB image) had 36 GiB free, so size is the gating
+  fact: the CRUDEOIL pilot decides it.
+- 2026-11-11 — Phase 1 built and run (`fyers/mcx.py`, `obt fyers mcx-inventory | mcx-pull |
+  mcx-report`, 12 tests). `mcx-inventory --to 2026-11-10 --refresh` froze the manifest
+  (`raw/fyers-expired/mcx/manifest-2024-10-21_2026-11-10-<hash>.json.gz`): **92,356 option
+  symbols, 0 undecodable**, the same list the probe found; discovery uses the reference future
+  from the live MCX master and 300-day expiry windows. **Prime confirmed**: the CRUDEOIL pilot
+  (the first two expiries, 2024-11-15 and 2024-12-16, plus 2025-06-16 as a full-life expiry)
+  made 434 candle requests with no refusal, no 429 and no retry (Standard stops at 10 a day).
+  Pilot figures: 28% of contracts answer `no_data`; the rest average 9,657 rows over all 434
+  (largest 29,705); raw cache 28.9 MB = **66 KB a contract**; no contract looked cut off at its
+  100-day window start. Projection if every root looks like CRUDEOIL: raw cache about 5.7 GiB and
+  about 890 million rows, Parquet about 7 GiB by the report's estimate (sorted by symbol, then time,
+  so the real per-day files will be larger; not yet measured). That fits the 36 GiB free, but
+  bullion strikes are not CRUDEOIL's, so a GOLD and a SILVER expiry should be pulled before the
+  bulk run. Not yet done: the lake write, instrument registration and the MCX session bounds
+  (Phase 2 and 3). The Phase 1 "done when" is met.
+- **2026-11-11 (bulk pull, import, audit):** pulled all 92,356 contracts in about 3 h 15 min
+  (87,544 requests, 20 threads on one paced client, 8/s cap; no refusal, 429 or retry; the resume
+  pass asked for nothing). Imported with `mcx-import --roots all`: **277,003,032 one-minute bars**
+  in the lake under `asset=option/underlying=<ROOT>` (1.3 GB of Parquet, 513-524 session days per
+  root), raw rows = lake rows for every root, 0 duplicates dropped. Only 29,127 of 92,356 contracts
+  (32%) have any bars; the rest answered `no_data` (GOLD 2,681 of 21,396, SILVER 2,691 of 18,156).
+  `mcx-audit --roots all` **passed**: 0 repeated minutes, 0 out of order, 0 negative price, volume
+  or open interest, 0 bars after expiry, 0 missing open interest, and 200 of 200 sampled
+  contracts per root identical to the raw cache. Rows by root: CRUDEOIL 44.0M, CRUDEOILM 35.0M,
+  NATURALGAS 36.5M, NATGASMINI 27.0M, GOLD 20.4M, GOLDM 40.1M, SILVER 21.6M, SILVERM 37.8M,
+  COPPER 11.7M, ZINC 2.8M. Vendor facts, listed and not repaired: 54-248 bars per root whose
+  high/low cannot hold their open or close (e.g. `MCX:CRUDEOIL24DEC6050PE` on 2024-12-12 09:00: high 124.8 below open 143.6); 0.1-0.3% of bars outside 09:00-23:55 IST (bars at 23:55 and, on 2026-07-03 and
+  07-07, after midnight); 0.4-0.5% of rows on a Saturday or Sunday IST date (not yet explained:
+  special sessions? unchecked). `may_be_cut_at_window_start`: 10 SILVERM contracts, 0 elsewhere.
+  Quality verdicts: 2 excluded days per root (the Diwali evening session, `short_session`),
+  COPPER 5, **ZINC 278 of 513** (`thin_chain`: few contracts trade) so ZINC is mostly unusable as a
+  chain. Not done: Phase 4 (daily collector and scheduler job; owner deferred it), the comparison
+  of `/data/history` active contracts against the expired API after they expire, the weekend-row
+  explanation.
+
