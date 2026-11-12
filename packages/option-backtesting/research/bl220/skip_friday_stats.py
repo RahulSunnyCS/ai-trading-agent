@@ -69,7 +69,7 @@ def book_series(root: Path, blocks: dict[date, dict]) -> dict[date, float]:
 
 
 def stats(days: list[date], x: list[float]) -> dict:
-    total, peak, cum, worst_dd, trough, under, longest, run = 0.0, 0.0, 0.0, 0.0, None, 0, 0, 0
+    peak, cum, worst_dd, trough, longest, run = 0.0, 0.0, 0.0, None, 0, 0
     for d, v in zip(days, x, strict=True):
         cum += v
         peak = max(peak, cum)
