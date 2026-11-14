@@ -7,8 +7,11 @@ bhavcopy (BL-226 Phase 1).
   does not, so it is derived: open interest and its change are whole lots, so the greatest common
   divisor of every OI and OI change of that symbol and expiry on that day (futures and options
   together) is the lot (or, when every position happens to be an even number of lots, a multiple of
-  it). A second estimate, futures value / contracts / close, is kept beside it; `lot_check` says
-  whether they agree.
+  it). The lot is then the divisor of that value (1 to 8 times) nearest the futures' traded value
+  per contract (value / contracts / close) when one is within 5 %, else the contract's gcd over its
+  life.
+  Checked on the UDiFF days, where NSE states the lot: 99.7 % equal (100 % when the value check
+  applies, 94 % of old-format days).
   Run on UDiFF days too, the derivation is compared with the stated lot (`compare_derived_lots`).
 - **Bans:** one row per (date, symbol) from the day's ban-list file.
 
@@ -85,14 +88,37 @@ def lots(con: duckdb.DuckDBPyConnection, root: Path) -> pa.Table:
               SELECT * EXCLUDE (pos),
                      CASE WHEN len(pos) = 0 THEN NULL
                           ELSE list_reduce(pos, (a, b) -> gcd(a, b)) END AS derived
-              FROM g0)
+              FROM g0),
+            life AS (
+              SELECT symbol, expiry,
+                     list_reduce(list_filter(list(derived), x -> x IS NOT NULL AND x > 0),
+                                 (a, b) -> gcd(a, b)) AS life_gcd
+              FROM g GROUP BY symbol, expiry HAVING count(derived) > 0),
+            cand AS (
+              SELECT g.date, g.symbol, g.expiry, g.derived // m AS c,
+                     abs(g.value_estimate / (g.derived // m) - 1) AS err
+              FROM g, range(1, 9) t(m)
+              WHERE g.derived IS NOT NULL AND g.value_estimate IS NOT NULL AND g.derived % m = 0),
+            best AS (
+              SELECT date, symbol, expiry, arg_min(c, err) AS by_value, min(err) AS err
+              FROM cand GROUP BY date, symbol, expiry),
+            pick AS (
+              SELECT g.*, life.life_gcd, best.by_value, best.err,
+                     CASE WHEN best.err <= 0.05 THEN best.by_value
+                          WHEN g.derived % life.life_gcd = 0 THEN life.life_gcd
+                          ELSE g.derived END AS derived_lot,
+                     CASE WHEN best.err <= 0.05 THEN 'value'
+                          WHEN g.derived IS NULL THEN 'none'
+                          ELSE 'contract_gcd' END AS derived_by
+              FROM g LEFT JOIN life USING (symbol, expiry)
+                     LEFT JOIN best USING (date, symbol, expiry))
            SELECT date, symbol, expiry, source_format,
-                  coalesce(stated, derived) AS lot_size,
-                  stated, stated_min, derived, value_estimate,
-                  CASE WHEN derived IS NULL OR value_estimate IS NULL THEN 'unchecked'
-                       WHEN abs(value_estimate / derived - 1) <= 0.05 THEN 'agree'
+                  coalesce(stated, derived_lot) AS lot_size,
+                  stated, stated_min, derived, derived_lot, derived_by, value_estimate,
+                  CASE WHEN derived_lot IS NULL OR value_estimate IS NULL THEN 'unchecked'
+                       WHEN abs(value_estimate / derived_lot - 1) <= 0.05 THEN 'agree'
                        ELSE 'differ' END AS lot_check
-           FROM g ORDER BY date, symbol, expiry"""
+           FROM pick ORDER BY date, symbol, expiry"""
     ).to_arrow_table()
 
 
@@ -144,13 +170,17 @@ def compare_derived_lots(root: Path) -> dict:
     con.register("l", t)
     row = con.execute(
         """SELECT count(*) AS n,
-                  count(*) FILTER (WHERE derived = stated) AS equal,
-                  count(*) FILTER (WHERE derived % stated = 0 AND derived <> stated) AS multiple,
+                  count(*) FILTER (WHERE derived_lot = stated) AS equal,
+                  count(*) FILTER (WHERE derived_lot % stated = 0 AND derived_lot <> stated)
+                      AS multiple,
+                  count(*) FILTER (WHERE stated % derived_lot = 0 AND derived_lot <> stated)
+                      AS divisor,
                   count(*) FILTER (WHERE derived IS NULL) AS no_oi,
                   count(*) FILTER (WHERE stated <> stated_min) AS mixed_stated
            FROM l WHERE source_format = 'udiff'"""
     ).fetchone()
-    return dict(zip(("n", "equal", "multiple", "no_oi", "mixed_stated"), row, strict=True))
+    names = ("n", "equal", "multiple", "divisor", "no_oi", "mixed_stated")
+    return dict(zip(names, row, strict=True))
 
 
 def report(root: Path) -> dict:

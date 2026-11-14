@@ -50,7 +50,8 @@ def test_members_spells_lots_and_bans(tmp_path):
     aaa_lots = {r["date"]: (r["lot_size"], r["lot_check"]) for r in lots if r["symbol"] == "AAA"}
     assert aaa_lots[d1] == (500, "agree")
     bbb_lot = [r["lot_size"] for r in lots if r["symbol"] == "BBB"]
-    assert bbb_lot == [600, 300]  # one row a day: 600 alone is a multiple; with 300 it resolves
+    # day 1 alone gives 600 (one position of two lots); the contract's life resolves it to 300
+    assert bbb_lot == [300, 300]
     r = fu.report(tmp_path)
     assert r["entries"] == [("BBB", "2020-01-03")] and r["exits"] == [("BBB", "2020-01-01")]
     assert r["ban_days"] == 1
