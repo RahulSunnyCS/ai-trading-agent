@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 ## Open
 
@@ -81,6 +81,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-202](BL-202-buy-sweep-at-slippage.md) | Buy-only sweep scored at 1 % slippage after brokerage: BL-104's Buy axes widened (premium to ₹100 / ₹300, 5-min window, SL 15–50 %, target 200 %, percent trail, no day stop) at one slot per band, then the axes BL-104 never moved (exit time, gap, valid-until, stop on close, one re-entry, peak trail), then when to take a Buy (expiry day, VIX band, gap open, weekday, the ranking's top N) against every day and never; fit 2024-10 → 2025-10-08, test after | P2 | Ready (Phase 0 written and answered: 1 % slippage, the split, the full 82k grid on three workers at night; nothing run) | research | options |
 | [BL-206](BL-206-dir-exits-scale-out.md) | Directional exits, wide: per-leg targets, profit lock and trail, and a two-lot scale-out, on the Dir settings Adaptive picks, at 0.5 % slippage (BL-105 killed the one-lot profit rules; the scale-out, leg targets, T1's settings and slippage are new) | P2 | Planned | research | options |
 | [BL-219](BL-219-gold-dir-forward-paper-test.md) | Forward paper test of GOLDM Dir in the expiry week: nightly journal over six gold expiries, 18:00 spread snapshot | P2 | In progress; built, waits for the merges and a scheduler restart (first session 2026-11-23) | research | options / trading-data |
+| [BL-220](BL-220-friday-size-down.md) | Friday size-down: trade fewer Adaptive picks on Fridays (drop the lowest pick, skip, or no starts from 13:00), tested on NIFTY 2022–24 and 20 forward Fridays, not the days that suggested it | P2 | In progress; Phase 1 passed narrowly (NIFTY 2022–24: Friday ₹81 vs ₹192, p 0.012); A2 on 2021–24 NIFTY T1: R1 and R2 pass, R3 fails; Phase 2 waits for 20 Fridays (~2 Apr 2027) | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -95,6 +96,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-221](BL-221-friday-by-family.md) | Fridays by family: how Widesl, Dir and Buy make or lose money on the day furthest from expiry | Descriptive (expiry Fridays left out): far from expiry, Friday nets about zero. The shortfall is the SENSEX Dirs (−₹150 to −₹200 a strategy-day, under 2 SE) and the 13:00–close window; fewer leg SLs, more time exits, VIX and gap no different | 2026-11-12 |
 | [BL-218](BL-218-mcx-commodity-options-sweep.md) | MCX commodity options sweep: Dir, Widesl, Buy on four minis, expiry week vs the week before | One pass: GOLDM Dir expiry week (18:00 ITM1 SL21 cost×1, ₹1,606 a session on the test year after charges and 1% slippage); crude, gas, silver, Widesl and the Buys fail | 2026-11-11 |
 | [BL-216](BL-216-range-band-fit-poc.md) | Range-band fit in Adaptive's ranking: the last-5-day range band added to list C's composite like the VIX band, replayed on T1 and Core | Killed: at 20 % weight T1 −₹257 [−460, −43] a day over two years and −₹296 over one, Core −₹150 [−353, +44] with a deeper drawdown, after 0.5 % slippage; 10 % worse too; picks changed on two days in three | 2026-11-08 |
 | [BL-215](BL-215-annual-retune-walk-forward.md) | Annual re-tune of Adaptive Tuned: sweep a period, take the best, trade the next, over NIFTY-only folds at 12 and 6 months (absorbs BL-213) | Done, no evidence either way: re-tune − Core +₹4 [−41, +49] per lot-day after 0.5 % slippage (12-month, 2 of 4 folds) and +₹32 [−23, +90] (6-month, 6 of 9); lost before 2024-10, won after; deeper drawdowns; T1 not to be re-tuned on a schedule, a new set only via a paper track with a registered pass rule | 2026-11-07 |

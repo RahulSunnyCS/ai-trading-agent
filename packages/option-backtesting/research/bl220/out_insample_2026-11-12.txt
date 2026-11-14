@@ -1,0 +1,12 @@
+
+== IN-SAMPLE T1 (descriptive, no verdict): 443 sessions (2025-01-10 -> 2026-11-12), Fridays 87, sessions left out (a pick without a result) 0
+R0  net/session 964  total 426,998  Friday mean -284  worst 20-session drawdown 41,287
+R1  net/session 1,016  total 450,239  Friday mean -17  worst 20-session drawdown 35,963
+R2  net/session 1,020  total 451,704  Friday mean 0  worst 20-session drawdown 27,101
+R3  net/session 942  total 417,239  Friday mean -396  worst 20-session drawdown 41,287
+
+== IN-SAMPLE CORE (descriptive, no verdict): 443 sessions (2025-01-10 -> 2026-11-12), Fridays 87, sessions left out (a pick without a result) 0
+R0  net/session 413  total 182,789  Friday mean -247  worst 20-session drawdown 46,139
+R1  net/session 412  total 182,367  Friday mean -252  worst 20-session drawdown 39,813
+R2  net/session 461  total 204,285  Friday mean 0  worst 20-session drawdown 36,661
+R3  net/session 395  total 174,963  Friday mean -337  worst 20-session drawdown 46,139
