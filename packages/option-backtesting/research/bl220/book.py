@@ -47,7 +47,7 @@ def journal_blocks(root: Path, track: str | None, lo: date, hi: date) -> dict[da
     out = {}
     for e in entries.read(root, track):
         d = date.fromisoformat(e["day"])
-        if lo <= d <= hi and d.weekday() < 5:
+        if lo <= d <= hi and d.weekday() < 5 and e.get("before_first_entry", False):
             out[d] = e["lists"]["C"]
     return out
 
@@ -136,7 +136,7 @@ def worst_drawdown(series: list[float]) -> float:
         total += v
         cum.append(total)
     for j, low in enumerate(cum):
-        start = max(0, j - DD_WINDOW)
+        start = max(0, j - DD_WINDOW + 1)
         peak = max([0.0 if start == 0 else cum[start - 1], *cum[start : j + 1]])
         worst = max(worst, peak - low)
     return worst

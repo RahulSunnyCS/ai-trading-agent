@@ -176,10 +176,10 @@ out. One lot per core pick, 0.5 % slippage, after brokerage; ₹ per session.
 
 | T1 (judged) | net / session | total | Friday mean | worst drawdown | verdict |
 |---|---|---|---|---|---|
-| R0 as now | 191 | 1,37,680 | −195 | 50,764 | — |
-| R1 drop lowest | 195 | 1,40,562 | −175 | 43,275 | **pass** |
+| R0 as now | 191 | 1,37,680 | −195 | 48,145 | — |
+| R1 drop lowest | 195 | 1,40,562 | −175 | 41,146 | **pass** |
 | R2 skip Friday | 230 | 1,65,701 | 0 | 39,761 | **pass** |
-| R3 no starts from 13:00 | 155 | 1,12,018 | −373 | 50,512 | fail (net below the floor, drawdown not 10 % smaller) |
+| R3 no starts from 13:00 | 155 | 1,12,018 | −373 | 47,893 | fail (net below the floor, drawdown not 10 % smaller) |
 
 | Core (beside) | net / session | Friday mean | worst drawdown | verdict |
 |---|---|---|---|---|
@@ -189,21 +189,22 @@ out. One lot per core pick, 0.5 % slippage, after brokerage; ₹ per session.
 | R3 | 149 | −295 | 28,648 | fail (both) |
 
 Reading. On T1 both size-downs passed: Friday cost T1 about ₹195 a Friday after brokerage there, so leaving
-it out raised net and cut the worst drawdown by a fifth. Core's Fridays were about zero, so nothing changed
+it out raised net and cut the worst drawdown by about a sixth (R2 17 %, R1 15 %). Core's Fridays were about zero, so nothing changed
 its drawdown. R3 hurt: the books' afternoon Friday picks made money, unlike the universe's afternoon in
 BL-221. A2 shares its days with A and is NIFTY-only with a Thursday expiry; it does not decide (Phase 0:
 B does).
 
 ### Amendment 1 — S: the last two years, in-sample (descriptive, 2026-11-12)
 
-`book.py insample`: 445 sessions 2025-01-10 → 2026-11-12, 88 Fridays, picks as Day by day takes them.
+`book.py insample`: 443 sessions 2025-01-10 → 2026-11-12, 87 Fridays, picks as Day by day takes them
+(re-run 2026-11-14 after the corrections in the Log: two late-recorded days dropped, 20-session window).
 
 | | T1 net / session | T1 Friday mean | T1 worst drawdown | Core net / session | Core Friday mean | Core worst drawdown |
 |---|---|---|---|---|---|---|
-| R0 | 951 | −279 | 45,112 | 396 | −257 | 52,780 |
-| R1 | 1,014 | 40 | 39,788 | 393 | −272 | 47,280 |
-| R2 | 1,006 | 0 | 30,926 | 447 | 0 | 36,661 |
-| R3 | 929 | −389 | 45,112 | 378 | −346 | 52,780 |
+| R0 | 964 | −284 | 41,287 | 413 | −247 | 46,139 |
+| R1 | 1,016 | −17 | 35,963 | 412 | −252 | 39,813 |
+| R2 | 1,020 | 0 | 27,101 | 461 | 0 | 36,661 |
+| R3 | 942 | −396 | 41,287 | 395 | −337 | 46,139 |
 
 The days that suggested the idea and that T1 was tuned on, so an upper bound, not evidence. T1's worst
 drawdown is the current one (Oct–Nov 2026; its three Fridays averaged −₹4,664), which is most of R2's cut.
@@ -219,10 +220,10 @@ read, the second is A2's data read again.
 
 | Jan 2025 – Nov 2026 | T1 now | T1 skip | Core now | Core skip | Base now | Base skip |
 |---|---|---|---|---|---|---|
-| Net (₹) | 4,23,366 | 4,47,879 | 1,76,148 | 1,98,808 | 1,69,374 | 1,81,445 |
-| Max drawdown (₹) | 45,112 | 30,926 | 52,921 | 46,173 | 1,55,422 | 1,50,907 |
-| Sharpe | 2.61 | 3.02 | 1.20 | 1.48 | 0.91 | 1.04 |
-| Profit factor | 1.57 | 1.80 | 1.23 | 1.33 | 1.17 | 1.22 |
+| Net (₹) | 4,26,998 | 4,51,704 | 1,82,789 | 2,04,285 | 1,69,374 | 1,81,445 |
+| Max drawdown (₹) | 41,287 | 27,101 | 52,921 | 46,173 | 1,55,422 | 1,50,907 |
+| Sharpe | 2.64 | 3.05 | 1.25 | 1.52 | 0.91 | 1.04 |
+| Profit factor | 1.58 | 1.82 | 1.24 | 1.34 | 1.17 | 1.22 |
 
 | NIFTY 2021-11 – 2024-10 | T1 now | T1 skip | Core now | Core skip | Base now | Base skip |
 |---|---|---|---|---|---|---|
@@ -282,3 +283,12 @@ Answered 2026-11-12 (owner, at "lets do BL220"):
   drops 7 SENSEX-expiry Fridays (Nov 2024 – Jan 2025): Friday ₹85 → ₹87; T1 and Core start 2025-01-10 and
   are unchanged.
 - 2026-11-12 — owner: book statistics with Fridays skipped (`skip_friday_stats.py`, descriptive, above).
+- 2026-11-14 — code review of PR #449 found two departures from the registration, both settled by the owner
+  **before hold-out B was read** (B is not complete): (1) `book.worst_drawdown` spanned 21 sessions, not the
+  registered 20 (`start = j - 20`): fixed to `max(0, j - DD_WINDOW + 1)`; (2) `journal_blocks` kept
+  journal entries recorded after the open, where Phase 0's R1 reads composites "recorded before the open":
+  now filtered on `before_first_entry`, as `rotation/readout.py` does. A2 re-run: the verdict is unchanged
+  (T1 R2 and R1 pass, R3 fails; Core none), T1 worst drawdowns R0 48,145, R1 41,146, R2 39,761, R3 47,893
+  (were 50,764, 43,275, 39,761, 50,512); Core unchanged. S re-run (443 sessions, 87 Fridays): numbers in
+  the S and skip-Friday tables above updated; descriptive, no verdict. Outputs `out_a2_`, `out_insample_`,
+  `out_skipfri_live_2026-11-12.txt` rewritten; `out_skipfri_bl214` unchanged.

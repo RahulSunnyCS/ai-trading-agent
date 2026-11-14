@@ -85,7 +85,7 @@ def main() -> None:
         + "."
     )
     lines.append(
-        f"Left out as the expiry-Friday period (2024-10-09 → 2025-01-09): {len(expiry_period)} sessions."
+        f"Left out as the expiry-Friday period (2024-10-09 → 2025-01-03): {len(expiry_period)} sessions."
     )
     lines.append("")
     lines.append(
