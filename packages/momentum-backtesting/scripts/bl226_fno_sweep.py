@@ -193,6 +193,13 @@ def confirm(args: argparse.Namespace) -> None:
         rows.append(row)
         _, results, full = run_entry(entry, LEARN[0], None)
         full.to_frame("equity").to_csv(out / f"equity-full-{pid}.csv")
+        held_n = [
+            m["broad_category_top_n"] * m.get("broad_picks_per_category", 1)
+            if m.get("broad_category_mode") == "on"
+            else m["broad_off_top_n"]
+            for m in entry["members"]
+        ]
+        (out / f"meta-{pid}.json").write_text(json.dumps({"held_n": held_n}))
         for i, r in enumerate(results):
             r.weights.to_csv(out / f"weights-{pid}-m{i}.csv")
             r.trades.to_csv(out / f"trades-{pid}-m{i}.csv")

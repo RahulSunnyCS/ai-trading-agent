@@ -216,3 +216,27 @@ Answered 2026-11-15 (Phase 0). As first asked:
   states it, 355,881 are equal (99.1 %), none a multiple, 919 a divisor, 2,280 had no OI. This replaces
   the 20-sample circular check planned for lots (it is a check on every stated day). Old-format days:
   648,250 agree with the value estimate, 1,982 differ, 51,613 unchecked (no futures trade).
+- 2026-11-15 — Phase 2 learning sweep run (`scripts/bl226_fno_sweep.py learn`, scratch data copy).
+  
+  **Phase 2 learning read (2026-11-15, 2020-01-03 → 2024-06-28, 235 weeks, after capital-gains tax; Nifty 50
+  benchmark 16.2 % a year).** 30 runs, none failed. Top ten by CAGR ÷ max drawdown:
+  
+  | Rank | Run | Calmar | CAGR after tax | Max DD | Buys a year |
+  |---|---|---|---|---|---|
+  | 1 | Four-Strategy Mix, BSE Tags (`fav-b2e4bcdc91df`) | 1.31 | 31.3 % | -24 % | 34.1 |
+  | 2 | grid-12m-top10-weekly (`grid-12m-top10-weekly`) | 1.01 | 29.5 % | -29 % | 244.7 |
+  | 3 | Trio Fortnightly · all Fridays (`fav-1258177078c9`) | 0.96 | 33.7 % | -35 % | 23.9 |
+  | 4 | grid-12m-top5-monthly (`grid-12m-top5-monthly`) | 0.95 | 36.3 % | -38 % | 48.2 |
+  | 5 | grid-6m-top10-weekly (`grid-6m-top10-weekly`) | 0.86 | 25.1 % | -29 % | 291.4 |
+  | 6 | grid-12m-top8-monthly (`grid-12m-top8-monthly`) | 0.85 | 32.5 % | -38 % | 68.8 |
+  | 7 | grid-12m-top8-weekly (`grid-12m-top8-weekly`) | 0.83 | 24.9 % | -30 % | 214.6 |
+  | 8 | grid-12m-top5-weekly (`grid-12m-top5-weekly`) | 0.83 | 26.8 % | -32 % | 155.1 |
+  | 9 | Phase 6 ensemble (`fav-9f553845b09c`) | 0.83 | 28.1 % | -34 % | 35.3 |
+  | 10 | Four Sectors, Half Tilt · all Fridays (`fav-0114cc82baed`) | 0.82 | 25.2 % | -31 % | 17.9 |
+  
+  Short look-backs are worst: every 3-month cell is below 0.52 (the 3-month top-5 weekly 0.10).
+  Kept (distinct look-back or N): **Four-Strategy Mix, BSE Tags** (the invested favourite, on F&O stocks),
+  **grid 12 months / top 10 / weekly**, **Trio Fortnightly**. Descriptive only: the stock signal's years were
+  searched before (Phase 0 caveat). For Phase 3 a favourite's N is the stocks it holds per sleeve
+  (categories × picks per category: 9, 8, 12 and 8 for the Mix's four members, 9 for both Trio sleeves),
+  not its category count.

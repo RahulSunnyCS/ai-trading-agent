@@ -387,8 +387,7 @@ def score(
 
 def picks_from(sweep: Path, pick: str, all_sessions) -> tuple[list[dict], int]:
     """Per sleeve: {rebalance day: [symbols held]}; and the candidate's N."""
-    learn = {json.loads(x)["id"]: json.loads(x) for x in (sweep / "learn.jsonl").open()}
-    n = int(learn[pick].get("n") or 10)
+    held_n = json.loads((sweep / f"meta-{pick}.json").read_text())["held_n"]
     sleeves = []
     for w in holdings(sweep, pick):
         by_day = {}
@@ -398,7 +397,7 @@ def picks_from(sweep: Path, pick: str, all_sessions) -> tuple[list[dict], int]:
                 continue
             by_day[d] = [c.split("#", 1)[0] for c, v in row.items() if v > 0]
         sleeves.append(by_day)
-    return sleeves, n
+    return sleeves, held_n
 
 
 def bottom_from(sweep: Path, pick: str, n: int, all_sessions) -> dict:
@@ -469,7 +468,7 @@ def iv_flags(rows: pd.DataFrame, spots: pd.DataFrame, all_sessions) -> dict:
 
 def load_inputs(sweep: Path, pick: str, all_sessions, extra_days=None, with_bottom=False):
     sleeves, n = picks_from(sweep, pick, all_sessions)
-    bottom = bottom_from(sweep, pick, n, all_sessions) if with_bottom else {}
+    bottom = bottom_from(sweep, pick, n[0], all_sessions) if with_bottom else {}
     days = sorted(set().union(*[s.keys() for s in sleeves]))
     symbols = set().union(*[set(x) for s in sleeves for x in s.values()])
     symbols |= set().union(*[set(v) for v in bottom.values()]) if bottom else set()
@@ -484,8 +483,9 @@ def load_inputs(sweep: Path, pick: str, all_sessions, extra_days=None, with_bott
 def _book(sleeves, n, money, right, all_sessions, chains, spots, lots, slip=1.0, iv=None,
           share=1.0):  # fmt: skip
     k = len(sleeves)
-    books = [run_book(s, CAPITAL * share / k / n, money, right, all_sessions, chains, spots, lots,
-                      slip, iv) for s in sleeves]  # fmt: skip
+    ns = n if isinstance(n, list) else [n] * k
+    books = [run_book(s, CAPITAL * share / k / ni, money, right, all_sessions, chains, spots, lots,
+                      slip, iv) for s, ni in zip(sleeves, ns, strict=True)]  # fmt: skip
     trades = pd.concat([b[0] for b in books], ignore_index=True)
     counts = {key: sum(b[1][key] for b in books) for key in books[0][1]}
     return trades, counts
