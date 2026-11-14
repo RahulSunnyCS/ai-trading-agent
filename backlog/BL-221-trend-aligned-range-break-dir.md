@@ -244,3 +244,11 @@ To put to the owner when this is started (step 3 of the workflow), not settled n
   stay here until the item is picked up.
 - 2026-11-15 — started: owner accepted all recommendations and asked for the last two years; Amendment 1 written and committed before any run; TODO row 3.11.30; Phase 1 (trend state, break finder, runner) begins.
 - 2026-11-15 — Amendment 2 written and committed before the full run (primary cell, which break the trend takes, placebo / bootstrap / quarter definitions). Runner `research/bl221/run.py` smoke-tested on 12 days (no results read); full fit-window run next.
+- 2026-11-15 — `override: owner asked in chat, "look with buy also, then look with ITM2 also instead of ATM"` (the
+  Phase 0 "Will not run" list named buying and ITM strikes). Run as **exploratory extras on the primary range
+  only**, after the registered fit-window run: (a) the same breaks **bought** at ATM (already computed as C5),
+  (b) **ITM2 sold** and (c) **ITM2 bought**, same 21% stop (sold: re-entry at cost ×1; bought: none), same
+  entries, costs and slippage, trend-aligned and no-gate. They add 3 counted variants to the family (now 16) and
+  are **never a pass**: the registered rule and primary cell are unchanged, and a lead in an extra is a new
+  hypothesis that needs its own pre-registration and the 2022–24 confirmation. Script `research/bl221/run_itm2.py`.
+
