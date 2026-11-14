@@ -72,6 +72,7 @@ rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cu
 | [Roll the decayed leg](roll.md) | Tested | Killed (BL-105): 0 of 336 settings pass; bounded risk, no edge |
 | [MCX commodity options (evening)](mcx-commodities.md) | Tested | One pass: gold mini, expiry week, 18:00 ITM1 SL21 cost×1 to close (₹1,606 a session on the test year, after charges); crude, gas and silver failed (BL-218) |
 | [Trend-aligned range break (one leg)](trend-range-break.md) | Tested | Killed (BL-221): the hourly-trend gate beats the ungated break by ₹114 a day [−36, +262] but the rule earns ₹24 a day against the base Dir's ₹77; buying and ITM2 lose; no cell passes |
+| [Trend-side wide stop](trend-side-stop.md) | Tested | Killed (BL-222): trend-side leg at 50% beats 50% on both legs by ₹271 a day [+91, +446] but not the picks as they are (+₹34 [−118, +191]); works on up-trend days (+₹158), loses on down-trend days (−₹70) |
 
 ## Across strategies
 

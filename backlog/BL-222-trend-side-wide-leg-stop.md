@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's idea (2026-11-15) from the BL-221 follow-up split; cheap to test on the engine and T1's own picks, no live change until it passes |
-| **Status** | In progress (pre-registered 2026-11-15, before any run) |
+| **Status** | Done, killed (2026-11-15): fails 3 of 5 rules; confirmation never opened |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-15 |
@@ -104,3 +104,13 @@ None needed to start: the owner chose the legs and the 40–50% range; "vice ver
 ## Log
 
 - 2026-11-15 — created and pre-registered before any run, from the owner's idea and its mirror ("and vice versa").
+- 2026-11-15 — **Result** (351 Dir pick-days, 2025-01-10 → 2026-10-08; control at 0% slippage and no charges equals the stored T1
+  results on all 351). ₹ per pick-day, after ₹23.6 an order and 0.5% slippage: A0 +244 (max drawdown ₹26,759, worst
+  5 days −₹14,811); primary W(50) +279 (₹28,331, −₹14,629); S(50) +8 (₹68,713); M(50) −38. Rule: (i) W minus A0 +34
+  [−118, +191] **fail**, W minus S +271 [+91, +446] pass; (ii) beat 97.9% of 2,000 placebo trends **pass**; (iii) above A0 in
+  2 of 4 blocks (+752/+296, +195/+42, +9/+266, +164/+374) **fail**; (iv) max drawdown above A0's **fail**. **Killed.** X = 30 / 40
+  trend-side: −31 / −28 against A0. Descriptive: up-trend days (CE wide) +₹158 a day against A0 on 161 days,
+  down-trend days (PE wide) −₹70 on 190; the two legs' roles are not symmetric. Findings page
+  `research/options/strategies/directional/trend-side-stop.md`. "CE wide on up-trend days only" is a lead found after the
+  fact: it needs its own pre-registration and the 2022–24 confirmation.
+

@@ -29,6 +29,9 @@ import numpy as np
 import yaml
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parents[0] / "common"))
+from trend_state import LAST, trend_states  # noqa: E402,F401
+
 OUT = HERE / "out"
 ROOT = Path(os.environ.get("TRADING_DATA_ROOT", "/Volumes/TradingData"))
 PKG = HERE.parents[1]
@@ -40,8 +43,6 @@ CUTOFFS = {"12:00": 165, "14:00": 285}
 SLIPS = (0.0, 0.5, 1.0)
 COST_PER_ORDER = 23.6  # ₹20 + 18% GST, the rotation's convention
 PRIMARY = ("10:00", "hourly", "12:00")
-HOUR_CLOSES = [59, 119, 179, 239, 299, 359, 374]  # six hours and the 15-minute stub
-LAST = 374
 SEED = 20261115
 
 
@@ -50,39 +51,7 @@ def label(minute: int) -> str:
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
-# ---- trend (point in time) ----
-
-
-def ema_state(values: list[float], fast: int, slow: int) -> list[float]:
-    """+1 / -1 / 0 (EMA fast above / below / equal slow) AFTER each value, seeded with the first."""
-    af, as_ = 2 / (fast + 1), 2 / (slow + 1)
-    f = s = values[0]
-    out = []
-    for v in values:
-        f += af * (v - f)
-        s += as_ * (v - s)
-        out.append(1.0 if f > s else -1.0 if f < s else 0.0)
-    return out
-
-
-def trend_states(frame) -> dict[str, dict[str, float]]:
-    """{'hourly'|'daily': {session: state known BEFORE that session opens}}."""
-    days = list(frame.days)
-    hourly_vals, owner = [], []
-    for i in range(len(days)):
-        for m in HOUR_CLOSES:
-            hourly_vals.append(float(frame.C[i, m]))
-            owner.append(i)
-    after_hourly = ema_state(hourly_vals, 20, 50)
-    last_of = {}
-    for k, i in enumerate(owner):
-        last_of[i] = after_hourly[k]  # the state after session i's last hourly bar
-    daily = ema_state([float(frame.C[i, LAST]) for i in range(len(days))], 20, 50)
-    out = {"hourly": {}, "daily": {}}
-    for i, d in enumerate(days):
-        out["hourly"][d] = last_of[i - 1] if i else 0.0
-        out["daily"][d] = daily[i - 1] if i else 0.0
-    return out
+# ---- trend (point in time): research/common/trend_state.py ----
 
 
 # ---- breaks ----
