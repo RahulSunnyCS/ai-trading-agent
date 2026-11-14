@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — a new strategy family over data we do not hold yet; behind finishing Momentum this month (BL-010, BL-001, BL-024, BL-025) |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | research |
 | **Area** | momentum / options / trading-data |
 | **Created** | 2026-11-15 |
 | **Depends on** | the F&O bhavcopy reader of [BL-107](BL-107-nse-fo-bhavcopy-daily.md) (this item needs its history, not only the daily file); Momentum's ranking engine (`categories/broad.py`) and search harness (BL-010, BL-176); the vendor stock options of [BL-037](BL-037-stock-options-in-the-lake.md) for a fill check only |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.75 |
 
 ## Context
 
@@ -52,7 +52,12 @@ configuration goes to a forward paper journal; if not, the item says why and sto
 ## Plan
 
 ### Phase 0 — Decisions and pre-registration
-Owner's answers first (open questions below), then this block filled in and committed **before any run**.
+Owner's answers (2026-11-15): learning 2020-01 → 2024-06, confirmation 2024-07 → the last full week; a small
+stock grid; both put forms; the options book sized for **₹10 lakh**. Taken as the default, not asked: weekly
+cadence for the options (as the idea said), monthly only as a stock-grid cell; the history reader is the one
+BL-107's daily job will use (same table), BL-107's schedule stays its own item.
+
+This block is the pre-registration; it is committed before any run and never edited after one.
 - **Hypothesis:** the calls of the top-ranked F&O stocks, held a week, earn more than the stocks after
   option costs, because the momentum move is convex in the option; with a trend filter, the puts of the
   bottom-ranked stocks earn in falling markets.
@@ -70,7 +75,21 @@ Owner's answers first (open questions below), then this block filled in and comm
   slippage and slab-rate tax beats the same picks held as stock (after delivery costs and capital-gains tax)
   on total return and is not worse than 1.5× its maximum drawdown; a block-bootstrap 90% interval of the
   weekly difference above zero. Kill if none of the three candidates × three moneyness levels pass.
-- **Will not run:** strike, expiry or stop rules invented after the learning read; more than the grid below.
+- **Fixed numbers:** budget per stock = ₹10 lakh ÷ N (rounded to whole lots, at least one; a stock whose one
+  lot costs over twice its budget is skipped and counted); expiry = the current month when it has at least 10
+  trading days left on the entry day, else the next; a strike is tradable when it has open interest of at
+  least 10 lots on the entry day; the fill is the day's close when the contract traded, else its settle price
+  (flagged and counted); slippage 1 / 2 / 3 % of premium for ATM / OTM1 / OTM2, each way, with a sensitivity
+  at double; costs: ₹20 brokerage per order, STT on sell premium at the rate of the day, NSE transaction and
+  SEBI charges, stamp duty on buys, GST on brokerage and charges; tax: option net at a 30 % slab plus cess,
+  stock at the capital-gains rates of the day.
+- **Stock grid (Phase 2):** Broad's score with look-back 3, 6, 12 months × top N 5, 8, 10 × cadence weekly,
+  monthly (the day after the monthly expiry) = 18 cells, plus Momentum's current headline and its saved
+  favourites run unchanged on the F&O universe. Ranked on the learning period by after-tax CAGR ÷ maximum
+  drawdown; the BL-010 harness's deflated Sharpe and PBO reported beside it. The three kept must differ in
+  look-back or N.
+- **Will not run:** strike, expiry or stop rules invented after the learning read; more than the grid above
+  and the two Phase 3 variants; the confirmation period before the learning read is written here.
 
 ### Phase 1 — F&O history (data)
 - **Tasks:** fetch the daily F&O bhavcopy from NSE's archive, 2019-01 → today (about 1,750 files, both
@@ -141,6 +160,8 @@ Owner's answers first (open questions below), then this block filled in and comm
 
 ## Open questions
 
+Answered 2026-11-15 (Phase 0). As first asked:
+
 1. Period: data from 2019-01, signals from 2020-01, learning to 2024-06 and confirmation after — or another split?
 2. The stock sweep: a small grid on Broad's engine as above, or a wider BL-010-style search?
 3. Cadence for the options: weekly only (as asked), or monthly at expiry beside it?
@@ -153,3 +174,8 @@ Owner's answers first (open questions below), then this block filled in and comm
 - 2026-11-15 — created from the owner's idea (futures momentum, then options on momentum-ranked F&O stocks,
   weekly, puts in a downtrend); data checked: stock daily prices 2011 →, no F&O list history, no stock
   futures, vendor stock options 2024-10 → 2026-04 only.
+- 2026-11-15 — started (owner: "Start it"). Answers in Phase 0. Checked before code: NSE's archive serves the
+  old-format F&O file for 2019-01-01, the UDiFF file for 2024-11-01 and the ban-list file for 2019-01-01 and
+  2026-11-13 (browser User-Agent, nseindia.com Referer). Broad's engine takes its universe as members by
+  **year** (`broad.py`, `members_by_year`); the F&O list changes within a year, so Phase 2 needs membership by
+  rebalance date (or by month) for the `fno` universe, not a yearly set.
