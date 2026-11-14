@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's idea (2026-11-15); the nearest earlier tests (BL-152, BL-083 pivot-with-trend) mostly killed or did not hold out of sample, so low prior odds, but cheap to test on the engine we already have |
-| **Status** | In progress (Phase 0 amended and answered 2026-11-15; Phase 1 building; nothing run) |
+| **Status** | Done, killed (2026-11-15): the registered primary cell fails 4 of 5 rules; confirmation never opened |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-15 |
@@ -257,4 +257,20 @@ To put to the owner when this is started (step 3 of the workflow), not settled n
   throughout). Same entries, 21% stop, re-entry at cost ×1, costs and slippage; written to the engine as the
   ITM/OTM offset from the ATM at the entry minute (`run_level.py`). Exploratory, counted (family now 17), never a
   pass.
+- 2026-11-15 — **Result (fit window 2024-10-09 → 2026-10-08, 491 sessions, ₹23.6 an order, 0.5% slippage).** Primary cell
+  (10:00 range, hourly EMA 20/50, to 12:00): +₹24 a day, +₹46 a trade on 263 days, max drawdown ₹39,672. Rule: (i)
+  minus base Dir −₹53 [−262, +148] and minus the ungated break +₹114 [−36, +262]: **fail** (lower bounds below
+  zero); (ii) beat 69.8% of 2,000 placebo trends: **fail**; (iii) above zero and above base Dir in 0 of 4 blocks
+  (+218, +4, −12, −111 against +455, +101, +88, −331): **fail**; (iv) drawdown below base Dir's ₹63,987: pass.
+  **Killed.** Comparators: base Dir +₹77 a day (drawdown ₹63,987), ungated break −₹90 (₹71,339), two-leg Dir at
+  10:01 −₹18, counter-trend break −₹67, buying the aligned break −₹232 (23% win). The 11 sensitivity cells range
+  −₹58 to +₹49 a day, none above the base Dir; no cell passes. Slippage 0 / 1%: +₹67 / −₹58 a day. The 2022–24
+  confirmation and sessions after 2026-10-08 were **not opened**.
+- 2026-11-15 — **Extras (owner override above), all exploratory, none a pass.** Cut-off 12:00, trend-aligned,
+  ₹ a day (vs base Dir, 90% range): sell ATM +24 (−53 [−262, +148]); **buy ATM −232** (−310 [−544, −89]); **sell
+  ITM2 −31** (−108 [−346, +112], drawdown ₹78,778, beat 51% of placebo trends); **buy ITM2 −252** (−330 [−588, −83]);
+  **sell at the range-edge strike +28** (−49 [−257, +154]; the level's strike was the ATM in 574 of 660 breaks, ITM1
+  in 23, OTM1 in 63). Cut-off 14:00 the same order. Family counted: 17 variants. Descriptive leads (in-sample, not
+  tested): CE sold on down-trend days +₹107 a day (155 days) vs PE on up-trend days −₹42 (109); the widest third of
+  ranges +₹162 a trade vs −₹91 for the narrowest. Findings page `research/options/strategies/directional/trend-range-break.md`.
 
