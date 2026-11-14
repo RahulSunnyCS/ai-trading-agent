@@ -146,6 +146,32 @@ years**. Answers, and what they change (the draft above stays; this supersedes i
 - **Counted tests:** no rule-tester ledger (the tester does not support a per-leg range break); instead every
   cell run is listed in this item's Log with its count, and the grid above is the whole family (13 cells).
 
+
+### Phase 0 — Amendment 2 (2026-11-15, before the full run; the 12-day smoke run read no results)
+
+Declared so no choice is made after seeing numbers:
+
+- **Primary cell:** range 09:17 to 10:00, **hourly** EMA 20/50, break valid until **12:00**. The pass rule
+  (below, unchanged) is judged on this cell only. The other 11 cells (range end 09:45 / 10:30, daily EMA 20/50,
+  cut-off 14:00) are sensitivity rows: a lead in another cell alone is not a pass.
+- **Which break the trend takes:** the first break **in the trend's direction** (up-trend: the first bar whose high
+  is above the range high; down-trend: the first bar whose low is below the range low). Breaks against the trend are
+  ignored; one trade a day; no second trade after it, whichever way the market then moves. No-gate comparator
+  (C3): the first break either way, a same-bar double break skipped.
+- **Break bar and fill:** break bar = first bar after the range-end bar with high > range high (low < range low);
+  entry = the next minute's engine fill (the break bar's close), ATM from the index close of that bar.
+- **Placebo trend:** per day, up with probability = the share of up days in the fit window, down otherwise, 2,000
+  draws, seed 20261115; the candidate must beat 95% of draws' mean net per day.
+- **Bootstrap:** circular 5-day blocks, 2,000 resamples, seed 20261115, on the paired daily difference (candidate
+  minus comparator, no-trade days = 0), 90% interval = 5th to 95th percentile; "excludes zero" = 5th percentile > 0.
+- **"3 of 4 quarters" (pass rule iii)** is read literally: the fit days split into 4 equal consecutive blocks; the
+  candidate's mean net per day is above zero **and** above C1's in at least 3 of the 4.
+- **Per-day unit:** ₹ per strategy-day (one lot of the one-leg candidate; the base Dir is one lot of a two-leg
+  strategy, as everywhere in the rotation). A per-leg figure (base ÷ 2) is printed beside it, descriptive only.
+- **Buy variant (C5):** the same entry, buying the same-direction ATM with a 21% stop, no re-entry, reported only.
+- **Cost:** ₹23.6 an order, 0.5% slippage primary, 0% and 1% beside it. Sessions the engine cannot run are left
+  out of every series (listed in the result).
+
 ### Phase 1 — Trend state and the rule as code
 
 - **Tasks:** build the point-in-time trend state (hourly resample of index 1-minute bars, EMA 20/50, the
@@ -217,3 +243,4 @@ To put to the owner when this is started (step 3 of the workflow), not settled n
   the underlying confirmed in `legwise/schema.py`. Pre-registration drafted, nothing run; pending decisions
   stay here until the item is picked up.
 - 2026-11-15 — started: owner accepted all recommendations and asked for the last two years; Amendment 1 written and committed before any run; TODO row 3.11.30; Phase 1 (trend state, break finder, runner) begins.
+- 2026-11-15 — Amendment 2 written and committed before the full run (primary cell, which break the trend takes, placebo / bootstrap / quarter definitions). Runner `research/bl221/run.py` smoke-tested on 12 days (no results read); full fit-window run next.
