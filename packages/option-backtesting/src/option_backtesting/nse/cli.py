@@ -36,3 +36,27 @@ def fo_fetch(
     typer.echo(json.dumps(result, indent=2))
     if result["stopped"]:
         raise typer.Exit(2)
+
+
+@nse_app.command("fno-build")
+def fno_build() -> None:
+    """Rebuild the F&O stock list, spells, lot sizes and ban days from the stored files."""
+    from ..fyers.daily import data_dir
+    from .fno_universe import build
+
+    typer.echo(json.dumps(build(data_dir()), indent=2))
+
+
+@nse_app.command("fno-report")
+def fno_report(
+    full: bool = typer.Option(False, "--full", help="List every entry and exit."),
+) -> None:
+    """Stocks on the list per month, entries and exits, lot checks and ban days."""
+    from ..fyers.daily import data_dir
+    from .fno_universe import report
+
+    r = report(data_dir())
+    if not full:
+        r["entries"] = f"{len(r['entries'])} (--full lists them)"
+        r["exits"] = f"{len(r['exits'])} (--full lists them)"
+    typer.echo(json.dumps(r, indent=2, default=str))
