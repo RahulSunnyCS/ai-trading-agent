@@ -37,6 +37,19 @@ import numpy as np
 import pandas as pd
 
 CAPITAL = 1_000_000.0
+EMPTY = pd.DataFrame(
+    columns=[
+        "date",
+        "symbol",
+        "expiry",
+        "strike",
+        "option_type",
+        "close",
+        "settle",
+        "contracts",
+        "oi",
+    ]
+)
 LEARN_END = pd.Timestamp("2024-06-28")
 CONFIRM_START = pd.Timestamp("2024-07-01")
 MIN_SESSIONS_LEFT = 10
@@ -219,13 +232,13 @@ def run_book(
                             "no_spot", "no_exit_row", "iv_skipped"), 0)  # fmt: skip
     slip = SLIPPAGE[moneyness] * slip_mult
     for d0, d1 in zip(days[:-1], days[1:], strict=True):
-        rows0, rows1 = chains[d0], chains[d1]
+        rows0, rows1 = chains[d0], chains[d1]  # {symbol: that day's option rows}
         for sym in picks_by_day[d0]:
             spot = spots.at[d0, sym] if (sym in spots.columns and d0 in spots.index) else np.nan
             if spot != spot:
                 counts["no_spot"] += 1
                 continue
-            chain = Chain(rows0[rows0["symbol"] == sym], lots)
+            chain = Chain(rows0.get(sym, EMPTY), lots)
             expiry = chain.pick_expiry(sym, d0, all_sessions)
             if expiry is None:
                 counts["no_contract"] += 1
@@ -267,8 +280,8 @@ def run_book(
                 counts["too_dear"] += 1
                 continue
             n_lots = max(1, round(budget_per_stock / one_lot))
-            ex = rows1[(rows1["symbol"] == sym) & (rows1["expiry"] == expiry)
-                       & (rows1["option_type"] == right) & (rows1["strike"] == k)]  # fmt: skip
+            r1 = rows1.get(sym, EMPTY)
+            ex = r1[(r1["expiry"] == expiry) & (r1["option_type"] == right) & (r1["strike"] == k)]
             if ex.empty:
                 counts["no_exit_row"] += 1
                 p1, exit_traded = 0.0, False  # treated as worthless: the harshest reading
@@ -473,9 +486,9 @@ def load_inputs(sweep: Path, pick: str, all_sessions, extra_days=None, with_bott
     symbols = set().union(*[set(x) for s in sleeves for x in s.values()])
     symbols |= set().union(*[set(v) for v in bottom.values()]) if bottom else set()
     rows = option_rows(days, symbols)
-    chains = {d: g for d, g in rows.groupby("date")}
-    for d in days:
-        chains.setdefault(d, rows.iloc[0:0])
+    chains: dict = {d: {} for d in days}
+    for (d, sym), g in rows.groupby(["date", "symbol"]):
+        chains.setdefault(d, {})[sym] = g
     spots = spot_closes(days)
     return sleeves, n, bottom, days, rows, chains, spots
 

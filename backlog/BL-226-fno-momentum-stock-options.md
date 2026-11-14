@@ -240,3 +240,32 @@ Answered 2026-11-15 (Phase 0). As first asked:
   searched before (Phase 0 caveat). For Phase 3 a favourite's N is the stocks it holds per sleeve
   (categories × picks per category: 9, 8, 12 and 8 for the Mix's four members, 9 for both Trio sleeves),
   not its category count.
+- 2026-11-15 — Phase 2 confirmation (2024-07-05 → 2026-11-13, 124 weeks, after tax; Nifty 50 1.4 % a year): Mix
+  6.4 % a year (max DD −23 %), grid 12m top 10 weekly 5.4 % (−18 %), Trio 11.2 % (−22 %). No stock-layer
+  pass rule (Phase 2 only chooses the candidates); all three beat the index, far less than in learning.
+- 2026-11-15 — **Phase 3 learning read** (calls, 2020-01 → 2024-06, 235 weeks; ₹10 lakh book, P&L after costs,
+  slippage and 31.2 % tax on each financial year's net; the stock book after capital-gains tax). Options total
+  and drawdown are on the ₹10 lakh (the book does not compound; a drawdown below −100 % means losses beyond the
+  capital). Pass = options total > stock's, options drawdown ≥ 1.5 × stock's, 90 % interval of the weekly
+  difference above zero.
+
+  | Book | Moneyness | Options total | Options DD | Stock total | Stock DD | Weekly diff 90 % | Win rate | Premium a week | Pass |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Mix | ATM | +1190 % | -60 % | +265 % | -24 % | +0.86 to +8.60 % | 48 % | ₹7.0 lakh | no |
+  | Mix | OTM1 | +999 % | -84 % | +265 % | -24 % | -0.18 to +7.90 % | 46 % | ₹7.3 lakh | no |
+  | Mix | OTM2 | +653 % | -120 % | +265 % | -24 % | -1.34 to +6.33 % | 41 % | ₹7.2 lakh | no |
+  | Grid 12m top 10 | ATM | +931 % | -73 % | +229 % | -29 % | -0.73 to +7.54 % | 44 % | ₹8.4 lakh | no |
+  | Grid 12m top 10 | OTM1 | +773 % | -100 % | +229 % | -29 % | -2.01 to +7.41 % | 41 % | ₹8.9 lakh | no |
+  | Grid 12m top 10 | OTM2 | +511 % | -129 % | +229 % | -29 % | -2.89 to +6.02 % | 38 % | ₹8.6 lakh | no |
+  | Trio | ATM | +837 % | -49 % | +289 % | -35 % | +0.03 to +5.95 % | 47 % | ₹3.7 lakh | yes |
+  | Trio | OTM1 | +758 % | -78 % | +289 % | -35 % | -0.38 to +5.83 % | 44 % | ₹3.8 lakh | no |
+  | Trio | OTM2 | +611 % | -73 % | +289 % | -35 % | -0.77 to +4.92 % | 42 % | ₹3.8 lakh | no |
+
+  Variants (same table, not shown): double slippage cuts every book and fails all; the IV cap lowers
+  drawdowns a little (Mix ATM −60 → −54 %) and totals more, passing none. Only **Trio ATM** passes in
+  learning (+837 % against +289 %, −49 % against a −52 % limit, interval +0.03 to +5.95 % a week); Mix ATM
+  fails on drawdown alone (−60 % against −36 %). In every book the equivalent stock exposure (the calls'
+  delta in shares) earned more before tax than the calls (e.g. Mix ATM ₹1.95 crore against ₹1.73 crore): the
+  gain is leverage, not convexity. Skips: strikes under 10 lots of OI (Mix 3,575 of ~9,800 attempts), the
+  favourites' Gold, Silver, Nasdaq 100, Hang Seng and idle-cash holdings (no stock options; their budget is
+  left unspent, the stock comparator keeps them), one lot dearer than twice the budget (Mix 1,287).
