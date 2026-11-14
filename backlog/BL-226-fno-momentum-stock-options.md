@@ -266,6 +266,6 @@ Answered 2026-11-15 (Phase 0). As first asked:
   learning (+837 % against +289 %, −49 % against a −52 % limit, interval +0.03 to +5.95 % a week); Mix ATM
   fails on drawdown alone (−60 % against −36 %). In every book the equivalent stock exposure (the calls'
   delta in shares) earned more before tax than the calls (e.g. Mix ATM ₹1.95 crore against ₹1.73 crore): the
-  gain is leverage, not convexity. Skips: strikes under 10 lots of OI (Mix 3,575 of ~9,800 attempts), the
+  gain is leverage, not convexity. Skips: strikes under 10 lots of OI (Mix 3,575 of 9,318 stock attempts), the
   favourites' Gold, Silver, Nasdaq 100, Hang Seng and idle-cash holdings (no stock options; their budget is
   left unspent, the stock comparator keeps them), one lot dearer than twice the budget (Mix 1,287).
