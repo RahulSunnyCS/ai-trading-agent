@@ -49,7 +49,7 @@ index, stating for Fridays against the other days:
   a Friday was 6 / 4 calendar days from them) and **Sep 2025 – Nov 2026** (NIFTY Tuesday, SENSEX Thursday:
   4 / 6 days). Owner, 2026-11-12: **expiry Fridays are left out of every table.** Every Friday from
   2024-10-11 to 2025-01-03 was a SENSEX expiry day (11 Fridays; 2024-10-25's label reads `unknown`), so that
-  stretch (2024-10-09 → 2025-01-09, 59 sessions) is left out whole; no Friday after it was an expiry day.
+  stretch (2024-10-09 → 2025-01-03, 59 sessions) is left out whole; no Friday after it was an expiry day.
 
 ## Out of scope
 
@@ -105,7 +105,7 @@ Descriptive only: no pass / kill rule, no verdict that changes a setting.
 Run: `research/bl221/replay.py` (every Core-298 and T1-extra strategy on every stored weekday session
 2024-10-09 → 2026-11-12, 0.5 % slippage, 402 s; 2026-11-06 left out whole: 405 of 521 not reproduced, its
 data changed after it was stored; no other day had a mismatch) and `research/bl221/analyse.py` (tables in
-`out/summary.md`, git-ignored). The stretch 2024-10-09 → 2025-01-09 is left out: its Fridays were SENSEX
+`out/summary.md`, git-ignored). The stretch 2024-10-09 → 2025-01-03 is left out: its Fridays were SENSEX
 expiry days. What remains: Jan 2025 → Nov 2026, 87 Fridays and 361 other sessions, 233,408 strategy-days.
 Means are per strategy-day at one lot, averaged within each session first, ± one standard error over
 sessions; before brokerage unless said. Descriptive: no test, no rule.
@@ -207,7 +207,7 @@ Answered 2026-11-12 (owner, at "start working on BL221"):
 - 2026-11-12 — Phases 1-3 done: full replay (508 days, 264,147 strategy-days, 2026-11-06 left out whole),
   findings above, research weekday pages updated. Closed.
 - 2026-11-12 — owner: "remove all the expiry Fridays … don't say R-a, R-b". The stretch 2024-10-09 →
-  2025-01-09 (every Friday a SENSEX expiry day) is left out of every table; periods are named by their
+  2025-01-03 (every Friday a SENSEX expiry day) is left out of every table; periods are named by their
   dates (`analyse.py` updated; the replay is unchanged). The findings above are rewritten on what remains;
   no number from Jan 2025 on changed.
 - 2026-11-12 — owner: "split friday by VIX". Finding 8 added (descriptive): the SENSEX Dirs' Friday shortfall
