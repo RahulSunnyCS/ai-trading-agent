@@ -179,3 +179,5 @@ Answered 2026-11-15 (Phase 0). As first asked:
   2026-11-13 (browser User-Agent, nseindia.com Referer). Broad's engine takes its universe as members by
   **year** (`broad.py`, `members_by_year`); the F&O list changes within a year, so Phase 2 needs membership by
   rebalance date (or by month) for the `fno` universe, not a yearly set.
+- 2026-11-15 — owner, before an overnight run: on finishing, push the branch and open a PR with a code
+  review (not merged); Phase 5 (the forward journal) is left for the owner's read, not built.
