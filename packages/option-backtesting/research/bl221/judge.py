@@ -60,8 +60,40 @@ def series(rname, kind_trend, cut, slip=SLIP, mode="gate", trade_kind="sell", rn
         r = side_trade(row, rname, side, cut, slip, trade_kind)
         if r is None:
             continue
-        net[i], traded[i], sides[i] = r["net"], True, side
+        net[i], traded[i], sides[i] = r["net"], bool(r["traded"]), side
     return net, traded, sides
+
+
+EXTRA_PATH = HERE / "out" / "table_itm2.json"
+LEVEL_PATH = HERE / "out" / "table_level.json"
+
+
+def extra_series(kind, cut, mode="gate", slip=SLIP, trend_kind="hourly", rname="10:00", path=EXTRA_PATH):
+    """ITM2 extras (exploratory, owner override): kind sell|buy over the primary range's breaks."""
+    ex = json.loads(path.read_text())
+    net = np.zeros(N)
+    traded = np.zeros(N, bool)
+    for i, d in enumerate(DAYS):
+        row = T[d]
+        if mode == "nogate":
+            tu, td = row["breaks"][rname]["up"], row["breaks"][rname]["down"]
+            cands = sorted((t, s) for s, t in (("up", tu), ("down", td)) if t is not None and t <= CUTOFFS[cut])
+            if not cands or (len(cands) == 2 and cands[0][0] == cands[1][0]):
+                continue
+            side = cands[0][1]
+        else:
+            tr = row["trend"][trend_kind]
+            if tr == 0:
+                continue
+            side = "up" if tr > 0 else "down"
+        t = row["breaks"][rname][side]
+        if t is None or t > CUTOFFS[cut]:
+            continue
+        r = ex.get(d, {}).get(f"{rname}|{side}", {}).get(kind, {}).get(slip)
+        if r is None:
+            continue
+        net[i], traded[i] = r["net"], bool(r["traded"])
+    return net, traded
 
 
 def comp(name, slip=SLIP):
@@ -186,6 +218,57 @@ def main():
     for kx, v in rule.items():
         print(f"  {kx}: {'PASS' if v else 'FAIL'}")
     print("VERDICT:", "ADVANCE to confirmation" if all(rule.values()) else "KILLED (no candidate)")
+    if EXTRA_PATH.exists():
+        print("\nEXTRAS (owner override, exploratory; primary range 10:00; 0.5% slippage; never a pass):")
+        c1s = stats(base)
+        for cut in ("12:00", "14:00"):
+            rows_ = {
+                "sell ATM (registered)": (series(r, k, cut)[0], series(r, k, cut)[1]),
+                "buy ATM": series(r, k, cut, trade_kind="buy")[:2],
+                "sell ITM2": extra_series("sell", cut),
+                "buy ITM2": extra_series("buy", cut),
+                **({"sell at range-edge strike": extra_series("sell", cut, path=LEVEL_PATH)} if LEVEL_PATH.exists() else {}),
+            }
+            nogate = {
+                "sell ATM": series(r, k, cut, mode="nogate")[:2],
+                "buy ATM": series(r, k, cut, mode="nogate", trade_kind="buy")[:2],
+                "sell ITM2": extra_series("sell", cut, "nogate"),
+                "buy ITM2": extra_series("buy", cut, "nogate"),
+                **({"sell at range-edge strike": extra_series("sell", cut, "nogate", path=LEVEL_PATH)} if LEVEL_PATH.exists() else {}),
+            }
+            print(f"  cut-off {cut}: trend-aligned | no-gate  (₹/day, ₹/trade, days, win%, maxDD, worst day; "
+                  "vs C1 mean [5%,95%])")
+            for nm, (nn, tt) in rows_.items():
+                g = nogate[nm.replace(" (registered)", "")]
+                a, b = stats(nn, tt), stats(g[0], g[1])
+                lo, hi = boot_lb(nn - base)
+                print(f"    {nm:22} {a['mean_day']:>6.0f} {a['per_trade']:>6.0f} {a['trades_days']:>4} {a['win_rate'] * 100:>3.0f}% "
+                      f"{a['max_dd']:>7.0f} {a['worst_day']:>7.0f} vs C1 {np.mean(nn - base):>6.0f} [{lo:>6.0f},{hi:>6.0f}]"
+                      f" | no-gate {b['mean_day']:>6.0f} {b['per_trade']:>6.0f} {b['trades_days']:>4} {b['max_dd']:>7.0f}")
+        for kind in ("sell", "buy"):
+            for sl in ("0.0", "1.0"):
+                nn, _ = extra_series(kind, "12:00", slip=sl)
+                print(f"  ITM2 {kind} (cut 12:00) slippage {sl}%: ₹/day {nn.mean():.0f}")
+        # placebo for the ITM2 buy and sell, same draws as the registered one
+        for kind in ("sell", "buy"):
+            ex = json.loads(EXTRA_PATH.read_text())
+            real = extra_series(kind, "12:00")[0].mean()
+            rng2 = np.random.default_rng(SEED)
+            vals = []
+            for _ in range(DRAWS):
+                tot = 0.0
+                for d in DAYS:
+                    tr = T[d]["trend"][k]
+                    if tr == 0:
+                        continue
+                    side = "up" if rng2.random() < p_up else "down"
+                    t = T[d]["breaks"][r][side]
+                    if t is None or t > CUTOFFS["12:00"]:
+                        continue
+                    x = ex.get(d, {}).get(f"{r}|{side}", {}).get(kind, {}).get(SLIP)
+                    tot += x["net"] if x else 0.0
+                vals.append(tot / N)
+            print(f"  ITM2 {kind} placebo trend: candidate beats {(np.array(vals) < real).mean() * 100:.1f}% of draws")
     result["rule"] = rule
     result["placebo_pct"] = pct
     result["blocks"] = bl

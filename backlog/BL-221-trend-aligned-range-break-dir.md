@@ -251,4 +251,10 @@ To put to the owner when this is started (step 3 of the workflow), not settled n
   entries, costs and slippage, trend-aligned and no-gate. They add 3 counted variants to the family (now 16) and
   are **never a pass**: the registered rule and primary cell are unchanged, and a lead in an extra is a new
   hypothesis that needs its own pre-registration and the 2022–24 confirmation. Script `research/bl221/run_itm2.py`.
+- 2026-11-15 — `override: owner asked in chat, "after 10 ... the highest point is 24,500, then the 24,500 PE should be sold ... whichever the higher or lower point"` — a fourth extra (d): **sell the strike at the range edge**
+  instead of the ATM at the break (up-break: the PE at the range high rounded to the nearest strike; down-break:
+  the CE at the range low's strike; the owner wrote CE once and then "24,500 PE", read as the opposite option
+  throughout). Same entries, 21% stop, re-entry at cost ×1, costs and slippage; written to the engine as the
+  ITM/OTM offset from the ATM at the entry minute (`run_level.py`). Exploratory, counted (family now 17), never a
+  pass.
 
