@@ -90,6 +90,24 @@ This block is the pre-registration; it is committed before any run and never edi
   look-back or N.
 - **Will not run:** strike, expiry or stop rules invented after the learning read; more than the grid above
   and the two Phase 3 variants; the confirmation period before the learning read is written here.
+- **How the rules map onto the engine (written 2026-11-15 before any Phase 2 or 3 run; reading, not
+  change):** Phase 2 runs Broad with `broad_universe="fno"` (the stock universe gated week by week by the F&O
+  list; `categories/fno.py`). Grid cells: category layer off, the default `ranksum` score with equal
+  weights over Broad's horizons up to the look-back ((1, 4, 13), (1, 4, 13, 26), (1, 4, 13, 26, 52)
+  weeks), top N held with an exit rank of 2N, weekly = every Friday, monthly = Broad's `monthly`
+  cadence (the weekly grid has no expiry-day rebalance); realism from the invested favourite (signal
+  delay 1, Friday close, itemised costs, 15 bps slippage, circuits respected, liquidity gate on), ₹10 lakh
+  and no share-price cap; capital-gains tax on (`tax.TaxRules()` defaults). Favourite groups: every
+  member's saved settings unchanged except the universe and the window, sleeves blended at equal
+  capital. Phase 3 trades the candidate's weekly holdings (each sleeve with its share of the budget);
+  the rebalance day is the last F&O session of the Momentum week; ATM = the listed strike nearest
+  the stock's unadjusted cash close. Variant "skip a results week": **not run**, the repo holds no
+  results calendar (logged). Variant "IV cap": the stock's ATM call IV (Black-Scholes, 6.5 %) at
+  or above the 80th percentile of its previous 52 rebalance-day readings (26 needed). Phase 4's
+  bottom N: the N worst-ranked eligible stocks in the candidate's own ranking; NIFTY's 200-day
+  average from the lake's NIFTY index closes; each form scored against the Phase 3 book of the
+  same candidate and moneyness with Phase 3's pass rule. Code: `obt nse ...`,
+  `scripts/bl226_fno_sweep.py`, `scripts/bl226_options_book.py` (momentum-backtesting).
 
 ### Phase 1 — F&O history (data)
 - **Tasks:** fetch the daily F&O bhavcopy from NSE's archive, 2019-01 → today (about 1,750 files, both

@@ -71,18 +71,21 @@ def lots(con: duckdb.DuckDBPyConnection, root: Path) -> pa.Table:
                      lot_size, source_format
               FROM read_parquet('{_glob(root)}')
               WHERE instrument IN ('FUTSTK', 'OPTSTK')),
-            g AS (
+            g0 AS (
               SELECT date, symbol, expiry,
                      any_value(source_format) AS source_format,
                      max(lot_size) AS stated,
                      min(lot_size) AS stated_min,
-                     list_reduce(
-                       list_filter(list(abs(oi)) || list(abs(chg_oi)),
-                                   x -> x IS NOT NULL AND x > 0),
-                       (a, b) -> gcd(a, b)) AS derived,
+                     list_filter(list(abs(oi)) || list(abs(chg_oi)),
+                                 x -> x IS NOT NULL AND x > 0) AS pos,
                      max(CASE WHEN instrument = 'FUTSTK' AND contracts > 0
                               THEN value_rs / contracts / close END) AS value_estimate
-              FROM r GROUP BY date, symbol, expiry)
+              FROM r GROUP BY date, symbol, expiry),
+            g AS (
+              SELECT * EXCLUDE (pos),
+                     CASE WHEN len(pos) = 0 THEN NULL
+                          ELSE list_reduce(pos, (a, b) -> gcd(a, b)) END AS derived
+              FROM g0)
            SELECT date, symbol, expiry, source_format,
                   coalesce(stated, derived) AS lot_size,
                   stated, stated_min, derived, value_estimate,

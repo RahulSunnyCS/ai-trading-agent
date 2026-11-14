@@ -79,7 +79,7 @@ FILLS = {
 #: arm's universe (BL-176 searches the point-in-time `turnover_rank` list directly; earlier rounds
 #: searched today's list and were re-scored point in time afterwards, `pit_rerun.py`).
 SPACE_KEYS = {"universe_kind"}
-UNIVERSE_KINDS = ("total_market", "all_liquid", "turnover_rank")
+UNIVERSE_KINDS = ("total_market", "all_liquid", "turnover_rank", "fno")
 ARMS = {
     "A": ("total_market", "on"),
     "B": ("total_market", "off"),
