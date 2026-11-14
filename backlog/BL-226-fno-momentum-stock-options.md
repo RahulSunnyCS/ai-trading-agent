@@ -199,3 +199,20 @@ Answered 2026-11-15 (Phase 0). As first asked:
   rebalance date (or by month) for the `fno` universe, not a yearly set.
 - 2026-11-15 — owner, before an overnight run: on finishing, push the branch and open a PR with a code
   review (not merged); Phase 5 (the forward journal) is left for the owner's read, not built.
+- 2026-11-15 — **Phase 1 done.** `obt nse fo-fetch` stored every session 2019-01-01 → 2026-11-13: 1,942 days
+  (1,740 + the 2026-11-13 test day + a few weekend sessions; 99 weekdays with no file = holidays), 1.1 GB
+  in the lake (`lake/eod/fo_bhavcopy/`) and 1.4 GB raw; ban lists for 1,724 days (16 sessions have no
+  ban file in NSE's archive; treated as unbanned). `obt nse fno-build`: 355 symbols on the list at some
+  time, 356,682 member-days, 185 entries and 167 exits; about 200 stocks in 2019, ~140 after the
+  2019-20 cuts, 180–200 in 2022-24, 227 after the 45 added on 2024-11-29, ~210 now. Checked against
+  NSE's announcements on three batches: the 45 stocks added on 29 Nov 2024 (ZOMATO, JIOFIN, DMART, LICI,
+  PAYTM, … all 45 present that day), the 16 excluded after the Feb 2025 expiry (ABBOTINDIA, ATUL,
+  BATAINDIA, CANFINHOME, COROMANDEL, CUB, GNFC, GUJGASLTD, INDIAMART, IPCALAB, LALPATHLAB, METROPOLIS,
+  NAVINFLUOR, PVRINOX, SUNTV, UBL — last day 2025-02-27) and the June 2019 cut (34 last seen 2019-06-27);
+  renames show as an exit and an entry (LTIM → LTM, ICICIPRULI → ICICILIFE), and every F&O symbol but
+  ICICILIFE (renamed 2026-10) is a stock instrument of its own, so the weekly gate follows each name.
+  **Lot sizes:** the old format's lot is derived (OI gcd, then the divisor matching the futures' value
+  per contract within 5 %, else the contract-life gcd); on the 359,080 UDiFF contract-days where NSE
+  states it, 355,881 are equal (99.1 %), none a multiple, 919 a divisor, 2,280 had no OI. This replaces
+  the 20-sample circular check planned for lots (it is a check on every stated day). Old-format days:
+  648,250 agree with the value estimate, 1,982 differ, 51,613 unchecked (no futures trade).
