@@ -146,3 +146,14 @@ def test_the_api_runs_as_a_job_and_refuses_calls_without_a_strategy():
     assert "Pick a strategy" in state["error"]
     assert client.post("/api/options-overlay/jobs", json={"moneyness": "ITM1"}).status_code == 422
     assert client.get("/api/options-overlay/jobs/nope").status_code == 404
+
+
+def test_two_sleeves_buying_one_contract_are_one_position():
+    row = {"entry": D0, "exit": D1, "symbol": "ABC", "right": "CE", "leg": "calls",
+           "expiry": NEXT, "strike": 100.0, "lot": 100, "lots": 1, "p0": 8.0, "p1": 12.0,
+           "exit_how": "same", "buy": 800.0, "sell": 1200.0, "costs": 50.0, "pnl": 350.0}  # fmt: skip
+    other = {**row, "symbol": "XYZ"}
+    merged = ov.merge_positions(pd.DataFrame([row, row, other]))
+    assert len(merged) == 2
+    abc = merged[merged["symbol"] == "ABC"].iloc[0]
+    assert abc["lots"] == 2 and abc["pnl"] == 700.0 and abc["p0"] == 8.0

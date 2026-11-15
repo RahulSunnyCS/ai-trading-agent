@@ -114,9 +114,12 @@ SETTING_FIELDS = tuple(ov.Settings.__dataclass_fields__)
 def run_request(body: dict[str, Any]) -> dict[str, Any]:
     settings = ov.Settings(**{k: body[k] for k in SETTING_FIELDS if k in body})
     settings.validate()
-    fid = body.get("favourite_id")
-    if settings.direction in ("calls", "switch", "both") and not fid:
+    # puts and the mirror pool read no strategy: compared with NIFTY, not some favourite's shares
+    uses_strategy = settings.direction in ("calls", "switch", "both")
+    fid = body.get("favourite_id") if uses_strategy else None
+    if uses_strategy and not fid:
         raise ValueError("Pick a strategy: calls are bought on its holdings.")
+    body = {**body, "favourite_id": fid}
     key = json.dumps({**body, "_lake": ov.LAKE.newest}, sort_keys=True, default=str)
     with _CACHE_LOCK:
         if key in _CACHE:

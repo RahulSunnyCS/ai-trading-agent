@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked for it as a tool of its own (2026-11-15); the options and momentum workbench is the next 2–3 months' goal; nothing live depends on it |
-| **Status** | In progress |
+| **Status** | In progress (Phases 1-3 built; Phase 4 open) |
 | **Type** | feature |
 | **Area** | momentum / options / dashboard |
 | **Created** | 2026-11-15 |
@@ -129,3 +129,12 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
   The put modes stay in the plan as descriptive settings; the page should show that result beside them.
 - 2026-11-15 — started (owner: "create the UI for this to test"); questions answered (above). Built on PR #450
   and #451's branches; the mirror pool added as a direction mode.
+- 2026-11-15 — Phases 1-3 built (`options_overlay.py`, `overlay_runs.py`, the job API, Momentum › Options
+  overlay and its Guide page). Parity: BL-228's N5 ATM puts book reproduced exactly (614 trades,
+  −₹11,51,443 before tax, learning window); the mirror pool differs by two contracts re-struck by bonuses
+  (BEL Sep 2022, PFC Sep 2023), now followed instead of booked at zero (+₹2.06 lakh); BL-226's Trio ATM
+  calls (premium sizing) 1,779 trades +₹1,29,47,277 against 1,789 +₹1,29,04,944 (bans now skipped, three
+  re-strikes followed). Two other vanished contracts (PFC Jun 2023, RECLTD Jul 2023: same lot, strike gone,
+  likely a dividend adjustment) are still booked at zero and counted. A week's same contract bought by two
+  sleeves is one position (lots added). Phase 4 (daily data refresh) not started: the F&O lake ends
+  2026-11-13 until `obt nse fo-fetch` is run again.

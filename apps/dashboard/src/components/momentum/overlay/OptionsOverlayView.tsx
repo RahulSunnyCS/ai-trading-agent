@@ -609,36 +609,58 @@ function OverlayResultView({
         <Widget title="Capital it needed" meta="One lot of every pick each week">
           <Table>
             <THead>
-              <tr>
-                <Th>Measure</Th>
-                <Th align="right">Median</Th>
-                <Th align="right">90th pct</Th>
-                <Th align="right">Largest</Th>
-              </tr>
+              <Th dense>Measure</Th>
+              <Th align="right" dense>
+                Median
+              </Th>
+              <Th align="right" dense>
+                90th pct
+              </Th>
+              <Th align="right" dense>
+                Largest
+              </Th>
             </THead>
             <tbody>
               {mc.weekly_premium ? (
                 <TRow>
-                  <Td>Premium a week</Td>
-                  <Td numeric>{formatInr(mc.weekly_premium.median)}</Td>
-                  <Td numeric>{formatInr(mc.weekly_premium.p90)}</Td>
-                  <Td numeric>{formatInr(mc.weekly_premium.max)}</Td>
+                  <Td dense>Premium a week</Td>
+                  <Td numeric align="right" dense>
+                    {formatInr(mc.weekly_premium.median)}
+                  </Td>
+                  <Td numeric align="right" dense>
+                    {formatInr(mc.weekly_premium.p90)}
+                  </Td>
+                  <Td numeric align="right" dense>
+                    {formatInr(mc.weekly_premium.max)}
+                  </Td>
                 </TRow>
               ) : null}
               {mc.one_lot ? (
                 <TRow>
-                  <Td>One lot of one stock</Td>
-                  <Td numeric>{formatInr(mc.one_lot.median)}</Td>
-                  <Td numeric>{formatInr(mc.one_lot.p90)}</Td>
-                  <Td numeric>{formatInr(mc.one_lot.max)}</Td>
+                  <Td dense>One lot of one stock</Td>
+                  <Td numeric align="right" dense>
+                    {formatInr(mc.one_lot.median)}
+                  </Td>
+                  <Td numeric align="right" dense>
+                    {formatInr(mc.one_lot.p90)}
+                  </Td>
+                  <Td numeric align="right" dense>
+                    {formatInr(mc.one_lot.max)}
+                  </Td>
                 </TRow>
               ) : null}
               {mc.positions_per_week ? (
                 <TRow>
-                  <Td>Positions a week</Td>
-                  <Td numeric>{formatInt(mc.positions_per_week.median)}</Td>
-                  <Td numeric>{EMPTY}</Td>
-                  <Td numeric>{formatInt(mc.positions_per_week.max)}</Td>
+                  <Td dense>Positions a week</Td>
+                  <Td numeric align="right" dense>
+                    {formatInt(mc.positions_per_week.median)}
+                  </Td>
+                  <Td numeric align="right" dense>
+                    {EMPTY}
+                  </Td>
+                  <Td numeric align="right" dense>
+                    {formatInt(mc.positions_per_week.max)}
+                  </Td>
                 </TRow>
               ) : null}
             </tbody>
@@ -716,36 +738,58 @@ function OverlayResultView({
         <Widget title="By year" meta="Options P&L by the year a trade closed" wide>
           <Table>
             <THead>
-              <tr>
-                <Th>Year</Th>
-                <Th align="right">Trades</Th>
-                <Th align="right">Won</Th>
-                <Th align="right">Calls</Th>
-                <Th align="right">Puts</Th>
-                <Th align="right">Before tax</Th>
-                <Th align="right">After tax</Th>
-                {shares ? <Th align="right">Shares</Th> : null}
-              </tr>
+              <Th dense>Year</Th>
+              <Th align="right" dense>
+                Trades
+              </Th>
+              <Th align="right" dense>
+                Won
+              </Th>
+              <Th align="right" dense>
+                Calls
+              </Th>
+              <Th align="right" dense>
+                Puts
+              </Th>
+              <Th align="right" dense>
+                Before tax
+              </Th>
+              <Th align="right" dense>
+                After tax
+              </Th>
+              {shares ? (
+                <Th align="right" dense>
+                  Shares
+                </Th>
+              ) : null}
             </THead>
             <tbody>
               {result.by_year.map((y) => (
                 <TRow key={y.year}>
-                  <Td>{y.year}</Td>
-                  <Td numeric>{formatInt(y.trades)}</Td>
-                  <Td numeric>{formatPct(y.win_rate, 0)}</Td>
-                  <Td numeric>
+                  <Td dense>{y.year}</Td>
+                  <Td numeric align="right" dense>
+                    {formatInt(y.trades)}
+                  </Td>
+                  <Td numeric align="right" dense>
+                    {formatPct(y.win_rate, 0)}
+                  </Td>
+                  <Td numeric align="right" dense>
                     <Money value={y.calls_rs} />
                   </Td>
-                  <Td numeric>
+                  <Td numeric align="right" dense>
                     <Money value={y.puts_rs} />
                   </Td>
-                  <Td numeric>
+                  <Td numeric align="right" dense>
                     <Money value={y.before_tax_rs} />
                   </Td>
-                  <Td numeric>
+                  <Td numeric align="right" dense>
                     <Money value={y.after_tax_rs} />
                   </Td>
-                  {shares ? <Td numeric>{formatPct(y.shares_return, 0, { sign: true })}</Td> : null}
+                  {shares ? (
+                    <Td numeric align="right" dense>
+                      {formatPct(y.shares_return, 0, { sign: true })}
+                    </Td>
+                  ) : null}
                 </TRow>
               ))}
             </tbody>
@@ -799,28 +843,48 @@ function ByStock({ rows }: { rows: OverlayResult['by_stock'] }) {
     >
       <Table {...(all ? { maxHeight: 480 } : {})}>
         <THead>
-          <tr>
-            <Th>Stock</Th>
-            <Th align="right">Trades</Th>
-            <Th align="right">Won</Th>
-            <Th align="right">Net</Th>
-            <Th align="right">Best</Th>
-            <Th align="right">Worst</Th>
-            <Th align="right">Premium paid</Th>
-          </tr>
+          <Th dense>Stock</Th>
+          <Th align="right" dense>
+            Trades
+          </Th>
+          <Th align="right" dense>
+            Won
+          </Th>
+          <Th align="right" dense>
+            Net
+          </Th>
+          <Th align="right" dense>
+            Best
+          </Th>
+          <Th align="right" dense>
+            Worst
+          </Th>
+          <Th align="right" dense>
+            Premium paid
+          </Th>
         </THead>
         <tbody>
           {shown.map((r) => (
             <TRow key={r.symbol}>
-              <Td>{r.symbol}</Td>
-              <Td numeric>{formatInt(r.trades)}</Td>
-              <Td numeric>{formatPct(r.win_rate, 0)}</Td>
-              <Td numeric>
+              <Td dense>{r.symbol}</Td>
+              <Td numeric align="right" dense>
+                {formatInt(r.trades)}
+              </Td>
+              <Td numeric align="right" dense>
+                {formatPct(r.win_rate, 0)}
+              </Td>
+              <Td numeric align="right" dense>
                 <Money value={r.net_rs} />
               </Td>
-              <Td numeric>{formatInr(r.best_rs, { compact: true })}</Td>
-              <Td numeric>{formatInr(r.worst_rs, { compact: true })}</Td>
-              <Td numeric>{formatInr(r.premium_rs, { compact: true })}</Td>
+              <Td numeric align="right" dense>
+                {formatInr(r.best_rs, { compact: true })}
+              </Td>
+              <Td numeric align="right" dense>
+                {formatInr(r.worst_rs, { compact: true })}
+              </Td>
+              <Td numeric align="right" dense>
+                {formatInr(r.premium_rs, { compact: true })}
+              </Td>
             </TRow>
           ))}
         </tbody>
@@ -836,17 +900,23 @@ function ByStock({ rows }: { rows: OverlayResult['by_stock'] }) {
 
 function tradeRow(t: OverlayTrade, i: number) {
   return (
-    <TRow key={`${t.entry}-${t.symbol}-${t.right}-${i}`}>
-      <Td>{formatDay(t.entry)}</Td>
-      <Td>{t.symbol}</Td>
-      <Td>{`${t.strike} ${t.right}`}</Td>
-      <Td numeric>{formatDay(t.expiry)}</Td>
-      <Td numeric>{formatInt(t.lots * t.lot)}</Td>
+    <TRow key={`${t.entry}-${t.symbol}-${t.right}-${i}`} className="whitespace-nowrap">
+      <Td dense>{formatDay(t.entry)}</Td>
+      <Td dense>{t.symbol}</Td>
+      <Td dense>{`${t.strike} ${t.right}`}</Td>
+      <Td numeric align="right" dense>
+        {formatDay(t.expiry)}
+      </Td>
+      <Td numeric align="right" dense>
+        {formatInt(t.lots * t.lot)}
+      </Td>
       <Td
         numeric
       >{`${formatNumber(t.p0, 2)} → ${formatNumber(t.p1, 2)}${t.exit_how === 'restruck' ? ' *' : t.exit_how === 'zero' ? ' †' : ''}`}</Td>
-      <Td numeric>{formatInr(t.buy, { compact: true })}</Td>
-      <Td numeric>
+      <Td numeric align="right" dense>
+        {formatInr(t.buy, { compact: true })}
+      </Td>
+      <Td numeric align="right" dense>
         <Money value={t.pnl} />
       </Td>
     </TRow>
@@ -856,23 +926,31 @@ function tradeRow(t: OverlayTrade, i: number) {
 function TradeHead() {
   return (
     <THead>
-      <tr>
-        <Th>Entry</Th>
-        <Th>Stock</Th>
-        <Th>Contract</Th>
-        <Th align="right">Expiry</Th>
-        <Th align="right">Qty</Th>
-        <Th align="right">Price in → out</Th>
-        <Th align="right">Paid</Th>
-        <Th align="right">P&amp;L</Th>
-      </tr>
+      <Th dense>Entry</Th>
+      <Th dense>Stock</Th>
+      <Th dense>Contract</Th>
+      <Th align="right" dense>
+        Expiry
+      </Th>
+      <Th align="right" dense>
+        Qty
+      </Th>
+      <Th align="right" dense>
+        Price in → out
+      </Th>
+      <Th align="right" dense>
+        Paid
+      </Th>
+      <Th align="right" dense>
+        P&amp;L
+      </Th>
     </THead>
   );
 }
 
 function TradeList({ title, trades }: { title: string; trades: OverlayTrade[] }) {
   return (
-    <Widget title={title} meta="After costs and slippage, before tax">
+    <Widget title={title} meta="After costs and slippage, before tax" wide>
       <Table>
         <TradeHead />
         <tbody>{trades.map(tradeRow)}</tbody>

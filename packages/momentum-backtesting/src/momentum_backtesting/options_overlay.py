@@ -586,6 +586,18 @@ def _exit_price(rows, expiry, right, k, lot, d1, sym, lots):
     return float(p1), traded, lot, how
 
 
+def merge_positions(t: pd.DataFrame) -> pd.DataFrame:
+    """One row per contract a week: sleeves (or both sides) that bought the same contract on the
+    same day are one position, their lots, money and costs added up."""
+    if not len(t):
+        return t
+    keys = ["entry", "exit", "symbol", "right", "expiry", "strike"]
+    summed = ["lots", "buy", "sell", "costs", "pnl"]
+    first = [c for c in t.columns if c not in keys + summed]
+    agg = {**{c: "sum" for c in summed}, **{c: "first" for c in first}}
+    return t.groupby(keys, as_index=False, sort=False).agg(agg)[list(t.columns)]
+
+
 def fy(d: pd.Timestamp) -> int:
     return d.year if d.month >= 4 else d.year - 1
 
@@ -775,19 +787,21 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
     trades: list[dict] = []
     for leg in legs:
         trades += run_leg(leg, s, days, chains, spots, lots, bans, sessions, counts)
-    tdf = pd.DataFrame(trades)
+    tdf = merge_positions(pd.DataFrame(trades))
     # one lot of everything, for the minimum-capital table (the same picks at one lot each)
     if s.sizing == "one_lot":
         one = tdf
     else:
         c2 = BookCounts()
         one_legs = [Leg(picks=leg.picks, right=leg.right, tag=leg.tag) for leg in legs]
-        one = pd.DataFrame(
-            [
-                t
-                for leg in one_legs
-                for t in run_leg(leg, s, days, chains, spots, lots, bans, sessions, c2)
-            ]
+        one = merge_positions(
+            pd.DataFrame(
+                [
+                    t
+                    for leg in one_legs
+                    for t in run_leg(leg, s, days, chains, spots, lots, bans, sessions, c2)
+                ]
+            )
         )
     return summarise(s, inputs, tdf, one, days, counts, down)
 
