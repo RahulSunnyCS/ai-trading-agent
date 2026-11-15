@@ -307,3 +307,11 @@ Answered 2026-11-15 (Phase 0). As first asked:
   | Trio | OTM2 | -49 % | -171 % | +27 % | -28 % | -2.79 to +0.55 % | 34 % | no |
 
   Double slippage and the IV cap fail too. Phase 4 not run (its gate). Item closed; Result above.
+- 2026-11-15 — PR #450 review (10 findings). Fixed: the live preview, signal and order paths now refuse
+  `broad_universe="fno"` with its own reason (`LIVE_REFUSED_BROAD_UNIVERSES`); a ban list NSE does not have
+  is recorded in the manifest and not asked again; the manifest is saved every 50 days actually fetched.
+  Left in the research scripts, which are this item's registered record (changing them would make it no
+  longer reproduce): contracts re-struck by a corporate action booked at zero, the NaN-premium guard, the
+  trade across the learning / confirmation cut, the bottom-N filter, the look-back labels in the
+  distinctness check, the slow CDF and the script's location. All are tasks of BL-227 Phase 1, where the
+  engine moves into the package.

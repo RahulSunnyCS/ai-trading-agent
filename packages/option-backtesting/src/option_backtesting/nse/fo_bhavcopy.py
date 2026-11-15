@@ -49,7 +49,7 @@ UDIFF_CUTOVER = date(2024, 7, 8)
 FRESH_DAYS = 5
 _MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
 _MONTH_NUM = {m: i + 1 for i, m in enumerate(_MONTHS)}
-_MANIFEST_COLUMNS = ("date", "status", "format", "file", "bytes")
+_MANIFEST_COLUMNS = ("date", "status", "format", "file", "bytes", "ban")
 
 #: the instrument codes of the old file; UDiFF's FinInstrmTp mapped onto them
 _UDIFF_INSTRUMENT = {"STO": "OPTSTK", "IDO": "OPTIDX", "STF": "FUTSTK", "IDF": "FUTIDX"}
@@ -358,8 +358,9 @@ def fetch(
     today = today or datetime.now().date()
     manifest_path = raw_dir(root) / "manifest.csv"
     manifest = _read_manifest(manifest_path)
-    counts = {"ok": 0, "missing": 0, "cached": 0, "bans": 0, "error": 0}
+    counts = {"ok": 0, "missing": 0, "cached": 0, "bans": 0, "no_ban_file": 0, "error": 0}
     stopped = None
+    fetched = 0  # days asked of NSE this run (the progress line and manifest save every 50)
     for day in _days(start, end):
         if day.weekday() >= 5 and not weekends:
             continue
@@ -387,23 +388,30 @@ def fetch(
                 log(f"{day}: stopped: {e}")
                 break
             counts[status] += 1
+            fetched += 1
+            if fetched % 50 == 0:
+                _write_manifest(manifest_path, manifest)
+                log(f"{day}: {counts}")
+        row = manifest.get(key, {})
+        # a ban list NSE does not have (404) is recorded once the day is old enough, not asked again
+        ban_settled = row.get("ban") == "missing" and (today - day).days > FRESH_DAYS
         if (
             bans
-            and manifest.get(key, {}).get("status") == "ok"
+            and row.get("status") == "ok"
             and not ban_path(root, day).exists()
+            and not ban_settled
         ):
             try:
                 _atomic_write(ban_path(root, day), http.get(ban_url(day)))
                 counts["bans"] += 1
             except NseNotFound:
+                row["ban"] = "missing"
+                counts["no_ban_file"] += 1
                 log(f"{day}: no ban-list file")
             except NseFetchError as e:
                 stopped = str(e)
                 log(f"{day}: stopped on the ban list: {e}")
                 break
-        if (counts["ok"] + counts["missing"]) % 50 == 0 and counts["ok"] + counts["missing"]:
-            _write_manifest(manifest_path, manifest)
-            log(f"{day}: {counts}")
     _write_manifest(manifest_path, manifest)
     return {"counts": counts, "requests": http.calls, "stopped": stopped}
 

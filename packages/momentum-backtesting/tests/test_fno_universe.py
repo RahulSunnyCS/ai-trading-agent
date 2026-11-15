@@ -28,3 +28,12 @@ def test_gate_follows_the_last_listed_session_and_years_are_supersets(tmp_path):
     assert g.loc["2020-01-10"].to_dict() == {"AAA": False, "BBB": True, "CCC": False, "ZZZ": False}
     assert g.loc["2021-01-08"].to_dict() == {"AAA": False, "BBB": False, "CCC": True, "ZZZ": False}
     assert fno.members_by_year(tmp_path) == {2020: {"AAA", "BBB"}, 2021: {"CCC"}}
+
+
+def test_the_research_only_fno_universe_is_refused_on_live_paths():
+    from momentum_backtesting import api
+
+    assert "fno" in api.LIVE_REFUSED_BROAD_UNIVERSES
+    assert set(api.LIVE_REFUSED_BROAD_UNIVERSES) <= set(api._LIVE_REFUSED_WHY)
+    req = api.BacktestRequest(dataset="broad", universe=["broad_momentum"], broad_universe="fno")
+    assert req.broad_universe == "fno"  # a backtest may still ask for it

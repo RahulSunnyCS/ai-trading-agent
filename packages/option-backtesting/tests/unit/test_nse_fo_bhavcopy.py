@@ -104,3 +104,14 @@ def test_a_recent_404_is_asked_again_and_a_server_error_stops(tmp_path):
     out = fb.fetch(tmp_path, date(2024, 7, 10), date(2024, 7, 12), http=http,
                    today=date(2024, 8, 1), log=lambda _m: None)  # fmt: skip
     assert out["stopped"] and out["counts"]["error"] == 1 and http.calls == 1
+
+
+def test_a_missing_ban_list_is_recorded_and_not_asked_again(tmp_path):
+    day = date(2024, 7, 8)
+    files = {fb.udiff_url(day): _zip("x.csv", UDIFF)}  # no ban-list file for the day
+    http = fb.Http(min_interval_s=0, opener=_opener(files))
+    out = fb.fetch(tmp_path, day, day, http=http, today=date(2024, 8, 1), log=lambda _m: None)
+    assert out["counts"]["no_ban_file"] == 1 and fb.read_bans(tmp_path, day) is None
+    again = fb.Http(min_interval_s=0, opener=_opener(files))
+    fb.fetch(tmp_path, day, day, http=again, today=date(2024, 8, 1), log=lambda _m: None)
+    assert again.calls == 0  # the day and its missing ban list are both settled
