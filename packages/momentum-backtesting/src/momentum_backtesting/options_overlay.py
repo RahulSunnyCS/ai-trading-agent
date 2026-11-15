@@ -722,15 +722,25 @@ def trade_week(
     if leg.weekly_total is not None and ready:
         # the week's budget over the picks that can be bought, not the skipped ones
         per_stock = leg.weekly_total * scale / len(ready)
+    exposure_delta = {}
+    if s.sizing == "exposure" and ready:
+        # one vectorised read per week and right, not one per contract
+        for right_ in ("CE", "PE"):
+            idx = [i for i, r in enumerate(ready) if r[1] == right_]
+            if idx:
+                d = deltas([ready[i][5] for i in idx], np.array([ready[i][7] for i in idx]),
+                           [ready[i][3] for i in idx], np.array([ready[i][8] for i in idx]),
+                           right_ == "CE")  # fmt: skip
+                exposure_delta.update(dict(zip(idx, d, strict=True)))
     positions = []  # (sym, right, expiry, k, lot, n_lots, p0, traded, spot, info|None)
     for sym, right, info, p0, traded, spot in kept:
         counts.held += 1
         positions.append((sym, right, info["expiry"], info["k"], info["lot"], info["lots"], p0,
                           traded, spot, info))  # fmt: skip
-    for sym, right, expiry, k, lot, p0, traded, spot, t_ in ready:
+    for n_ready, (sym, right, expiry, k, lot, p0, traded, spot, _t) in enumerate(ready):
         one_lot = p0 * lot
         if s.sizing == "exposure":
-            d = deltas([p0], spot, [k], t_, right == "CE")[0]
+            d = exposure_delta[n_ready]
             target = s.capital * float(s.sizing_value) * scale / len(ready)
             n_lots = round(target / (d * spot * lot)) if d > 0 else 0
             if n_lots < 1:
@@ -1008,7 +1018,7 @@ def market_down(s: Settings, entry_days: list[pd.Timestamp], frame=None) -> dict
     return out
 
 
-def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
+def run(s: Settings, inputs: Inputs, *, capital_table: bool = True) -> dict[str, Any]:
     s.validate()
     sessions_list = LAKE.sessions()
     sessions = np.array(sessions_list, dtype="datetime64[ns]")
@@ -1114,7 +1124,9 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
                                      between)  # fmt: skip
     tdf = merge_positions(pd.DataFrame(trades))
     # one lot of everything, for the minimum-capital table (the same picks at one lot each)
-    if s.sizing == "one_lot" and s.profit_step is None:
+    if not capital_table:
+        one = tdf.iloc[0:0]  # a sweep: the one-lot pass behind "capital it needed" is skipped
+    elif s.sizing == "one_lot" and s.profit_step is None:
         one = tdf  # with booking the account skips picks it cannot pay for: run every pick
     else:
         c2 = BookCounts()

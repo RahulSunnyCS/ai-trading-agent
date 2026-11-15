@@ -181,7 +181,7 @@ def strategy_inputs(
 SETTING_FIELDS = tuple(ov.Settings.__dataclass_fields__)
 
 
-def run_request(body: dict[str, Any]) -> dict[str, Any]:
+def run_request(body: dict[str, Any], *, capital_table: bool = True) -> dict[str, Any]:
     settings = ov.Settings(**{k: body[k] for k in SETTING_FIELDS if k in body})
     settings.validate()
     # puts and the mirror pool read no strategy: compared with NIFTY, not some favourite's shares
@@ -193,7 +193,8 @@ def run_request(body: dict[str, Any]) -> dict[str, Any]:
     if custom is not None:
         custom_config(custom)  # refuse a bad custom strategy before any work
     body = {**body, "favourite_id": fid, "custom": custom}
-    key = json.dumps({**body, "_lake": ov.LAKE.newest}, sort_keys=True, default=str)
+    key = json.dumps({**body, "_lake": ov.LAKE.newest, "_table": capital_table}, sort_keys=True,
+                     default=str)  # fmt: skip
     with _CACHE_LOCK:
         if key in _CACHE:
             _CACHE.move_to_end(key)
@@ -203,7 +204,7 @@ def run_request(body: dict[str, Any]) -> dict[str, Any]:
         if fid or custom is not None
         else ov.Inputs()
     )
-    result = ov.run(settings, inputs)
+    result = ov.run(settings, inputs, capital_table=capital_table)
     result["favourite_id"] = fid
     with _CACHE_LOCK:
         _CACHE[key] = result

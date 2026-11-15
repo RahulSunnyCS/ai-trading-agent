@@ -122,7 +122,7 @@ def _worker(k: int, bodies: list[dict[str, Any]], folder: str) -> None:
         t0 = time.time()
         request = {key: v for key, v in body.items() if not key.startswith("_")}
         try:
-            result = overlay_runs.run_request(request)
+            result = overlay_runs.run_request(request, capital_table=False)
             row = summary_row(body, result, time.time() - t0)
         except Exception as error:  # noqa: BLE001 - recorded, the sweep goes on
             row = {"id": body["_id"], "label": body.get("_label"),
