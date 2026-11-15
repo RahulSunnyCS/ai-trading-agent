@@ -93,6 +93,26 @@ Committed before any run. A rule is never edited after a run.
   year; the market-switch book (BL-226's Trio ATM calls while NIFTY is above its average, this rule's puts
   while below) beside Trio ATM alone.
 
+### Phase 0b — Mirror pool (added 2026-11-15, before any Phase 0 learning result was read)
+The owner's idea: put every F&O stock's chart and its inverse (1 ÷ price) into one pool and rank all of
+them for upward momentum; a stock picked buys its call, an inverse picked buys the stock's put.
+- **Why it differs from Phase 0:** with log returns the inverse chart's return is exactly minus the stock's,
+  so ranking the 2 × N charts together ranks each stock against the others' falls as well as their rises.
+  In a falling market the inverse charts fill the top; in a rising one the stocks do. The book tilts between
+  calls and puts by itself, with no NIFTY gate.
+- **Score:** per horizon (1, 4, 13, 26, 52 weeks), the log return of every eligible stock and of its inverse
+  (its negative), ranked across the combined pool; the rank-sum, highest first. Same universe, adjusted
+  weekly closes, segments and eligibility as Phase 0, read at the previous week's close.
+- **Own trend up for the chart picked:** its 26-week log return above zero and its close above its own
+  40-week average (the inverse chart's average is of 1 ÷ price). A stock and its inverse cannot both pass.
+- **Picks:** the top N charts of the pool, kept where their own trend is up; a stock → its ATM call, an
+  inverse → the stock's ATM put; ban list skipped; one lot each; contracts, fills, costs, slippage, tax as
+  Phase 0.
+- **Books (2):** N ∈ {5, 10}, ATM only (the owner's form).
+- **Pass rule, windows, carry and kill:** Phase 0's, against cash (both books may be carried).
+- **Descriptive (not deciding):** the share of positions that were puts, by year; the same top-N stocks'
+  calls alone (one lot, ATM) beside it.
+
 ### Phase 1 — Run and verdict
 - **Tasks:** `packages/momentum-backtesting/scripts/bl228_fno_puts.py` (reuses BL-226's options book
   functions; the put list built as above); learning read written here and committed; then the carried books'
@@ -113,3 +133,6 @@ Committed before any run. A rule is never edited after a run.
 
 - 2026-11-15 — created at the owner's request ("what about taking PE also"; chose a new pre-registered
   standalone test over BL-226 Phase 4 with an override); Phase 0 written and committed before any run.
+- 2026-11-15 — owner: rank every stock's chart and its inverse in one pool (inverse picked = buy the put,
+  stock picked = buy the call). Registered as Phase 0b while Phase 0's learning run was still loading,
+  before any of its results were read.
