@@ -77,6 +77,7 @@ export const DEFAULT_REQUEST: OverlayRequest = {
   end: null,
   profit_step: null,
   withdraw_share: 0.75,
+  refill: true,
 };
 
 /** Why the request cannot run yet, or null. */
@@ -109,7 +110,7 @@ export function requestChips(request: OverlayRequest, strategyName: string | nul
   if (request.direction === 'both') chips.push(`Puts ${formatPct(request.put_share, 0)}`);
   if (request.profit_step)
     chips.push(
-      `Take out ${formatPct(request.withdraw_share, 0)} of each ${formatInr(request.profit_step, { compact: true })}`,
+      `Take out ${formatPct(request.withdraw_share, 0)} of each ${formatInr(request.profit_step, { compact: true })}${request.refill ? ', refill' : ''}`,
     );
   chips.push(request.tax ? 'After tax' : 'Before tax');
   chips.push(`From ${request.start}`);

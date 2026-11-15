@@ -472,6 +472,21 @@ function OverlaySettings({
                 onChange={(v) => update({ withdraw_share: v / 100 })}
               />
             </Field>
+            <Field
+              label="Refill from money taken out"
+              help="A week the account cannot pay for a pick, money taken out earlier goes back in, up to the starting capital, so the book keeps trading."
+            >
+              <SegmentedControl
+                ariaLabel="Refill from money taken out"
+                size="sm"
+                value={request.refill ? 'on' : 'off'}
+                options={[
+                  { value: 'on', label: 'On' },
+                  { value: 'off', label: 'Off' },
+                ]}
+                onChange={(v) => update({ refill: v === 'on' })}
+              />
+            </Field>
           </>
         ) : null}
         <Field label="Tax">
@@ -1068,23 +1083,27 @@ function BookingWidget({ result }: { result: OverlayResult }) {
   const [all, setAll] = useState(false);
   if (!b) return null;
   const rows = all ? b.bookings : b.bookings.slice(-8);
+  const outs = b.bookings.filter((e) => e.kind === 'out').length;
+  const ins = b.bookings.length - outs;
   return (
     <Widget
       title="Profit booking"
-      meta={`Take out ${formatPct(b.withdraw_share, 0)} of each ${formatInr(b.profit_step, { compact: true })} made · before tax`}
+      meta={`Take out ${formatPct(b.withdraw_share, 0)} of each ${formatInr(b.profit_step, { compact: true })} made${b.refill ? ' · refilled from it when short' : ''} · before tax`}
     >
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
         <Stat label="Started with" value={formatInr(result.settings.capital)} />
-        <Stat label="Taken out" value={formatInr(b.taken_rs)} />
         <Stat label="Trading account at the end" value={formatInr(b.account_end_rs)} />
-        <Stat label="Bookings" value={formatInt(b.bookings.length)} />
+        <Stat label={`Taken out (${formatInt(outs)} times)`} value={formatInr(b.out_rs)} />
+        <Stat label={`Moved back in (${formatInt(ins)} times)`} value={formatInr(b.in_rs)} />
+        <Stat label="Kept out at the end" value={formatInr(b.taken_rs)} />
       </dl>
       {b.bookings.length ? (
         <Table>
           <THead>
             <Th dense>Day</Th>
+            <Th dense>Move</Th>
             <Th align="right" dense>
-              Taken out
+              Amount
             </Th>
             <Th align="right" dense>
               Account after
@@ -1092,10 +1111,15 @@ function BookingWidget({ result }: { result: OverlayResult }) {
           </THead>
           <tbody>
             {[...rows].reverse().map((e) => (
-              <TRow key={e.day}>
+              <TRow key={`${e.day}-${e.kind}`}>
                 <Td dense>{formatDay(e.day)}</Td>
+                <Td dense>
+                  <span className={e.kind === 'out' ? 'text-positive' : 'text-warning'}>
+                    {e.kind === 'out' ? 'Taken out' : 'Moved back in'}
+                  </span>
+                </Td>
                 <Td numeric align="right" dense>
-                  {formatInr(e.taken_rs)}
+                  {formatInr(e.amount_rs)}
                 </Td>
                 <Td numeric align="right" dense>
                   {formatInr(e.account_rs)}

@@ -4979,6 +4979,7 @@ class OptionsOverlayRequest(BaseModel):
     # profit booking: each `profit_step` rupees made, `withdraw_share` of it taken out
     profit_step: float | None = Field(None, gt=0)
     withdraw_share: float = Field(0.75, ge=0, le=1)
+    refill: bool = True  # move taken-out money back when the account cannot pay for a pick
 
 
 class _BacktestJobs:

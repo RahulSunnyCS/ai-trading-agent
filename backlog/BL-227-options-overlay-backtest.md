@@ -147,3 +147,8 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
   tooltip and the trade tables. Built: `profit_step` / `withdraw_share` (week-by-week account sized on
   itself; a one-lot book buys only what the account can pay for; a loss is made back before the next
   booking); the tooltip lists each day's sales (price, P&L) and buys.
+- 2026-11-15 — owner: refill from money taken out (option 1 of three, after a booked Trio book stopped
+  trading in 2022 once its account fell below one lot). `refill` (on by default with booking): a week the
+  account cannot pay for a pick and is below the starting capital, taken-out money goes back in, up to
+  it. Trio, one lot, ₹1 lakh, 75 % of each ₹50,000: +₹44.4 lakh after tax and trading to Oct 2026 with
+  refill (₹53.6 lakh out, ₹7.1 lakh back) against +₹1.6 lakh and no trade after Jun 2022 without.

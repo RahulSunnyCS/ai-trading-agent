@@ -187,10 +187,45 @@ def test_profit_booking_takes_out_its_share_and_sizes_on_the_account():
     pnl = trades[0]["pnl"]  # 400 less costs: one whole 300 step
     assert booking["taken"][D1] == pytest.approx(0.75 * 300)
     assert booking["account"][D1] == pytest.approx(1000 + pnl - 225)
-    assert booking["events"][0]["taken_rs"] == 225
+    assert booking["events"][0] == {"day": "2024-01-12", "kind": "out", "amount_rs": 225,
+                                    "account_rs": round(1000 + pnl - 225)}  # fmt: skip
     # an account that cannot pay for one lot (800) buys nothing
     poor = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0, capital=500.0,
                        profit_step=300.0)  # fmt: skip
     counts = ov.BookCounts()
     trades, _ = ov.run_booked([leg], poor, [D0, D1], chains, SPOTS, _lots(), set(), ARR, counts)
     assert trades == [] and counts.no_capital == 1
+
+
+def test_refill_moves_taken_out_money_back_when_a_lot_is_too_dear():
+    # week 1 gains (booked out), week 2 loses (account under capital), week 3's pick costs more
+    # than the account holds: money taken out goes back in, up to capital
+    d3 = pd.Timestamp("2024-01-26")
+    chains = {
+        (D0, "ABC"): _chain(D0),  # buy at 8
+        (D1, "ABC"): _chain(D1, exit_price=12.0),  # sell at 12, buy again at 12
+        (D2, "ABC"): _chain(D2, exit_price=3.0),  # sell at 3
+        (D2, "XYZ"): _chain(D2, exit_price=6.0).assign(symbol="XYZ"),  # one lot 600
+        (d3, "XYZ"): _chain(d3, exit_price=6.0).assign(symbol="XYZ"),
+    }
+    spots = pd.DataFrame({"ABC": [101.0, 104.0, 99.0, 99.0], "XYZ": [100.0] * 4},
+                         index=[D0, D1, D2, d3])  # fmt: skip
+    idx = [(d, sym, e) for d in (D0, D1, D2, d3) for sym in ("ABC", "XYZ") for e in (NEAR, NEXT)]
+    lots = pd.Series(100.0, index=pd.MultiIndex.from_tuples(idx))
+    leg = ov.Leg(picks={D0: ["ABC"], D1: ["ABC"], D2: ["XYZ"]}, right="CE")
+
+    def run(refill: bool):
+        s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0, capital=1300.0,
+                        profit_step=100.0, withdraw_share=1.0, refill=refill)  # fmt: skip
+        return ov.run_booked([leg], s, [D0, D1, D2, d3], chains, spots, lots, set(), ARR,
+                             ov.BookCounts())  # fmt: skip
+
+    trades, booking = run(True)
+    kinds = [e["kind"] for e in booking["events"]]
+    assert kinds[0] == "out" and kinds[-1] == "in"
+    back = booking["events"][-1]
+    assert back["day"] == "2024-01-19" and back["account_rs"] <= 1300
+    assert [t["symbol"] for t in trades] == ["ABC", "ABC", "XYZ"]  # week 3 traded
+    trades, booking = run(False)
+    assert [t["symbol"] for t in trades] == ["ABC", "ABC"]
+    assert all(e["kind"] == "out" for e in booking["events"])

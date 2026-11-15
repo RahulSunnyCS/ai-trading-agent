@@ -24,6 +24,8 @@ export interface OverlayRequest {
   /** Profit booking: every this many rupees made, `withdraw_share` of it is taken out (null = off). */
   profit_step: number | null;
   withdraw_share: number;
+  /** With profit booking: move taken-out money back when the account cannot pay for a pick. */
+  refill: boolean;
 }
 
 export interface OverlayStrategy {
@@ -147,9 +149,13 @@ export interface OverlayResult {
     withdraw_share: number;
     account: number[];
     taken: number[];
+    refill: boolean;
+    /** Out, less what went back in. */
     taken_rs: number;
+    out_rs: number;
+    in_rs: number;
     account_end_rs: number;
-    bookings: Array<{ day: string; taken_rs: number; account_rs: number }>;
+    bookings: Array<{ day: string; kind: 'out' | 'in'; amount_rs: number; account_rs: number }>;
   } | null;
 }
 

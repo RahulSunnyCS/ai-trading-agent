@@ -60,6 +60,10 @@ Off by default. Turn it on to trade like a small account that pays itself out: s
   out** for good (₹37,500 of each ₹50,000) and the rest (₹12,500) stays to trade. Two steps at
   once take out twice that.
 - After a loss the account has to make it back before the next booking.
+- **Refill from money taken out** (on by default): a week the account cannot pay for a pick (a
+  lot costs more than it holds) and it is below the starting capital, money taken out earlier goes
+  back in, up to the starting capital, as far as it goes. Without it a book that loses its
+  cushion stops trading for good. The card lists each move, out and back in.
 - The next weeks are **sized on the account**: the premium budgets grow and shrink with it, and a
   one-lot book buys only the picks the account can pay for that week (skipped picks are counted).
 - The chart adds the trading account and the money taken out; the **Profit booking** card lists

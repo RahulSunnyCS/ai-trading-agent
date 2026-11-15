@@ -84,6 +84,9 @@ class Settings:
     #: (every week sized on `capital`, nothing taken out).
     profit_step: float | None = None
     withdraw_share: float = 0.75
+    #: With profit booking: a week the account cannot pay for a pick, money taken out earlier
+    #: goes back in, up to `capital`.
+    refill: bool = True
 
     def validate(self) -> None:
         if self.moneyness not in MONEYNESS:
@@ -883,23 +886,39 @@ def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, cou
     each week's P&L (before tax) and sizes the next week on itself: the budgets scale by account /
     capital, and a one-lot book buys only the picks the account can pay for. Each time it stands a
     whole `profit_step` (or more) above where it last booked, `withdraw_share` of those steps is
-    taken out and the rest stays to trade; a loss must be made back before the next booking."""
+    taken out and the rest stays to trade; a loss must be made back before the next booking.
+    With `refill`, a week the account cannot pay for a pick (and is below `capital`) first moves
+    money taken out earlier back in, up to `capital`, as far as it goes."""
     trades: list[dict] = []
     account = base = s.capital
     taken = 0.0
     account_by_day = {days[0]: account}
     taken_by_day = {days[0]: 0.0}
     events = []
-    for d0, d1 in zip(days[:-1], days[1:], strict=True):
-        scale = max(account, 0.0) / s.capital
-        afford = max(account, 0.0) if s.sizing == "one_lot" else None
+
+    def play(d0, d1, account_now, tally):
+        scale = max(account_now, 0.0) / s.capital
+        afford = max(account_now, 0.0) if s.sizing == "one_lot" else None
         week: list[dict] = []
         for leg in legs:
-            got = trade_week(leg, s, d0, d1, chains, spots, lots, bans, sessions, counts,
+            got = trade_week(leg, s, d0, d1, chains, spots, lots, bans, sessions, tally,
                              scale=scale, afford=afford)  # fmt: skip
             if afford is not None:
                 afford -= sum(t["buy"] for t in got)
             week += got
+        return week
+
+    for d0, d1 in zip(days[:-1], days[1:], strict=True):
+        if s.refill and taken > 0 and account < s.capital:
+            trial = BookCounts()
+            play(d0, d1, account, trial)
+            if trial.no_capital or trial.too_dear:
+                back = min(taken, s.capital - account)
+                account += back
+                taken -= back
+                events.append({"day": d0.date().isoformat(), "kind": "in",
+                               "amount_rs": round(back), "account_rs": round(account)})  # fmt: skip
+        week = play(d0, d1, account, counts)
         account += sum(t["pnl"] for t in week)
         steps = int((account - base) // s.profit_step) if account > base else 0
         if steps > 0:
@@ -907,8 +926,8 @@ def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, cou
             account -= out
             taken += out
             base += steps * s.profit_step * (1 - s.withdraw_share)
-            events.append({"day": d1.date().isoformat(), "taken_rs": round(out),
-                           "account_rs": round(account)})  # fmt: skip
+            events.append({"day": d1.date().isoformat(), "kind": "out",
+                           "amount_rs": round(out), "account_rs": round(account)})  # fmt: skip
         account_by_day[d1] = account
         taken_by_day[d1] = taken
         trades += week
@@ -1027,14 +1046,20 @@ def booking_summary(booking: dict | None, eq_days: list, s: Settings) -> dict[st
         return None
     account = [round(float(booking["account"].get(d, np.nan))) for d in eq_days]
     taken = [round(float(booking["taken"].get(d, 0.0))) for d in eq_days]
+    events = booking["events"]
+    out_rs = sum(e["amount_rs"] for e in events if e["kind"] == "out")
+    in_rs = sum(e["amount_rs"] for e in events if e["kind"] == "in")
     return {
         "profit_step": s.profit_step,
         "withdraw_share": s.withdraw_share,
         "account": account,
         "taken": taken,
-        "taken_rs": taken[-1],
+        "refill": s.refill,
+        "taken_rs": taken[-1],  # out, less what went back in
+        "out_rs": out_rs,
+        "in_rs": in_rs,
         "account_end_rs": account[-1],
-        "bookings": booking["events"],
+        "bookings": events,
     }
 
 
