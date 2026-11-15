@@ -92,3 +92,9 @@ Committed before any sweep run (the grid file and this section in one commit).
 
 - 2026-11-15 — created at the owner's request ("we will start the overnight sweep today"); settings built on
   the BL-227 page (PR #452's branch); Phase 0 and the grid committed before any sweep run.
+- 2026-11-15 22:54 — round 1 started (3 workers, `caffeinate`, detached). 23:08 — stopped after 7 runs to make
+  runs faster (one delta read per week; the sweep skips the one-lot pass behind the page's "capital it
+  needed"; commit `22a68a17`; results unchanged), resumed from the 7 done.
+- 2026-11-15 — disclosure: while checking that the Sweeps table rendered, the page read-out returned one
+  row's test figures (Trio Fortnightly, calls, ITM2, exposure 100 %: train +₹23.9 lakh / −47 %, test
+  +₹9.5 lakh / −44 %). No other test figure was read; the selection is still made on train columns only.
