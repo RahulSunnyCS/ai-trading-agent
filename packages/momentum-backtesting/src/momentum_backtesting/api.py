@@ -4974,8 +4974,8 @@ class OptionsOverlayRequest(BaseModel):
     favourite_id: str | None = None
     custom: OverlayCustomStrategy | None = None  # instead of a favourite
     direction: Literal["calls", "puts", "mirror", "switch", "both"] = "calls"
-    moneyness: Literal["ATM", "OTM1", "OTM2", "OTM3"] = "ATM"
-    sizing: Literal["one_lot", "premium", "capital_share"] = "one_lot"
+    moneyness: Literal["ITM2", "ITM1", "ATM", "OTM1", "OTM2", "OTM3", "DELTA"] = "ATM"
+    sizing: Literal["one_lot", "premium", "capital_share", "exposure"] = "one_lot"
     sizing_value: float | None = Field(None, gt=0)
     capital: float = Field(1_000_000.0, gt=0, le=1e9)
     n: int = Field(5, ge=1, le=30)
@@ -4991,6 +4991,15 @@ class OptionsOverlayRequest(BaseModel):
     profit_step: float | None = Field(None, gt=0)
     withdraw_share: float = Field(0.75, ge=0, le=1)
     refill: bool = True  # move taken-out money back when the account cannot pay for a pick
+    hold: bool = False  # keep a contract while its stock is still picked
+    delta_target: float = Field(0.6, ge=0.05, le=0.95)  # moneyness DELTA
+    expiry_skip: int = Field(0, ge=0, le=2)
+    stop: float | None = Field(None, gt=0, le=10)  # exit on a daily close this far down
+    target: float | None = Field(None, gt=0, le=10)  # ... or this far up
+    call_filter: Literal["none", "nifty_200dma", "nifty_26w", "breadth"] = "none"
+    max_positions: int | None = Field(None, ge=1, le=50)
+    max_weekly_premium: float | None = Field(None, gt=0, le=5)
+    split: str | None = None  # train / test split day
 
 
 class _BacktestJobs:
@@ -6525,6 +6534,22 @@ def create_app() -> FastAPI:
         except FileNotFoundError:
             newest = None
         return {"strategies": overlay_runs.strategies(), "data_through": newest}
+
+    @app.get("/api/options-overlay/sweeps")
+    def options_overlay_sweeps() -> dict:
+        """BL-229: the overlay sweeps on disk, with how far each has got."""
+        from . import overlay_sweep
+
+        return {"sweeps": overlay_sweep.list_sweeps()}
+
+    @app.get("/api/options-overlay/sweeps/{name}")
+    def options_overlay_sweep(name: str) -> dict:
+        from . import overlay_sweep
+
+        try:
+            return {"name": name, "rows": overlay_sweep.read_sweep(name)}
+        except LookupError as error:
+            raise HTTPException(404, str(error)) from error
 
     @app.post("/api/options-overlay/jobs", status_code=202)
     def start_options_overlay(req: OptionsOverlayRequest) -> dict:

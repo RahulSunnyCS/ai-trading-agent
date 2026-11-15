@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import math
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -36,12 +36,14 @@ import numpy as np
 import pandas as pd
 
 Direction = Literal["calls", "puts", "mirror", "switch", "both"]
-Sizing = Literal["one_lot", "premium", "capital_share"]
+Sizing = Literal["one_lot", "premium", "capital_share", "exposure"]
 MarketFilter = Literal["nifty_200dma", "nifty_26w", "breadth"]
 
-MONEYNESS = {"ATM": 0, "OTM1": 1, "OTM2": 2, "OTM3": 3}
-DEFAULT_SLIPPAGE = {"ATM": 0.01, "OTM1": 0.02, "OTM2": 0.03, "OTM3": 0.04}
+MONEYNESS = {"ITM2": -2, "ITM1": -1, "ATM": 0, "OTM1": 1, "OTM2": 2, "OTM3": 3, "DELTA": 0}
+DEFAULT_SLIPPAGE = {"ITM2": 0.01, "ITM1": 0.01, "ATM": 0.01, "OTM1": 0.02, "OTM2": 0.03,
+                    "OTM3": 0.04, "DELTA": 0.01}  # fmt: skip
 HORIZONS = (1, 4, 13, 26, 52)
+RATE = 0.065  # for the delta read only
 TREND_WEEKS, AVERAGE_WEEKS, NIFTY_AVERAGE = 26, 40, 200
 BREADTH_BELOW = 0.40
 TAX_RATE = 0.30 * 1.04
@@ -87,6 +89,23 @@ class Settings:
     #: With profit booking: a week the account cannot pay for a pick, money taken out earlier
     #: goes back in, up to `capital`.
     refill: bool = True
+    #: Keep a contract while its stock is still picked (no sale and re-buy), rolled only when it
+    #: has fewer than `min_sessions_left` sessions left; off = sold and bought again every week.
+    hold: bool = False
+    #: Moneyness "DELTA": the listed strike whose delta (from its own price) is nearest this.
+    delta_target: float = 0.6
+    #: 0 = the nearest expiry with enough sessions left, 1 = the one after it, ...
+    expiry_skip: int = 0
+    #: Exit on a daily close this far below / above the entry premium (None = off).
+    stop: float | None = None
+    target: float | None = None
+    #: Calls only while the market is not falling ("none" = always).
+    call_filter: Literal["none", "nifty_200dma", "nifty_26w", "breadth"] = "none"
+    #: At most this many positions a week per sleeve, and premium a week as a share of capital.
+    max_positions: int | None = None
+    max_weekly_premium: float | None = None
+    #: A train / test split day for the summary (trades closed by it / opened from it).
+    split: str | None = None
 
     def validate(self) -> None:
         if self.moneyness not in MONEYNESS:
@@ -111,6 +130,21 @@ class Settings:
             raise ValueError("The profit step must be above zero.")
         if not 0 <= self.withdraw_share <= 1:
             raise ValueError("The share taken out must be between 0 and 1.")
+        if self.sizing == "exposure" and not (
+            self.sizing_value is not None and 0 < self.sizing_value <= 5
+        ):
+            raise ValueError("Exposure must be between 0 and 5 times capital (e.g. 1 for 100 %).")
+        if not 0.05 <= self.delta_target <= 0.95:
+            raise ValueError("The target delta must be between 0.05 and 0.95.")
+        if not 0 <= self.expiry_skip <= 2:
+            raise ValueError("Skip 0 to 2 expiries.")
+        for name, v in (("stop", self.stop), ("target", self.target)):
+            if v is not None and not 0 < v <= 10:
+                raise ValueError(f"The {name} must be above 0 (a share of the premium).")
+        if self.max_positions is not None and not 1 <= self.max_positions <= 50:
+            raise ValueError("At most 1 to 50 positions a week.")
+        if self.max_weekly_premium is not None and not 0 < self.max_weekly_premium <= 5:
+            raise ValueError("The weekly premium cap is a share of capital above 0.")
 
     @property
     def slip(self) -> float:
@@ -427,14 +461,52 @@ def fno_frame():
 # ---------------------------------------------------------------------------------------------
 
 
-def costs(buy: float, sell: float, day: pd.Timestamp) -> float:
+def costs(buy: float, sell: float, day: pd.Timestamp, *, orders: int = 2) -> float:
+    """Charges on a buy and a sell (either may be 0 with `orders=1`): Rs 20 an order, STT on the
+    sale, NSE transaction charges, SEBI, stamp duty on the buy, GST."""
     after = day >= pd.Timestamp("2024-10-01")
     stt = sell * (0.001 if after else 0.000625)
     txn = (buy + sell) * (0.0003503 if after else 0.00053)
     sebi = (buy + sell) * 1e-6
     stamp = buy * 0.00003
-    brokerage = 40.0
+    brokerage = 20.0 * orders
     return brokerage + stt + txn + sebi + stamp + 0.18 * (brokerage + txn + sebi)
+
+
+# ---------------------------------------------------------------------------------------------
+# Black-Scholes delta from an option's own price (no scipy: a normal CDF to ~1e-7)
+# ---------------------------------------------------------------------------------------------
+
+
+def norm_cdf(x):
+    x = np.asarray(x, dtype=float)
+    z = np.abs(x) / math.sqrt(2)
+    t_ = 1 / (1 + 0.3275911 * z)
+    a1, a2, a3, a4, a5 = 0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429
+    poly = t_ * (a1 + t_ * (a2 + t_ * (a3 + t_ * (a4 + t_ * a5))))
+    erf = 1 - poly * np.exp(-z * z)
+    return 0.5 * (1 + np.sign(x) * erf)
+
+
+def _bs(s, k, t_, vol, call):
+    d1 = (np.log(s / k) + (RATE + 0.5 * vol**2) * t_) / (vol * np.sqrt(t_))
+    d2 = d1 - vol * np.sqrt(t_)
+    if call:
+        return s * norm_cdf(d1) - k * np.exp(-RATE * t_) * norm_cdf(d2), norm_cdf(d1)
+    return k * np.exp(-RATE * t_) * norm_cdf(-d2) - s * norm_cdf(-d1), norm_cdf(d1) - 1
+
+
+def deltas(prices, spot, strikes, t_, call) -> np.ndarray:
+    """|delta| of each strike, from the volatility its own price implies (bisection)."""
+    prices, strikes = np.asarray(prices, float), np.asarray(strikes, float)
+    lo, hi = np.full(prices.shape, 0.01), np.full(prices.shape, 4.0)
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        price, _ = _bs(spot, strikes, t_, mid, call)
+        high = price > prices
+        hi, lo = np.where(high, mid, hi), np.where(high, lo, mid)
+    _, d = _bs(spot, strikes, t_, (lo + hi) / 2, call)
+    return np.abs(d)
 
 
 @dataclass
@@ -447,6 +519,8 @@ class Leg:
     per_stock: float | None = None
     weekly_total: float | None = None
     tag: str = ""
+    #: (symbol, right) -> the contract kept from last week (hold), set by `trade_week`.
+    held: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -463,9 +537,21 @@ class BookCounts:
     restruck: int = 0
     zero_booked: int = 0
     no_capital: int = 0  # profit booking: the trading account could not pay for it
+    capped: int = 0  # over the positions or premium cap that week
+    held: int = 0  # weeks a contract was kept, not sold and bought again
+    stopped: int = 0  # closed on a daily close at the stop
+    targeted: int = 0  # closed on a daily close at the target
+    no_delta: int = 0  # no strike priced well enough to read a delta
 
 
-def _expiry(rows: pd.DataFrame, day: pd.Timestamp, sessions: np.ndarray, min_left: int):
+def _sessions_left(expiry, day, sessions: np.ndarray) -> int:
+    return int(np.searchsorted(sessions, np.datetime64(expiry), side="right")
+               - np.searchsorted(sessions, np.datetime64(day), side="right"))  # fmt: skip
+
+
+def _expiry(
+    rows: pd.DataFrame, day: pd.Timestamp, sessions: np.ndarray, min_left: int, skip: int = 0
+):
     exps = np.sort(rows["expiry"].unique())
     if not len(exps):
         return None
@@ -473,7 +559,7 @@ def _expiry(rows: pd.DataFrame, day: pd.Timestamp, sessions: np.ndarray, min_lef
         sessions, np.datetime64(day), side="right"
     )
     ok = exps[left >= min_left]
-    return pd.Timestamp(ok[0]) if len(ok) else None
+    return pd.Timestamp(ok[skip]) if len(ok) > skip else None
 
 
 def run_leg(
@@ -486,12 +572,67 @@ def run_leg(
     bans: set,
     sessions: np.ndarray,
     counts: BookCounts,
+    *,
+    between: dict | None = None,
+    cap: float | None = None,
 ) -> list[dict]:
-    """Trades for one leg over consecutive rebalance days (each entry exits on the next day)."""
+    """Trades for one leg over consecutive rebalance days (each entry exits on the next day, or
+    is kept with `hold`); `cap` = the leg's premium a week at most."""
     trades = []
     for d0, d1 in zip(days[:-1], days[1:], strict=True):
-        trades += trade_week(leg, s, d0, d1, chains, spots, lots, bans, sessions, counts)
+        trades += trade_week(leg, s, d0, d1, chains, spots, lots, bans, sessions, counts,
+                             afford=cap, between=(between or {}).get(d0))  # fmt: skip
     return trades
+
+
+def between_days(days: list, sessions_list: list) -> dict:
+    """{rebalance day: the sessions after it up to the next rebalance day}."""
+    arr = np.array(sessions_list, dtype="datetime64[ns]")
+    out = {}
+    for d0, d1 in zip(days[:-1], days[1:], strict=True):
+        i = int(np.searchsorted(arr, np.datetime64(d0), side="right"))
+        j = int(np.searchsorted(arr, np.datetime64(d1), side="right"))
+        out[d0] = sessions_list[i:j]
+    return out
+
+
+def _parse(item: str, default_right: str) -> tuple[str, str]:
+    return tuple(item.split("|", 1)) if "|" in item else (item, default_right)  # type: ignore[return-value]
+
+
+def _price(row) -> tuple[float, bool]:
+    traded = bool(row["contracts"] > 0)
+    return float(row["close"] if traded else row["settle"]), traded
+
+
+def _contract_row(rows, expiry, right, k):
+    if rows is None or rows.empty:
+        return None
+    hit = rows[(rows["expiry"] == expiry) & (rows["option_type"] == right) & (rows["strike"] == k)]
+    return None if hit.empty else hit.iloc[0]
+
+
+def _pick_strike(side: pd.DataFrame, spot: float, right: str, s: Settings, t_: float):
+    """The strike for the moneyness setting: k listed strikes from the one nearest spot, or the
+    strike whose delta (read from its own price) is nearest `delta_target`."""
+    strikes = np.sort(side["strike"].unique())
+    if not len(strikes):
+        return None
+    if s.moneyness != "DELTA":
+        i = int(np.argmin(np.abs(strikes - spot))) + MONEYNESS[s.moneyness] * (
+            1 if right == "CE" else -1
+        )
+        return float(strikes[i]) if 0 <= i < len(strikes) else None
+    priced = side.assign(p=np.where(side["contracts"] > 0, side["close"], side["settle"]))
+    priced = priced[(priced["p"] > 0) & np.isfinite(priced["p"])].drop_duplicates("strike")
+    if priced.empty or t_ <= 0:
+        return None
+    d = deltas(priced["p"].to_numpy(), spot, priced["strike"].to_numpy(), t_, right == "CE")
+    ok = np.isfinite(d) & (d > 0.01) & (d < 0.99)
+    if not ok.any():
+        return None
+    j = int(np.argmin(np.where(ok, np.abs(d - s.delta_target), np.inf)))
+    return float(priced["strike"].to_numpy()[j])
 
 
 def trade_week(
@@ -508,85 +649,134 @@ def trade_week(
     *,
     scale: float = 1.0,
     afford: float | None = None,
+    between: list[pd.Timestamp] | None = None,
 ) -> list[dict]:
-    """One leg's entries on d0, sold on d1. `scale` multiplies the leg's budget (profit booking:
-    the trading account against the starting capital); `afford` caps the premium a one-lot book
-    may spend this week (picks in order until it runs out)."""
+    """One leg's positions from d0 to d1. `scale` multiplies the leg's budget (profit booking:
+    the account against the starting capital); `afford` caps the premium bought this week (a
+    one-lot booked account, or the weekly premium cap); `between` are the sessions after d0 up to
+    d1, read for the stop and target. With `hold`, a contract whose stock is picked again is kept:
+    its week ends on a mark (no sale, no costs) and the next week starts from it."""
     trades: list[dict] = []
-    offset = MONEYNESS[s.moneyness]
     slip = s.slip
-    for _ in (0,):
-        items = leg.picks.get(d0, [])
-        if not items:
+    items = leg.picks.get(d0, [])
+    carried = leg.held
+    leg.held = {}
+    next_keys = {_parse(i, leg.right) for i in leg.picks.get(d1, [])} if s.hold else set()
+    ready = []  # new contracts to size: (sym, right, expiry, k, lot, p0, traded, spot, t)
+    kept = []  # contracts carried from last week: (sym, right, info, p0, traded, spot)
+    for n_seen, item in enumerate(items):
+        sym, right = _parse(item, leg.right)
+        counts.entries += 1
+        if s.max_positions is not None and n_seen >= s.max_positions:
+            counts.capped += 1
             continue
-        ready = []  # the picks that can be bought, before sizing
-        for item in items:
-            sym, right = item.split("|", 1) if "|" in item else (item, leg.right)
-            counts.entries += 1
-            if (d0, sym) in bans:
-                counts.banned += 1
-                continue
-            if sym not in spots.columns:
-                counts.not_a_stock += 1
-                continue
-            spot = spots.at[d0, sym] if d0 in spots.index else np.nan
-            if not spot > 0:
-                counts.no_spot += 1
-                continue
-            rows = chains.get((d0, sym))
-            if rows is None or rows.empty:
-                counts.no_contract += 1
-                continue
-            expiry = _expiry(rows, d0, sessions, s.min_sessions_left)
-            if expiry is None:
-                counts.no_contract += 1
-                continue
-            side = rows[(rows["expiry"] == expiry) & (rows["option_type"] == right)]
-            strikes = np.sort(side["strike"].unique())
-            if not len(strikes):
-                counts.no_contract += 1
-                continue
-            i = int(np.argmin(np.abs(strikes - spot))) + offset * (1 if right == "CE" else -1)
-            if not 0 <= i < len(strikes):
-                counts.no_contract += 1
-                continue
-            k = float(strikes[i])
-            row = side[side["strike"] == k].iloc[0]
-            lot = lots.get((d0, sym, expiry))
-            if lot is None or not lot > 0:
-                counts.no_contract += 1
-                continue
-            if not row["oi"] >= s.min_oi_lots * lot:
-                counts.thin += 1
-                continue
-            traded = bool(row["contracts"] > 0)
-            p0 = float(row["close"] if traded else row["settle"])
-            if not p0 > 0:  # NaN or zero: no price to buy at
-                counts.no_contract += 1
-                continue
-            ready.append((sym, right, expiry, k, lot, p0, traded, spot))
-        per_stock = None if leg.per_stock is None else leg.per_stock * scale
-        if leg.weekly_total is not None and ready:
-            # the week's budget over the picks that can be bought, not the skipped ones
-            per_stock = leg.weekly_total * scale / len(ready)
-        for sym, right, expiry, k, lot, p0, traded, spot in ready:
-            one_lot = p0 * lot
-            if per_stock is None:
-                if afford is not None:
-                    if one_lot * (1 + slip) > afford:
-                        counts.no_capital += 1
-                        continue
-                    afford -= one_lot * (1 + slip)
-                n_lots = 1
-            else:
-                if per_stock <= 0:
-                    counts.no_capital += 1
+        info = carried.get((sym, right))
+        if info is not None:
+            row = _contract_row(chains.get((d0, sym)), info["expiry"], right, info["k"])
+            spot = spots.at[d0, sym] if (sym in spots.columns and d0 in spots.index) else np.nan
+            if row is not None:
+                p0, traded = _price(row)
+                if p0 > 0:
+                    kept.append((sym, right, info, p0, traded, float(spot)))
                     continue
-                if one_lot > 2 * per_stock:
-                    counts.too_dear += 1
+        if (d0, sym) in bans:
+            counts.banned += 1
+            continue
+        if sym not in spots.columns:
+            counts.not_a_stock += 1
+            continue
+        spot = spots.at[d0, sym] if d0 in spots.index else np.nan
+        if not spot > 0:
+            counts.no_spot += 1
+            continue
+        rows = chains.get((d0, sym))
+        if rows is None or rows.empty:
+            counts.no_contract += 1
+            continue
+        expiry = _expiry(rows, d0, sessions, s.min_sessions_left, s.expiry_skip)
+        if expiry is None:
+            counts.no_contract += 1
+            continue
+        side = rows[(rows["expiry"] == expiry) & (rows["option_type"] == right)]
+        t_ = max((expiry - d0).days, 1) / 365
+        k = _pick_strike(side, float(spot), right, s, t_)
+        if k is None:
+            counts.no_delta += 1 if s.moneyness == "DELTA" else 0
+            counts.no_contract += 0 if s.moneyness == "DELTA" else 1
+            continue
+        row = side[side["strike"] == k].iloc[0]
+        lot = lots.get((d0, sym, expiry))
+        if lot is None or not lot > 0:
+            counts.no_contract += 1
+            continue
+        if not row["oi"] >= s.min_oi_lots * lot:
+            counts.thin += 1
+            continue
+        p0, traded = _price(row)
+        if not p0 > 0:  # NaN or zero: no price to buy at
+            counts.no_contract += 1
+            continue
+        ready.append((sym, right, expiry, k, lot, p0, traded, float(spot), t_))
+
+    per_stock = None if leg.per_stock is None else leg.per_stock * scale
+    if leg.weekly_total is not None and ready:
+        # the week's budget over the picks that can be bought, not the skipped ones
+        per_stock = leg.weekly_total * scale / len(ready)
+    positions = []  # (sym, right, expiry, k, lot, n_lots, p0, traded, spot, info|None)
+    for sym, right, info, p0, traded, spot in kept:
+        counts.held += 1
+        positions.append((sym, right, info["expiry"], info["k"], info["lot"], info["lots"], p0,
+                          traded, spot, info))  # fmt: skip
+    for sym, right, expiry, k, lot, p0, traded, spot, t_ in ready:
+        one_lot = p0 * lot
+        if s.sizing == "exposure":
+            d = deltas([p0], spot, [k], t_, right == "CE")[0]
+            target = s.capital * float(s.sizing_value) * scale / len(ready)
+            n_lots = round(target / (d * spot * lot)) if d > 0 else 0
+            if n_lots < 1:
+                counts.too_dear += 1
+                continue
+        elif per_stock is None:
+            n_lots = 1
+        else:
+            if per_stock <= 0:
+                counts.no_capital += 1
+                continue
+            if one_lot > 2 * per_stock:
+                counts.too_dear += 1
+                continue
+            n_lots = max(1, round(per_stock / one_lot))
+        if afford is not None:
+            spend = one_lot * (1 + slip) * n_lots
+            if spend > afford:
+                counts.no_capital += 1
+                continue
+            afford -= spend
+        counts.settle_entry += 0 if traded else 1
+        positions.append((sym, right, expiry, k, lot, n_lots, p0, traded, spot, None))
+
+    for sym, right, expiry, k, lot, n_lots, p0, traded, spot, info in positions:
+        held_in = info is not None
+        basis = info["basis"] if held_in else p0
+        pos_id = info["pos_id"] if held_in else f"{leg.tag}:{sym}:{right}:{d0.date()}"
+        exit_day, how, p1, exit_traded, qty_exit = d1, None, None, False, lot
+        if (s.stop is not None or s.target is not None) and between:
+            for day in between:
+                row = _contract_row(chains.get((day, sym)), expiry, right, k)
+                if row is None:
                     continue
-                n_lots = max(1, round(per_stock / one_lot))
-            counts.settle_entry += 0 if traded else 1
+                px, px_traded = _price(row)
+                if not px > 0:
+                    continue
+                if s.stop is not None and px <= basis * (1 - s.stop):
+                    exit_day, how, p1, exit_traded = day, "stop", px, px_traded
+                    counts.stopped += 1
+                    break
+                if s.target is not None and px >= basis * (1 + s.target):
+                    exit_day, how, p1, exit_traded = day, "target", px, px_traded
+                    counts.targeted += 1
+                    break
+        if how is None:
             p1, exit_traded, qty_exit, how = _exit_price(
                 chains.get((d1, sym)), expiry, right, k, lot, d1, sym, lots
             )
@@ -596,33 +786,57 @@ def trade_week(
                 counts.zero_booked += 1
             elif not exit_traded:
                 counts.settle_exit += 1
-            buy = p0 * (1 + slip) * n_lots * lot
-            sell = max(p1 * (1 - slip), 0.0) * n_lots * qty_exit
-            cost = costs(buy, sell, d1)
-            spot1 = spots.at[d1, sym] if (sym in spots.columns and d1 in spots.index) else np.nan
-            trades.append(
-                {
-                    "entry": d0,
-                    "exit": d1,
-                    "symbol": sym,
-                    "right": right,
-                    "leg": leg.tag,
-                    "expiry": expiry,
-                    "strike": k,
-                    "spot": float(spot),
-                    "spot_exit": float(spot1) if spot1 == spot1 else None,
-                    "lot": int(lot),
-                    "lots": int(n_lots),
-                    "p0": p0,
-                    "p1": float(p1),
-                    "entry_traded": traded,
-                    "exit_how": how,
-                    "buy": buy,
-                    "sell": sell,
-                    "costs": cost,
-                    "pnl": sell - buy - cost,
-                }
-            )
+        held_out = (
+            how == "same"
+            and (sym, right) in next_keys
+            and _sessions_left(expiry, d1, sessions) >= s.min_sessions_left
+        )
+        if held_out:
+            leg.held[(sym, right)] = {"expiry": expiry, "k": k, "lot": lot, "lots": n_lots,
+                                      "basis": basis, "pos_id": pos_id}  # fmt: skip
+        entry_slip = 0.0 if held_in else slip
+        exit_slip = 0.0 if held_out else slip
+        buy = p0 * (1 + entry_slip) * n_lots * lot
+        sell = max(p1 * (1 - exit_slip), 0.0) * n_lots * qty_exit
+        orders = (0 if held_in else 1) + (0 if held_out else 1)
+        cost = (
+            0.0
+            if orders == 0
+            else costs(0.0 if held_in else buy, 0.0 if held_out else sell, d1, orders=orders)
+        )
+        spot1 = (
+            spots.at[exit_day, sym]
+            if (sym in spots.columns and exit_day in spots.index)
+            else np.nan
+        )
+        trades.append(
+            {
+                "entry": d0,
+                "exit": exit_day,
+                "week_end": d1,
+                "symbol": sym,
+                "right": right,
+                "leg": leg.tag,
+                "expiry": expiry,
+                "strike": k,
+                "spot": float(spot),
+                "spot_exit": float(spot1) if spot1 == spot1 else None,
+                "lot": int(lot),
+                "lots": int(n_lots),
+                "p0": p0,
+                "p1": float(p1),
+                "entry_traded": traded,
+                "exit_how": how,
+                "held_in": held_in,
+                "held_out": held_out,
+                "pos_id": pos_id,
+                "basis": basis,
+                "buy": buy,
+                "sell": sell,
+                "costs": cost,
+                "pnl": sell - buy - cost,
+            }
+        )
     return trades
 
 
@@ -658,10 +872,35 @@ def merge_positions(t: pd.DataFrame) -> pd.DataFrame:
     if not len(t):
         return t
     keys = ["entry", "exit", "symbol", "right", "expiry", "strike"]
+    keys = [k for k in keys if k in t.columns]
     summed = ["lots", "buy", "sell", "costs", "pnl"]
     first = [c for c in t.columns if c not in keys + summed]
     agg = {**{c: "sum" for c in summed}, **{c: "first" for c in first}}
     return t.groupby(keys, as_index=False, sort=False).agg(agg)[list(t.columns)]
+
+
+def _week_col(t: pd.DataFrame) -> str:
+    """The column that says which rebalance week a row's P&L belongs to (a stop can close a
+    position mid-week)."""
+    return "week_end" if "week_end" in t.columns else "exit"
+
+
+def positions_of(t: pd.DataFrame) -> pd.DataFrame:
+    """One row per position: the weeks a contract was kept joined (bought on the first, sold on
+    the last; P&L and costs added up); `weeks` = how many it spanned."""
+    if not len(t) or "pos_id" not in t.columns:
+        return t
+    t = t.sort_values(["pos_id", "entry"])
+    g = t.groupby("pos_id", sort=False)
+    out = g.first()
+    last = g.last()
+    for c in ("exit", "week_end", "p1", "sell", "exit_how", "spot_exit", "held_out"):
+        if c in last.columns:
+            out[c] = last[c]
+    out["costs"] = g["costs"].sum()
+    out["pnl"] = g["pnl"].sum()
+    out["weeks"] = g.size()
+    return out.reset_index().sort_values("entry").reset_index(drop=True)
 
 
 def fy(d: pd.Timestamp) -> int:
@@ -672,7 +911,7 @@ def weekly_pnl(trades: pd.DataFrame, weeks: list[pd.Timestamp], tax: bool) -> pd
     """Per exit week: P&L before tax, the tax taken (at each financial year's last week, a loss
     carried forward), and after tax."""
     before = (
-        trades.groupby("exit")["pnl"].sum().reindex(weeks, fill_value=0.0)
+        trades.groupby(_week_col(trades))["pnl"].sum().reindex(weeks, fill_value=0.0)
         if len(trades)
         else pd.Series(0.0, index=weeks)
     )
@@ -823,6 +1062,10 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
             return per * share, None
         return None, s.capital * float(s.sizing_value) * share / sleeves
 
+    call_down: dict = {}
+    if s.call_filter != "none" and s.direction in ("calls", "both"):
+        call_frame = frame if s.call_filter != "breadth" else (frame or fno_frame())
+        call_down = market_down(replace(s, market_filter=s.call_filter), days, call_frame)
     legs: list[Leg] = []
     if s.direction == "mirror":
         per, total = budget(1.0, s.n, 1)
@@ -835,6 +1078,8 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
             picks = leg.picks
             if s.direction == "switch":
                 picks = {d: (v if not down.get(d, False) else []) for d, v in picks.items()}
+            elif call_down:
+                picks = {d: (v if not call_down.get(d, False) else []) for d, v in picks.items()}
             legs.append(
                 Leg(picks=picks, right="CE", per_stock=per, weekly_total=total, tag="calls")
             )
@@ -845,12 +1090,14 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
             picks = {d: (v if down.get(d, False) else []) for d, v in picks.items()}
         legs.append(Leg(picks=picks, right="PE", per_stock=per, weekly_total=total, tag="puts"))
 
+    between = between_days(days, sessions_list) if (s.stop or s.target) else {}
     pairs: set[tuple[pd.Timestamp, str]] = set()
     for leg in legs:
         for d0, d1 in zip(days[:-1], days[1:], strict=True):
             for item in leg.picks.get(d0, []):
                 sym = item.split("|", 1)[0]
                 pairs |= {(d0, sym), (d1, sym)}
+                pairs |= {(day, sym) for day in between.get(d0, [])}
     chains = LAKE.chains(pairs) if pairs else {}
     spots = LAKE.spots(days)
     lots, bans = LAKE.lots(), LAKE.bans()
@@ -858,10 +1105,13 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
     trades: list[dict] = []
     booking = None
     if s.profit_step is None:
+        cap = s.max_weekly_premium * s.capital / max(len(legs), 1) if s.max_weekly_premium else None
         for leg in legs:
-            trades += run_leg(leg, s, days, chains, spots, lots, bans, sessions, counts)
+            trades += run_leg(leg, s, days, chains, spots, lots, bans, sessions, counts,
+                              between=between, cap=cap)  # fmt: skip
     else:
-        trades, booking = run_booked(legs, s, days, chains, spots, lots, bans, sessions, counts)
+        trades, booking = run_booked(legs, s, days, chains, spots, lots, bans, sessions, counts,
+                                     between)  # fmt: skip
     tdf = merge_positions(pd.DataFrame(trades))
     # one lot of everything, for the minimum-capital table (the same picks at one lot each)
     if s.sizing == "one_lot" and s.profit_step is None:
@@ -881,7 +1131,8 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
     return summarise(s, inputs, tdf, one, days, counts, down, booking)
 
 
-def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, counts):
+def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, counts,
+               between: dict | None = None):  # fmt: skip
     """The book week by week with profit booking. The trading account starts at `capital`, takes
     each week's P&L (before tax) and sizes the next week on itself: the budgets scale by account /
     capital, and a one-lot book buys only the picks the account can pay for. Each time it stands a
@@ -890,6 +1141,7 @@ def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, cou
     With `refill`, a week the account cannot pay for a pick (and is below `capital`) first moves
     money taken out earlier back in, up to `capital`, as far as it goes."""
     trades: list[dict] = []
+    between = between or {}
     account = base = s.capital
     taken = 0.0
     account_by_day = {days[0]: account}
@@ -899,10 +1151,13 @@ def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, cou
     def play(d0, d1, account_now, tally):
         scale = max(account_now, 0.0) / s.capital
         afford = max(account_now, 0.0) if s.sizing == "one_lot" else None
+        if s.max_weekly_premium is not None:
+            cap = s.max_weekly_premium * max(account_now, 0.0)
+            afford = cap if afford is None else min(afford, cap)
         week: list[dict] = []
         for leg in legs:
             got = trade_week(leg, s, d0, d1, chains, spots, lots, bans, sessions, tally,
-                             scale=scale, afford=afford)  # fmt: skip
+                             scale=scale, afford=afford, between=between.get(d0))  # fmt: skip
             if afford is not None:
                 afford -= sum(t["buy"] for t in got)
             week += got
@@ -959,6 +1214,7 @@ def summarise(
 ) -> dict[str, Any]:
     weeks = days[1:]
     w = weekly_pnl(t, weeks, s.tax)
+    pos = positions_of(t)
     equity = s.capital + w["after_tax"].cumsum()
     eq_arr = np.concatenate([[s.capital], equity.to_numpy()])
     dd, peak_i, trough_i = _max_dd(eq_arr)
@@ -1029,12 +1285,13 @@ def summarise(
         "nifty": nifty_book,
         "series": series,
         "min_capital": min_capital(one, weeks, s),
-        "stats": trade_stats(t),
-        "by_stock": by_stock(t),
-        "by_year": by_year(t, w, inputs, s),
-        "sides": sides(t, down, days),
+        "stats": trade_stats(pos),
+        "by_stock": by_stock(pos),
+        "by_year": by_year(pos, w, inputs, s),
+        "sides": sides(pos, down, days),
+        "windows": windows(s, t, days) if s.split else None,
         "counts": counts.__dict__,
-        "trades": trades_rows(t),
+        "trades": trades_rows(pos),
         "booking": booking_summary(booking, eq_days, s),
     }
 
@@ -1063,6 +1320,51 @@ def booking_summary(booking: dict | None, eq_days: list, s: Settings) -> dict[st
     }
 
 
+def window_metrics(t: pd.DataFrame, weeks: list, s: Settings) -> dict[str, Any]:
+    """A window's book on its own: after-tax total (tax per financial year inside the window),
+    CAGR, drawdown, the weekly 90 % range, trades, win rate and the top 5 %'s share."""
+    if len(weeks) < 2:
+        return {"weeks": len(weeks)}
+    w = weekly_pnl(t, weeks, s.tax)
+    eq = np.concatenate([[s.capital], s.capital + w["after_tax"].cumsum().to_numpy()])
+    dd, _, _ = _max_dd(eq)
+    years = max((weeks[-1] - weeks[0]).days / 365.25, 1e-9)
+    total = float(w["after_tax"].sum())
+    pos = positions_of(t)
+    order = pos["pnl"].sort_values(ascending=False) if len(pos) else pd.Series(dtype=float)
+    k = max(1, int(len(pos) * 0.05))
+    net = float(pos["pnl"].sum()) if len(pos) else 0.0
+    return {
+        "first": _iso(weeks[0]),
+        "last": _iso(weeks[-1]),
+        "weeks": len(weeks),
+        "total_rs": round(total),
+        "total": total / s.capital,
+        "cagr": cagr(s.capital, s.capital + total, years),
+        "max_dd": dd,
+        "weekly_90": _bootstrap((w["after_tax"] / s.capital).to_numpy()),
+        "trades": len(pos),
+        "win_rate": float((pos["pnl"] > 0).mean()) if len(pos) else None,
+        "top5pct_share": float(order.iloc[:k].sum() / net) if net else None,
+        "net_without_top5pct_rs": round(float(order.iloc[k:].sum())) if len(pos) else 0,
+    }
+
+
+def windows(s: Settings, t: pd.DataFrame, days: list) -> dict[str, Any]:
+    """Train = weeks ending by the split day; test = weeks starting from it (a week across it is
+    in neither)."""
+    split = pd.Timestamp(s.split)
+    weeks = days[1:]
+    col = _week_col(t) if len(t) else "exit"
+    train = t[t[col] <= split] if len(t) else t
+    test = t[t["entry"] >= split] if len(t) else t
+    return {
+        "split": _iso(split),
+        "train": window_metrics(train, [d for d in weeks if d <= split], s),
+        "test": window_metrics(test, [d for d in days if d > split and d != days[0]], s),
+    }
+
+
 def min_capital(one: pd.DataFrame, weeks: list, s: Settings) -> dict[str, Any]:
     """One lot of every pick a week: premium needed (median, 90th percentile, largest) and the
     worst fall of that one-lot book before tax; suggested = 90th percentile + worst fall."""
@@ -1071,7 +1373,14 @@ def min_capital(one: pd.DataFrame, weeks: list, s: Settings) -> dict[str, Any]:
     prem = one.groupby("entry")["buy"].sum()
     per_trade = one["buy"]
     eq = np.concatenate(
-        [[0.0], one.groupby("exit")["pnl"].sum().reindex(weeks, fill_value=0.0).cumsum().to_numpy()]
+        [
+            [0.0],
+            one.groupby(_week_col(one))["pnl"]
+            .sum()
+            .reindex(weeks, fill_value=0.0)
+            .cumsum()
+            .to_numpy(),
+        ]
     )
     fall = float((eq - np.maximum.accumulate(eq)).min())
     p90 = float(prem.quantile(0.9))
@@ -1102,7 +1411,7 @@ def trade_stats(t: pd.DataFrame) -> dict[str, Any]:
     order = t["pnl"].sort_values(ascending=False)
     k = max(1, int(len(t) * 0.05))
     net = float(t["pnl"].sum())
-    weekly = t.groupby("exit")["pnl"].sum()
+    weekly = t.groupby(_week_col(t))["pnl"].sum()
     return {
         "trades": len(t),
         "win_rate": float((t["pnl"] > 0).mean()),
@@ -1206,16 +1515,22 @@ def trades_rows(t: pd.DataFrame) -> list[dict[str, Any]]:
         "p0",
         "p1",
         "exit_how",
+        "weeks",
         "buy",
         "sell",
         "costs",
         "pnl",
     ]
     rows = []
+    if "weeks" not in t.columns:
+        t = t.assign(weeks=1)
+    if "week_end" in t.columns:
+        cols = [*cols, "week_end"]
     for r in t[cols].itertuples(index=False):
         d = {k: (v.item() if hasattr(v, "item") else v) for k, v in r._asdict().items()}
-        for c in ("entry", "exit", "expiry"):
-            d[c] = _iso(d[c])
+        for c in ("entry", "exit", "expiry", "week_end"):
+            if c in d:
+                d[c] = _iso(d[c])
         for c in ("buy", "sell", "costs", "pnl"):
             d[c] = round(float(d[c]))
         for c in ("strike", "spot", "p0", "p1"):

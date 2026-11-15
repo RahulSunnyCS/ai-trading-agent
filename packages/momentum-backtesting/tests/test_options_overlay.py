@@ -113,7 +113,7 @@ def test_settings_are_validated():
     with pytest.raises(ValueError):
         ov.Settings(sizing="capital_share", sizing_value=None).validate()
     with pytest.raises(ValueError):
-        ov.Settings(moneyness="ITM1").validate()
+        ov.Settings(moneyness="ITM5").validate()
     ov.Settings(sizing="capital_share", sizing_value=0.2).validate()
 
 
@@ -147,7 +147,7 @@ def test_the_api_runs_as_a_job_and_refuses_calls_without_a_strategy():
         time.sleep(0.05)
     assert state["status"] == "failed" and state["error_status"] == 422
     assert "Pick a strategy" in state["error"]
-    assert client.post("/api/options-overlay/jobs", json={"moneyness": "ITM1"}).status_code == 422
+    assert client.post("/api/options-overlay/jobs", json={"moneyness": "ITM5"}).status_code == 422
     assert client.get("/api/options-overlay/jobs/nope").status_code == 404
 
 
@@ -246,3 +246,53 @@ def test_a_custom_strategy_is_a_valid_broad_request_on_fno_stocks():
                 {"lookbacks": [4], "rebalance": "daily"}):  # fmt: skip
         with pytest.raises(ValueError):
             overlay_runs.custom_config(bad)
+
+
+def test_hold_keeps_the_contract_without_a_sale_and_rebuy():
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0),
+              (D2, "ABC"): _chain(D2, exit_price=15.0)}  # fmt: skip
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.01, hold=True)
+    leg = ov.Leg(picks={D0: ["ABC"], D1: ["ABC"]}, right="CE")
+    counts = ov.BookCounts()
+    rows = ov.run_leg(leg, s, [D0, D1, D2], chains, SPOTS, _lots(), set(), ARR, counts)
+    w1, w2 = rows
+    assert w1["held_out"] and not w1["held_in"] and w2["held_in"] and not w2["held_out"]
+    assert w1["sell"] == pytest.approx(12.0 * 100)  # a mark: no slippage
+    assert w1["costs"] == pytest.approx(ov.costs(w1["buy"], 0.0, D1, orders=1))
+    assert w2["buy"] == pytest.approx(12.0 * 100) and counts.held == 1
+    pos = ov.positions_of(pd.DataFrame(rows))
+    assert len(pos) == 1 and pos.iloc[0]["weeks"] == 2
+    assert pos.iloc[0]["pnl"] == pytest.approx(w1["pnl"] + w2["pnl"])
+
+
+def test_itm_delta_expiry_skip_exposure_and_caps():
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0)}
+    leg = lambda: ov.Leg(picks={D0: ["ABC"]}, right="CE")  # noqa: E731
+    (t,), _ = _run(leg(), ov.Settings(moneyness="ITM1", min_sessions_left=15), chains)
+    assert t["strike"] == 95.0  # ATM 100, one strike in the money for a call
+    (t,), _ = _run(leg(), ov.Settings(moneyness="ATM", min_sessions_left=10, expiry_skip=1),
+                   chains)  # fmt: skip
+    assert t["expiry"] == NEXT  # NEAR qualifies, skipped once
+    real = pd.concat([_rows(D0, NEXT, [90.0, 100.0, 110.0], "CE", [13.0, 6.0, 2.0])])
+    (t,), _ = _run(leg(), ov.Settings(moneyness="DELTA", delta_target=0.8, min_sessions_left=15),
+                   {(D0, "ABC"): real, (D1, "ABC"): _chain(D1)})  # fmt: skip
+    assert t["strike"] == 90.0  # the deepest strike has the highest delta
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, sizing="exposure", sizing_value=1.0,
+                    capital=100_000.0)  # fmt: skip
+    (t,), _ = _run(leg(), s, chains)
+    assert t["lots"] >= 1
+    two = ov.Leg(picks={D0: ["ABC", "ABC"]}, right="CE")
+    trades, counts = _run(two, ov.Settings(min_sessions_left=15, max_positions=1), chains)
+    assert len(trades) == 1 and counts.capped == 1
+
+
+def test_a_stop_closes_on_the_first_daily_close_through_it():
+    mid = pd.Timestamp("2024-01-08")
+    chains = {(D0, "ABC"): _chain(D0), (mid, "ABC"): _chain(mid, exit_price=3.0),
+              (D1, "ABC"): _chain(D1, exit_price=12.0)}  # fmt: skip
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0, stop=0.5)
+    counts = ov.BookCounts()
+    (t,) = ov.trade_week(ov.Leg(picks={D0: ["ABC"]}, right="CE"), s, D0, D1, chains, SPOTS,
+                         _lots(), set(), ARR, counts, between=[mid, D1])  # fmt: skip
+    assert t["exit_how"] == "stop" and t["exit"] == mid and t["p1"] == 3.0
+    assert t["week_end"] == D1 and counts.stopped == 1
