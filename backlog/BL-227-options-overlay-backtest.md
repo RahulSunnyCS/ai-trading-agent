@@ -31,7 +31,9 @@ pre-registered item (`research/README.md`), and the page says so.
 From the dashboard, the owner picks a Momentum strategy (a saved favourite, or Broad settings on the F&O
 universe), the option settings and the capital, and gets within a minute: the options book against the
 same picks held as shares (equity, drawdown, after tax), the minimum capital it needed, win rate and
-payoff, the winners and losers by stock, every trade, and the year-by-year split.
+payoff, the winners and losers by stock, every trade, and the year-by-year split. The same page covers
+**downward momentum**: buying the puts of the stocks falling hardest, on their own or when the market
+itself is falling (owner, 2026-11-15: "if it is downward momentum, we can buy PE also").
 
 ## Out of scope
 
@@ -49,6 +51,20 @@ payoff, the winners and losers by stock, every trade, and the year-by-year split
   vectorised normal CDF and one session array; settings: right (calls, puts, the two put forms), moneyness
   (ATM, OTM1–OTM3), expiry rule (minimum sessions left), sizing (premium per stock, a fixed number of lots,
   or a share of capital a week), minimum OI in lots, slippage, capital, tax on or off.
+- **Downward momentum (puts):** the same score read from the bottom. A stock is a put candidate when it
+  is among the N worst-ranked F&O stocks that week **and** its own trend is down (its 26-week return below
+  zero and its close below its 200-day average), so a stock that is merely lagging a rising market is not
+  shorted. Only F&O stocks count (the review's finding: Broad's Gold, Silver, Nasdaq 100, Hang Seng, idle
+  cash and split segments are dropped from the bottom list). Direction modes:
+  - **Calls only:** BL-226's book.
+  - **Puts only:** the falling stocks' puts every week.
+  - **Market switch:** calls on the top N while the market is rising, puts on the bottom N while it is
+    falling. "Falling" is a setting: NIFTY below its 200-day average (the default), NIFTY's own 26-week
+    return below zero, or breadth (under 40 % of F&O stocks above their 200-day average). The switch is
+    read at the rebalance close, from closes up to that day.
+  - **Both sides:** calls on the top N and puts on the bottom N every week, the budget split between them
+    (a setting, 50 / 50 by default).
+  The page shows, for each run, how many weeks were in each state and what each side earned on its own.
 - **Deliverables:** the module, unit tests on synthetic chains (strike choice, expiry rule, re-strike,
   sizing modes, tax carry), and a parity test: with BL-226's settings it reproduces BL-226's registered
   numbers, except where a fix changes them (each change listed in this item).
@@ -91,10 +107,16 @@ payoff, the winners and losers by stock, every trade, and the year-by-year split
 
 1. Where does it live: under Momentum (it starts from a Momentum strategy), or in the Options Lab?
 2. Which sizing modes first: one lot per stock, premium per stock, or a share of capital a week?
-3. Include the puts (both forms) in the first version, or calls only?
+3. ~~Include the puts in the first version?~~ Answered 2026-11-15 (owner): yes, downward momentum is in
+   (Phase 1's direction modes). Still open: is 26-week return < 0 and below the 200-day average the right
+   "own trend down" test, or should the bottom N alone be enough?
 4. Should the data refresh wait for BL-107's job, or have its own now?
 
 ## Log
 
 - 2026-11-15 — created at the owner's request after BL-226 was killed ("add this as a separate item in
   backtesting"); planned in four phases, not started.
+- 2026-11-15 — owner: add downward momentum (buy the puts of falling stocks). Added to Phase 1 as direction
+  modes (calls only, puts only, market switch, both sides). Untested: BL-226's Phase 4 never ran (its gate
+  needed a passing call book), so these runs are descriptive until a pre-registered item tests one.
+
