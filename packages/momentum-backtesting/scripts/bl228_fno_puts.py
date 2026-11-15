@@ -325,9 +325,12 @@ def build(out: Path, *, mirror: bool = False):
         chains.setdefault(d, {})[sym] = g
     spots = ob.spot_closes(days)
     lots = ob.lot_sizes()
+    # learning weeks only: the confirmation years' signals stay unread until a book is carried
+    learn_down = pd.Series({w: v for w, v in down.items() if FIRST_ENTRY <= w <= ob.LEARN_END})
+    by_year = learn_down.groupby(lambda w: w.year)
     meta = {
-        "down_weeks_by_year": pd.Series(down).groupby(lambda w: w.year).sum().astype(int).to_dict(),
-        "weeks_by_year": pd.Series(down).groupby(lambda w: w.year).size().to_dict(),
+        "down_weeks_by_year": by_year.sum().astype(int).to_dict(),
+        "weeks_by_year": by_year.size().to_dict(),
         "banned_skips": {f"N{n}-{f}": v for (n, f), v in skipped.items()},
     }
     if mirror:
@@ -335,6 +338,8 @@ def build(out: Path, *, mirror: bool = False):
         for (n, _), lst in lists.items():
             by_year: dict[int, list[bool]] = {}
             for d, v in lst.items():
+                if d > ob.LEARN_END:
+                    continue
                 by_year.setdefault(d.year, []).extend(s.endswith("|PE") for s in v)
             meta["put_share_by_year"][f"N{n}"] = {
                 y: round(float(np.mean(v)), 3) if v else None for y, v in sorted(by_year.items())
@@ -362,7 +367,7 @@ def run_all(out: Path, *, confirm_books: list[str] | None, mirror: bool = False)
             if confirm_books is None:
                 tl = trades[trades["exit"] <= ob.LEARN_END] if len(trades) else trades
                 tl.to_csv(out / f"trades-learn-{bid}-{variant}.csv", index=False)
-                results[tag] = {"learning": score(tl, learn_w)}
+                results[tag] = {"learning": score(tl, learn_w), "counts": counts}
             else:
                 tc = trades[trades["entry"] >= ob.CONFIRM_START] if len(trades) else trades
                 tc.to_csv(out / f"trades-confirm-{bid}-{variant}.csv", index=False)

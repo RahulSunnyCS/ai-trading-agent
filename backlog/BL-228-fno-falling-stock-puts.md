@@ -162,9 +162,9 @@ With double slippage: +₹11.1 lakh (−51 %) and +₹18.8 lakh (−67 %).
 
 Descriptive (learning trades, before tax; not part of the verdict):
 - **The pool tilts as intended:** puts were 37 % (2020), 3 % (2021), 40 % (2022), 26 % (2023) and 6 % (2024)
-  of the top 5's positions.
+  of the top 5's positions (learning years only; the confirmation years' picks are not read).
 - **The gain is all the calls'.** Top 5: calls +₹24.6 lakh on 550 trades (47 % won), puts −₹1.7 lakh on 161
-  (32 %). Top 10: calls +₹44.4 lakh, puts −₹4.7 lakh. The puts made money only in 2020.
+  (32 %). Top 10: calls +₹44.4 lakh, puts −₹4.7 lakh. The puts made money in 2020 (and the top 5's, ₹11k, in 2021), lost after.
 - **The gain is concentrated:** the top 5 % of trades made 173 % (top 5) and 189 % (top 10) of the net; without
   them the books lose ₹16.8 lakh and ₹35.2 lakh. 2021 alone made ₹15.1 lakh of the top 5's calls.
 - **Read with BL-226:** the call side is BL-226's kind of book at one lot each, and BL-226's call books failed
@@ -176,7 +176,7 @@ way. NIFTY's falling weeks help a little (the gated books lose less, mostly beca
 often), but none of them earns.
 
 **Caveats:** daily closes, not quotes; a missing exit row booked at zero (0–5 trades a book); 2020's crash is in
-the learning years, the only year the puts made money.
+the learning years, the puts' one clearly profitable year.
 
 ## Risks
 

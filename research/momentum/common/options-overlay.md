@@ -36,7 +36,7 @@ Not used. The live Momentum book holds shares on Kite.
   falling weeks (registered, BL-228): a stock already down on 1 to 52 weeks and below its average tends not
   to keep falling fast enough within a week to pay for the put.
 - Ranking stocks and their inverse charts together (BL-228 Phase 0b) tilts the book to puts in falling years
-  (37–43 % of positions in 2020, 2022, 2025, 2026; 3–7 % in 2021 and 2024), but its puts lost money and its
+  (37–43 % of positions in 2020 and 2022; 3–7 % in 2021 and 2024), but its puts lost money and its
   gain was its calls' (descriptive split of the registered books); its top 5 % of trades made more than all
   of its net.
 
