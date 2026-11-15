@@ -1,6 +1,6 @@
 # Momentum: universe, dates and weekly data
 
-**Status:** Tested · **Last updated:** 2026-11-02
+**Status:** Tested · **Last updated:** 2026-11-15
 
 ## What it is
 
@@ -12,7 +12,7 @@ Which names can be ranked, over which dates, and how daily prices become weekly 
 | `end` | None = latest (Config) | Last week of the backtest. Used to define evaluation windows | R |
 | `universe` / `include_optional` | every `core` row, optional off (Config) | Which instruments are ranked. Core is 21 rows in `universe.csv` (4 broad, 13 sector/thematic, gold, silver, Nasdaq 100, Hang Seng). Optional rows have ETF turnover below about 2 crore a day or overlap heavily with a core row | R |
 | Weekly close | last trading day of each Mon-Fri week, labelled Friday | Turns daily data into the signal frequency: one decision per week | R |
-| `broad_universe` (Broad only) | `total_market` in the request model; `turnover_rank` for a new dashboard run since 2026-10-10 | `total_market`: today's ~755 Nifty Total Market names for every year. `all_liquid`: every NSE equity, narrowed weekly by the tradability gate. `turnover_rank`: the top 750 by turnover as known each January (point in time), gated like `all_liquid` | M, BL-010 Phase 3 |
+| `broad_universe` (Broad only) | `total_market` in the request model; `turnover_rank` for a new dashboard run since 2026-10-10 | `total_market`: today's ~755 Nifty Total Market names for every year. `all_liquid`: every NSE equity, narrowed weekly by the tradability gate. `turnover_rank`: the top 750 by turnover as known each January (point in time), gated like `all_liquid`. `fno` (BL-226, research only): the F&O stocks of each week, from `lake/eod/fno_universe/` (`obt nse fno-build`) | M, BL-010 Phase 3 |
 
 ## Live value
 
@@ -36,6 +36,7 @@ Which names can be ranked, over which dates, and how daily prices become weekly 
 | BL-010 Phase 4 | all 8,003 configs re-scored on the point-in-time universe | same | Single-winner selection killed (PBO) | Median 28.1%, best 56.0% (today's list 33.4% / 77.3%; Mom30 TRI 17.0%). PBO 0.69, 0.53 within the 40% drawdown ceiling (today's list 0.48 / 0.20). 82% of configs still beat Mom30 TRI by 5 points pre-tax |
 | BL-036 Phase 1 | default Broad run, today's list vs point in time | 2017-01-06 to 2026-10-09, pre-tax, circuit locks and tradability filter on | Point in time made the default | Today's list 41.4%, worst fall -29.3%, Sharpe 1.28; point in time 33.3%, -33.6%, Sharpe 1.09 |
 | [BL-176](../../../backlog/BL-176-momentum-search-on-f6-ranking.md) arms | point-in-time `turnover_rank` pool (A, B) vs the ~4,000-name all-liquid universe (C1, extended tags) | Broad, 2017-01 to 2026-10, F6 ranking, Stage 1 (one sampled Friday, ₹50k sleeve; 20,000 runs per arm A tag set, 10,000 B, 4,000 C1) | Descriptive: the wider universe is no better; direct rank (B) far worse | Median lower-bound FY excess / CAGR: A curated about −9.6 / 22.0%, A extended −9.2 / 20.9%, C1 −11.4 / 19.4%, B −20.4 / 8.0%. One C1 config (`d7b06967be4e`) made the extended ensemble. `search_spaces/bl176_stage1_axes.csv` |
+| [BL-226](../../../backlog/BL-226-fno-momentum-stock-options.md) | `fno`: the stocks whose futures NSE listed that week (from the daily F&O bhavcopy, 2019 →) | Broad, learning 2020-01 to 2024-06, confirmation 2024-07 to 2026-11, after tax, ₹10 lakh | Descriptive (Phase 2 only chose candidates) | Best learning runs 29-34% a year after tax (Four-Strategy Mix 31.3%, max DD −24%); the same three runs 5-11% a year in confirmation (Nifty 1.4%). Short look-backs worst: every 3-month cell below Calmar 0.52 |
 
 ## What we know
 

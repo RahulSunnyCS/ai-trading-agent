@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a new strategy family over data we do not hold yet; behind finishing Momentum this month (BL-010, BL-001, BL-024, BL-025) |
-| **Status** | In progress |
+| **Status** | Done — killed |
 | **Type** | research |
 | **Area** | momentum / options / trading-data |
 | **Created** | 2026-11-15 |
@@ -162,6 +162,27 @@ This block is the pre-registration; it is committed before any run and never edi
   the day's F&O bhavcopy; 20 weeks before any real money.
 - **Done when:** 20 forward weeks scored against the pass rule.
 
+## Result
+
+**Killed (2026-11-15).** On the locked confirmation weeks (2024-07 → 2026-11, 124 weeks) none of the nine
+registered call books (three candidates × ATM / OTM1 / OTM2) passes: every one fails the drawdown rule, seven
+lose money after tax, and no 90 % interval of the weekly difference is above zero. Phase 4 (puts) was not
+run, by its own gate (only after a passing call book); Phase 5 is moot.
+
+- **Learning (2020-01 → 2024-06):** the books made +511 % to +1,190 % on ₹10 lakh after tax, against +229 %
+  to +289 % for the same stocks held; one book (Trio ATM) met all three rules.
+- **Confirmation:** Trio ATM +42 % against +27 % for the stock, but a −82 % drawdown on the ₹10 lakh
+  (limit −42 %) and an interval of −1.57 to +1.27 % a week; its confirmation net comes from its top 21
+  trades (5 %): without them it loses ₹22.6 lakh before tax. Mix ATM −182 %, grid ATM −444 %.
+- **Why:** the gain is leverage. In every book the same delta held in shares earned more before tax than the
+  calls; the stock signal itself weakened after mid-2024 (5–11 % a year after tax, Phase 2), and a book
+  that spends ₹2–11 lakh of premium a week on ₹10 lakh multiplies a weak signal's losses.
+- **Kept:** the NSE F&O history and the point-in-time F&O list (`obt nse fo-fetch / fno-build`, BL-107's
+  reader), the `fno` Broad universe (`broad_universe="fno"`), and the two research scripts.
+- **Caveats:** daily closes, not tradable quotes (slippage 1–3 % assumed, doubled as a sensitivity); a
+  contract missing on the exit day (a corporate action re-strikes it) is booked at zero; results-week skip
+  not run (no results calendar); the stock signal's years were searched before (Phase 0 caveat).
+
 ## Risks
 
 - **Liquidity:** OTM2 calls of mid-caps can go days without a trade; bhavcopy closes are then stale. The OI
@@ -269,3 +290,20 @@ Answered 2026-11-15 (Phase 0). As first asked:
   gain is leverage, not convexity. Skips: strikes under 10 lots of OI (Mix 3,575 of 9,318 stock attempts), the
   favourites' Gold, Silver, Nasdaq 100, Hang Seng and idle-cash holdings (no stock options; their budget is
   left unspent, the stock comparator keeps them), one lot dearer than twice the budget (Mix 1,287).
+- 2026-11-15 — scratch outputs lost at an app restart; the Phase 2 confirmation and the Phase 3 books re-run into
+  `packages/momentum-backtesting/data/bl226/` (git-ignored): the learning figures reproduced to the rupee.
+- 2026-11-15 — **Phase 3 confirmation (registered verdict): killed.** Base books on 2024-07-05 → 2026-11-13:
+
+  | Book | Moneyness | Options total | Options DD | Stock total | Stock DD | Weekly diff 90 % | Win rate | Pass |
+  |---|---|---|---|---|---|---|---|---|
+  | Mix | ATM | -182 % | -308 % | +17 % | -22 % | -5.28 to +1.80 % | 37 % | no |
+  | Mix | OTM1 | -395 % | -474 % | +17 % | -22 % | -6.94 to -0.37 % | 35 % | no |
+  | Mix | OTM2 | -591 % | -708 % | +17 % | -22 % | -9.00 to -1.87 % | 32 % | no |
+  | Grid 12m top 10 | ATM | -444 % | -579 % | +10 % | -19 % | -8.83 to +0.47 % | 40 % | no |
+  | Grid 12m top 10 | OTM1 | -852 % | -970 % | +10 % | -19 % | -12.08 to -2.88 % | 37 % | no |
+  | Grid 12m top 10 | OTM2 | -979 % | -1125 % | +10 % | -19 % | -13.61 to -3.68 % | 35 % | no |
+  | Trio | ATM | +42 % | -82 % | +27 % | -28 % | -1.57 to +1.27 % | 41 % | no |
+  | Trio | OTM1 | +26 % | -108 % | +27 % | -28 % | -1.93 to +1.24 % | 39 % | no |
+  | Trio | OTM2 | -49 % | -171 % | +27 % | -28 % | -2.79 to +0.55 % | 34 % | no |
+
+  Double slippage and the IV cap fail too. Phase 4 not run (its gate). Item closed; Result above.

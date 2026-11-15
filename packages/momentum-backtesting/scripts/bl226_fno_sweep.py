@@ -183,6 +183,7 @@ def rank(out: Path) -> list[dict[str, Any]]:
 
 def confirm(args: argparse.Namespace) -> None:
     out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
     entries = {e["id"]: e for e in grid() + favourite_groups(Path(args.favourites))}
     rows = []
     for pid in args.pick:
