@@ -138,3 +138,7 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
   likely a dividend adjustment) are still booked at zero and counted. A week's same contract bought by two
   sleeves is one position (lots added). Phase 4 (daily data refresh) not started: the F&O lake ends
   2026-11-13 until `obt nse fo-fetch` is run again.
+- 2026-11-15 — PR #452 review: fixed the spinner after a lost job, the weekly-share budget split over
+  skipped picks, the chain cache (only traded (day, stock) pairs, bounded), concurrent cold runs (a lock per
+  key) and the favourite cache (newest four). Not done: a benchmark picker on the headline strip and widgets
+  loaded after the chart's first paint (Analytics page pattern); the comparison is fixed (shares, else NIFTY).

@@ -47,6 +47,7 @@ BREADTH_BELOW = 0.40
 TAX_RATE = 0.30 * 1.04
 RESTRIKE_TOLERANCE = 0.01
 BOOT_DRAWS, BOOT_BLOCK, SEED = 2000, 4, 20261115
+CHAIN_KEPT = 60_000  # (day, symbol) chains kept in memory between runs
 OPTION_COLUMNS = [
     "date",
     "symbol",
@@ -137,6 +138,8 @@ class Lake:
         self._spots: pd.DataFrame | None = None
         self._spot_days: set[pd.Timestamp] = set()
         self._cache: dict[str, Any] = {}
+        self._key_locks: dict[str, threading.Lock] = {}
+        self._groups: dict[str, list[str]] = {}
 
     def _check(self) -> None:
         days = sorted(p.name[5:] for p in _fo_dir().glob("date=*"))
@@ -147,6 +150,7 @@ class Lake:
             self._key = key
             self._chains.clear()
             self._cache.clear()
+            self._groups.clear()
             self._spots, self._spot_days = None, set()
             self._cache["sessions"] = [pd.Timestamp(d) for d in days]
 
@@ -211,28 +215,29 @@ class Lake:
                 )
             return self._cache["nifty"]
 
-    def chains(self, days: list[pd.Timestamp], symbols: set[str]) -> dict:
-        """{(day, symbol): that day's OPTSTK rows}, loading only what is not cached."""
+    def chains(self, pairs: set[tuple[pd.Timestamp, str]]) -> dict:
+        """{(day, symbol): that day's OPTSTK rows} for exactly the pairs a run trades (entry and
+        exit days), loading only what is not cached; the cache is cleared past CHAIN_KEPT pairs."""
         import duckdb
 
         with self._lock:
             self._check()
-            want = [(d, s) for d in days for s in symbols if (d, s) not in self._chains]
+            want = sorted(p for p in pairs if p not in self._chains)
             if want:
-                need_days = sorted({d for d, _ in want})
-                need_syms = sorted({s for _, s in want})
-                day_list = ",".join(f"DATE '{d.date()}'" for d in need_days)
-                sym_list = ",".join("'" + s.replace("'", "''") + "'" for s in need_syms)
+                if len(self._chains) + len(want) > CHAIN_KEPT:
+                    self._chains.clear()
+                    want = sorted(pairs)
+                wanted = pd.DataFrame({"d": [d.date() for d, _ in want], "s": [s for _, s in want]})
+                day_list = ",".join(f"DATE '{d}'" for d in sorted(set(wanted["d"])))
                 glob = str(_fo_dir() / "date=*" / "data.parquet")
-                df = (
-                    duckdb.connect()
-                    .execute(
-                        f"SELECT {', '.join(OPTION_COLUMNS)} FROM read_parquet('{glob}') "
-                        f"WHERE instrument = 'OPTSTK' AND date IN ({day_list}) "
-                        f"AND symbol IN ({sym_list})"
-                    )
-                    .df()
-                )
+                con = duckdb.connect()
+                con.register("wanted", wanted)
+                cols = ", ".join(f"f.{c}" for c in OPTION_COLUMNS)
+                df = con.execute(
+                    f"SELECT {cols} FROM read_parquet('{glob}') f "
+                    "JOIN wanted w ON f.date = w.d AND f.symbol = w.s "
+                    f"WHERE f.instrument = 'OPTSTK' AND f.date IN ({day_list})"
+                ).df()
                 for c in ("date", "expiry"):
                     df[c] = pd.to_datetime(df[c])
                 for key, g in df.groupby(["date", "symbol"]):
@@ -240,7 +245,7 @@ class Lake:
                 empty = df.iloc[0:0]
                 for key in want:
                     self._chains.setdefault(key, empty)
-            return {(d, s): self._chains[(d, s)] for d in days for s in symbols}
+            return {p: self._chains[p] for p in pairs}
 
     def spots(self, days: list[pd.Timestamp]) -> pd.DataFrame:
         """date x symbol unadjusted cash closes (the EQ series first) on the given days."""
@@ -266,15 +271,27 @@ class Lake:
                 self._spot_days |= set(missing)
             return self._spots
 
-    def remember(self, key: str, make):
-        """A value cached until the lake changes (the stock frame, a weak list)."""
+    def remember(self, key: str, make, *, group: str | None = None, keep: int = 0):
+        """A value cached until the lake changes (the stock frame, a weak list, a favourite's
+        re-run). Computed once even when two runs ask at the same time (a lock per key); with
+        `group`, only the newest `keep` keys of that group are kept."""
         with self._lock:
             self._check()
             if key in self._cache:
                 return self._cache[key]
-        value = make()
-        with self._lock:
-            self._cache[key] = value
+            key_lock = self._key_locks.setdefault(key, threading.Lock())
+        with key_lock:
+            with self._lock:
+                if key in self._cache:
+                    return self._cache[key]
+            value = make()
+            with self._lock:
+                self._cache[key] = value
+                if group is not None:
+                    order = self._groups.setdefault(group, [])
+                    order.append(key)
+                    while len(order) > keep:
+                        self._cache.pop(order.pop(0), None)
         return value
 
 
@@ -465,9 +482,7 @@ def run_leg(
         items = leg.picks.get(d0, [])
         if not items:
             continue
-        per_stock = leg.per_stock
-        if leg.weekly_total is not None:
-            per_stock = leg.weekly_total / len(items)
+        ready = []  # the picks that can be bought, before sizing
         for item in items:
             sym, right = item.split("|", 1) if "|" in item else (item, leg.right)
             counts.entries += 1
@@ -512,6 +527,12 @@ def run_leg(
             if not p0 > 0:  # NaN or zero: no price to buy at
                 counts.no_contract += 1
                 continue
+            ready.append((sym, right, expiry, k, lot, p0, traded, spot))
+        per_stock = leg.per_stock
+        if leg.weekly_total is not None and ready:
+            # the week's budget over the picks that can be bought, not the skipped ones
+            per_stock = leg.weekly_total / len(ready)
+        for sym, right, expiry, k, lot, p0, traded, spot in ready:
             one_lot = p0 * lot
             if per_stock is None:
                 n_lots = 1
@@ -779,8 +800,13 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
             picks = {d: (v if down.get(d, False) else []) for d, v in picks.items()}
         legs.append(Leg(picks=picks, right="PE", per_stock=per, weekly_total=total, tag="puts"))
 
-    symbols = {i.split("|", 1)[0] for leg in legs for v in leg.picks.values() for i in v}
-    chains = LAKE.chains(days, symbols) if symbols else {}
+    pairs: set[tuple[pd.Timestamp, str]] = set()
+    for leg in legs:
+        for d0, d1 in zip(days[:-1], days[1:], strict=True):
+            for item in leg.picks.get(d0, []):
+                sym = item.split("|", 1)[0]
+                pairs |= {(d0, sym), (d1, sym)}
+    chains = LAKE.chains(pairs) if pairs else {}
     spots = LAKE.spots(days)
     lots, bans = LAKE.lots(), LAKE.bans()
     counts = BookCounts()

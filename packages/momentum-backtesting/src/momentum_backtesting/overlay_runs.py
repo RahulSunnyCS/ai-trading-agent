@@ -105,7 +105,8 @@ def strategy_inputs(fid: str, start: str, end: str | None) -> ov.Inputs:
         blend = pd.concat(equities, axis=1).ffill().mean(axis=1)
         return ov.Inputs(sleeves=sleeves, stock_equity=blend, strategy_name=record.get("name"))
 
-    return ov.LAKE.remember(f"favourite:{fid}:{start}:{end}", make)
+    # a few favourite re-runs kept (each holds weekly weights and equity), newest last
+    return ov.LAKE.remember(f"favourite:{fid}:{start}:{end}", make, group="favourite", keep=4)
 
 
 SETTING_FIELDS = tuple(ov.Settings.__dataclass_fields__)

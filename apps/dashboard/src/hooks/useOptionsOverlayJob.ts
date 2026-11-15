@@ -30,7 +30,9 @@ export function useOptionsOverlayJob(): OptionsOverlayJobState {
     { enabled: jobId !== null, ...(polling ? { intervalMs: POLL_MS } : {}) },
   );
   const job = data && data.id === jobId ? data : null;
-  const running = starting || (jobId !== null && (job === null || job.status === 'running'));
+  // a poll error with no job (404: the service restarted and forgot it) ends the wait
+  const running =
+    starting || (jobId !== null && (job === null ? error === null : job.status === 'running'));
   if (polling !== running) setPolling(running);
 
   const start = useCallback(async (request: OverlayRequest) => {

@@ -66,6 +66,9 @@ def test_sizing_one_lot_premium_and_pnl():
     assert t["lots"] == 5
     two, _ = _run(ov.Leg(picks={D0: ["ABC", "ABC"]}, right="CE", weekly_total=3200.0), s, chains)
     assert [x["lots"] for x in two] == [2, 2]  # 3200 over two picks = 1600 a stock = 2 lots
+    # a skipped pick (not a stock) does not take a share of the week's budget
+    (t,), _ = _run(ov.Leg(picks={D0: ["ABC", "GOLD"]}, right="CE", weekly_total=1600.0), s, chains)
+    assert t["lots"] == 2
     trades, counts = _run(ov.Leg(picks={D0: ["ABC"]}, right="CE", per_stock=300.0), s, chains)
     assert trades == [] and counts.too_dear == 1
 
