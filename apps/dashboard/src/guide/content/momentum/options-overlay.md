@@ -65,6 +65,9 @@ booked at zero. Costs: ₹20 an order, STT on the sale, exchange and SEBI charge
 - **Capital it needed**: one lot of every pick each week. The premium a week (median, 90th
   percentile, largest), one lot's cost, positions a week, and the worst fall of that one-lot book.
   Suggested capital = the 90th-percentile week's premium + that fall.
+  When the capital you set is below it, a red note says the percentages are not meaningful.
+- **Chart tooltip**: hovering a week lists the options bought that day, puts and calls apart (×N =
+  N lots, e.g. one from each sleeve of a group).
 - **Chart**: the growth of the options book, the same picks as shares and NIFTY. **Drawdown** adds
   the book's fall from its high.
 - **Trades**: win rate, payoff (average win ÷ average loss), weeks won, and the net without the best

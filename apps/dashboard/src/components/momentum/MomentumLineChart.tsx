@@ -16,6 +16,15 @@ export interface ChartLine {
   dash?: 'solid' | 'dot';
   /** Shade between the line and zero (an underwater curve). */
   fill?: boolean;
+  /** Extra hover lines per date (same length as `dates`; '' for none), shown under the value. */
+  hover?: ReadonlyArray<string>;
+}
+
+/** Plotly hover text is HTML: escape it, and turn newlines into line breaks. */
+function hoverHtml(text: string): string {
+  if (!text) return '';
+  const safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<br>${safe.replace(/\n/g, '<br>')}`;
 }
 
 /**
@@ -65,7 +74,12 @@ export function MomentumLineChart({
           dash: line.dash ?? 'solid',
         },
         ...(line.fill ? { fill: 'tozeroy', fillcolor: withAlpha(colour[line.role], 0.18) } : {}),
-        hovertemplate: `${line.name} %{y:.1%}<extra></extra>`,
+        ...(line.hover
+          ? {
+              customdata: line.hover.map(hoverHtml),
+              hovertemplate: `${line.name} %{y:.1%}%{customdata}<extra></extra>`,
+            }
+          : { hovertemplate: `${line.name} %{y:.1%}<extra></extra>` }),
       }));
       await plotly.react(
         element,
@@ -78,7 +92,7 @@ export function MomentumLineChart({
           ...plotlyChrome(colors),
           showlegend: false,
           hovermode: 'x unified',
-          xaxis: { type: 'date', gridcolor: colors.grid },
+          xaxis: { type: 'date', gridcolor: colors.grid, hoverformat: '%d %b %Y' },
           yaxis: { gridcolor: colors.grid, tickformat: '.0%', zerolinecolor: colors.border },
         },
         { responsive: true, displaylogo: false, displayModeBar: false, staticPlot: false },

@@ -30,6 +30,7 @@ import {
   MARKET_FILTER_LABEL,
   MONEYNESS,
   SIZING_LABEL,
+  boughtByDay,
   countRows,
   growthLines,
   needsStrategy,
@@ -498,7 +499,9 @@ function OverlayResultView({
   const compareName = shares ? 'shares' : 'NIFTY';
   const lines = useMemo<ChartLine[]>(() => {
     const g = growthLines(result);
-    const out: ChartLine[] = [{ name: 'Options book', values: g.options, role: 'strategy' }];
+    const out: ChartLine[] = [
+      { name: 'Options book', values: g.options, role: 'strategy', hover: boughtByDay(result) },
+    ];
     if (g.shares) out.push({ name: 'Same picks as shares', values: g.shares, role: 'benchmark' });
     if (g.nifty) out.push({ name: 'NIFTY', values: g.nifty, role: 'benchmark', dash: 'dot' });
     return out;
@@ -508,8 +511,22 @@ function OverlayResultView({
     [result],
   );
 
+  const short =
+    mc.suggested_rs !== null && result.settings.capital < mc.suggested_rs ? mc.suggested_rs : null;
+
   return (
     <>
+      {short !== null ? (
+        <p className="flex items-start gap-2 rounded-lg border border-negative/30 bg-negative/10 px-3 py-2 text-xs text-muted">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-negative" aria-hidden />
+          <span>
+            Capital {formatInr(result.settings.capital, { compact: true })} is below the{' '}
+            {formatInr(short, { compact: true })} this book needed at one lot of each pick, so its
+            percentages and drawdown are not meaningful. Raise the capital, or read the rupee
+            figures.
+          </span>
+        </p>
+      ) : null}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <StatCard
           label={result.settings.tax ? 'Total, after tax' : 'Total, before tax'}

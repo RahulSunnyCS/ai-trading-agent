@@ -146,3 +146,33 @@ export function countRows(counts: Record<string, number>): Array<{ label: string
     .map(([key, value]) => ({ label: COUNT_LABEL[key] ?? key, value }))
     .sort((a, b) => b.value - a.value);
 }
+
+/** Names a hover line shows before "+N more". */
+const HOVER_NAMES = 12;
+
+function nameList(names: string[]): string {
+  const shown = names.slice(0, HOVER_NAMES).join(', ');
+  return names.length > HOVER_NAMES ? `${shown} +${names.length - HOVER_NAMES} more` : shown;
+}
+
+/**
+ * For each day of the chart, the options bought that day (the week's positions, held to the next
+ * point): "Puts (3): A, B, C" and "Calls (2): D, E" on their own lines; '' when nothing was bought.
+ */
+export function boughtByDay(result: OverlayResult): string[] {
+  const byDay = new Map<string, { CE: string[]; PE: string[] }>();
+  for (const trade of result.trades) {
+    const day = byDay.get(trade.entry) ?? { CE: [], PE: [] };
+    const label = trade.lots > 1 ? `${trade.symbol} ×${trade.lots}` : trade.symbol;
+    if (!day[trade.right].includes(label)) day[trade.right].push(label);
+    byDay.set(trade.entry, day);
+  }
+  return result.series.days.map((d) => {
+    const day = byDay.get(d);
+    if (!day) return '';
+    const lines: string[] = [];
+    if (day.PE.length) lines.push(`Puts (${day.PE.length}): ${nameList([...day.PE].sort())}`);
+    if (day.CE.length) lines.push(`Calls (${day.CE.length}): ${nameList([...day.CE].sort())}`);
+    return lines.join('\n');
+  });
+}
