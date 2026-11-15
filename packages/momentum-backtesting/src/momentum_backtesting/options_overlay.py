@@ -79,6 +79,11 @@ class Settings:
     put_share: float = 0.5  # both sides: the puts' share of the budget
     start: str = "2020-01-01"
     end: str | None = None
+    #: Profit booking: each time the trading account is this many rupees above where it last
+    #: booked, `withdraw_share` of each step is taken out and the rest stays to trade; None = off
+    #: (every week sized on `capital`, nothing taken out).
+    profit_step: float | None = None
+    withdraw_share: float = 0.75
 
     def validate(self) -> None:
         if self.moneyness not in MONEYNESS:
@@ -99,6 +104,10 @@ class Settings:
             raise ValueError("Slippage must be between 0 and 50 % of premium.")
         if not 1 <= self.min_sessions_left <= 60:
             raise ValueError("Sessions left must be between 1 and 60.")
+        if self.profit_step is not None and self.profit_step <= 0:
+            raise ValueError("The profit step must be above zero.")
+        if not 0 <= self.withdraw_share <= 1:
+            raise ValueError("The share taken out must be between 0 and 1.")
 
     @property
     def slip(self) -> float:
@@ -450,6 +459,7 @@ class BookCounts:
     too_dear: int = 0
     restruck: int = 0
     zero_booked: int = 0
+    no_capital: int = 0  # profit booking: the trading account could not pay for it
 
 
 def _expiry(rows: pd.DataFrame, day: pd.Timestamp, sessions: np.ndarray, min_left: int):
@@ -476,9 +486,33 @@ def run_leg(
 ) -> list[dict]:
     """Trades for one leg over consecutive rebalance days (each entry exits on the next day)."""
     trades = []
+    for d0, d1 in zip(days[:-1], days[1:], strict=True):
+        trades += trade_week(leg, s, d0, d1, chains, spots, lots, bans, sessions, counts)
+    return trades
+
+
+def trade_week(
+    leg: Leg,
+    s: Settings,
+    d0: pd.Timestamp,
+    d1: pd.Timestamp,
+    chains: dict,
+    spots: pd.DataFrame,
+    lots: pd.Series,
+    bans: set,
+    sessions: np.ndarray,
+    counts: BookCounts,
+    *,
+    scale: float = 1.0,
+    afford: float | None = None,
+) -> list[dict]:
+    """One leg's entries on d0, sold on d1. `scale` multiplies the leg's budget (profit booking:
+    the trading account against the starting capital); `afford` caps the premium a one-lot book
+    may spend this week (picks in order until it runs out)."""
+    trades: list[dict] = []
     offset = MONEYNESS[s.moneyness]
     slip = s.slip
-    for d0, d1 in zip(days[:-1], days[1:], strict=True):
+    for _ in (0,):
         items = leg.picks.get(d0, [])
         if not items:
             continue
@@ -528,15 +562,23 @@ def run_leg(
                 counts.no_contract += 1
                 continue
             ready.append((sym, right, expiry, k, lot, p0, traded, spot))
-        per_stock = leg.per_stock
+        per_stock = None if leg.per_stock is None else leg.per_stock * scale
         if leg.weekly_total is not None and ready:
             # the week's budget over the picks that can be bought, not the skipped ones
-            per_stock = leg.weekly_total / len(ready)
+            per_stock = leg.weekly_total * scale / len(ready)
         for sym, right, expiry, k, lot, p0, traded, spot in ready:
             one_lot = p0 * lot
             if per_stock is None:
+                if afford is not None:
+                    if one_lot * (1 + slip) > afford:
+                        counts.no_capital += 1
+                        continue
+                    afford -= one_lot * (1 + slip)
                 n_lots = 1
             else:
+                if per_stock <= 0:
+                    counts.no_capital += 1
+                    continue
                 if one_lot > 2 * per_stock:
                     counts.too_dear += 1
                     continue
@@ -811,12 +853,16 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
     lots, bans = LAKE.lots(), LAKE.bans()
     counts = BookCounts()
     trades: list[dict] = []
-    for leg in legs:
-        trades += run_leg(leg, s, days, chains, spots, lots, bans, sessions, counts)
+    booking = None
+    if s.profit_step is None:
+        for leg in legs:
+            trades += run_leg(leg, s, days, chains, spots, lots, bans, sessions, counts)
+    else:
+        trades, booking = run_booked(legs, s, days, chains, spots, lots, bans, sessions, counts)
     tdf = merge_positions(pd.DataFrame(trades))
     # one lot of everything, for the minimum-capital table (the same picks at one lot each)
-    if s.sizing == "one_lot":
-        one = tdf
+    if s.sizing == "one_lot" and s.profit_step is None:
+        one = tdf  # with booking the account skips picks it cannot pay for: run every pick
     else:
         c2 = BookCounts()
         one_legs = [Leg(picks=leg.picks, right=leg.right, tag=leg.tag) for leg in legs]
@@ -829,7 +875,48 @@ def run(s: Settings, inputs: Inputs) -> dict[str, Any]:
                 ]
             )
         )
-    return summarise(s, inputs, tdf, one, days, counts, down)
+    return summarise(s, inputs, tdf, one, days, counts, down, booking)
+
+
+def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, counts):
+    """The book week by week with profit booking. The trading account starts at `capital`, takes
+    each week's P&L (before tax) and sizes the next week on itself: the budgets scale by account /
+    capital, and a one-lot book buys only the picks the account can pay for. Each time it stands a
+    whole `profit_step` (or more) above where it last booked, `withdraw_share` of those steps is
+    taken out and the rest stays to trade; a loss must be made back before the next booking."""
+    trades: list[dict] = []
+    account = base = s.capital
+    taken = 0.0
+    account_by_day = {days[0]: account}
+    taken_by_day = {days[0]: 0.0}
+    events = []
+    for d0, d1 in zip(days[:-1], days[1:], strict=True):
+        scale = max(account, 0.0) / s.capital
+        afford = max(account, 0.0) if s.sizing == "one_lot" else None
+        week: list[dict] = []
+        for leg in legs:
+            got = trade_week(leg, s, d0, d1, chains, spots, lots, bans, sessions, counts,
+                             scale=scale, afford=afford)  # fmt: skip
+            if afford is not None:
+                afford -= sum(t["buy"] for t in got)
+            week += got
+        account += sum(t["pnl"] for t in week)
+        steps = int((account - base) // s.profit_step) if account > base else 0
+        if steps > 0:
+            out = s.withdraw_share * steps * s.profit_step
+            account -= out
+            taken += out
+            base += steps * s.profit_step * (1 - s.withdraw_share)
+            events.append({"day": d1.date().isoformat(), "taken_rs": round(out),
+                           "account_rs": round(account)})  # fmt: skip
+        account_by_day[d1] = account
+        taken_by_day[d1] = taken
+        trades += week
+    return trades, {
+        "account": account_by_day,
+        "taken": taken_by_day,
+        "events": events,
+    }
 
 
 # ---------------------------------------------------------------------------------------------
@@ -849,6 +936,7 @@ def summarise(
     days: list,
     counts: BookCounts,
     down: dict,
+    booking: dict | None = None,
 ) -> dict[str, Any]:
     weeks = days[1:]
     w = weekly_pnl(t, weeks, s.tax)
@@ -928,6 +1016,25 @@ def summarise(
         "sides": sides(t, down, days),
         "counts": counts.__dict__,
         "trades": trades_rows(t),
+        "booking": booking_summary(booking, eq_days, s),
+    }
+
+
+def booking_summary(booking: dict | None, eq_days: list, s: Settings) -> dict[str, Any] | None:
+    """Profit booking: the trading account and the money taken out on the chart's days, the
+    bookings, and where it ended (before tax; the book's total is after tax)."""
+    if booking is None:
+        return None
+    account = [round(float(booking["account"].get(d, np.nan))) for d in eq_days]
+    taken = [round(float(booking["taken"].get(d, 0.0))) for d in eq_days]
+    return {
+        "profit_step": s.profit_step,
+        "withdraw_share": s.withdraw_share,
+        "account": account,
+        "taken": taken,
+        "taken_rs": taken[-1],
+        "account_end_rs": account[-1],
+        "bookings": booking["events"],
     }
 
 

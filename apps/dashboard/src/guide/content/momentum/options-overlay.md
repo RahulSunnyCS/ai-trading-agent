@@ -50,6 +50,22 @@ Open **Settings** on the run bar (or click any chip).
   1 % ATM, 2 % OTM1, 3 % OTM2, 4 % OTM3) and **tax** (each financial year's net at 31.2 %, a loss
   carried forward).
 
+## Profit booking
+
+Off by default. Turn it on to trade like a small account that pays itself out: set the starting
+**capital** (say ₹1 lakh), the **step** (₹50,000) and the share **taken out** (75 %).
+
+- The **trading account** starts at the capital and takes every week's profit or loss (before tax).
+- Each time it stands a whole step above where it last booked, that share of the step is **taken
+  out** for good (₹37,500 of each ₹50,000) and the rest (₹12,500) stays to trade. Two steps at
+  once take out twice that.
+- After a loss the account has to make it back before the next booking.
+- The next weeks are **sized on the account**: the premium budgets grow and shrink with it, and a
+  one-lot book buys only the picks the account can pay for that week (skipped picks are counted).
+- The chart adds the trading account and the money taken out; the **Profit booking** card lists
+  every booking. The headline total is still everything made, after tax: what is in the account
+  plus what was taken out, less tax.
+
 ## How a week is traded
 
 Each week the book buys on the last F&O session's close and sells on the next week's. A contract
@@ -66,8 +82,9 @@ booked at zero. Costs: ₹20 an order, STT on the sale, exchange and SEBI charge
   percentile, largest), one lot's cost, positions a week, and the worst fall of that one-lot book.
   Suggested capital = the 90th-percentile week's premium + that fall.
   When the capital you set is below it, a red note says the percentages are not meaningful.
-- **Chart tooltip**: hovering a week lists the options bought that day, puts and calls apart (×N =
-  N lots, e.g. one from each sleeve of a group).
+- **Chart tooltip**: hovering a week shows what the book did that day: what it sold (each with its
+  sell price and P&L, and the day's total) and what it bought, puts first, written as trades: "Buy
+  LAURUSLABS 2,000 CE at 34.00". ×N means N lots (e.g. one from each sleeve of a group).
 - **Chart**: the growth of the options book, the same picks as shares and NIFTY. **Drawdown** adds
   the book's fall from its high.
 - **Trades**: win rate, payoff (average win ÷ average loss), weeks won, and the net without the best
@@ -76,7 +93,9 @@ booked at zero. Costs: ₹20 an order, STT on the sale, exchange and SEBI charge
 - **Skips and fills**: how many picks each rule touched (thin strikes, ban list, no contract, settle
   prices, re-struck contracts).
 - **By year**, **winners and losers by stock**, the **best and worst trades** and **all trades**
-  (filter by stock; * followed through a corporate action, † booked at zero).
+  (filter by stock). Each trade reads "Buy LAURUSLABS 2,000 CE at 34.00 → Sell at 52.00", with the
+  day bought, the day sold, the quantity, the premium paid and the P&L; a contract re-struck by a
+  corporate action says so, and one that vanished reads "Contract gone: booked at 0".
 
 ## Limits
 

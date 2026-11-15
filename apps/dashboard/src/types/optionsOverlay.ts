@@ -21,6 +21,9 @@ export interface OverlayRequest {
   put_share: number;
   start: string;
   end: string | null;
+  /** Profit booking: every this many rupees made, `withdraw_share` of it is taken out (null = off). */
+  profit_step: number | null;
+  withdraw_share: number;
 }
 
 export interface OverlayStrategy {
@@ -139,6 +142,15 @@ export interface OverlayResult {
   };
   counts: Record<string, number>;
   trades: OverlayTrade[];
+  booking: {
+    profit_step: number;
+    withdraw_share: number;
+    account: number[];
+    taken: number[];
+    taken_rs: number;
+    account_end_rs: number;
+    bookings: Array<{ day: string; taken_rs: number; account_rs: number }>;
+  } | null;
 }
 
 export interface OverlayJob {

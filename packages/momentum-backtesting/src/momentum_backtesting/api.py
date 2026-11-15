@@ -4976,6 +4976,9 @@ class OptionsOverlayRequest(BaseModel):
     put_share: float = Field(0.5, ge=0, le=1)
     start: str = "2020-01-01"
     end: str | None = None
+    # profit booking: each `profit_step` rupees made, `withdraw_share` of it taken out
+    profit_step: float | None = Field(None, gt=0)
+    withdraw_share: float = Field(0.75, ge=0, le=1)
 
 
 class _BacktestJobs:

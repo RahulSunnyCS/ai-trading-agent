@@ -142,3 +142,8 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
   skipped picks, the chain cache (only traded (day, stock) pairs, bounded), concurrent cold runs (a lock per
   key) and the favourite cache (newest four). Not done: a benchmark picker on the headline strip and widgets
   loaded after the chart's first paint (Analytics page pattern); the comparison is fixed (shares, else NIFTY).
+- 2026-11-15 — owner: profit booking ("start with ₹1 lakh; for each ₹50,000 of profit keep 25 % to trade
+  and take 75 % out") and clearer trades ("Buy LAURUSLABS 2,000 CE at 34 → Sell at …") in the chart
+  tooltip and the trade tables. Built: `profit_step` / `withdraw_share` (week-by-week account sized on
+  itself; a one-lot book buys only what the account can pay for; a loss is made back before the next
+  booking); the tooltip lists each day's sales (price, P&L) and buys.

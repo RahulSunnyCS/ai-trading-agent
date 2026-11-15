@@ -7,8 +7,9 @@ import type {
   OverlayRequest,
   OverlayResult,
   OverlaySizing,
+  OverlayTrade,
 } from '../types/optionsOverlay';
-import { formatInr, formatPct } from './format';
+import { formatInr, formatNumber, formatPct } from './format';
 
 export const DIRECTION_LABEL: Record<OverlayDirection, string> = {
   calls: 'Calls on the picks',
@@ -74,6 +75,8 @@ export const DEFAULT_REQUEST: OverlayRequest = {
   put_share: 0.5,
   start: '2020-01-01',
   end: null,
+  profit_step: null,
+  withdraw_share: 0.75,
 };
 
 /** Why the request cannot run yet, or null. */
@@ -104,6 +107,10 @@ export function requestChips(request: OverlayRequest, strategyName: string | nul
   chips.push(formatInr(request.capital, { compact: true }));
   if (request.direction === 'switch') chips.push(MARKET_FILTER_LABEL[request.market_filter]);
   if (request.direction === 'both') chips.push(`Puts ${formatPct(request.put_share, 0)}`);
+  if (request.profit_step)
+    chips.push(
+      `Take out ${formatPct(request.withdraw_share, 0)} of each ${formatInr(request.profit_step, { compact: true })}`,
+    );
   chips.push(request.tax ? 'After tax' : 'Before tax');
   chips.push(`From ${request.start}`);
   return chips;
@@ -138,6 +145,7 @@ export const COUNT_LABEL: Record<string, string> = {
   settle_exit: 'Sold at the settle price (no trade that day)',
   restruck: 'Re-struck by a corporate action, followed',
   zero_booked: 'Contract gone on the exit day, booked at zero',
+  no_capital: 'Skipped: the trading account could not pay for it',
 };
 
 export function countRows(counts: Record<string, number>): Array<{ label: string; value: number }> {
@@ -147,32 +155,67 @@ export function countRows(counts: Record<string, number>): Array<{ label: string
     .sort((a, b) => b.value - a.value);
 }
 
-/** Names a hover line shows before "+N more". */
-const HOVER_NAMES = 12;
+/** "Buy LAURUSLABS 2,000 CE ×2 at 34.50" (×N = N lots). */
+export function buyText(trade: OverlayTrade): string {
+  const lots = trade.lots > 1 ? ` ×${trade.lots}` : '';
+  return `Buy ${trade.symbol} ${formatNumber(trade.strike, 2, { trim: true })} ${trade.right}${lots} at ${formatNumber(trade.p0, 2)}`;
+}
 
-function nameList(names: string[]): string {
-  const shown = names.slice(0, HOVER_NAMES).join(', ');
-  return names.length > HOVER_NAMES ? `${shown} +${names.length - HOVER_NAMES} more` : shown;
+/** "Sell at 52.00" (or how a re-struck or vanished contract was closed). */
+export function sellText(trade: OverlayTrade): string {
+  if (trade.exit_how === 'zero') return 'Contract gone: booked at 0';
+  const restruck = trade.exit_how === 'restruck' ? ' (re-struck contract)' : '';
+  return `Sell at ${formatNumber(trade.p1, 2)}${restruck}`;
+}
+
+/** The whole trade in one line: "Buy LAURUSLABS 2,000 CE at 34.50 → Sell at 52.00". */
+export function tradeText(trade: OverlayTrade): string {
+  return `${buyText(trade)} → ${sellText(trade)}`;
+}
+
+/** Lines a hover block shows before "+N more". */
+const HOVER_LINES = 10;
+
+function capped(lines: string[]): string[] {
+  return lines.length > HOVER_LINES
+    ? [...lines.slice(0, HOVER_LINES), `+${lines.length - HOVER_LINES} more (All trades)`]
+    : lines;
 }
 
 /**
- * For each day of the chart, the options bought that day (the week's positions, held to the next
- * point): "Puts (3): A, B, C" and "Calls (2): D, E" on their own lines; '' when nothing was bought.
+ * For each day of the chart, what the book did that day: the positions it sold (bought the week
+ * before, with their P&L) and the ones it bought, puts first, one per line; '' on a day with
+ * neither.
  */
-export function boughtByDay(result: OverlayResult): string[] {
-  const byDay = new Map<string, { CE: string[]; PE: string[] }>();
+export function tradesByDay(result: OverlayResult): string[] {
+  const buys = new Map<string, OverlayTrade[]>();
+  const sells = new Map<string, OverlayTrade[]>();
   for (const trade of result.trades) {
-    const day = byDay.get(trade.entry) ?? { CE: [], PE: [] };
-    const label = trade.lots > 1 ? `${trade.symbol} ×${trade.lots}` : trade.symbol;
-    if (!day[trade.right].includes(label)) day[trade.right].push(label);
-    byDay.set(trade.entry, day);
+    buys.set(trade.entry, [...(buys.get(trade.entry) ?? []), trade]);
+    sells.set(trade.exit, [...(sells.get(trade.exit) ?? []), trade]);
   }
+  const order = (a: OverlayTrade, b: OverlayTrade) =>
+    a.right === b.right ? a.symbol.localeCompare(b.symbol) : a.right === 'PE' ? -1 : 1;
   return result.series.days.map((d) => {
-    const day = byDay.get(d);
-    if (!day) return '';
     const lines: string[] = [];
-    if (day.PE.length) lines.push(`Puts (${day.PE.length}): ${nameList([...day.PE].sort())}`);
-    if (day.CE.length) lines.push(`Calls (${day.CE.length}): ${nameList([...day.CE].sort())}`);
+    const sold = [...(sells.get(d) ?? [])].sort(order);
+    if (sold.length) {
+      const net = sold.reduce((sum, t) => sum + t.pnl, 0);
+      lines.push(`Sold ${sold.length} (${formatInr(net, { sign: true, compact: true })}):`);
+      lines.push(
+        ...capped(
+          sold.map(
+            (t) =>
+              `· ${t.symbol} ${formatNumber(t.strike, 2, { trim: true })} ${t.right}: ${sellText(t)} (${formatInr(t.pnl, { sign: true, compact: true })})`,
+          ),
+        ),
+      );
+    }
+    const bought = [...(buys.get(d) ?? [])].sort(order);
+    if (bought.length) {
+      lines.push(`Bought ${bought.length}:`);
+      lines.push(...capped(bought.map((t) => `· ${buyText(t)}`)));
+    }
     return lines.join('\n');
   });
 }

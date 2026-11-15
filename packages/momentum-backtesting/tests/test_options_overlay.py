@@ -175,3 +175,22 @@ def test_two_sleeves_buying_one_contract_are_one_position():
     assert len(merged) == 2
     abc = merged[merged["symbol"] == "ABC"].iloc[0]
     assert abc["lots"] == 2 and abc["pnl"] == 700.0 and abc["p0"] == 8.0
+
+
+def test_profit_booking_takes_out_its_share_and_sizes_on_the_account():
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0)}
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0, capital=1000.0,
+                    profit_step=300.0, withdraw_share=0.75)  # fmt: skip
+    leg = ov.Leg(picks={D0: ["ABC"]}, right="CE")
+    counts = ov.BookCounts()
+    trades, booking = ov.run_booked([leg], s, [D0, D1], chains, SPOTS, _lots(), set(), ARR, counts)
+    pnl = trades[0]["pnl"]  # 400 less costs: one whole 300 step
+    assert booking["taken"][D1] == pytest.approx(0.75 * 300)
+    assert booking["account"][D1] == pytest.approx(1000 + pnl - 225)
+    assert booking["events"][0]["taken_rs"] == 225
+    # an account that cannot pay for one lot (800) buys nothing
+    poor = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0, capital=500.0,
+                       profit_step=300.0)  # fmt: skip
+    counts = ov.BookCounts()
+    trades, _ = ov.run_booked([leg], poor, [D0, D1], chains, SPOTS, _lots(), set(), ARR, counts)
+    assert trades == [] and counts.no_capital == 1

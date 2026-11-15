@@ -30,12 +30,14 @@ import {
   MARKET_FILTER_LABEL,
   MONEYNESS,
   SIZING_LABEL,
-  boughtByDay,
+  buyText,
   countRows,
   growthLines,
   needsStrategy,
   requestChips,
   requestProblem,
+  sellText,
+  tradesByDay,
   usesPutList,
 } from '../../../lib/optionsOverlay';
 import type {
@@ -435,6 +437,43 @@ function OverlaySettings({
             }}
           />
         </Field>
+        <Field
+          label="Profit booking"
+          help="Each time the trading account is a whole step above where it last booked, that share of the step is taken out; the rest stays and the next weeks are sized on the account."
+        >
+          <SegmentedControl
+            ariaLabel="Profit booking"
+            size="sm"
+            value={request.profit_step ? 'on' : 'off'}
+            options={[
+              { value: 'off', label: 'Off' },
+              { value: 'on', label: 'On' },
+            ]}
+            onChange={(v) => update({ profit_step: v === 'on' ? 50_000 : null })}
+          />
+        </Field>
+        {request.profit_step ? (
+          <>
+            <Field label="Every ₹ of profit">
+              <NumberField
+                aria-label="Profit step"
+                min={1000}
+                max={100_000_000}
+                value={request.profit_step}
+                onChange={(v) => update({ profit_step: v })}
+              />
+            </Field>
+            <Field label="Take out (%)">
+              <NumberField
+                aria-label="Share taken out"
+                min={0}
+                max={100}
+                value={Math.round(request.withdraw_share * 100)}
+                onChange={(v) => update({ withdraw_share: v / 100 })}
+              />
+            </Field>
+          </>
+        ) : null}
         <Field label="Tax">
           <SegmentedControl
             ariaLabel="Tax"
@@ -500,10 +539,25 @@ function OverlayResultView({
   const lines = useMemo<ChartLine[]>(() => {
     const g = growthLines(result);
     const out: ChartLine[] = [
-      { name: 'Options book', values: g.options, role: 'strategy', hover: boughtByDay(result) },
+      { name: 'Options book', values: g.options, role: 'strategy', hover: tradesByDay(result) },
     ];
     if (g.shares) out.push({ name: 'Same picks as shares', values: g.shares, role: 'benchmark' });
     if (g.nifty) out.push({ name: 'NIFTY', values: g.nifty, role: 'benchmark', dash: 'dot' });
+    if (result.booking) {
+      const capital = result.settings.capital;
+      out.push({
+        name: 'Trading account',
+        values: result.booking.account.map((v) => v / capital - 1),
+        role: 'strategy',
+        dash: 'dot',
+      });
+      out.push({
+        name: 'Taken out',
+        values: result.booking.taken.map((v) => v / capital),
+        role: 'negative',
+        dash: 'dot',
+      });
+    }
     return out;
   }, [result]);
   const ddLines = useMemo<ChartLine[]>(
@@ -717,6 +771,8 @@ function OverlayResultView({
           </dl>
         </Widget>
 
+        {result.booking ? <BookingWidget result={result} /> : null}
+
         <Widget title="Calls and puts" meta="What each side earned, before tax">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
             <Stat label="Call trades" value={formatInt(result.sides.calls.trades)} />
@@ -919,17 +975,17 @@ function tradeRow(t: OverlayTrade, i: number) {
   return (
     <TRow key={`${t.entry}-${t.symbol}-${t.right}-${i}`} className="whitespace-nowrap">
       <Td dense>{formatDay(t.entry)}</Td>
-      <Td dense>{t.symbol}</Td>
-      <Td dense>{`${t.strike} ${t.right}`}</Td>
-      <Td numeric align="right" dense>
-        {formatDay(t.expiry)}
+      <Td dense title={`Expiry ${formatDay(t.expiry)}`}>
+        <span className={t.right === 'PE' ? 'text-negative' : 'text-positive'}>Buy</span>{' '}
+        {buyText(t).slice(4)} <span className="text-faint">→</span>{' '}
+        <span className={t.exit_how === 'zero' ? 'text-negative' : 'text-muted'}>
+          {sellText(t)}
+        </span>
       </Td>
+      <Td dense>{formatDay(t.exit)}</Td>
       <Td numeric align="right" dense>
         {formatInt(t.lots * t.lot)}
       </Td>
-      <Td
-        numeric
-      >{`${formatNumber(t.p0, 2)} → ${formatNumber(t.p1, 2)}${t.exit_how === 'restruck' ? ' *' : t.exit_how === 'zero' ? ' †' : ''}`}</Td>
       <Td numeric align="right" dense>
         {formatInr(t.buy, { compact: true })}
       </Td>
@@ -943,17 +999,11 @@ function tradeRow(t: OverlayTrade, i: number) {
 function TradeHead() {
   return (
     <THead>
-      <Th dense>Entry</Th>
-      <Th dense>Stock</Th>
-      <Th dense>Contract</Th>
-      <Th align="right" dense>
-        Expiry
-      </Th>
+      <Th dense>Bought</Th>
+      <Th dense>Trade</Th>
+      <Th dense>Sold</Th>
       <Th align="right" dense>
         Qty
-      </Th>
-      <Th align="right" dense>
-        Price in → out
       </Th>
       <Th align="right" dense>
         Paid
@@ -987,7 +1037,7 @@ function AllTrades({ trades }: { trades: OverlayTrade[] }) {
   return (
     <Widget
       title="All trades"
-      meta="* followed through a corporate action · † booked at zero (contract gone)"
+      meta="Each row: what was bought, what it was sold at, quantity, premium paid and P&L"
       wide
     >
       <div className="mb-2 flex items-center gap-2">
@@ -1007,6 +1057,61 @@ function AllTrades({ trades }: { trades: OverlayTrade[] }) {
       {filtered.length > limit ? (
         <Button variant="ghost" size="sm" className="mt-2" onClick={() => setLimit((n) => n + 200)}>
           Show more
+        </Button>
+      ) : null}
+    </Widget>
+  );
+}
+
+function BookingWidget({ result }: { result: OverlayResult }) {
+  const b = result.booking;
+  const [all, setAll] = useState(false);
+  if (!b) return null;
+  const rows = all ? b.bookings : b.bookings.slice(-8);
+  return (
+    <Widget
+      title="Profit booking"
+      meta={`Take out ${formatPct(b.withdraw_share, 0)} of each ${formatInr(b.profit_step, { compact: true })} made · before tax`}
+    >
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+        <Stat label="Started with" value={formatInr(result.settings.capital)} />
+        <Stat label="Taken out" value={formatInr(b.taken_rs)} />
+        <Stat label="Trading account at the end" value={formatInr(b.account_end_rs)} />
+        <Stat label="Bookings" value={formatInt(b.bookings.length)} />
+      </dl>
+      {b.bookings.length ? (
+        <Table>
+          <THead>
+            <Th dense>Day</Th>
+            <Th align="right" dense>
+              Taken out
+            </Th>
+            <Th align="right" dense>
+              Account after
+            </Th>
+          </THead>
+          <tbody>
+            {[...rows].reverse().map((e) => (
+              <TRow key={e.day}>
+                <Td dense>{formatDay(e.day)}</Td>
+                <Td numeric align="right" dense>
+                  {formatInr(e.taken_rs)}
+                </Td>
+                <Td numeric align="right" dense>
+                  {formatInr(e.account_rs)}
+                </Td>
+              </TRow>
+            ))}
+          </tbody>
+        </Table>
+      ) : (
+        <p className="mt-2 text-xs text-muted">
+          The account never stood a whole step above its start.
+        </p>
+      )}
+      {b.bookings.length > 8 ? (
+        <Button variant="ghost" size="sm" className="mt-2" onClick={() => setAll((v) => !v)}>
+          {all ? 'Show the last 8' : `Show all ${b.bookings.length}`}
         </Button>
       ) : null}
     </Widget>
