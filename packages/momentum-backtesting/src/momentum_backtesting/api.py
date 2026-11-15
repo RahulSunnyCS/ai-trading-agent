@@ -425,7 +425,9 @@ class _Data:
         liquidity: liquidity_mod.LiquidityConfig | None = None,
         voladj_lookbacks: bool = False,
         voladj_skip: Literal["long", "all", "none"] = "long",
-        universe_kind: Literal["total_market", "all_liquid", "turnover_rank", "fno"] = "total_market",
+        universe_kind: Literal[
+            "total_market", "all_liquid", "turnover_rank", "fno"
+        ] = "total_market",
         series_breaks: Literal["legacy", "verified"] = "verified",
     ) -> broad.UniverseRanking:
         """Step 2 (categories/broad.py) for this exact parameter combination - cached the same
