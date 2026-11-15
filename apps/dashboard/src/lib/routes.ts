@@ -6,7 +6,7 @@
  *   /live  /trades  /personalities  /pnl  /regime
  *   /optionslab/{rotation|heatmap|matrix|correlation|strategies|builder|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
- *   /momentum/{backtest|scores|saved|week|journal} (old /momentum/weekly and /rebalance redirect)
+ *   /momentum/{backtest|scores|options|saved|week|journal} (old /momentum/weekly and /rebalance redirect)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
  *   /tradebook/{fno|trades|money|momentum}
@@ -84,7 +84,14 @@ export type CoverageSection = (typeof COVERAGE_SECTIONS)[number];
 /** What `/coverage` opens. */
 export const COVERAGE_DEFAULT_SECTION: CoverageSection = 'backfill';
 
-export const MOMENTUM_SECTIONS = ['backtest', 'scores', 'saved', 'week', 'journal'] as const;
+export const MOMENTUM_SECTIONS = [
+  'backtest',
+  'scores',
+  'options',
+  'saved',
+  'week',
+  'journal',
+] as const;
 export type MomentumSection = (typeof MOMENTUM_SECTIONS)[number];
 
 /** The Trade book's views (BL-168), in display order. Must match its nav item's children. */
@@ -199,7 +206,8 @@ export function oneOf<T extends string>(
  */
 export function isAnalyticsPage(tab: Tab | null, rest: readonly string[] = []): boolean {
   if (tab === 'tradebook') return true;
-  return tab === 'momentum' && (oneOf(MOMENTUM_SECTIONS, rest[0]) ?? 'backtest') === 'backtest';
+  const section = oneOf(MOMENTUM_SECTIONS, rest[0]) ?? 'backtest';
+  return tab === 'momentum' && (section === 'backtest' || section === 'options');
 }
 
 export const APP_NAME = 'AI Trading Agent';
