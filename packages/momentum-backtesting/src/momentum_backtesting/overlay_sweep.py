@@ -6,7 +6,7 @@ combination runs through `overlay_runs.run_request`; one JSON line per run is ap
 sweep's folder (`<data>/overlay-sweeps/<name>/results-w<k>.jsonl`, one file per worker), with
 the settings, the whole book, the train and test windows (`split` in the base) and the skip
 counts, never the trades. Runs already in the folder are skipped, so a stopped sweep resumes.
-Workers take whole strategies, so each strategy is re-run on F&O stocks once per worker.
+Workers take whole (strategy, mode) groups: the same picks, so the same option rows stay cached.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def expand(grid: dict[str, Any]) -> list[dict[str, Any]]:
                 value = dict(value)
                 label = value.pop("label", None)
                 body.update(value)
-            elif name == "bundle":  # several settings that go together, e.g. stop + target
+            elif isinstance(value, dict):  # several settings that go together (stop + target)
                 body.update(value)
             else:
                 body[name] = value
@@ -144,10 +144,13 @@ def run(grid_path: Path, workers: int = 3) -> dict[str, Any]:
     bodies = expand(grid)
     done = done_ids(folder)
     todo = [b for b in bodies if b["_id"] not in done]
-    # whole strategies to a worker, the biggest groups first, so each is re-run once
+    # a strategy and mode (same picks, so the same option rows) to one worker, the biggest
+    # groups first; a worker re-runs a strategy at most once per group it holds
     groups: dict[str, list] = {}
     for b in todo:
-        key = json.dumps({k: b.get(k) for k in ("favourite_id", "custom")}, sort_keys=True)
+        key = json.dumps({k: b.get(k) for k in ("favourite_id", "custom", "direction", "n",
+                                                "call_filter", "market_filter")},
+                         sort_keys=True, default=str)  # fmt: skip
         groups.setdefault(key, []).append(b)
     shares: list[list] = [[] for _ in range(max(1, workers))]
     for group in sorted(groups.values(), key=len, reverse=True):

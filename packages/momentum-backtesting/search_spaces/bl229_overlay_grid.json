@@ -1,0 +1,44 @@
+{
+  "name": "bl229-round1",
+  "base": {
+    "capital": 1500000,
+    "start": "2020-01-01",
+    "end": "2026-11-13",
+    "split": "2023-12-29",
+    "tax": true,
+    "min_sessions_left": 10,
+    "min_oi_lots": 10
+  },
+  "axes": {
+    "strategy": [
+      {"label": "Four-Strategy Mix (BL-226 candidate)", "favourite_id": "b2e4bcdc91df443b89da1c5e2938ce29"},
+      {"label": "Trio Fortnightly (BL-226 candidate)", "favourite_id": "1258177078c9468e90329185848a4895"},
+      {"label": "12m top 10 weekly (BL-226 candidate)", "custom": {"lookbacks": [1, 4, 13, 26, 52], "top_n": 10, "exit_rank": 20, "rebalance": "weekly", "score": "ranksum"}}
+    ],
+    "mode": [
+      {"direction": "calls", "call_filter": "none"},
+      {"direction": "calls", "call_filter": "nifty_200dma"},
+      {"direction": "switch", "market_filter": "nifty_200dma", "n": 5},
+      {"direction": "mirror", "n": 5},
+      {"direction": "mirror", "n": 10}
+    ],
+    "strike": [
+      {"moneyness": "ITM2"},
+      {"moneyness": "ITM1"},
+      {"moneyness": "ATM"},
+      {"moneyness": "OTM1"},
+      {"moneyness": "DELTA", "delta_target": 0.7}
+    ],
+    "expiry_skip": [0, 1],
+    "hold": [false, true],
+    "exits": [
+      {},
+      {"stop": 0.5},
+      {"stop": 0.5, "target": 1.0}
+    ],
+    "size": [
+      {"sizing": "capital_share", "sizing_value": 0.2},
+      {"sizing": "exposure", "sizing_value": 1.0}
+    ]
+  }
+}
