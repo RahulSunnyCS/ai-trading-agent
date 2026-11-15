@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked for it (2026-11-15, "what about taking PE also"); research only, nothing live depends on it |
-| **Status** | In progress |
+| **Status** | Done — killed at learning (2026-11-15) |
 | **Type** | research |
 | **Area** | momentum / options |
 | **Created** | 2026-11-15 |
@@ -121,6 +121,63 @@ them for upward momentum; a stock picked buys its call, an inverse picked buys t
 - **Done when:** the verdict is in Result, `research/momentum/common/options-overlay.md` updated, `TODO.md`
   and `INDEX.md` rows closed.
 
+## Result
+
+**Killed at learning (2026-11-15).** No book of either rule set passes the learning rule, so none was carried and
+the confirmation weeks (2024-07 →) were not read. Learning = trades exiting 2020-01 → 2024-06-28, 235 weeks,
+₹10 lakh, after costs, slippage and 31.2 % tax; files under `packages/momentum-backtesting/data/bl226/bl228/`
+(git-ignored).
+
+**Phase 0 — puts on the weakest, down-trending F&O stocks (12 books): all lose.**
+
+| Book | Trades | Weeks held | After tax | Drawdown | 90 % weekly | Win rate |
+|---|---|---|---|---|---|---|
+| N5 ATM every week | 614 | 206 | −₹12.5 lakh | −119 % | −0.86 to −0.13 % | 32 % |
+| N5 OTM1 every week | 608 | 201 | −₹12.6 lakh | −120 % | −0.83 to −0.20 % | 30 % |
+| N5 OTM2 every week | 609 | 203 | −₹11.3 lakh | −110 % | −0.75 to −0.15 % | 29 % |
+| N5 ATM NIFTY-gated | 116 | 35 | −₹1.3 lakh | −35 % | −0.29 to +0.19 % | 31 % |
+| N5 OTM1 NIFTY-gated | 116 | 35 | −₹2.0 lakh | −32 % | −0.28 to +0.11 % | 28 % |
+| N5 OTM2 NIFTY-gated | 111 | 33 | −₹1.8 lakh | −31 % | −0.26 to +0.10 % | 27 % |
+| N10 ATM every week | 1,158 | 216 | −₹27.7 lakh | −205 % | −1.79 to −0.48 % | 32 % |
+| N10 OTM1 every week | 1,157 | 217 | −₹25.2 lakh | −191 % | −1.63 to −0.42 % | 30 % |
+| N10 OTM2 every week | 1,179 | 216 | −₹25.3 lakh | −194 % | −1.57 to −0.50 % | 28 % |
+| N10 ATM NIFTY-gated | 233 | 38 | −₹5.6 lakh | −70 % | −0.68 to +0.21 % | 30 % |
+| N10 OTM1 NIFTY-gated | 234 | 37 | −₹6.4 lakh | −73 % | −0.67 to +0.13 % | 27 % |
+| N10 OTM2 NIFTY-gated | 237 | 35 | −₹5.8 lakh | −70 % | −0.61 to +0.13 % | 26 % |
+
+A drawdown beyond −100 % means the book lost more than the ₹10 lakh. Double slippage is worse in every book.
+NIFTY was below its 200-day average in 20 weeks of 2020, none of 2021, 17 of 2022, 4 of 2023 and 2 of 2024
+(the gated books' 33–38 weeks with a position). The every-week book lost in every year after 2020
+(N5 ATM: 2021 −₹4.6 lakh, 2022 −₹1.3 lakh, 2023 −₹3.2 lakh, 2024 −₹2.4 lakh before tax).
+
+**Phase 0b — the mirror pool (owner's idea, 2 books): both make money, both fail.**
+
+| Book | Trades | After tax | Drawdown | 90 % weekly | Win rate | Payoff | Premium a week |
+|---|---|---|---|---|---|---|---|
+| top 5, ATM | 711 | +₹15.8 lakh | −46 % | −0.13 to +1.48 % | 43 % | 1.77 | ₹1.56 lakh |
+| top 10, ATM | 1,421 | +₹27.3 lakh | −58 % | −0.09 to +2.45 % | 42 % | 1.81 | ₹2.68 lakh |
+
+Each fails two of the three rules: the interval's lower bound is below zero, and the drawdown is beyond −40 %.
+With double slippage: +₹11.1 lakh (−51 %) and +₹18.8 lakh (−67 %).
+
+Descriptive (learning trades, before tax; not part of the verdict):
+- **The pool tilts as intended:** puts were 37 % (2020), 3 % (2021), 40 % (2022), 26 % (2023) and 6 % (2024)
+  of the top 5's positions.
+- **The gain is all the calls'.** Top 5: calls +₹24.6 lakh on 550 trades (47 % won), puts −₹1.7 lakh on 161
+  (32 %). Top 10: calls +₹44.4 lakh, puts −₹4.7 lakh. The puts made money only in 2020.
+- **The gain is concentrated:** the top 5 % of trades made 173 % (top 5) and 189 % (top 10) of the net; without
+  them the books lose ₹16.8 lakh and ₹35.2 lakh. 2021 alone made ₹15.1 lakh of the top 5's calls.
+- **Read with BL-226:** the call side is BL-226's kind of book at one lot each, and BL-226's call books failed
+  on the confirmation weeks.
+
+**Why the puts lose:** a stock already weak on 1 to 52 weeks and below its 40-week average has mostly made its
+fall; within a week it falls slowly or bounces, too little to pay a week's decay and the 1–3 % slippage each
+way. NIFTY's falling weeks help a little (the gated books lose less, mostly because they trade a sixth as
+often), but none of them earns.
+
+**Caveats:** daily closes, not quotes; a missing exit row booked at zero (0–5 trades a book); 2020's crash is in
+the learning years, the only year the puts made money.
+
 ## Risks
 
 - **Daily closes, not quotes:** put closes of falling mid-caps can be stale; the settle rule and the counts
@@ -136,3 +193,6 @@ them for upward momentum; a stock picked buys its call, an inverse picked buys t
 - 2026-11-15 — owner: rank every stock's chart and its inverse in one pool (inverse picked = buy the put,
   stock picked = buy the call). Registered as Phase 0b while Phase 0's learning run was still loading,
   before any of its results were read.
+- 2026-11-15 — learning read (both rule sets): no book passes. Phase 0's 12 put books all lose after tax
+  (−₹1.3 to −₹27.7 lakh); Phase 0b's two mirror books make +₹15.8 / +₹27.3 lakh but fail the interval and the
+  drawdown rule, their gain all from the calls. None carried, the confirmation weeks not read. Killed.
