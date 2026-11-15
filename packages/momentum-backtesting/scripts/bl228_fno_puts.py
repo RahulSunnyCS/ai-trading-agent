@@ -46,6 +46,10 @@ def book_ids() -> list[str]:
     return [f"N{n}-{m}-{f}" for n in NS for m in MONEYNESS for f in FORMS]
 
 
+#: Phase 0b: the mirror pool (each stock's chart and its inverse ranked together), ATM only.
+MIRROR_IDS = [f"N{n}-ATM-mirror" for n in NS]
+
+
 # ---------------------------------------------------------------------------------------------
 # The weak list
 # ---------------------------------------------------------------------------------------------
@@ -82,6 +86,51 @@ def weak_list(
     return out
 
 
+def mirror_list(
+    prices: pd.DataFrame, membership: pd.DataFrame, to_base: dict[str, str], n: int
+) -> dict[pd.Timestamp, list[str]]:
+    """Phase 0b. {signal week: "SYMBOL|CE" or "SYMBOL|PE"}: every eligible column and its inverse
+    (1 / price) ranked together on the rank-sum of their 1 / 4 / 13 / 26 / 52-week log returns
+    (an inverse's log return is minus the stock's), the n highest kept where the chart picked has
+    its own trend up (26-week log return above zero, close above its own 40-week average)."""
+    prices = prices.sort_index()
+    member = membership.reindex(index=prices.index, columns=prices.columns).fillna(False)
+    logp = np.log(prices)
+    rets = {h: logp - logp.shift(h) for h in HORIZONS}
+    eligible = member.astype(bool)
+    for r in rets.values():
+        eligible &= r.notna()
+    inv_cols = ["~" + c for c in prices.columns]
+    score = None
+    for r in rets.values():
+        both = pd.concat(
+            [r.where(eligible), (-r).where(eligible).set_axis(inv_cols, axis=1)], axis=1
+        )
+        ranked = both.rank(axis=1, ascending=True)
+        score = ranked if score is None else score + ranked
+    inverse = 1 / prices
+    up = (rets[TREND_WEEKS] > 0) & (
+        prices > prices.rolling(AVERAGE_WEEKS, min_periods=AVERAGE_WEEKS).mean()
+    )
+    up_inv = (rets[TREND_WEEKS] < 0) & (
+        inverse > inverse.rolling(AVERAGE_WEEKS, min_periods=AVERAGE_WEEKS).mean()
+    )
+    out = {}
+    for week in prices.index:
+        s = score.loc[week].dropna()
+        s = s.sort_index().sort_values(ascending=False, kind="mergesort")
+        picked = []
+        for c in s.index[:n]:
+            col, right = (c[1:], "PE") if c.startswith("~") else (c, "CE")
+            if not bool((up_inv if right == "PE" else up).at[week, col]):
+                continue
+            item = f"{to_base.get(col, col.split('#', 1)[0])}|{right}"
+            if item not in picked:
+                picked.append(item)
+        out[week] = picked
+    return out
+
+
 def universe():
     from momentum_backtesting.categories import broad
     from momentum_backtesting.categories.liquidity import LiquidityConfig
@@ -115,7 +164,7 @@ def entry_lists(weak: dict, all_sessions, banned, gate_down: dict | None):
         names = weak[w0]
         if gate_down is not None and not gate_down.get(w0, False):
             names = []
-        kept = [s for s in names if (d, s) not in banned]
+        kept = [s for s in names if (d, s.split("|", 1)[0]) not in banned]
         skipped += len(names) - len(kept)
         out[d] = kept
     return out, skipped
@@ -145,10 +194,10 @@ def run_one_lot(picks_by_day, moneyness, all_sessions, chains, spots, lots, slip
     counts = dict.fromkeys(("settle_entry", "settle_exit", "no_contract", "thin", "no_spot",
                             "no_exit_row", "exit_no_price"), 0)  # fmt: skip
     slip = ob.SLIPPAGE[moneyness] * slip_mult
-    right = "PE"
     for d0, d1 in zip(days[:-1], days[1:], strict=True):
         rows0, rows1 = chains.get(d0, {}), chains.get(d1, {})
-        for sym in picks_by_day[d0]:
+        for item in picks_by_day[d0]:
+            sym, right = item.split("|", 1) if "|" in item else (item, "PE")
             spot = spots.at[d0, sym] if (sym in spots.columns and d0 in spots.index) else np.nan
             if not spot > 0:
                 counts["no_spot"] += 1
@@ -164,7 +213,8 @@ def run_one_lot(picks_by_day, moneyness, all_sessions, chains, spots, lots, slip
             if len(strikes) == 0:
                 counts["no_contract"] += 1
                 continue
-            i = int(np.argmin(np.abs(strikes - spot))) - ob.OFFSET[moneyness]
+            step = ob.OFFSET[moneyness] * (1 if right == "CE" else -1)
+            i = int(np.argmin(np.abs(strikes - spot))) + step
             if not 0 <= i < len(strikes):
                 counts["no_contract"] += 1
                 continue
@@ -203,8 +253,8 @@ def run_one_lot(picks_by_day, moneyness, all_sessions, chains, spots, lots, slip
             cost = ob.costs(buy, sell, d1)
             spot1 = spots.at[d1, sym] if (sym in spots.columns and d1 in spots.index) else np.nan
             trades.append({
-                "entry": d0, "exit": d1, "symbol": sym, "expiry": expiry, "strike": k,
-                "spot": spot, "spot_exit": spot1, "lot": lot, "p0": p0, "p1": p1,
+                "entry": d0, "exit": d1, "symbol": sym, "right": right, "expiry": expiry,
+                "strike": k, "spot": spot, "spot_exit": spot1, "lot": lot, "p0": p0, "p1": p1,
                 "entry_traded": traded, "exit_traded": exit_traded, "no_exit_row": ex.empty,
                 "buy": buy, "sell": sell, "costs": cost, "pnl": sell - buy - cost,
             })  # fmt: skip
@@ -248,7 +298,7 @@ def score(trades: pd.DataFrame, weeks: list[pd.Timestamp]) -> dict:
 # ---------------------------------------------------------------------------------------------
 
 
-def build(out: Path):
+def build(out: Path, *, mirror: bool = False):
     all_sessions = ob.sessions()
     prices, membership, to_base = universe()
     weeks = list(prices.index)
@@ -256,13 +306,19 @@ def build(out: Path):
     banned = bans()
     lists, skipped = {}, {}
     for n in NS:
+        if mirror:
+            m = mirror_list(prices, membership, to_base, n)
+            lists[(n, "mirror")], skipped[(n, "mirror")] = entry_lists(
+                m, all_sessions, banned, None
+            )
+            continue
         weak = weak_list(prices, membership, to_base, n)
         for form in FORMS:
             lists[(n, form)], skipped[(n, form)] = entry_lists(
                 weak, all_sessions, banned, down if form == "gated" else None
             )
     days = sorted(set().union(*[set(v) for v in lists.values()]))
-    symbols = set().union(*[set(x) for v in lists.values() for x in v.values()])
+    symbols = {s.split("|", 1)[0] for v in lists.values() for x in v.values() for s in x}
     rows = ob.option_rows(days, symbols)
     chains: dict = {d: {} for d in days}
     for (d, sym), g in rows.groupby(["date", "symbol"]):
@@ -274,17 +330,30 @@ def build(out: Path):
         "weeks_by_year": pd.Series(down).groupby(lambda w: w.year).size().to_dict(),
         "banned_skips": {f"N{n}-{f}": v for (n, f), v in skipped.items()},
     }
-    (out / "meta.json").write_text(json.dumps(meta, indent=1, default=str))
+    if mirror:
+        meta["put_share_by_year"] = {}
+        for (n, _), lst in lists.items():
+            by_year: dict[int, list[bool]] = {}
+            for d, v in lst.items():
+                by_year.setdefault(d.year, []).extend(s.endswith("|PE") for s in v)
+            meta["put_share_by_year"][f"N{n}"] = {
+                y: round(float(np.mean(v)), 3) if v else None for y, v in sorted(by_year.items())
+            }
+    (out / ("meta-mirror.json" if mirror else "meta.json")).write_text(
+        json.dumps(meta, indent=1, default=str)
+    )
     return lists, days, all_sessions, chains, spots, lots
 
 
-def run_all(out: Path, *, confirm_books: list[str] | None):
+def run_all(out: Path, *, confirm_books: list[str] | None, mirror: bool = False):
     out.mkdir(parents=True, exist_ok=True)
-    lists, days, all_sessions, chains, spots, lots = build(out)
+    lists, days, all_sessions, chains, spots, lots = build(out, mirror=mirror)
+    suffix = "-mirror" if mirror else ""
     learn_w = [d for d in days if d <= ob.LEARN_END]
     conf_w = [d for d in days if d >= ob.CONFIRM_START]
     results = {}
-    for bid in book_ids() if confirm_books is None else confirm_books:
+    learn_books = MIRROR_IDS if mirror else book_ids()
+    for bid in learn_books if confirm_books is None else confirm_books:
         n, money, form = bid.split("-")
         picks = lists[(int(n[1:]), form)]
         for variant, slip in (("base", 1.0), ("slip2x", 2.0)):
@@ -299,12 +368,12 @@ def run_all(out: Path, *, confirm_books: list[str] | None):
                 tc.to_csv(out / f"trades-confirm-{bid}-{variant}.csv", index=False)
                 results[tag] = {"counts": counts, "confirmation": score(tc, conf_w)}
             print(tag, json.dumps(results[tag]), flush=True)
-    name = "learning.json" if confirm_books is None else "confirmation.json"
+    name = ("learning" if confirm_books is None else "confirmation") + suffix + ".json"
     (out / name).write_text(json.dumps(results, indent=1, default=str))
 
 
-def carried(out: Path) -> list[str]:
-    res = json.loads((out / "learning.json").read_text())
+def carried(out: Path, *, mirror: bool = False) -> list[str]:
+    res = json.loads((out / ("learning-mirror.json" if mirror else "learning.json")).read_text())
     ok = [(k.split("|")[0], v["learning"]) for k, v in res.items()
           if k.endswith("|base") and v["learning"]["passes"]]  # fmt: skip
     ok.sort(key=lambda kv: -kv[1]["pnl_after_tax_rs"] / max(abs(kv[1]["mdd"]), 1e-9))
@@ -314,25 +383,24 @@ def carried(out: Path) -> list[str]:
 def main() -> None:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
-    a = sub.add_parser("learn")
-    a.add_argument("--out", required=True)
-    b = sub.add_parser("carried")
-    b.add_argument("--out", required=True)
-    c = sub.add_parser("confirm")
-    c.add_argument("--out", required=True)
-    c.add_argument("--book", action="append", required=True)
+    for cmd in ("learn", "carried", "confirm"):
+        a = sub.add_parser(cmd)
+        a.add_argument("--out", required=True)
+        a.add_argument("--mirror", action="store_true", help="Phase 0b's mirror-pool books.")
+        if cmd == "confirm":
+            a.add_argument("--book", action="append", required=True)
     args = p.parse_args()
     out = Path(args.out)
     if args.cmd == "learn":
-        run_all(out, confirm_books=None)
-        print("carried:", carried(out))
+        run_all(out, confirm_books=None, mirror=args.mirror)
+        print("carried:", carried(out, mirror=args.mirror))
     elif args.cmd == "carried":
-        print(carried(out))
+        print(carried(out, mirror=args.mirror))
     else:
-        unknown = set(args.book) - set(book_ids())
+        unknown = set(args.book) - set(MIRROR_IDS if args.mirror else book_ids())
         if unknown:
             raise SystemExit(f"unknown book(s): {sorted(unknown)}")
-        run_all(out, confirm_books=args.book)
+        run_all(out, confirm_books=args.book, mirror=args.mirror)
 
 
 if __name__ == "__main__":

@@ -57,3 +57,21 @@ def test_only_members_with_their_own_trend_down():
     seg_member = member.rename(columns={"S01": "S02#2"})
     lists = m.weak_list(seg, seg_member, {"S02#2": "S02"}, 3)
     assert all(len(v) == len(set(v)) and "S02#2" not in v for v in lists.values())
+
+
+def test_mirror_pool_tilts_with_the_market_and_reads_no_future():
+    m = _load()
+    prices, member = _frame()
+    falling = prices * np.exp(-0.02 * np.arange(len(prices)))[:, None]  # every stock falls
+    lists = m.mirror_list(falling, member, {}, 4)
+    late = [s for w in falling.index[55:] for s in lists[w]]
+    assert late and all(s.endswith("|PE") for s in late)
+    rising = prices * np.exp(0.02 * np.arange(len(prices)))[:, None]
+    late = [s for w in rising.index[55:] for s in m.mirror_list(rising, member, {}, 4)[w]]
+    assert late and all(s.endswith("|CE") for s in late)
+    for v in m.mirror_list(prices, member, {}, 6).values():
+        assert len({s.split("|")[0] for s in v}) == len(v)  # never a stock and its inverse
+    shocked = prices.copy()
+    shocked.iloc[60:] *= np.linspace(0.2, 5, shocked.shape[1])
+    a, b = m.mirror_list(prices, member, {}, 4), m.mirror_list(shocked, member, {}, 4)
+    assert all(a[w] == b[w] for w in prices.index[:60])
