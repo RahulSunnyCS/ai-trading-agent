@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked for it as a tool of its own (2026-11-15); the options and momentum workbench is the next 2–3 months' goal; nothing live depends on it |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | feature |
 | **Area** | momentum / options / dashboard |
 | **Created** | 2026-11-15 |
 | **Depends on** | [BL-226](BL-226-fno-momentum-stock-options.md) (the NSE F&O history, the point-in-time F&O list, the `fno` Broad universe and the research scripts this builds on); [BL-107](BL-107-nse-fo-bhavcopy-daily.md) for keeping the F&O files current |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.77 |
 
 ## Context
 
@@ -105,12 +105,17 @@ itself is falling (owner, 2026-11-15: "if it is downward momentum, we can buy PE
 
 ## Open questions
 
-1. Where does it live: under Momentum (it starts from a Momentum strategy), or in the Options Lab?
-2. Which sizing modes first: one lot per stock, premium per stock, or a share of capital a week?
-3. ~~Include the puts in the first version?~~ Answered 2026-11-15 (owner): yes, downward momentum is in
-   (Phase 1's direction modes). Still open: is 26-week return < 0 and below the 200-day average the right
-   "own trend down" test, or should the bottom N alone be enough?
-4. Should the data refresh wait for BL-107's job, or have its own now?
+Answered 2026-11-15 (owner, on starting the item):
+1. **Where:** under Momentum, a page of its own.
+2. **Picks:** the chosen favourite is re-run on the F&O universe (`broad_universe="fno"`, as BL-226), so every
+   pick has options.
+3. **Sizing:** all three in the first version: one lot per stock, premium per stock (capital ÷ N), a share of
+   capital a week.
+4. **Direction:** all modes: calls only, puts only (BL-228 Phase 0's weak list), the mirror pool (BL-228
+   Phase 0b, the owner's idea), the market switch and both sides.
+
+Still open: the data refresh (Phase 4) waits for BL-107's job or has its own; the own-trend test stays
+BL-228's (26-week return and the 40-week average) unless the owner says otherwise.
 
 ## Log
 
@@ -122,3 +127,5 @@ itself is falling (owner, 2026-11-15: "if it is downward momentum, we can buy PE
 - 2026-11-15 — [BL-228](BL-228-fno-falling-stock-puts.md) tested the put side on its own and killed it at
   learning: every put book lost in 2020-24, and the stock-and-inverse mirror pool earned only from its calls.
   The put modes stay in the plan as descriptive settings; the page should show that result beside them.
+- 2026-11-15 — started (owner: "create the UI for this to test"); questions answered (above). Built on PR #450
+  and #451's branches; the mirror pool added as a direction mode.
