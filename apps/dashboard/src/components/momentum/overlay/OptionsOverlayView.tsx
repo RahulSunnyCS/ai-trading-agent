@@ -23,6 +23,8 @@ import {
   formatPp,
 } from '../../../lib/format';
 import {
+  CUSTOM_LOOKBACKS,
+  DEFAULT_CUSTOM,
   DEFAULT_REQUEST,
   DEFAULT_SLIPPAGE,
   DIRECTION_HELP,
@@ -32,6 +34,7 @@ import {
   SIZING_LABEL,
   buyText,
   countRows,
+  customName,
   growthLines,
   needsStrategy,
   requestChips,
@@ -41,6 +44,7 @@ import {
   usesPutList,
 } from '../../../lib/optionsOverlay';
 import type {
+  OverlayCustom,
   OverlayDirection,
   OverlayMarketFilter,
   OverlayMoneyness,
@@ -60,6 +64,7 @@ import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 import { type ChartLine, MomentumLineChart } from '../MomentumLineChart';
 
 const STORAGE_KEY = 'ata.optionsOverlay.request';
+const CUSTOM_VALUE = '__custom__';
 const STRATEGIES_URL = '/api/momentum/options-overlay/strategies';
 
 function loadStored(): OverlayRequest {
@@ -97,7 +102,9 @@ export function OptionsOverlayView() {
   }, [result]);
 
   const list = strategies.data?.strategies ?? [];
-  const strategyName = list.find((s) => s.id === request.favourite_id)?.name ?? null;
+  const strategyName = request.custom
+    ? customName(request.custom)
+    : (list.find((s) => s.id === request.favourite_id)?.name ?? null);
   const problem = requestProblem(request);
   const update = useCallback(
     (patch: Partial<OverlayRequest>) =>
@@ -112,8 +119,9 @@ export function OptionsOverlayView() {
   // a first visit with no strategy chosen: the headline favourite
   const firstChoice = (list.find((s) => s.active) ?? list[0])?.id ?? null;
   useEffect(() => {
-    if (request.favourite_id === null && firstChoice) update({ favourite_id: firstChoice });
-  }, [firstChoice, request.favourite_id, update]);
+    if (request.favourite_id === null && request.custom === null && firstChoice)
+      update({ favourite_id: firstChoice });
+  }, [firstChoice, request.favourite_id, request.custom, update]);
 
   const run = () => {
     if (problem) {
@@ -262,14 +270,19 @@ function OverlaySettings({
       {needsStrategy(request.direction) ? (
         <Field
           label="Strategy"
-          help="A saved Broad favourite or group, re-run on the F&O stocks of each year, so every pick has options. Its result there is the shares book."
+          help="A saved Broad favourite or group, or a custom strategy, run on the F&O stocks of each year so every pick has options. Its result there is the shares book."
         >
           <Select
             aria-label="Strategy"
-            value={request.favourite_id ?? ''}
-            onChange={(e) => update({ favourite_id: e.target.value || null })}
+            value={request.custom ? CUSTOM_VALUE : (request.favourite_id ?? '')}
+            onChange={(e) =>
+              e.target.value === CUSTOM_VALUE
+                ? update({ custom: request.custom ?? DEFAULT_CUSTOM, favourite_id: null })
+                : update({ favourite_id: e.target.value || null, custom: null })
+            }
           >
             <option value="">{loadingStrategies ? 'Loading…' : 'Pick a strategy'}</option>
+            <option value={CUSTOM_VALUE}>Custom strategy…</option>
             {list.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -279,6 +292,10 @@ function OverlaySettings({
             ))}
           </Select>
         </Field>
+      ) : null}
+
+      {needsStrategy(request.direction) && request.custom ? (
+        <CustomStrategyFields custom={request.custom} onChange={(custom) => update({ custom })} />
       ) : null}
 
       {usesPutList(request.direction) ? (
@@ -1139,5 +1156,101 @@ function BookingWidget({ result }: { result: OverlayResult }) {
         </Button>
       ) : null}
     </Widget>
+  );
+}
+
+function CustomStrategyFields({
+  custom,
+  onChange,
+}: {
+  custom: OverlayCustom;
+  onChange: (custom: OverlayCustom) => void;
+}) {
+  const set = (patch: Partial<OverlayCustom>) => onChange({ ...custom, ...patch });
+  const toggle = (weeks: number) =>
+    set({
+      lookbacks: custom.lookbacks.includes(weeks)
+        ? custom.lookbacks.filter((w) => w !== weeks)
+        : [...custom.lookbacks, weeks].sort((a, b) => a - b),
+    });
+  return (
+    <div className="space-y-4 rounded-lg border border-border bg-surface-2 p-3">
+      <Field
+        label="Look-backs (weeks)"
+        help="The score reads each stock's return over these windows, as Momentum's Broad engine does."
+      >
+        <div className="flex flex-wrap gap-1.5">
+          {CUSTOM_LOOKBACKS.map((weeks) => {
+            const on = custom.lookbacks.includes(weeks);
+            return (
+              <button
+                key={weeks}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggle(weeks)}
+                className={cn(
+                  'rounded-full border px-2.5 py-0.5 text-xs',
+                  on
+                    ? 'border-primary bg-primary/15 text-foreground'
+                    : 'border-border text-muted hover:text-foreground',
+                )}
+              >
+                {weeks}w
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Stocks held (top N)">
+          <NumberField
+            aria-label="Top N"
+            min={1}
+            max={30}
+            value={custom.top_n}
+            onChange={(top_n) => set({ top_n, exit_rank: Math.max(custom.exit_rank, top_n) })}
+          />
+        </Field>
+        <Field label="Sell when rank falls below">
+          <NumberField
+            aria-label="Exit rank"
+            min={custom.top_n}
+            max={100}
+            value={custom.exit_rank}
+            onChange={(exit_rank) => set({ exit_rank })}
+          />
+        </Field>
+      </div>
+      <Field label="Rebalance">
+        <SegmentedControl
+          ariaLabel="Rebalance"
+          size="sm"
+          value={custom.rebalance}
+          options={[
+            { value: 'weekly', label: 'Weekly' },
+            { value: 'fortnightly', label: 'Every 2 weeks' },
+            { value: 'monthly', label: 'Monthly' },
+          ]}
+          onChange={(rebalance: OverlayCustom['rebalance']) => set({ rebalance })}
+        />
+      </Field>
+      <Field label="Score">
+        <SegmentedControl
+          ariaLabel="Score"
+          size="sm"
+          value={custom.score}
+          options={[
+            { value: 'ranksum', label: 'Rank-sum' },
+            { value: 'voladj', label: 'Volatility-adjusted' },
+          ]}
+          onChange={(score: OverlayCustom['score']) => set({ score })}
+        />
+      </Field>
+      <p className="text-xs text-faint">
+        Fixed: F&amp;O stocks of each year that pass the liquidity filter (₹2 crore turnover, ₹30
+        price), at most 25 % in one stock, bought at Friday&apos;s close a week after the signal,
+        itemised costs and 0.15 % slippage on the shares.
+      </p>
+    </div>
   );
 }

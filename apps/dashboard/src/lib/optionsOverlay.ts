@@ -1,6 +1,7 @@
 /** BL-227: Momentum › Options overlay — labels, defaults and the run bar's chips. */
 
 import type {
+  OverlayCustom,
   OverlayDirection,
   OverlayMarketFilter,
   OverlayMoneyness,
@@ -59,8 +60,25 @@ export function usesPutList(direction: OverlayDirection): boolean {
   return direction !== 'calls';
 }
 
+export const CUSTOM_LOOKBACKS: readonly number[] = [1, 4, 13, 26, 52];
+
+export const DEFAULT_CUSTOM: OverlayCustom = {
+  lookbacks: [1, 4, 13, 26, 52],
+  top_n: 10,
+  exit_rank: 20,
+  rebalance: 'weekly',
+  score: 'ranksum',
+};
+
+/** "Custom · top 10 · 52w · weekly", as the server names it. */
+export function customName(custom: OverlayCustom): string {
+  const longest = custom.lookbacks.length ? `${Math.max(...custom.lookbacks)}w` : '?';
+  return `Custom · top ${custom.top_n} · ${longest} · ${custom.rebalance}`;
+}
+
 export const DEFAULT_REQUEST: OverlayRequest = {
   favourite_id: null,
+  custom: null,
   direction: 'calls',
   moneyness: 'ATM',
   sizing: 'one_lot',
@@ -82,8 +100,13 @@ export const DEFAULT_REQUEST: OverlayRequest = {
 
 /** Why the request cannot run yet, or null. */
 export function requestProblem(request: OverlayRequest): string | null {
-  if (needsStrategy(request.direction) && !request.favourite_id)
+  if (needsStrategy(request.direction) && !request.favourite_id && !request.custom)
     return 'Pick a strategy: its holdings are what the calls are bought on.';
+  if (needsStrategy(request.direction) && request.custom) {
+    if (!request.custom.lookbacks.length) return 'Pick at least one look-back.';
+    if (request.custom.exit_rank < request.custom.top_n)
+      return 'The exit rank must be at least the number held.';
+  }
   if (request.sizing === 'capital_share' && !(request.sizing_value && request.sizing_value <= 1))
     return 'Set the share of capital spent on premium a week.';
   return null;

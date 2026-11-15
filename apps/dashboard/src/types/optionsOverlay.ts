@@ -5,8 +5,19 @@ export type OverlaySizing = 'one_lot' | 'premium' | 'capital_share';
 export type OverlayMoneyness = 'ATM' | 'OTM1' | 'OTM2' | 'OTM3';
 export type OverlayMarketFilter = 'nifty_200dma' | 'nifty_26w' | 'breadth';
 
+/** A custom Broad strategy on F&O stocks (the research grid's settings plus these). */
+export interface OverlayCustom {
+  lookbacks: number[];
+  top_n: number;
+  exit_rank: number;
+  rebalance: 'weekly' | 'fortnightly' | 'monthly';
+  score: 'ranksum' | 'voladj';
+}
+
 export interface OverlayRequest {
   favourite_id: string | null;
+  /** Instead of a favourite. */
+  custom: OverlayCustom | null;
   direction: OverlayDirection;
   moneyness: OverlayMoneyness;
   sizing: OverlaySizing;

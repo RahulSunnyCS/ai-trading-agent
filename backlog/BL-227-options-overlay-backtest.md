@@ -152,3 +152,6 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
   account cannot pay for a pick and is below the starting capital, taken-out money goes back in, up to
   it. Trio, one lot, ₹1 lakh, 75 % of each ₹50,000: +₹44.4 lakh after tax and trading to Oct 2026 with
   refill (₹53.6 lakh out, ₹7.1 lakh back) against +₹1.6 lakh and no trade after Jun 2022 without.
+- 2026-11-15 — owner: a custom strategy from the picker, not only saved favourites. "Custom strategy…"
+  sets the look-backs (1-52 weeks), top N, exit rank, rebalance (weekly / every 2 weeks / monthly) and
+  score (rank-sum / volatility-adjusted); the rest is BL-226's grid base (`overlay_runs.CUSTOM_BASE`).

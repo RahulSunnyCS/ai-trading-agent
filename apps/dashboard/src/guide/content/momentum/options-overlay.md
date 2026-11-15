@@ -34,8 +34,12 @@ Open **Settings** on the run bar (or click any chip).
     below zero, or under 40 % of F&O stocks above their 40-week average, read at the previous
     session's close.
   - *Both sides*: the calls and the puts every week, the budget split (puts' share, 50 % by default).
-- **Strategy**: the saved favourite, re-run on each year's F&O stocks. The first run of a strategy
-  takes a minute or two; later runs reuse it.
+- **Strategy**: a saved favourite, re-run on each year's F&O stocks, or **Custom strategy…** (first
+  in the list): pick the look-backs (1, 4, 13, 26, 52 weeks), how many stocks to hold, the rank a
+  holding is sold below, the rebalance (weekly, every 2 weeks, monthly) and the score (rank-sum or
+  volatility-adjusted). The rest is fixed: F&O stocks of each year that pass the liquidity filter,
+  at most 25 % in one stock, bought at Friday's close a week after the signal, the share book's
+  costs. The first run of a strategy takes a minute or two; later runs reuse it.
 - **Moneyness**: ATM is the listed strike nearest the stock's close; OTM1 to OTM3 are one to three
   strikes further out (above the price for a call, below for a put).
 - **Sizing**

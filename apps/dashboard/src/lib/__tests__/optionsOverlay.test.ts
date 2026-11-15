@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { OverlayResult, OverlayTrade } from '../../types/optionsOverlay';
 import {
+  DEFAULT_CUSTOM,
   DEFAULT_REQUEST,
   buyText,
   countRows,
+  customName,
   requestChips,
   requestProblem,
   sellText,
@@ -78,5 +80,22 @@ describe('trade wording', () => {
     expect(second?.split('\n')[0]).toMatch(/^Sold 2 \(/);
     expect(second).toContain('· PFC 400 CE: Sell at 5.00');
     expect(third).toBe('');
+  });
+});
+
+describe('custom strategy', () => {
+  it('names itself and needs look-backs and a sane exit rank', () => {
+    expect(customName(DEFAULT_CUSTOM)).toBe('Custom · top 10 · 52w · weekly');
+    const base = { ...DEFAULT_REQUEST, direction: 'calls' as const };
+    expect(requestProblem({ ...base, custom: DEFAULT_CUSTOM })).toBeNull();
+    expect(requestProblem({ ...base, custom: { ...DEFAULT_CUSTOM, lookbacks: [] } })).toMatch(
+      /look-back/,
+    );
+    expect(
+      requestProblem({ ...base, custom: { ...DEFAULT_CUSTOM, top_n: 10, exit_rank: 5 } }),
+    ).toMatch(/exit rank/);
+    expect(requestChips({ ...base, custom: DEFAULT_CUSTOM }, customName(DEFAULT_CUSTOM))[0]).toBe(
+      'Custom · top 10 · 52w · weekly',
+    );
   });
 });

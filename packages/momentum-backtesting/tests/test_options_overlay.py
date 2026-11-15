@@ -229,3 +229,20 @@ def test_refill_moves_taken_out_money_back_when_a_lot_is_too_dear():
     trades, booking = run(False)
     assert [t["symbol"] for t in trades] == ["ABC", "ABC"]
     assert all(e["kind"] == "out" for e in booking["events"])
+
+
+def test_a_custom_strategy_is_a_valid_broad_request_on_fno_stocks():
+    from momentum_backtesting import api, overlay_runs
+
+    cfg = overlay_runs.custom_config(
+        {"lookbacks": [26, 4, 52], "top_n": 8, "exit_rank": 16, "rebalance": "fortnightly"}
+    )
+    req = api.BacktestRequest(**{**cfg, "start": "2020-01-01", "end": None})
+    assert req.broad_universe == "fno" and req.broad_category_mode == "off"
+    assert req.lookbacks == [4, 26, 52] and req.broad_off_top_n == 8
+    assert req.rebalance == "weekly" and req.rebalance_every == 2
+    assert overlay_runs.held_n(cfg) == 8
+    for bad in ({"lookbacks": [3]}, {"lookbacks": [4], "top_n": 10, "exit_rank": 5},
+                {"lookbacks": [4], "rebalance": "daily"}):  # fmt: skip
+        with pytest.raises(ValueError):
+            overlay_runs.custom_config(bad)

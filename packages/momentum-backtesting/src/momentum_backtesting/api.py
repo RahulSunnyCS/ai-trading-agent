@@ -4958,10 +4958,21 @@ def _run_options_overlay(body: dict) -> dict:
 OVERLAY_JOBS = _PreviewJobs(_run_options_overlay)
 
 
+class OverlayCustomStrategy(BaseModel):
+    """BL-227: a custom Broad strategy on F&O stocks (`overlay_runs.CUSTOM_BASE` plus these)."""
+
+    lookbacks: list[int] = Field([1, 4, 13, 26, 52], min_length=1, max_length=5)
+    top_n: int = Field(10, ge=1, le=30)
+    exit_rank: int = Field(20, ge=1, le=100)
+    rebalance: Literal["weekly", "fortnightly", "monthly"] = "weekly"
+    score: Literal["ranksum", "voladj"] = "ranksum"
+
+
 class OptionsOverlayRequest(BaseModel):
     """BL-227: one Options overlay run (`options_overlay.Settings` plus the strategy)."""
 
     favourite_id: str | None = None
+    custom: OverlayCustomStrategy | None = None  # instead of a favourite
     direction: Literal["calls", "puts", "mirror", "switch", "both"] = "calls"
     moneyness: Literal["ATM", "OTM1", "OTM2", "OTM3"] = "ATM"
     sizing: Literal["one_lot", "premium", "capital_share"] = "one_lot"
