@@ -9,7 +9,8 @@ killed their registered forms, and a run here is a look, not a test.
 The rules (BL-226 Phase 0, BL-228 Phase 0 / 0b):
 - each Momentum week's rebalance day is its last F&O session; the book buys on that day's close and
   sells on the next rebalance day's close (the settle price when the contract did not trade);
-- the expiry is the nearest with at least `min_sessions_left` sessions after the entry day; ATM is
+- the expiry is the nearest with at least `min_sessions_left` sessions after the entry day (and
+  never before the exit day); ATM is
   the listed strike nearest the unadjusted cash close, OTMk k listed strikes further out (higher for
   a call, lower for a put); a strike with open interest under `min_oi_lots` lots is skipped;
 - a contract re-struck by a corporate action between entry and exit is followed: the exit day's row
@@ -145,7 +146,8 @@ class Lake:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._key: str | None = None
+        self._key: tuple | None = None
+        self._newest: str | None = None
         self._chains: dict[tuple[pd.Timestamp, str], pd.DataFrame] = {}
         self._spots: pd.DataFrame | None = None
         self._spot_days: set[pd.Timestamp] = set()
@@ -157,9 +159,14 @@ class Lake:
         days = sorted(p.name[5:] for p in _fo_dir().glob("date=*"))
         if not days:
             raise FileNotFoundError("No F&O bhavcopy days in the lake: run `obt nse fo-fetch`.")
-        key = days[-1]
+        from . import db_read
+
+        # the newest F&O day AND what the shared database and the stock / F&O list lake files hold:
+        # a stock-bar top-up, a corporate-action fix or a rebuilt F&O list changes no F&O day
+        key = (days[-1], db_read.data_version())
         if key != self._key:
             self._key = key
+            self._newest = days[-1]
             self._chains.clear()
             self._cache.clear()
             self._groups.clear()
@@ -170,7 +177,14 @@ class Lake:
     def newest(self) -> str:
         with self._lock:
             self._check()
-            return str(self._key)
+            return str(self._newest)
+
+    @property
+    def version(self) -> str:
+        """What every cached result is keyed on: the newest day and the data version."""
+        with self._lock:
+            self._check()
+            return repr(self._key)
 
     def sessions(self) -> list[pd.Timestamp]:
         with self._lock:
@@ -465,15 +479,26 @@ class BookCounts:
     no_capital: int = 0  # profit booking: the trading account could not pay for it
 
 
-def _expiry(rows: pd.DataFrame, day: pd.Timestamp, sessions: np.ndarray, min_left: int):
-    exps = np.sort(rows["expiry"].unique())
-    if not len(exps):
-        return None
-    left = np.searchsorted(sessions, exps.astype("datetime64[ns]"), side="right") - np.searchsorted(
-        sessions, np.datetime64(day), side="right"
+def _sessions_to(sessions: np.ndarray, day: pd.Timestamp, expiry: np.datetime64) -> int:
+    """Sessions after `day` up to and including `expiry`. The lake holds only the days collected, so
+    past its last day the count goes on in weekdays (an exchange holiday is not known there, which
+    can only call an expiry a day nearer than it is)."""
+    start = int(np.searchsorted(sessions, np.datetime64(day), side="right"))
+    if expiry <= sessions[-1]:
+        return int(np.searchsorted(sessions, expiry, side="right")) - start
+    after = np.busday_count(
+        (sessions[-1] + np.timedelta64(1, "D")).astype("datetime64[D]"),
+        (expiry + np.timedelta64(1, "D")).astype("datetime64[D]"),
     )
-    ok = exps[left >= min_left]
-    return pd.Timestamp(ok[0]) if len(ok) else None
+    return len(sessions) - start + int(after)
+
+
+def _expiry(rows: pd.DataFrame, day: pd.Timestamp, sessions: np.ndarray, min_left: int):
+    exps = np.sort(rows["expiry"].unique()).astype("datetime64[ns]")
+    for e in exps:
+        if _sessions_to(sessions, day, e) >= min_left:
+            return pd.Timestamp(e)
+    return None
 
 
 def run_leg(
@@ -537,7 +562,12 @@ def trade_week(
             if rows is None or rows.empty:
                 counts.no_contract += 1
                 continue
-            expiry = _expiry(rows, d0, sessions, s.min_sessions_left)
+            # the contract must live to the exit day: a shorter one would expire before it is sold
+            # and be booked at nothing, even when it expired in the money
+            hold = int(np.searchsorted(sessions, np.datetime64(d1), side="right")) - int(
+                np.searchsorted(sessions, np.datetime64(d0), side="right")
+            )
+            expiry = _expiry(rows, d0, sessions, max(s.min_sessions_left, hold))
             if expiry is None:
                 counts.no_contract += 1
                 continue

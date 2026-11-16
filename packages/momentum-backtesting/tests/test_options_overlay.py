@@ -54,6 +54,64 @@ def test_expiry_needs_ten_sessions_and_strikes_count_outward():
     assert trades[0]["expiry"] == NEAR
 
 
+def test_sessions_to_an_expiry_past_the_lakes_last_day_go_on_in_weekdays():
+    # the lake holds days to 2024-03-08; an entry on 2024-03-01 has 5 more sessions in it and the
+    # weekdays 03-11 .. 03-28 (14) to the expiry. Counted in the lake alone it would have 5 and
+    # every expiry of the last weeks would be refused.
+    sessions = np.array(pd.bdate_range("2024-01-01", "2024-03-08"), dtype="datetime64[ns]")
+    day, far = pd.Timestamp("2024-03-01"), np.datetime64("2024-03-28", "ns")
+    assert ov._sessions_to(sessions, day, far) == 19
+    assert ov._sessions_to(sessions, day, np.datetime64("2024-03-06", "ns")) == 3  # inside it
+    rows = pd.DataFrame({"expiry": [pd.Timestamp("2024-03-28")]})
+    assert ov._expiry(rows, day, sessions, 19) == pd.Timestamp("2024-03-28")
+    assert ov._expiry(rows, day, sessions, 20) is None
+
+
+def test_the_contract_lives_to_the_exit_day_whatever_min_sessions_left_says():
+    # an expiry 3 sessions out would lapse before the exit 5 sessions out and be booked at nothing
+    early = pd.Timestamp("2024-01-10")
+    strikes = [90.0, 95.0, 100.0, 105.0, 110.0]
+    rows = pd.concat([_rows(D0, early, strikes, "CE", 5.0), _chain(D0)], ignore_index=True)
+    chains = {(D0, "ABC"): rows, (D1, "ABC"): _chain(D1, exit_price=12.0)}
+    lots = pd.Series(100, index=pd.MultiIndex.from_tuples(
+        [(D0, "ABC", e) for e in (early, NEAR, NEXT)]), dtype=float)  # fmt: skip
+    s = ov.Settings(moneyness="ATM", min_sessions_left=1, slippage=0.0)
+    (t,), _ = _run(ov.Leg(picks={D0: ["ABC"]}, right="CE"), s, chains, lots)
+    assert t["expiry"] == NEAR  # not the 2024-01-10 contract
+
+
+def test_the_lake_cache_key_moves_with_the_shared_data_version(tmp_path, monkeypatch):
+    from momentum_backtesting import db_read
+
+    (tmp_path / "date=2024-03-01").mkdir()
+    monkeypatch.setattr(ov, "_fo_dir", lambda: tmp_path)
+    version = {"now": ("bars", 1)}
+    monkeypatch.setattr(db_read, "data_version", lambda root=None: version["now"])
+    lake = ov.Lake()
+    first = lake.version
+    assert lake.remember("k", lambda: "old") == "old"
+    assert lake.remember("k", lambda: "never") == "old"  # same data: served from the cache
+    version["now"] = ("bars", 2)  # a stock-bar top-up: no new F&O day
+    assert lake.version != first and lake.newest == "2024-03-01"
+    assert lake.remember("k", lambda: "new") == "new"  # the cache was emptied
+
+
+def test_a_favourites_digest_follows_its_saved_settings(monkeypatch):
+    from momentum_backtesting import overlay_runs as runs
+
+    record = {"id": "f", "members": [{"config": {"lookbacks": [4, 13]}}]}
+    monkeypatch.setattr(runs, "_favourite", lambda fid: record)
+    before = runs._digest("f")
+    record["members"][0]["config"]["lookbacks"] = [4, 26]
+    assert runs._digest("f") != before and runs._digest(None) is None
+
+    def gone(fid):
+        raise LookupError(fid)
+
+    monkeypatch.setattr(runs, "_favourite", gone)
+    assert runs._digest("f") is None
+
+
 def test_sizing_one_lot_premium_and_pnl():
     chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0)}
     s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0)

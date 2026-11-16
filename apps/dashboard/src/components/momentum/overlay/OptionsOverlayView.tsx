@@ -37,9 +37,11 @@ import {
   customName,
   growthLines,
   needsStrategy,
+  parseSlippage,
   requestChips,
   requestProblem,
   sellText,
+  slippageText,
   tradesByDay,
   usesPutList,
 } from '../../../lib/optionsOverlay';
@@ -116,12 +118,19 @@ export function OptionsOverlayView() {
     [],
   );
 
-  // a first visit with no strategy chosen: the headline favourite
+  // a first visit with no strategy chosen: the headline favourite. Decided on the request as it is
+  // when the update runs: the stored request is set in the same commit, and a check made on the
+  // render's own (default) request would put the headline over a stored choice
   const firstChoice = (list.find((s) => s.active) ?? list[0])?.id ?? null;
   useEffect(() => {
-    if (request.favourite_id === null && request.custom === null && firstChoice)
-      update({ favourite_id: firstChoice });
-  }, [firstChoice, request.favourite_id, request.custom, update]);
+    if (!firstChoice) return;
+    setRequest((current) => {
+      if (current.favourite_id !== null || current.custom !== null) return current;
+      const next = { ...current, favourite_id: firstChoice };
+      store(next);
+      return next;
+    });
+  }, [firstChoice]);
 
   const run = () => {
     if (problem) {
@@ -222,6 +231,36 @@ export function OptionsOverlayView() {
         />
       </Drawer>
     </div>
+  );
+}
+
+/** The slippage field keeps what is typed: a controlled number would rewrite "1." to "1" and show
+ * 0.07 × 100 as 7.000000000000001. It commits the parsed fraction, and follows the request only
+ * when that changes to something other than what the text already means. */
+function SlippageInput({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: number | null;
+  placeholder: string;
+  onChange: (slippage: number | null) => void;
+}) {
+  const [text, setText] = useState(() => slippageText(value));
+  useEffect(() => {
+    setText((current) => (parseSlippage(current) === value ? current : slippageText(value)));
+  }, [value]);
+  return (
+    <Input
+      aria-label="Slippage"
+      inputMode="decimal"
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(parseSlippage(e.target.value));
+      }}
+    />
   );
 }
 
@@ -441,17 +480,10 @@ function OverlaySettings({
           label="Slippage (% of premium each way)"
           help={`Default for ${request.moneyness}: ${formatPct(DEFAULT_SLIPPAGE[request.moneyness], 0)}`}
         >
-          <Input
-            aria-label="Slippage"
-            inputMode="decimal"
-            placeholder={String(DEFAULT_SLIPPAGE[request.moneyness] * 100)}
-            value={request.slippage === null ? '' : String(request.slippage * 100)}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              update({
-                slippage: e.target.value === '' || !(v >= 0 && v < 50) ? null : v / 100,
-              });
-            }}
+          <SlippageInput
+            value={request.slippage}
+            placeholder={slippageText(DEFAULT_SLIPPAGE[request.moneyness])}
+            onChange={(slippage) => update({ slippage })}
           />
         </Field>
         <Field

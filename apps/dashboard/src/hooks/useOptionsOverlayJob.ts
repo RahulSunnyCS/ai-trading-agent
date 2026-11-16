@@ -7,6 +7,7 @@
 import { useCallback, useState } from 'react';
 
 import { apiPost } from '../lib/api';
+import { jobRunning } from '../lib/optionsOverlay';
 import type { OverlayJob, OverlayRequest } from '../types/optionsOverlay';
 import { usePolledResource } from './usePolledResource';
 
@@ -30,9 +31,8 @@ export function useOptionsOverlayJob(): OptionsOverlayJobState {
     { enabled: jobId !== null, ...(polling ? { intervalMs: POLL_MS } : {}) },
   );
   const job = data && data.id === jobId ? data : null;
-  // a poll error with no job (404: the service restarted and forgot it) ends the wait
-  const running =
-    starting || (jobId !== null && (job === null ? error === null : job.status === 'running'));
+  // a poll error ends the wait (the service restarted and forgot the job: every poll is a 404)
+  const running = jobRunning({ starting, jobId, job, pollError: error });
   if (polling !== running) setPolling(running);
 
   const start = useCallback(async (request: OverlayRequest) => {
