@@ -723,4 +723,34 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
       await forward(reply, `/api/options-overlay/jobs/${id}`);
     },
   );
+
+  // Fresh starts: the page's settings started afresh with the capital on many days
+  fastify.post(
+    '/api/momentum/options-overlay/starts/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/options-overlay/starts/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.get(
+    '/api/momentum/options-overlay/starts/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/options-overlay/starts/jobs/${id}`);
+    },
+  );
 });

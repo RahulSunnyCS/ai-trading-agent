@@ -9,9 +9,10 @@ import type {
   OverlayRequest,
   OverlayResult,
   OverlaySizing,
+  OverlayStart,
   OverlayTrade,
 } from '../types/optionsOverlay';
-import { formatInr, formatNumber, formatPct } from './format';
+import { formatDay, formatInr, formatInt, formatNumber, formatPct } from './format';
 
 export const DIRECTION_LABEL: Record<OverlayDirection, string> = {
   calls: 'Calls on the picks',
@@ -302,4 +303,46 @@ export function tradesByDay(result: OverlayResult): string[] {
     }
     return lines.join('\n');
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fresh starts: the page's settings started afresh with the capital on many days
+// ---------------------------------------------------------------------------------------------
+
+/** How a start ended: above the capital it began with, washed out (its account fell below the
+ * wash-out level at some point), or neither. */
+export type StartOutcome = 'above' | 'washed' | 'below';
+
+export function startOutcome(start: OverlayStart, capital: number): StartOutcome {
+  if (start.end_rs > capital) return 'above';
+  return start.washed_out ? 'washed' : 'below';
+}
+
+/** The tooltip of one start's bar. */
+export function startHover(start: OverlayStart): string {
+  const taken = start.taken_rs
+    ? ` (${formatInr(start.taken_rs, { compact: true })} taken out)`
+    : '';
+  const washed = start.washed_out ? ' · washed out' : '';
+  const unpaid = start.unaffordable
+    ? ` · ${formatInt(start.unaffordable)} picks it could not pay for`
+    : '';
+  return [
+    `Start ${formatDay(start.first_day)} → ${formatDay(start.last_day)}`,
+    `Ended ${formatInr(start.end_rs, { compact: true })}${taken}`,
+    `Account low ${formatInr(start.low_rs, { compact: true })}${washed}`,
+    `${formatInt(start.trades)} trades${unpaid}`,
+  ].join('<br>');
+}
+
+/** The log axis's floor (an end below it is drawn at it) and ticks, as multiples of capital. */
+export function startsAxis(
+  capital: number,
+  best: number,
+): { floor: number; tickvals: number[]; ticktext: string[] } {
+  const floor = capital / 100;
+  const multiples = [0.01, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
+  const top = Math.max(best, capital);
+  const tickvals = multiples.map((m) => m * capital).filter((v) => v <= top * 1.5);
+  return { floor, tickvals, ticktext: tickvals.map((v) => formatInr(v, { compact: true })) };
 }

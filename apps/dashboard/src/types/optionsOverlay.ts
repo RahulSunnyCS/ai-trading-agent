@@ -205,12 +205,12 @@ export interface OverlayResult {
   } | null;
 }
 
-export interface OverlayJob {
+export interface OverlayJob<R = OverlayResult> {
   id: string;
   status: 'running' | 'done' | 'failed';
   started_at: string;
   finished_at: string | null;
-  result: OverlayResult | null;
+  result: R | null;
   error: string | null;
   error_status: number | null;
 }
@@ -237,4 +237,51 @@ export interface OverlaySweepRow {
   min_capital?: number | null;
   error?: string;
   secs?: number;
+}
+
+/** Fresh starts: the page's settings started afresh with the capital on many days. */
+export interface OverlayStartsRequest extends OverlayRequest {
+  every_months: 1 | 3 | 6;
+  years: number;
+  /** A start washed out when its account fell below this share of the capital. */
+  washout: number;
+}
+
+export interface OverlayStart {
+  start: string;
+  first_day: string;
+  last_day: string;
+  /** Capital plus the after-tax total, money taken out included. */
+  end_rs: number;
+  taken_rs: number;
+  /** The trading account's lowest week-end (before tax). */
+  low_rs: number;
+  washed_out: boolean;
+  max_dd: number;
+  trades: number;
+  /** Picks the account could not pay for. */
+  unaffordable: number;
+}
+
+export interface OverlayStartsResult {
+  settings: OverlayRequest & { slippage: number };
+  strategy: string | null;
+  favourite_id: string | null;
+  data_through: string;
+  every_months: number;
+  years: number;
+  washout: number;
+  washout_rs: number;
+  skipped: number;
+  summary: {
+    starts: number;
+    median_end_rs: number;
+    mean_end_rs: number;
+    best_rs: number;
+    worst_rs: number;
+    above_start: number;
+    washed_out: number;
+    median_trades: number;
+  } | null;
+  starts: OverlayStart[];
 }

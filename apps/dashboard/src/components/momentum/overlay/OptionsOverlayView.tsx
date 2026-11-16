@@ -65,6 +65,7 @@ import { StatCard } from '../../ui/StatCard';
 import { StateMessage } from '../../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 import { type ChartLine, MomentumLineChart } from '../MomentumLineChart';
+import { OverlayStarts } from './OverlayStarts';
 import { OverlaySweeps } from './OverlaySweeps';
 
 const STORAGE_KEY = 'ata.optionsOverlay.request';
@@ -200,6 +201,8 @@ export function OptionsOverlayView() {
           description="Pick a strategy and the option settings, then Run."
         />
       )}
+
+      <OverlayStarts request={request} problem={problem} />
 
       <OverlaySweeps
         onOpen={(settings) => {

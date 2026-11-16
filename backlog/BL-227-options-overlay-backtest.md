@@ -155,3 +155,14 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
 - 2026-11-15 — owner: a custom strategy from the picker, not only saved favourites. "Custom strategy…"
   sets the look-backs (1-52 weeks), top N, exit rank, rebalance (weekly / every 2 weeks / monthly) and
   score (rank-sum / volatility-adjusted); the rest is BL-226's grid base (`overlay_runs.CUSTOM_BASE`).
+- 2026-11-16 — owner: a small options sleeve (₹1 lakh, about 3 % of the portfolio) may wash out now and
+  then, so judge it by what a start usually returns and how often it is lost, not by one start's
+  drawdown; asked for the "₹1 lakh starts" view. Built the **Fresh starts** card
+  (`options_overlay.starts`, POST /api/options-overlay/starts/jobs): the run bar's settings started
+  afresh with the capital every month / quarter / half-year, each held 1–3 years, each its own account
+  (a one-lot book buys only what it can pay for); tiles for the median end, ended above start, washed
+  out (account below 10–50 % of capital at a week's close), average, best and worst; one log-scale bar
+  per start. Descriptive, like the page. BL-229's nearest miss (Trio, calls while NIFTY is above its
+  200-day average, hold, stop −50 %, one lot) at ATM, ₹1 lakh, quarterly from 2020, one year: median
+  end ₹19,230, 10 of 24 above ₹1 lakh, 13 of 24 washed out, average ₹4.30 lakh (best ₹24.0 lakh);
+  five of the six starts from July 2024 washed out.

@@ -1205,6 +1205,104 @@ def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, cou
     }
 
 
+#: A profit step no account reaches: the booked path (an account that pays for its picks)
+#: with nothing ever taken out.
+NO_BOOKING = 1e15
+#: The most start dates one request may run (each is a whole book).
+STARTS_MAX = 80
+
+
+def starts(
+    s: Settings,
+    inputs: Inputs,
+    *,
+    every_months: int = 3,
+    years: int = 1,
+    washout: float = 0.2,
+) -> dict[str, Any]:
+    """The same settings started afresh with `capital` on many days: a start on the first of
+    every `every_months`-th month from `s.start`, each run for `years` (only starts whose whole
+    horizon is in the data). Every start is its own account (the booked path, so a one-lot book
+    buys only what the account can pay for; profit booking as set, else none). A start ends at
+    capital plus its after-tax total (money taken out included); it washed out when its trading
+    account fell below `washout` × capital at some week's close. For a small sleeve judged by
+    what a ticket usually returns and how often it is lost, not by one start's drawdown."""
+    s.validate()
+    if every_months < 1 or years < 1 or not 0 < washout < 1:
+        raise ValueError("Starts need a step of at least a month, a horizon of a year or more "
+                         "and a wash-out level between 0 and 1.")  # fmt: skip
+    sessions_list = LAKE.sessions()
+    last = min(pd.Timestamp(s.end), sessions_list[-1]) if s.end else sessions_list[-1]
+    span = pd.DateOffset(years=years)
+    first = pd.Timestamp(s.start)
+    first = first if first.day == 1 else first + pd.offsets.MonthBegin(1)
+    dates = list(pd.date_range(first, last - span, freq=f"{every_months}MS"))
+    if not dates:
+        raise ValueError(f"The window is shorter than one {years}-year horizon.")
+    if len(dates) > STARTS_MAX:
+        raise ValueError(f"{len(dates)} starts is too many (at most {STARTS_MAX}): start less "
+                         "often or shorten the window.")  # fmt: skip
+    # one run over the whole window first: it loads every option row the starts trade in one
+    # read of the lake (each start then reads only the cache; a read per start is ~7 s)
+    run(replace(s, split=None, profit_step=None), inputs, capital_table=False)
+    rows: list[dict[str, Any]] = []
+    skipped = 0
+    for day in dates:
+        one = replace(
+            s,
+            start=_iso(day),
+            end=_iso(day + span),
+            split=None,
+            profit_step=s.profit_step if s.profit_step is not None else NO_BOOKING,
+        )
+        try:
+            r = run(one, inputs, capital_table=False)
+        except ValueError:  # fewer than three rebalance weeks in it
+            skipped += 1
+            continue
+        account = [x for x in r["booking"]["account"] if np.isfinite(x)]
+        low = float(min(account)) if account else s.capital
+        rows.append(
+            {
+                "start": _iso(day),
+                "first_day": r["first_day"],
+                "last_day": r["last_day"],
+                "end_rs": round(s.capital + r["book"]["total_rs"]),
+                "taken_rs": r["booking"]["taken_rs"],
+                "low_rs": round(low),
+                "washed_out": low < washout * s.capital,
+                "max_dd": r["book"]["max_dd"],
+                "trades": r["stats"]["trades"],
+                "unaffordable": r["counts"].get("no_capital", 0),
+            }
+        )
+    ends = np.array([x["end_rs"] for x in rows], dtype=float)
+    summary = None
+    if rows:
+        summary = {
+            "starts": len(rows),
+            "median_end_rs": round(float(np.median(ends))),
+            "mean_end_rs": round(float(ends.mean())),
+            "best_rs": round(float(ends.max())),
+            "worst_rs": round(float(ends.min())),
+            "above_start": int((ends > s.capital).sum()),
+            "washed_out": int(sum(x["washed_out"] for x in rows)),
+            "median_trades": float(np.median([x["trades"] for x in rows])),
+        }
+    return {
+        "settings": {**s.__dict__, "slippage": s.slip},
+        "strategy": inputs.strategy_name,
+        "data_through": LAKE.newest,
+        "every_months": every_months,
+        "years": years,
+        "washout": washout,
+        "washout_rs": round(washout * s.capital),
+        "skipped": skipped,
+        "summary": summary,
+        "starts": rows,
+    }
+
+
 # ---------------------------------------------------------------------------------------------
 # The response
 # ---------------------------------------------------------------------------------------------

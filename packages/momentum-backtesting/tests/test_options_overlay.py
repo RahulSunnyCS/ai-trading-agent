@@ -296,3 +296,58 @@ def test_a_stop_closes_on_the_first_daily_close_through_it():
                          _lots(), set(), ARR, counts, between=[mid, D1])  # fmt: skip
     assert t["exit_how"] == "stop" and t["exit"] == mid and t["p1"] == 3.0
     assert t["week_end"] == D1 and counts.stopped == 1
+
+
+def test_fresh_starts_run_each_start_as_its_own_account(monkeypatch):
+    # every start is one run of the booked path over its own horizon; the run is faked by the
+    # start day so the summary and the wash-out can be checked by hand
+    sessions = list(pd.bdate_range("2020-01-01", "2021-12-31"))
+    monkeypatch.setattr(ov.LAKE, "sessions", lambda: sessions)
+    monkeypatch.setattr(ov.Lake, "newest", property(lambda self: "2021-12-31"))
+    calls = []
+    outcome = {"2020-01-01": (-90_000, [100_000, 10_000, 10_000]),
+               "2020-04-01": (300_000, [100_000, 60_000, 400_000]),
+               "2020-07-01": (-20_000, [100_000, 80_000, 80_000])}  # fmt: skip
+
+    def fake_run(s, inputs, capital_table=True):
+        calls.append(s)
+        if s.start == "2020-01-01" and s.end == "2021-12-31":  # the warm-up over the window
+            return {}
+        if s.start == "2020-10-01":
+            raise ValueError("The window holds fewer than three rebalance weeks of F&O data.")
+        total, account = outcome[s.start]
+        return {"first_day": s.start, "last_day": s.end,
+                "book": {"total_rs": total, "max_dd": -0.5},
+                "booking": {"account": account, "taken_rs": 0}, "stats": {"trades": 7},
+                "counts": {"no_capital": 2}}  # fmt: skip
+
+    monkeypatch.setattr(ov, "run", fake_run)
+    s = ov.Settings(capital=100_000.0, start="2020-01-01", end="2021-12-31", split="2020-06-30",
+                    sizing="one_lot")  # fmt: skip
+    out = ov.starts(s, ov.Inputs(), every_months=3, years=1, washout=0.2)
+    # starts 2020-01 .. 2020-10 (2021-01 + 1 year is past the data); the warm-up first
+    assert [c.start for c in calls[1:]] == ["2020-01-01", "2020-04-01", "2020-07-01", "2020-10-01"]
+    assert all(c.split is None and c.profit_step == ov.NO_BOOKING for c in calls[1:])
+    assert calls[1].end == "2021-01-01"
+    assert out["skipped"] == 1 and [r["start"] for r in out["starts"]] == [
+        "2020-01-01", "2020-04-01", "2020-07-01"]  # fmt: skip
+    assert [r["washed_out"] for r in out["starts"]] == [True, False, False]
+    assert out["summary"] == {"starts": 3, "median_end_rs": 80_000, "mean_end_rs": 163_333,
+                              "best_rs": 400_000, "worst_rs": 10_000, "above_start": 1,
+                              "washed_out": 1, "median_trades": 7.0}  # fmt: skip
+    with pytest.raises(ValueError, match="shorter than one 3-year"):
+        ov.starts(s, ov.Inputs(), years=3)
+
+
+def test_the_starts_api_validates_and_runs_as_a_job():
+    from fastapi.testclient import TestClient
+
+    from momentum_backtesting import api
+
+    client = TestClient(api.create_app())
+    assert client.post("/api/options-overlay/starts/jobs", json={"years": 4}).status_code == 422
+    assert client.post("/api/options-overlay/starts/jobs",
+                       json={"every_months": 2}).status_code == 422  # fmt: skip
+    job = client.post("/api/options-overlay/starts/jobs", json={"direction": "calls"})
+    assert job.status_code == 202
+    assert client.get("/api/options-overlay/starts/jobs/nope").status_code == 404
