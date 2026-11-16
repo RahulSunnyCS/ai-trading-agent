@@ -36,6 +36,8 @@ import duckdb
 import numpy as np
 import pandas as pd
 
+from momentum_backtesting.categories import fno
+
 CAPITAL = 1_000_000.0
 EMPTY = pd.DataFrame(
     columns=[
@@ -224,16 +226,22 @@ def run_book(
     lots: pd.Series,
     slip_mult: float = 1.0,
     iv_cap: dict | None = None,
+    banned: dict[pd.Timestamp, set[str]] | None = None,
 ) -> tuple[pd.DataFrame, dict]:
-    """One row per trade (entry day, symbol, contract, prices, lots, P&L before tax)."""
+    """One row per trade (entry day, symbol, contract, prices, lots, P&L before tax). `banned`
+    (day -> symbols in the F&O ban period) are not bought that day, as no account could open them;
+    counted under `banned`. None = no ban rule (the figures recorded before 2026-11-16 ran so)."""
     days = sorted(picks_by_day)
     trades = []
     counts = dict.fromkeys(("settle_entry", "settle_exit", "no_contract", "thin", "too_dear",
-                            "no_spot", "no_exit_row", "iv_skipped"), 0)  # fmt: skip
+                            "no_spot", "no_exit_row", "iv_skipped", "banned"), 0)  # fmt: skip
     slip = SLIPPAGE[moneyness] * slip_mult
     for d0, d1 in zip(days[:-1], days[1:], strict=True):
         rows0, rows1 = chains[d0], chains[d1]  # {symbol: that day's option rows}
         for sym in picks_by_day[d0]:
+            if banned and sym in banned.get(d0, ()):
+                counts["banned"] += 1
+                continue
             spot = spots.at[d0, sym] if (sym in spots.columns and d0 in spots.index) else np.nan
             if spot != spot:
                 counts["no_spot"] += 1
@@ -493,12 +501,23 @@ def load_inputs(sweep: Path, pick: str, all_sessions, extra_days=None, with_bott
     return sleeves, n, bottom, days, rows, chains, spots
 
 
+_BANS: dict | None = None
+
+
+def bans() -> dict[pd.Timestamp, set[str]]:
+    """The F&O ban lists (loaded once): `_book` buys nothing in a banned stock that day."""
+    global _BANS  # noqa: PLW0603
+    if _BANS is None:
+        _BANS = fno.load_bans(root())
+    return _BANS
+
+
 def _book(sleeves, n, money, right, all_sessions, chains, spots, lots, slip=1.0, iv=None,
           share=1.0):  # fmt: skip
     k = len(sleeves)
     ns = n if isinstance(n, list) else [n] * k
     books = [run_book(s, CAPITAL * share / k / ni, money, right, all_sessions, chains, spots, lots,
-                      slip, iv) for s, ni in zip(sleeves, ns, strict=True)]  # fmt: skip
+                      slip, iv, bans()) for s, ni in zip(sleeves, ns, strict=True)]  # fmt: skip
     trades = pd.concat([b[0] for b in books], ignore_index=True)
     counts = {key: sum(b[1][key] for b in books) for key in books[0][1]}
     return trades, counts
@@ -562,13 +581,13 @@ def puts(args: argparse.Namespace) -> None:
         # every week's entry needs the next week's exit: keep all days in each book's calendar
         up_only = [{d: (v if not down[d] else []) for d, v in s.items()} for s in sleeves]
         calls_part, _ = _book(up_only, n, money, "CE", all_sessions, chains, spots, lots)
-        put_part, _ = _book([{d: (put_days.get(d, [])) for d in days}], n, money, "PE",
+        put_part, _ = _book([{d: (put_days.get(d, [])) for d in days}], n[0], money, "PE",
                             all_sessions, chains, spots, lots)  # fmt: skip
         gate = pd.concat([calls_part, put_part], ignore_index=True)
         # (b) long-short: half budget each side, every week
         ls_calls, _ = _book(sleeves, n, money, "CE", all_sessions, chains, spots, lots, share=0.5)
-        ls_puts, _ = _book([{d: bottom.get(d, []) for d in days}], n, money, "PE", all_sessions,
-                           chains, spots, lots, share=0.5)  # fmt: skip
+        ls_puts, _ = _book([{d: bottom.get(d, []) for d in days}], n[0], money, "PE",
+                           all_sessions, chains, spots, lots, share=0.5)  # fmt: skip
         longshort = pd.concat([ls_calls, ls_puts], ignore_index=True)
         for name, trades in (("gate", gate), ("longshort", longshort)):
             trades.to_csv(out / f"trades-{pick}-{money}-{name}.csv", index=False)

@@ -10,6 +10,7 @@ the list mid-year leaves the universe that week, so a holding in it is sold like
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pandas as pd
@@ -22,6 +23,47 @@ def members_path(root: Path | None = None) -> Path:
 
         root = data_root()
     return root / "lake" / "eod" / "fno_universe" / "members.parquet"
+
+
+def bans_path(root: Path | None = None) -> Path:
+    return members_path(root).with_name("bans.parquet")
+
+
+def members_stamp(root: Path | None = None) -> tuple | None:
+    """Size and mtime of the F&O list file (None when it is not built): part of every cache key
+    a result that reads the list depends on, since a rebuild writes no catalog row."""
+    path = members_path(root)
+    if not path.exists():
+        return None
+    stat = path.stat()
+    return ("fno_universe", stat.st_size, stat.st_mtime_ns)
+
+
+def members_digest(through: str | None = None, root: Path | None = None) -> str | None:
+    """A hash of the list's (day, symbol) rows up to `through` (all when None): what a search's
+    data snapshot records, so a rebuild that changes an end-dated run's past moves its id and a
+    new week beyond it does not."""
+    path = members_path(root)
+    if not path.exists():
+        return None
+    df = pq.read_table(path, columns=["date", "symbol"]).to_pandas()
+    df["date"] = pd.to_datetime(df["date"])
+    if through is not None:
+        df = df[df["date"] <= pd.Timestamp(through)]
+    rows = df.sort_values(["date", "symbol"]).astype(str).agg("|".join, axis=1)
+    return hashlib.sha1("\n".join(rows).encode()).hexdigest()[:12]
+
+
+def load_bans(root: Path | None = None) -> dict[pd.Timestamp, set[str]]:
+    """day -> the symbols in NSE's F&O ban period that day (no new positions may be opened in
+    them). A day with no ban file is absent, and `lake/eod/fno_universe/bans.parquet` records
+    which days those are (its `days_without_file` metadata)."""
+    path = bans_path(root)
+    if not path.exists():
+        raise FileNotFoundError(f"{path} is missing: run `obt nse fo-fetch`, `obt nse fno-build`")
+    df = pq.read_table(path).to_pandas()
+    df["date"] = pd.to_datetime(df["date"])
+    return {day: set(g["symbol"]) for day, g in df.groupby("date")}
 
 
 def load_members(root: Path | None = None) -> pd.DataFrame:

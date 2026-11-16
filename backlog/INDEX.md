@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-15
+Last updated: 2026-11-16
 
 ## Open
 
@@ -82,6 +82,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-206](BL-206-dir-exits-scale-out.md) | Directional exits, wide: per-leg targets, profit lock and trail, and a two-lot scale-out, on the Dir settings Adaptive picks, at 0.5 % slippage (BL-105 killed the one-lot profit rules; the scale-out, leg targets, T1's settings and slippage are new) | P2 | Planned | research | options |
 | [BL-219](BL-219-gold-dir-forward-paper-test.md) | Forward paper test of GOLDM Dir in the expiry week: nightly journal over six gold expiries, 18:00 spread snapshot | P2 | In progress; built, waits for the merges and a scheduler restart (first session 2026-11-23) | research | options / trading-data |
 | [BL-227](BL-227-options-overlay-backtest.md) | Options overlay backtest: run a Momentum strategy's picks as bought stock options from the dashboard, calls and puts (downward momentum, market switch); book vs shares, minimum capital, winners, trades | P2 | In progress (page built; daily data refresh open) | feature | momentum / options / dashboard |
+| [BL-230](BL-230-options-overlay-rescore.md) | Re-score the options-overlay record after the PR #450–#454 review fixes: BL-226 with the ban rule, BL-228's registered extras, BL-229 round 1 on the fixed engine, BL-227's parity figure | P2 | Planned | research | momentum / options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |

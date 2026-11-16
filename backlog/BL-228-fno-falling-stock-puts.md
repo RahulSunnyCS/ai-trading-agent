@@ -178,6 +178,19 @@ often), but none of them earns.
 **Caveats:** daily closes, not quotes; a missing exit row booked at zero (0–5 trades a book); 2020's crash is in
 the learning years, the puts' one clearly profitable year.
 
+**Review amendment (2026-11-16):**
+- **Two registered extras were not run:** Phase 0's market-switch book (BL-226's Trio ATM calls above the
+  200-session NIFTY average, these puts below) beside Trio ATM alone, and Phase 0b's same top-N stocks' calls
+  alone (one lot, ATM). The calls / puts split and the top-5 % concentration figures above are an ad-hoc read of
+  the saved trades; the code that produced them is not committed, so they cannot be reproduced from the repo.
+  The mirror book's calls are the stocks that outranked every inverse chart, a different set from a plain top-N
+  call book, so "calls +₹24.6 lakh" is **not** the registered calls-alone comparison.
+- **The learning counts were not learning counts:** the run traded every rebalance day through 2026-11 and
+  cut only the trades, so the `counts` and `banned_skips` it saved included the confirmation weeks (their
+  figures were not read for the verdict). The learning run now builds learning days only (`until=LEARN_END`);
+  the verdict figures are unchanged (the same trades), the saved counts are not and are to be re-run.
+- Re-run and the extras: BL-230.
+
 ## Risks
 
 - **Daily closes, not quotes:** put closes of falling mid-caps can be stale; the settle rule and the counts
@@ -196,3 +209,7 @@ the learning years, the puts' one clearly profitable year.
 - 2026-11-15 — learning read (both rule sets): no book passes. Phase 0's 12 put books all lose after tax
   (−₹1.3 to −₹27.7 lakh); Phase 0b's two mirror books make +₹15.8 / +₹27.3 lakh but fail the interval and the
   drawdown rule, their gain all from the calls. None carried, the confirmation weeks not read. Killed.
+- 2026-11-16 — PR #451 review. Fixed in code, with a test: the learning run builds only learning days, so
+  its counts, ban tally and option rows stop at 2024-06-28 (`entry_lists(..., until=)`). Not run, and now
+  said so in the Result: the two registered descriptive extras (market-switch book; the top-N stocks' calls
+  alone) and the code behind the split / concentration figures. Both are BL-230.
