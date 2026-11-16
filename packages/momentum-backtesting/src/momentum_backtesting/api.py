@@ -425,7 +425,9 @@ class _Data:
         liquidity: liquidity_mod.LiquidityConfig | None = None,
         voladj_lookbacks: bool = False,
         voladj_skip: Literal["long", "all", "none"] = "long",
-        universe_kind: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
+        universe_kind: Literal[
+            "total_market", "all_liquid", "turnover_rank", "fno"
+        ] = "total_market",
         series_breaks: Literal["legacy", "verified"] = "verified",
     ) -> broad.UniverseRanking:
         """Step 2 (categories/broad.py) for this exact parameter combination - cached the same
@@ -762,7 +764,7 @@ class BacktestRequest(BaseModel):
     # every NSE equity, narrowed week by week by the tradability gate (which is then mandatory);
     # "turnover_rank" = the top 750 by turnover as known each January (point in time, BL-010 F1;
     # what the Phase 3-6 searches ran on) - gated like all_liquid, because the search always gates.
-    broad_universe: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market"
+    broad_universe: Literal["total_market", "all_liquid", "turnover_rank", "fno"] = "total_market"
     broad_liquidity_filter: bool = False
     # Fill as a live account would around circuit locks: no buying a stock locked at the upper
     # circuit, no selling one locked at the lower circuit. Off = fills ignore locks (the original
@@ -2213,8 +2215,14 @@ def _fill_companion(
 #: what narrows it) and the point-in-time turnover rank (every search that used it gated).
 GATED_BROAD_UNIVERSES = ("all_liquid", "turnover_rank")
 #: Universes the live rebalance preview does not quote. The whole market is ~1,800 stocks; the
-#: turnover rank is the top 750, the same size as the Total Market pool, so it is quoted.
-LIVE_REFUSED_BROAD_UNIVERSES = ("all_liquid",)
+#: turnover rank is the top 750, the same size as the Total Market pool, so it is quoted. The F&O
+#: universe (BL-226) is research only: it reads NSE's F&O list from the lake, which no live path
+#: keeps current.
+LIVE_REFUSED_BROAD_UNIVERSES = ("all_liquid", "fno")
+_LIVE_REFUSED_WHY = {
+    "all_liquid": "The whole-market universe is not quoted live (about 1,800 stocks)",
+    "fno": "The F&O universe is research only (BL-226) and is not quoted live",
+}
 
 #: Exceptions a live preview reports instead of raising: a missing token, a Fyers error, a
 #: network failure (urllib's URLError and timeouts are OSError), stale history or a missing quote.
@@ -2630,8 +2638,7 @@ def _broad_live_ranking(
     stored history is stale or a quote is missing; the caller falls back or reports it."""
     if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
         raise ValueError(
-            "The whole-market universe is not quoted live (about 1,800 stocks); "
-            "it previews from the latest stored close."
+            f"{_LIVE_REFUSED_WHY[req.broad_universe]}; it previews from the latest stored close."
         )
     ranking = _broad_ranking(req)
     config = Config(
@@ -5422,7 +5429,7 @@ def _broad_live_weekly_result(
     config = dict(favorite["config"])
     req = BacktestRequest.model_validate(config)
     if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
-        raise ValueError("the whole-market universe is not quoted live")
+        raise ValueError(_LIVE_REFUSED_WHY[req.broad_universe])
     if split_every(req) > 1:  # All Fridays: no one portfolio for the engine to decide
         raise ValueError(analysis.SPLIT_SIGNAL_NOTE)
     symbols = tuple(sorted(set(rebalance.broad_quote_symbols(_broad_ranking(req)).values())))
