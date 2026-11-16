@@ -52,6 +52,32 @@ def journal_blocks(root: Path, track: str | None, lo: date, hi: date) -> dict[da
     return out
 
 
+def journal_days(root: Path, track: str | None, lo: date) -> dict[date, bool]:
+    """Every weekday journal entry from `lo` on, mapped to whether it was recorded before the open."""
+    return {
+        date.fromisoformat(e["day"]): bool(e.get("before_first_entry", False))
+        for e in entries.read(root, track)
+        if date.fromisoformat(e["day"]) >= lo and date.fromisoformat(e["day"]).weekday() < 5
+    }
+
+
+def window_problems(
+    days: dict[date, bool], first_friday: date, n_fridays: int
+) -> tuple[list[date], list[date]]:
+    """(entries recorded late, weekdays with no entry) inside the registered hold-out window: from
+    the Monday of the first week to the n-th Friday on record. Phase 0 registers journal entries
+    recorded before the open; a late entry would otherwise vanish from the window and push its end
+    a week on, and the verdict is read once."""
+    fridays = sorted(d for d in days if d.weekday() == 4 and d >= first_friday)
+    if len(fridays) < n_fridays:
+        return [], []
+    lo, hi = first_friday - timedelta(days=4), fridays[n_fridays - 1]
+    late = sorted(d for d, early in days.items() if lo <= d <= hi and not early)
+    span = [lo + timedelta(days=i) for i in range((hi - lo).days + 1)]
+    missing = [d for d in span if d.weekday() < 5 and d not in days]
+    return late, missing
+
+
 def bl214_blocks(root: Path, names: list[str], lo: date, hi: date) -> dict[date, dict]:
     """List C core picks re-derived as research/bl214/score.py `book_picks` does, with composites."""
     daylog._recon_cache.clear()  # noqa: SLF001
@@ -201,6 +227,19 @@ def main() -> None:
             False,
         )
     elif args.mode == "b":
+        late, missing = window_problems(
+            journal_days(root, "t1", FIRST_FRIDAY - timedelta(days=4)), FIRST_FRIDAY, N_FRIDAYS
+        )
+        if missing:  # market holidays have no entry, so this is a notice, not a stop
+            print("weekdays in the window with no journal entry (holidays are fine): "
+                  + ", ".join(d.isoformat() for d in missing))  # fmt: skip
+        if late:
+            raise SystemExit(
+                "hold-out B is read once and its window is the journal entries recorded before "
+                "the open: these were recorded late, so they would drop out and move the window's "
+                "end: " + ", ".join(d.isoformat() for d in late)
+                + ". Decide what the window is, write it in the item's Log, then read B."
+            )  # fmt: skip
         blocks = journal_blocks(root, "t1", FIRST_FRIDAY - timedelta(days=4), date(2099, 1, 1))
         fridays = sorted(d for d in blocks if d.weekday() == 4 and d >= FIRST_FRIDAY)
         if len(fridays) < N_FRIDAYS:

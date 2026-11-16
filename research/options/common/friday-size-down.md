@@ -18,7 +18,7 @@ None: every pick trades every day.
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| [BL-220][bl220] Phase 1 (A) | Friday against the other weekdays, the strategy universe | BL-071's 124 NIFTY variants, 2022-04-05 → 2024-10-08 (618 sessions, P3), gross at 0 % slippage | **Pass, narrowly**: Friday ₹81 against ₹192 a strategy-day, gap ₹111 (bar ₹100), one-sided p 0.012 (bar 0.05) | `research/bl220/out_mechanism_2026-11-12.txt` (tracked) |
+| [BL-220][bl220] Phase 1 (A) | Friday against the other weekdays, the strategy universe | BL-071's 124 NIFTY variants, 2022-04-05 → 2024-10-08 (618 sessions, P3), gross at 0 % slippage | **Pass, narrowly**: Friday ₹81 against ₹192 a strategy-day, gap ₹111 (bar ₹100), one-sided p 0.012 (bar 0.05); the registered read was the second, a first read on 69 of the 124 variants having been defective (the item's Log) | `research/bl220/out_mechanism_2026-11-12.txt` (tracked) |
 | [BL-220][bl220] Amendment 1 (A2) | R1, R2, R3 against R0 on the books | BL-214's NIFTY-only T1 and Core, 2021-11-02 → 2024-10-08 (722 sessions, 144 Fridays), core picks, one lot, 0.5 % slippage, after brokerage | **T1: R2 and R1 pass, R3 fails. Core: none passes** (reported beside) | `research/bl220/out_a2_2026-11-12.txt` (tracked) |
 | [BL-220][bl220] Amendment 1 (S) | the same, in-sample | live store, 2025-01-10 → 2026-11-12 (443 sessions, 87 Fridays), picks as Day by day takes them | Descriptive only (the days that suggested the idea; T1 tuned on them) | `research/bl220/out_insample_2026-11-12.txt` (tracked) |
 | [BL-220][bl220] Phase 2 (B) | R1, R2, R3 against R0 | T1's journal, the first 20 Fridays from 2026-11-13 | **The verdict; not read yet** (about 2 April 2027) | `research/bl220/book.py b` |
