@@ -1,6 +1,6 @@
 # Momentum research: strategies and parameters
 
-**Last updated:** 2026-11-15
+**Last updated:** 2026-11-16
 
 A durable record of every parameter the momentum lab uses: its shipped default and where that
 default lives, what it does, why it is set that way, and the evidence. One page per variable
@@ -56,6 +56,7 @@ Pages tested on one strategy only live in that strategy's folder.
 | [Broad funnel](strategies/broad/funnel.md) | Broad | Tested | pool 200 / 250, coverage 0.40, categories 4 / 8, 2 picks | Defaults hold; 3 picks wins most; return is flat from 2 to 24 holdings |
 | [Category tags](strategies/broad/category-tags.md) | Broad | Tested | curated | Tags are hindsight: extended tags cost 4-11 points; the category-layer test is undecided |
 | [Stop-loss](strategies/broad/stop.md) | Broad | Tested | off | Killed, weekly (0 of 30 cells) and daily |
+| [Extension exit](strategies/broad/extension-exit.md) | Broad | Tested | off | Killed (BL-233): selling or trimming 70 % above the 200-day EMA costs every followed group 2–5 CAGR points, worst fall unchanged |
 | [Stock filters](strategies/broad/filters.md) | Broad | Tested | off | No survivor (PBO 0.72) |
 | [Chart patterns](strategies/broad/patterns.md) | Broad pool | Tested | off | Killed in BL-042 and BL-043; BL-035 tightness feature not yet tested |
 | [Inner and outer rotation](strategies/custom-index/inner-outer-rotation.md) | Custom Index | Descriptive | inner 2 / 8, outer 8 / 16, copies 1 | Outer 8 / 16 beat 5 / 10; the inner settings were never isolated |

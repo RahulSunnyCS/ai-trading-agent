@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked (2026-11-16); an exit rule for the money-carrying Momentum groups |
-| **Status** | In progress |
+| **Status** | Done — killed: sell and half trim both cost every group return, worst falls unchanged (2026-11-16) |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-11-16 |
@@ -102,6 +102,45 @@ Committed before any run.
   day; the circuit masks the favourites already use block nothing on the sell side for that.
 - Twelve groups share many sleeves' picks, so they are not twelve independent tests.
 
+## Result
+
+**Killed, both arms (2026-11-16).** 12 favourite groups (46 sleeves), saved configs, 2017-01-06 → 2026-11-13,
+after tax. Median change across groups against no exit:
+
+| Arm | CAGR | Worst fall | Ulcer | Halves (CAGR) | Headline CAGR | Groups with CAGR up | Rule |
+|---|---|---|---|---|---|---|---|
+| B sell at 70 % | **−4.6 pts** | 0.0 | −0.4 | −5.4 / −3.6 | −2.0 | 0 of 12 | killed |
+| C trim half at 70 % | **−2.6 pts** | 0.0 | −0.3 | −2.8 / −2.3 | −0.8 | 0 of 12 | killed |
+| D sell at 50 % (description) | −8.7 | +2.7 | −1.1 | −9.7 / −7.5 | −5.1 | 0 of 12 | — |
+| E sell at 100 % (description) | −0.1 | 0.0 | −0.2 | +0.8 / −1.4 | 0.0 | 4 of 12 | — |
+
+Per group, after tax (CAGR % / worst fall %; extension actions over all sleeves):
+
+| Group | Status | No exit | Sell at 70 % | Trim at 70 % |
+|---|---|---|---|---|
+| Four-Strategy Mix, BSE Tags (headline) | invested | 24.8 / −30.2 | 22.8 / −31.1 (150) | 24.0 / −30.8 (173) |
+| Four Sectors Monthly, No Tilt | invested | 29.9 / −35.4 | 26.2 / −35.3 (86) | 27.4 / −35.3 (110) |
+| Five Sectors, Rank Sum | paper | 32.4 / −36.2 | 27.6 / −36.2 (141) | 29.4 / −36.2 (165) |
+| Phase 6 ensemble | watching | 26.4 / −35.4 | 24.6 / −35.5 (164) | 25.8 / −35.5 (186) |
+| Six Sectors Monthly, No Tilt | watching | 26.2 / −33.6 | 21.6 / −33.6 (97) | 23.4 / −33.6 (114) |
+| Trio Fortnightly | watching | 33.3 / −32.9 | 31.0 / −34.5 (62) | 33.1 / −34.1 (67) |
+| Five Sectors Monthly | watching | 29.6 / −37.8 | 24.7 / −36.8 (98) | 27.2 / −37.5 (118) |
+| Five Sectors, Stock Tilt | watching | 30.6 / −37.0 | 25.6 / −29.4 (105) | 27.3 / −32.4 (127) |
+| Four Sectors, Quick Exit | watching | 22.7 / −34.1 | 19.4 / −34.2 (58) | 20.4 / −34.1 (71) |
+| Four Sectors, Half Tilt | watching | 32.8 / −35.4 | 25.8 / −28.6 (84) | 28.1 / −31.8 (108) |
+| Six Sectors, Make Room | watching | 28.2 / −36.1 | 22.4 / −36.2 (92) | 24.2 / −36.1 (111) |
+| Five Sectors, Wide Pool | watching | 26.2 / −29.4 | 21.1 / −29.2 (83) | 23.3 / −29.2 (101) |
+
+- Every group earns less with either arm, in both halves of the record. The worst fall moves by under a point
+  in 8 of 12 groups; where it is shallower (Half Tilt, Stock Tilt) it costs 5–7 CAGR points.
+- The lower the level, the bigger the cost; at 100 % it fires about half as often as at 70 % and changes
+  almost nothing.
+- Pre-tax reads the same (sell −5.2, trim −2.9 median).
+- Agrees with BL-050's M1 (stretched names kept rising) and BL-084 / BL-085 (extra sells cost more than they
+  save). Findings page: [extension exit](../research/momentum/strategies/broad/extension-exit.md).
+- Control: with the setting off the full momentum suite (2,078 tests, goldens included) passes unchanged.
+
 ## Log
 
 - 2026-11-16 — created at the owner's request; Phase 0 committed before any run.
+- 2026-11-16 — engine setting, EMA table and script (2dc01fe5); run (46 sleeves × 5 arms × tax / pre-tax, ~40 min); both arms killed; Result written.
