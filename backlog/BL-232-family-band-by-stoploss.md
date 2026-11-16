@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a ranking change to T1's Adaptive, one pre-registered test, no live change |
-| **Status** | In progress — pre-registered 2026-11-16, run after this commit |
+| **Status** | Done — killed on the fit window (pass rule 3 failed); the confirmation window was left unread |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-16 |
@@ -100,7 +100,38 @@ pool, lookback changes, the BL-122 expiry rule and the BL-192 cap (ranking only)
 
 - **Tasks:** read F, then K once; record both with the pass rule's three tests; update `research/options/` pages
   for the variables tested (the family weight and the family key on the ranking); update `INDEX.md`.
-- **Done when:** the result, the verdict and the findings pages are committed.
+- **Done when:** the result, the verdict and the findings pages are committed (done 2026-11-16).
+
+## Result (2026-11-16)
+
+Parity first: V0 equalled the production list C (`pick._rank`, and `score_history` before the BL-192 cap) on all
+69 days checked, in a span before and a span after 2026-10-30. SL3 family sizes: Dir 175, Widesl > 100 175,
+Widesl ≤ 100 75 (60 % and 40 % stop-loss variants, T1 settings only), Buy 96.
+
+**Fit window F, 2025-01-10 → 2025-10-08, 184 days, one lot per pick, stored 0 % slippage.** Mean ₹ per lot-day,
+total, largest drawdown per lot, and the arm minus V0 on the same days with the 90 % block-bootstrap interval:
+
+| Arm | Mean | Total | Max drawdown | Minus V0 [90 %] |
+|---|---|---|---|---|
+| V0 list C (5 %, type × band) | +1,634 | +3,00,615 | 21,340 | — |
+| **V1 15 %, SL3 (the proposal)** | +1,566 | +2,88,130 | 24,403 | **−68 [−462, +377]** |
+| V2 15 %, type × band | +1,301 | +2,39,444 | 29,708 | −332 [−632, −35] |
+| V3 5 %, SL3 | +1,599 | +2,94,267 | 22,382 | −34 [−372, +316] |
+| V4 15 %, SL3 × band | +1,635 | +3,00,850 | 22,382 | +1 [−219, +227] |
+
+On the 0.5 % slippage copy (a check, not a second test) every arm is below V0: V1 −278 [−653, +104], V2 −220,
+V3 −138, V4 −36.
+
+**Verdict: killed.** The registered pass rule needs the V1 − V0 mean on F to be non-negative; it is −₹68 (and −₹278 at
+0.5 % slippage), with a deeper drawdown (24,403 against 21,340). Rule (3) fails, so no reading of K can change the
+verdict, and **K (2025-10-09 → 2026-11-16) was not read**; it stays unused for this question.
+
+What the arms say (descriptive, F only, none adoptable):
+- The weight alone hurts: raising the family term to 15 % on today's key (V2) is the worst arm, −₹332 [−632, −35],
+  the only interval wholly below zero, in line with BL-074's 20 % row.
+- The stop-loss key alone is neutral (V3 −34 [−372, +316]).
+- Adding the start band back to the stop-loss key at 15 % (V4) matches list C (+1 [−219, +227]): the start band
+  carries what the three-family key loses.
 
 ## Risks
 
@@ -118,3 +149,4 @@ None open; the owner asked for the test as written (2026-11-16).
 
 - 2026-11-16 — created from the owner's question (family-band 15 % with Dir, Widesl ≤ 100, Widesl > 100);
   Phase 0 registered before any run; arms, windows and pass rule fixed above.
+- 2026-11-16 — Phase 1: script parity with list C passed (69 days). Phase 2: F read once; V1 − V0 = −₹68 [−462, +377], so pass rule (3) failed; killed. K left unread. Findings page `research/options/common/rotation-ranking.md` updated.
