@@ -1,0 +1,13 @@
+
+== A2, T1 NIFTY-only (registered): 722 sessions (2021-11-02 -> 2024-10-08), Fridays 144, sessions left out (a pick without a result) 0
+R0  net/session 191  total 137,680  Friday mean -195  worst 20-session drawdown 48,145
+R1  net/session 195  total 140,562  Friday mean -175  worst 20-session drawdown 41,146  | net ok, drawdown ok -> PASS
+R2  net/session 230  total 165,701  Friday mean 0  worst 20-session drawdown 39,761  | net ok, drawdown ok -> PASS
+R3  net/session 155  total 112,018  Friday mean -373  worst 20-session drawdown 47,893  | net below the floor, drawdown not 10% smaller -> fail
+A2 T1: passing R2, R1
+
+== A2, Core NIFTY-only (reported beside): 722 sessions (2021-11-02 -> 2024-10-08), Fridays 144, sessions left out (a pick without a result) 0
+R0  net/session 204  total 147,221  Friday mean -19  worst 20-session drawdown 28,636
+R1  net/session 204  total 147,627  Friday mean -16  worst 20-session drawdown 28,992  | net ok, drawdown not 10% smaller -> fail
+R2  net/session 208  total 149,972  Friday mean 0  worst 20-session drawdown 28,505  | net ok, drawdown not 10% smaller -> fail
+R3  net/session 149  total 107,528  Friday mean -295  worst 20-session drawdown 28,648  | net below the floor, drawdown not 10% smaller -> fail
