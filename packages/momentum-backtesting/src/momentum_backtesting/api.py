@@ -1981,9 +1981,12 @@ def _run_broad(
     *,
     top_sector_weight: float | None = None,
     tax: TaxRules | None = None,
+    extension_exit: float | None = None,
+    extension_action: Literal["sell", "trim"] = "sell",
 ) -> broad.BroadBacktestResult:
-    """`top_sector_weight` (None = the request's `broad_top_sector_weight`) and `tax` are for
-    research scripts (BL-116, after-tax runs); the API's own Broad requests leave both unset."""
+    """`top_sector_weight` (None = the request's `broad_top_sector_weight`), `tax` and the BL-233
+    extension exit are for research scripts (BL-116, after-tax runs, BL-233); the API's own Broad
+    requests leave them unset."""
     if top_sector_weight is None:
         top_sector_weight = req.broad_top_sector_weight
     if top_sector_weight != 1.0 and req.broad_category_mode != "on":
@@ -2055,6 +2058,8 @@ def _run_broad(
         lc_locked=lc_locked,
         top_sector_weight=top_sector_weight,
         tax=tax,
+        extension_exit=extension_exit,
+        extension_action=extension_action,
     )
 
 
