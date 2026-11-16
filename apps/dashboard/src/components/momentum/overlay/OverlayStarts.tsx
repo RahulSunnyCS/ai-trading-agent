@@ -253,7 +253,7 @@ function StartsChart({ result }: { result: OverlayStartsResult }) {
           gridcolor: colors.grid,
           tickvals: axis.tickvals,
           ticktext: axis.ticktext,
-          range: [Math.log10(axis.floor) - 0.25, Math.log10(Math.max(...axis.tickvals) * 1.2)],
+          range: [Math.log10(axis.floor) - 0.25, Math.log10(axis.top * 1.2)],
         },
         shapes: [line(capital, 'solid'), line(result.washout_rs, 'dot')],
       };

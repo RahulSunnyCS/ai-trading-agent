@@ -339,6 +339,34 @@ def test_fresh_starts_run_each_start_as_its_own_account(monkeypatch):
         ov.starts(s, ov.Inputs(), years=3)
 
 
+def test_fresh_starts_never_begin_before_the_data_nor_count_a_late_first_week(monkeypatch):
+    # the data begins 2020-01-01; From asks for 2019-07-01. The 2019 starts would trade part of
+    # their year, so the first start is the first month-begin inside the data. A start whose
+    # first rebalance day comes long after its date (the data began later) is skipped, not counted
+    sessions = list(pd.bdate_range("2020-01-01", "2021-12-31"))
+    monkeypatch.setattr(ov.LAKE, "sessions", lambda: sessions)
+    monkeypatch.setattr(ov.Lake, "newest", property(lambda self: "2021-12-31"))
+    calls = []
+
+    def fake_run(s, inputs, capital_table=True):
+        calls.append(s)
+        if s.end == "2021-12-31":  # the warm-up over the window
+            return {}
+        late = s.start == "2020-04-01"
+        return {"first_day": "2020-04-20" if late else s.start, "last_day": s.end,
+                "book": {"total_rs": 1_000, "max_dd": -0.1},
+                "booking": {"account": [100_000, 101_000], "taken_rs": 0},
+                "stats": {"trades": 3}, "counts": {}}  # fmt: skip
+
+    monkeypatch.setattr(ov, "run", fake_run)
+    s = ov.Settings(capital=100_000.0, start="2019-07-01", end="2021-12-31", sizing="one_lot")
+    out = ov.starts(s, ov.Inputs(), every_months=3, years=1)
+    assert [c.start for c in calls[1:]][0] == "2020-01-01"
+    assert all(c.start >= "2020-01-01" for c in calls[1:])
+    assert [r["start"] for r in out["starts"]][:2] == ["2020-01-01", "2020-07-01"]
+    assert out["skipped"] == 1  # 2020-04-01: its first week was 19 days in
+
+
 def test_the_starts_api_validates_and_runs_as_a_job():
     from fastapi.testclient import TestClient
 

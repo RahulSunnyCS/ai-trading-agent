@@ -339,10 +339,16 @@ export function startHover(start: OverlayStart): string {
 export function startsAxis(
   capital: number,
   best: number,
-): { floor: number; tickvals: number[]; ticktext: string[] } {
+): { floor: number; top: number; tickvals: number[]; ticktext: string[] } {
   const floor = capital / 100;
   const multiples = [0.01, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
   const top = Math.max(best, capital);
   const tickvals = multiples.map((m) => m * capital).filter((v) => v <= top * 1.5);
-  return { floor, tickvals, ticktext: tickvals.map((v) => formatInr(v, { compact: true })) };
+  // the axis ends above the tallest thing drawn, not above the last tick (ticks stop at 1.5 x top)
+  return {
+    floor,
+    top: Math.max(top, ...tickvals),
+    tickvals,
+    ticktext: tickvals.map((v) => formatInr(v, { compact: true })),
+  };
 }

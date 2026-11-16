@@ -1210,6 +1210,8 @@ def run_booked(legs, s: Settings, days, chains, spots, lots, bans, sessions, cou
 NO_BOOKING = 1e15
 #: The most start dates one request may run (each is a whole book).
 STARTS_MAX = 80
+# a start whose first rebalance day falls later than this after its date began before the data did
+START_LAG_DAYS = 10
 
 
 def starts(
@@ -1234,7 +1236,9 @@ def starts(
     sessions_list = LAKE.sessions()
     last = min(pd.Timestamp(s.end), sessions_list[-1]) if s.end else sessions_list[-1]
     span = pd.DateOffset(years=years)
-    first = pd.Timestamp(s.start)
+    # never before the first stored session: a start ahead of the data would trade a part of its
+    # horizon and be counted as a whole one
+    first = max(pd.Timestamp(s.start), pd.Timestamp(sessions_list[0]))
     first = first if first.day == 1 else first + pd.offsets.MonthBegin(1)
     dates = list(pd.date_range(first, last - span, freq=f"{every_months}MS"))
     if not dates:
@@ -1258,6 +1262,9 @@ def starts(
         try:
             r = run(one, inputs, capital_table=False)
         except ValueError:  # fewer than three rebalance weeks in it
+            skipped += 1
+            continue
+        if (pd.Timestamp(r["first_day"]) - day).days > START_LAG_DAYS:  # the data began after it
             skipped += 1
             continue
         account = [x for x in r["booking"]["account"] if np.isfinite(x)]

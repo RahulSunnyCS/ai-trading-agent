@@ -140,4 +140,14 @@ describe('fresh starts', () => {
     ]);
     expect(axis.ticktext[4]).toBe('₹1.00 L');
   });
+
+  it('ends the axis above the best start even when the last tick is lower', () => {
+    // capital 1 L, best 3 L: the ticks stop at 2 L (5 L is past 1.5 x 3 L), so a top taken from
+    // the ticks would clip the best bar
+    const axis = startsAxis(100_000, 300_000);
+    expect(Math.max(...axis.tickvals)).toBe(200_000);
+    expect(axis.top).toBe(300_000);
+    expect(startsAxis(100_000, 130_000).top).toBe(130_000);
+    expect(startsAxis(100_000, 20_000).top).toBe(100_000);
+  });
 });
