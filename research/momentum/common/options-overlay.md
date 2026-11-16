@@ -18,7 +18,7 @@ Not used. The live Momentum book holds shares on Kite.
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| [BL-226](../../../backlog/BL-226-fno-momentum-stock-options.md) Phase 3 | three F&O candidates (Four-Strategy Mix, 12-month top-10 weekly, Trio Fortnightly) × ATM / OTM1 / OTM2 calls, ₹10 lakh ÷ N of premium per stock, weekly; double slippage and an IV cap as variants | NSE daily closes, learning 2020-01 to 2024-06, confirmation 2024-07 to 2026-11, after costs, 1–3 % slippage and 31.2 % tax | **Killed**: no book passes on the confirmation weeks | Learning +511 % to +1,190 % on ₹10 lakh (shares +229 to +289 %), only Trio ATM met all rules; confirmation Trio ATM +42 % (shares +27 %) with a −82 % drawdown, Mix ATM −182 %, grid ATM −444 %; 7 of 9 lose |
+| [BL-226](../../../backlog/BL-226-fno-momentum-stock-options.md) Phase 3 | three F&O candidates (Four-Strategy Mix, 12-month top-10 weekly, Trio Fortnightly) × ATM / OTM1 / OTM2 calls, ₹10 lakh ÷ N of premium per stock, weekly; double slippage and an IV cap as variants | NSE daily closes, learning 2020-01 to 2024-06, confirmation 2024-07 to 2026-11, after costs, 1–3 % slippage and 31.2 % tax | **Killed**: no book passes on the confirmation weeks | Learning +511 % to +1,190 % on ₹10 lakh (shares +229 to +289 %), only Trio ATM met all rules; confirmation Trio ATM +42 % (shares +27 %) with a −82 % drawdown, Mix ATM −182 %, grid ATM −444 %; 7 of 9 lose; **not re-scored**: run without the F&O ban-period rule, four registered checks not run (BL-230) |
 | BL-226 Phase 4 | puts on the weakest N (market gate; long-short) | — | Not run (its gate: a passing call book) | — |
 
 ## What we know
