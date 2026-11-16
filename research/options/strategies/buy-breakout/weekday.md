@@ -1,6 +1,6 @@
 # Buy: weekday
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-11-12
 
 ## What it is
 
@@ -18,6 +18,8 @@ Trades every day. The rotation lists weight a weekday fit at 25–36% of the com
 |---|---|---|---|---|
 | BL-056 | Monday to Friday (weekend sessions dropped) | 2025-09-01 → 2026-10-08, 52–55 days a cell, 11 start times 09:17–11:47, before charges | Descriptive | [BL-056][bl056] |
 | BL-059 | Same tables for the 13 later start times | same window | Descriptive; agrees with BL-056 for morning starts | [BL-059][bl059] |
+| BL-221 | Fridays vs the other weekdays, every Buy in Core-298 and T1's extras; three expiry regimes | 2024-10-09 → 2026-11-12 (2026-11-06 left out), replayed at 0.5 % slippage, means over sessions | Descriptive: Friday no different | [BL-221][bl221] |
+| BL-220 Phase 1 | Fridays vs the other weekdays, BL-071's NIFTY variants (Buy among them) | NIFTY 2022-04-05 → 2024-10-08, 618 sessions, gross at 0 % slippage (hold-out) | Registered mechanism test: pass (all 124: gap ₹111, p 0.012) | [BL-220][bl220] |
 
 Buy family mean ₹ per day per lot:
 
@@ -28,6 +30,11 @@ Buy family mean ₹ per day per lot:
 
 ## What we know
 
+- **Fridays on NIFTY 2022–24 (BL-220 Phase 1, hold-out).** NIFTY Buy on a Friday made ₹53 ± 56 a strategy-day,
+  within the other days' range (−₹52 to ₹142).
+- **Fridays (BL-221).** Buy is no different on Fridays: far from expiry (Jan 2025 on) NIFTY −₹29 ± 51 a strategy-day
+  against −₹33 ± 28, SENSEX +₹10 ± 18 against −₹2 ± 9 (Core-298, 0.5 % slippage, before brokerage). Exits are the
+  same mix (leg SL 75–87 %). Descriptive, already-read days.
 - In this window weekday and days to expiry are the same split (one expiry weekday per index), so this
   page and [days to expiry](days-to-expiry.md) read the same cells.
 - The spread between cells (−₹88 to +₹287) is inside BL-056's noise yardstick: a cell's standard
@@ -46,3 +53,5 @@ Buy family mean ₹ per day per lot:
 
 [bl056]: ../../../../backlog/BL-056-weekday-dte-vix-breakdown.md
 [bl059]: ../../../../backlog/BL-059-whole-day-start-time-curve.md
+[bl221]: ../../../../backlog/BL-221-friday-by-family.md
+[bl220]: ../../../../backlog/BL-220-friday-size-down.md

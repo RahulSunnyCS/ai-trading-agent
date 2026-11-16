@@ -1,6 +1,6 @@
 # Options: shared findings
 
-**Last updated:** 2026-10-26
+**Last updated:** 2026-11-12
 
 These pages hold findings that belong to no single strategy: they concern the basket, the money, the
 ranking that picks strategies each day, or the market state that might time them. A strategy's
@@ -19,6 +19,7 @@ variable page links here instead of repeating them.
 | [Previous-session state](previous-session-state.md) | Descriptive | The previous session's VRP, skew and put/call ratio do not separate good Widesl or Dir days from bad (no t reaches 2 in size, 2024–26 NIFTY); asymmetric Widesl legs do not help |
 | [Two-session sweep](two-session-sweep.md) | Tested | Half-day sets (morning + afternoon) chosen by a T1-style one-year selection do not beat T1 as traded (−₹260 [−446, −85] net per margin lot-day, drawdown 3× deeper) and are level with the sweep's own whole-day winners (+₹16); the afternoon set is the part that earns on non-expiry days (BL-185) |
 | [Correlation](correlation.md) | Tested | Widesl variants are near-copies (0.85–0.92); Buy moves against Widesl; a trailing-correlation cap on the lists was killed (BL-090 Phase 3) |
+| [Trading less on Fridays](friday-size-down.md) | Tested (forward verdict pending) | Fridays far from expiry earn less (NIFTY 2022–24: ₹81 vs ₹192, narrow pass); on 2021–24 NIFTY T1, skipping Fridays or dropping the weakest Friday pick passed, dropping afternoon starts failed; the decision reads 20 live Fridays (~Apr 2027) |
 
 ## The periods these pages use
 
