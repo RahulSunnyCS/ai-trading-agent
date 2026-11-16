@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { OverlayResult, OverlayStart, OverlayTrade } from '../../types/optionsOverlay';
+import type {
+  OverlayJob,
+  OverlayResult,
+  OverlayStart,
+  OverlayTrade,
+} from '../../types/optionsOverlay';
 import { formatInr } from '../format';
 import {
   DEFAULT_CUSTOM,
@@ -8,9 +13,12 @@ import {
   buyText,
   countRows,
   customName,
+  jobRunning,
+  parseSlippage,
   requestChips,
   requestProblem,
   sellText,
+  slippageText,
   startHover,
   startOutcome,
   startsAxis,
@@ -149,5 +157,35 @@ describe('fresh starts', () => {
     expect(axis.top).toBe(300_000);
     expect(startsAxis(100_000, 130_000).top).toBe(130_000);
     expect(startsAxis(100_000, 20_000).top).toBe(100_000);
+  });
+});
+
+describe('the run state and the slippage field', () => {
+  const running = { id: 'a', status: 'running' } as OverlayJob;
+  const done = { id: 'a', status: 'done' } as OverlayJob;
+
+  it('stops waiting when a poll fails, even for a job last seen running', () => {
+    const state = { starting: false, jobId: 'a', job: running, pollError: null };
+    expect(jobRunning(state)).toBe(true);
+    expect(jobRunning({ ...state, pollError: 'HTTP 404' })).toBe(false);
+    expect(jobRunning({ ...state, job: null, pollError: 'HTTP 404' })).toBe(false);
+    expect(jobRunning({ ...state, job: null })).toBe(true); // first answer not in yet
+    expect(jobRunning({ ...state, job: done })).toBe(false);
+    expect(jobRunning({ starting: true, jobId: null, job: null, pollError: null })).toBe(true);
+    expect(jobRunning({ starting: false, jobId: null, job: null, pollError: null })).toBe(false);
+  });
+
+  it('shows a stored slippage as typed and reads what is typed as a fraction', () => {
+    expect(slippageText(0.07)).toBe('7');
+    expect(slippageText(0.29)).toBe('29');
+    expect(slippageText(0.015)).toBe('1.5');
+    expect(slippageText(null)).toBe('');
+    expect(parseSlippage('7')).toBe(0.07);
+    expect(parseSlippage('1.')).toBe(0.01); // mid-typing: the field keeps "1." itself
+    expect(parseSlippage('1.5')).toBe(0.015);
+    expect(parseSlippage('')).toBeNull();
+    expect(parseSlippage('abc')).toBeNull();
+    expect(parseSlippage('50')).toBeNull();
+    expect(parseSlippage('-1')).toBeNull();
   });
 });

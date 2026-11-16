@@ -166,3 +166,11 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
   200-day average, hold, stop −50 %, one lot) at ATM, ₹1 lakh, quarterly from 2020, one year: median
   end ₹19,230, 10 of 24 above ₹1 lakh, 13 of 24 washed out, average ₹4.30 lakh (best ₹24.0 lakh);
   five of the six starts from July 2024 washed out.
+- 2026-11-16 — PR #452 review (7 bugs). Fixed: a saved favourite is re-run with `signal_delay >= 1` and
+  Friday-close execution (it kept its own, so a delay-0 favourite's calls were bought on the close that
+  ranked them); **this moves the BL-226 parity figure for such a favourite**, to be re-read in BL-230. Also:
+  the last weeks of a default run were all "no contract" (sessions to an expiry are counted in weekdays past
+  the lake's last day); the chosen expiry is never before the exit day (a short `min_sessions_left` booked a
+  lapsed contract at zero); the Run button no longer waits for ever on a forgotten job; a stored favourite is
+  not replaced by the headline; the slippage field keeps what is typed; every cache is keyed on
+  `db_read.data_version()` (stock bars, F&O list) and a favourite's re-run on a hash of its saved settings.

@@ -39,11 +39,13 @@ Open **Settings** on the run bar (or click any chip).
   holding is sold below, the rebalance (weekly, every 2 weeks, monthly) and the score (rank-sum or
   volatility-adjusted). The rest is fixed: F&O stocks of each year that pass the liquidity filter,
   at most 25 % in one stock, bought at Friday's close a week after the signal, the share book's
-  costs. The first run of a strategy takes a minute or two; later runs reuse it.
+  costs. A saved favourite is re-run the same way (one week after the signal, Friday's close), even if
+  it was saved with no delay: the calls are bought at that close, so the picks cannot be ranked on it.
+  The first run of a strategy takes a minute or two; later runs reuse it, until the data or the
+  favourite's settings change.
 - **Moneyness**: ATM is the listed strike nearest the stock's close; OTM1 to OTM3 are one to three
-  strikes further out (above the price for a call, below for a put).
-- **Moneyness**: ITM2 and ITM1 are one or two listed strikes in the money (a call below the price,
-  a put above it), ATM the nearest, OTM1 to OTM3 out of the money. **Delta** picks the strike whose
+  strikes further out (above the price for a call, below for a put); ITM2 and ITM1 are one or two
+  listed strikes in the money (a call below the price, a put above it). **Delta** picks the strike whose
   delta, read from that option's own price, is nearest the target (e.g. 60 %): deeper strikes act
   more like the stock, with less time decay and less leverage.
 - **Expiry**: the nearest expiry with enough sessions left, or the next one or two after it.
@@ -69,7 +71,8 @@ Open **Settings** on the run bar (or click any chip).
   - *Exposure*: each week's positions sized so that delta × stock value adds up to this share of
     capital (100 % = as much stock as the capital buys), split over the week's picks.
 - **Capital**, **From** (the first week; data starts in 2020), **sessions left at entry** (the
-  expiry must have at least this many sessions after the entry day), **open interest** (a strike
+  expiry must have at least this many sessions after the entry day, and never fall before the day
+  the call is sold, so a short setting still buys a contract that lives through the week), **open interest** (a strike
   with fewer lots open is skipped), **slippage** (a share of the premium, paid each way; empty =
   1 % ATM, 2 % OTM1, 3 % OTM2, 4 % OTM3) and **tax** (each financial year's net at 31.2 %, a loss
   carried forward).
@@ -159,9 +162,10 @@ files.
 
 The **Sweeps** table at the foot of the page lists the runs of a grid of settings run overnight
 (`mbt overlay-sweep <grid.json>`): one row per setting, with the strategy, direction and settings,
-the train and test totals and drawdowns, the test's top-5 % share and the trades. Sort by the test
-total, the train total, the test drawdown or the whole period; **Open** loads a row's settings into
-the page and runs it. While a sweep runs the table refreshes every minute.
+the train total and drawdown and the trades, best train total first. The test window stays hidden:
+**Show the test window** adds its totals, drawdown and top-5 % share and the sorts by them, so the
+choice is made on train before the test is looked at once. **Open** loads a row's settings into the
+page and runs it. While a sweep runs the table refreshes every minute.
 
 Read it with care: with hundreds of rows a few will look good by chance. Choose on the train
 columns and read the test columns as the check; the 2024–2026 weeks were also read by earlier

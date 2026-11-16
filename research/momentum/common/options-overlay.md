@@ -1,6 +1,6 @@
 # Momentum: holding the picks as bought options
 
-**Status:** Tested · **Last updated:** 2026-11-16 (BL-229)
+**Status:** Tested · **Last updated:** 2026-11-16 (BL-229 round 1 void, BL-230)
 
 ## What it is
 
@@ -18,11 +18,11 @@ Not used. The live Momentum book holds shares on Kite.
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| [BL-226](../../../backlog/BL-226-fno-momentum-stock-options.md) Phase 3 | three F&O candidates (Four-Strategy Mix, 12-month top-10 weekly, Trio Fortnightly) × ATM / OTM1 / OTM2 calls, ₹10 lakh ÷ N of premium per stock, weekly; double slippage and an IV cap as variants | NSE daily closes, learning 2020-01 to 2024-06, confirmation 2024-07 to 2026-11, after costs, 1–3 % slippage and 31.2 % tax | **Killed**: no book passes on the confirmation weeks | Learning +511 % to +1,190 % on ₹10 lakh (shares +229 to +289 %), only Trio ATM met all rules; confirmation Trio ATM +42 % (shares +27 %) with a −82 % drawdown, Mix ATM −182 %, grid ATM −444 %; 7 of 9 lose |
+| [BL-226](../../../backlog/BL-226-fno-momentum-stock-options.md) Phase 3 | three F&O candidates (Four-Strategy Mix, 12-month top-10 weekly, Trio Fortnightly) × ATM / OTM1 / OTM2 calls, ₹10 lakh ÷ N of premium per stock, weekly; double slippage and an IV cap as variants | NSE daily closes, learning 2020-01 to 2024-06, confirmation 2024-07 to 2026-11, after costs, 1–3 % slippage and 31.2 % tax | **Killed**: no book passes on the confirmation weeks | Learning +511 % to +1,190 % on ₹10 lakh (shares +229 to +289 %), only Trio ATM met all rules; confirmation Trio ATM +42 % (shares +27 %) with a −82 % drawdown, Mix ATM −182 %, grid ATM −444 %; 7 of 9 lose; **not re-scored**: run without the F&O ban-period rule, four registered checks not run (BL-230) |
 | BL-226 Phase 4 | puts on the weakest N (market gate; long-short) | — | Not run (its gate: a passing call book) | — |
 | [BL-228](../../../backlog/BL-228-fno-falling-stock-puts.md) Phase 0 | ATM / OTM1 / OTM2 puts, one lot each, on the 5 or 10 weakest F&O stocks (rank-sum of 1–52-week returns) whose own trend is down (26-week return < 0, below the 40-week average), every week or only when NIFTY is below its 200-day average; against cash | same data, costs, slippage, tax, ₹10 lakh; learning 2020-01 to 2024-06 | **Killed at learning**: all 12 books lose; confirmation not read | every-week books −₹11 to −₹28 lakh after tax (−113 % to −277 % of ₹10 lakh), NIFTY-gated −₹1.3 to −₹6.4 lakh; win rate 26–32 % |
-| BL-228 Phase 0b | the mirror pool (owner's idea): every F&O stock's chart and its inverse ranked together, the top 5 or 10 with their own trend up, ATM call for a stock and ATM put for an inverse, one lot each; against cash | as above | **Killed at learning**: both make money but fail the interval and the −40 % drawdown rule; confirmation not read | top 5 +₹15.8 lakh after tax, drawdown −46 %, 90 % interval −0.13 to +1.48 % a week; top 10 +₹27.3 lakh, −58 %, −0.09 to +2.45 %; the calls earned +₹24.6 / +₹44.4 lakh before tax, the puts lost ₹1.7 / ₹4.7 lakh |
-| [BL-229](../../../backlog/BL-229-options-overlay-sweep.md) round 1 | 1,320 runs: BL-226's three candidates and the mirror pool × calls / calls if NIFTY > 200-DMA / market switch / mirror 5, 10 × ITM2, ITM1, ATM, OTM1, delta 0.7 × nearest / next expiry × hold on / off × no exit / stop −50 % / stop −50 % + target +100 % × 20 % of capital / 100 % delta exposure | ₹15 lakh; train 2020-01 → 2023-12, test 2024-01 → 2026-11; after costs, slippage, tax | **Killed**: none of the five carried from train passes on test (all fail the weekly interval, three the −50 % drawdown, one loses) | nearest miss Trio, calls if NIFTY > 200-DMA, ITM1, hold, stop −50 %: test +₹18.6 L (shares +88 %), DD −39 %, its top 5 % of trades = all its profit |
+| BL-228 Phase 0b | the mirror pool (owner's idea): every F&O stock's chart and its inverse ranked together, the top 5 or 10 with their own trend up, ATM call for a stock and ATM put for an inverse, one lot each; against cash | as above | **Killed at learning**: both make money but fail the interval and the −40 % drawdown rule; confirmation not read | top 5 +₹15.8 lakh after tax, drawdown −46 %, 90 % interval −0.13 to +1.48 % a week; top 10 +₹27.3 lakh, −58 %, −0.09 to +2.45 %; the calls earned +₹24.6 / +₹44.4 lakh before tax, the puts lost ₹1.7 / ₹4.7 lakh (an ad-hoc split, not the registered calls-alone comparison; the market-switch and top-N-calls extras were not run, BL-230) |
+| [BL-229](../../../backlog/BL-229-options-overlay-sweep.md) round 1 | 1,320 runs: BL-226's three candidates and the mirror pool × calls / calls if NIFTY > 200-DMA / market switch / mirror 5, 10 × ITM2, ITM1, ATM, OTM1, delta 0.7 × nearest / next expiry × hold on / off × no exit / stop −50 % / stop −50 % + target +100 % × 20 % of capital / 100 % delta exposure | ₹15 lakh; train 2020-01 → 2023-12, test 2024-01 → 2026-11; after costs, slippage, tax | **Killed**: none of the five carried from train passes on test (all fail the weekly interval, three the −50 % drawdown, one loses) | nearest miss Trio, calls if NIFTY > 200-DMA, ITM1, hold, stop −50 %: test +₹18.6 L (shares +88 %), DD −39 %, its top 5 % of trades = all its profit **Void: run on an engine with sizing bugs, re-run pending (BL-230)** |
 
 ## What we know
 
@@ -41,12 +41,12 @@ Not used. The live Momentum book holds shares on Kite.
   gain was its calls' (descriptive split of the registered books); its top 5 % of trades made more than all
   of its net.
 
-- Holding a contract while its stock stays picked beats selling and re-buying it weekly (BL-229 grid: test
+- **Void until BL-230's re-run** (round 1 ran on an engine with sizing bugs; see the item): holding a contract while its stock stays picked beats selling and re-buying it weekly (BL-229 grid: test
   median +₹2.2 lakh against −₹2.4 lakh at ₹15 lakh; descriptive).
-- Calls only while NIFTY is above its 200-day average, and deeper strikes (ITM1, delta 0.7), lose less on the
+- **Void until BL-230's re-run:** calls only while NIFTY is above its 200-day average, and deeper strikes (ITM1, delta 0.7), lose less on the
   2024-26 weeks; OTM1 and ATM lose most; the mirror pool lost on almost every run in 2024-26 (BL-229,
   descriptive).
-- Train rank predicted test rank weakly (Spearman 0.34 over 1,320 runs): a sweep's best train row is mostly luck.
+- **Void until BL-230's re-run:** train rank predicted test rank weakly (Spearman 0.34 over 1,320 runs): a sweep's best train row is mostly luck.
 
 ## Not yet tested
 

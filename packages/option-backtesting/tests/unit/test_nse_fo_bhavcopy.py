@@ -115,3 +115,22 @@ def test_a_missing_ban_list_is_recorded_and_not_asked_again(tmp_path):
     again = fb.Http(min_interval_s=0, opener=_opener(files))
     fb.fetch(tmp_path, day, day, http=again, today=date(2024, 8, 1), log=lambda _m: None)
     assert again.calls == 0  # the day and its missing ban list are both settled
+
+
+def test_a_body_that_is_not_a_zip_stops_the_run_with_the_manifest_saved(tmp_path):
+    d_ok, d_bad = date(2024, 7, 5), date(2024, 7, 8)
+    files = {
+        fb.old_url(d_ok): _zip("fo05JUL2024bhav.csv", OLD),
+        fb.ban_url(d_ok): EMPTY_BAN.encode(),
+        fb.udiff_url(d_bad): b"<html>Access Denied</html>",  # a 200 that is not a file
+    }
+    http = fb.Http(min_interval_s=0, opener=_opener(files))
+    out = fb.fetch(tmp_path, d_ok, d_bad, http=http, today=date(2024, 8, 1), log=lambda _m: None)
+    assert out["stopped"] and "not a readable udiff file" in out["stopped"]
+    assert out["counts"]["ok"] == 1 and out["counts"]["error"] == 1
+    manifest = fb._read_manifest(fb.raw_dir(tmp_path) / "manifest.csv")
+    assert manifest[d_ok.isoformat()]["status"] == "ok"  # the day fetched first is kept
+    assert manifest[d_bad.isoformat()]["status"] == "error"  # and the bad one is on record
+    again = fb.Http(min_interval_s=0, opener=_opener(files))
+    fb.fetch(tmp_path, d_ok, d_ok, http=again, today=date(2024, 8, 1), log=lambda _m: None)
+    assert again.calls == 0  # the good day is not requested again

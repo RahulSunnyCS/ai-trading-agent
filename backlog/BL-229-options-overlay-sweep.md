@@ -84,7 +84,21 @@ Committed before any sweep run (the grid file and this section in one commit).
 
 ## Result
 
-**Round 1 killed (2026-11-16).** None of the five runs carried from the train window passes on the test weeks
+**Review amendment (2026-11-16): round 1 is void until it is re-run.** The sweep ran on an engine with two
+sizing bugs the PR #453 review found: *exposure* sizing gave every leg the whole exposure (a four-sleeve
+favourite at "100 % exposure" carried about 400 %), and with *hold* the week's budget went to the new picks
+alone, so a week with kept contracts overweighted the new ones (hold runs were levered against runs that sell
+weekly). All five carried runs use hold, and the first carried run was a four-sleeve exposure run. Two more
+engine bugs touched every hold run: a held contract that did not continue was dropped with no exit slippage or
+costs, and `weeks_won` was counted on positions, not weeks. All four are fixed and tested; **every figure
+below (the table, the verdict, "hold helps most", "exposure halves the drawdown", the grid-wide read) was
+computed before the fix and is void.** The re-run is [BL-230](BL-230-options-overlay-rescore.md): a new sweep
+name, the same frozen grid and selection rule. The Sweeps table used to open sorted on the test window; it
+now opens on train and keeps the test columns shut until they are opened, so a re-run's selection reads
+train only. The test weeks were also read once for the five carried runs and by the grid-wide read, so a
+re-run on them is a check of the fix, not a fresh test.
+
+**Round 1 killed (2026-11-16), void as above.** None of the five runs carried from the train window passes on the test weeks
 (2024-01 → 2026-11, ₹15 lakh, after costs, slippage and tax). Every one fails the weekly 90 % interval (5,000
 draws: its lower bound is below zero), three also fail the −50 % drawdown limit, and one loses money.
 
@@ -151,3 +165,13 @@ of #4's settings is the cleaner test.
   All five hold while picked and use the nearest expiry; no mirror or market-switch run made the five.
 - 2026-11-16 — test read for the five (5,000-draw interval): none passes; round 1 killed. Result written; the
   grid-wide descriptive read added after the verdict.
+- 2026-11-16 — PR #453 review (9 bugs, 6 nits). Fixed in code, with tests: exposure sizing uses the leg's own
+  share (`leg.weekly_total`), and a held week splits the budget over kept plus new contracts; a held contract
+  is not kept past the run's last week or the next week's position cap (it is sold, with costs); the refill
+  trial no longer changes the hold state; two sleeves' positions no longer share a `pos_id`; `weeks_won` is
+  counted on weeks; a resumed sweep asks failed runs again (`failed_ids`; the table shows one row a run, a
+  result over a failure); the Sweeps table opens on train with the test columns shut. The recorded round 1
+  is void (Result above) and BL-230 re-runs it. Not done, noted: a week across the train / test split is
+  counted in the test weeks (not hit by this grid); the selection and the 5,000-draw verdict are not
+  reproducible from committed code; the grid-wide read used the 2024-26 weeks; no multiple-testing
+  adjustment on the five carried runs.
