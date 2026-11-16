@@ -98,3 +98,13 @@ Committed before any sweep run (the grid file and this section in one commit).
 - 2026-11-15 — disclosure: while checking that the Sweeps table rendered, the page read-out returned one
   row's test figures (Trio Fortnightly, calls, ITM2, exposure 100 %: train +₹23.9 lakh / −47 %, test
   +₹9.5 lakh / −44 %). No other test figure was read; the selection is still made on train columns only.
+- 2026-11-16 08:20 — round 1 finished at 00:38 (1,320 runs, no failures). Train selection (written before any
+  test column was read; 533 runs had ≥ 150 train trades and a positive train total; ranked by train after-tax
+  total ÷ |train drawdown|, one per strategy and mode), ₹15 lakh:
+  1. `deb0f923` Four-Strategy Mix, calls, OTM1, hold, exposure 100 %: train +₹122.5 lakh, DD −53 %.
+  2. `3c66b189` Four-Strategy Mix, calls while NIFTY > 200-DMA, OTM1, hold, 20 % a week: +₹71.0 lakh, −32 %.
+  3. `625db05a` Trio Fortnightly, calls, ITM2, hold, 20 % a week: +₹78.4 lakh, −43 %.
+  4. `9267a0db` Trio Fortnightly, calls while NIFTY > 200-DMA, ITM1, hold, stop −50 %, 20 % a week: +₹74.4
+     lakh, −45 %.
+  5. `2293eef6` 12m top 10 weekly, calls, ATM, hold, 20 % a week: +₹62.7 lakh, −55 %.
+  All five hold while picked and use the nearest expiry; no mirror or market-switch run made the five.
