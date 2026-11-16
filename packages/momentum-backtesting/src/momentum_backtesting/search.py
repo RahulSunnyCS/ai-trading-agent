@@ -379,7 +379,13 @@ def data_snapshot(root: Path | None = None, through: str | None = None) -> dict[
             [cap],
         ).fetchall()
     digest = hashlib.sha1(json.dumps(factors, default=str).encode()).hexdigest()[:12]
-    return {"last_bar": str(last_bar), "last_week": str(last_week), "factors": digest}
+    snapshot = {"last_bar": str(last_bar), "last_week": str(last_week), "factors": digest}
+    from .categories import fno
+
+    members = fno.members_digest(through, root)
+    if members is not None:  # only once the F&O list is built: older snapshots keep their keys
+        snapshot["fno"] = members
+    return snapshot
 
 
 def tilt_possible(lookbacks) -> bool:

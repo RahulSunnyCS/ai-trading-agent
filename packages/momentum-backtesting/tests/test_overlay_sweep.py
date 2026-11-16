@@ -32,3 +32,18 @@ def test_done_ids_read_every_worker_file(tmp_path):
     (tmp_path / "results-w0.jsonl").write_text(json.dumps({"id": "a"}) + "\n")
     (tmp_path / "results-w1.jsonl").write_text(json.dumps({"id": "b"}) + "\nnot json\n")
     assert sweep.done_ids(tmp_path) == {"a", "b"}
+
+
+def test_a_failed_run_is_not_done_and_a_later_result_replaces_it(tmp_path, monkeypatch):
+    def line(**row):
+        return json.dumps(row) + "\n"
+
+    (tmp_path / "results-w0.jsonl").write_text(
+        line(id="a") + line(id="b", error="OSError: unmounted") + line(id="c", error="ValueError")
+    )
+    (tmp_path / "results-w1.jsonl").write_text(line(id="c", book={"total": 1}))
+    assert sweep.done_ids(tmp_path) == {"a", "c"}  # b is asked again on the next resume
+    assert sweep.failed_ids(tmp_path) == {"b"}  # c failed once, then succeeded
+    monkeypatch.setattr(sweep, "sweeps_dir", lambda: tmp_path.parent)
+    rows = {r["id"]: r for r in sweep.read_sweep(tmp_path.name)}
+    assert set(rows) == {"a", "b", "c"} and "error" not in rows["c"] and "error" in rows["b"]

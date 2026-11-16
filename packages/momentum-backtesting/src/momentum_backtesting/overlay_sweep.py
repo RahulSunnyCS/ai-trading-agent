@@ -68,15 +68,26 @@ def expand(grid: dict[str, Any]) -> list[dict[str, Any]]:
     return list(unique.values())
 
 
-def done_ids(folder: Path) -> set[str]:
-    ids = set()
+def _rows(folder: Path):
     for path in folder.glob("results-w*.jsonl"):
         for line in path.read_text().splitlines():
             try:
-                ids.add(json.loads(line)["id"])
-            except (ValueError, KeyError):
+                row = json.loads(line)
+                row["id"]
+            except (ValueError, KeyError, TypeError):
                 continue
-    return ids
+            yield row
+
+
+def done_ids(folder: Path) -> set[str]:
+    """The runs with a result. A run that failed is not done: whatever stopped it (the volume
+    unmounting, a restart) may have passed, so a resumed sweep asks it again."""
+    return {row["id"] for row in _rows(folder) if "error" not in row}
+
+
+def failed_ids(folder: Path) -> set[str]:
+    """The runs whose every attempt failed (a later success makes one done)."""
+    return {row["id"] for row in _rows(folder) if "error" in row} - done_ids(folder)
 
 
 def summary_row(body: dict[str, Any], result: dict[str, Any], secs: float) -> dict[str, Any]:
@@ -168,6 +179,7 @@ def run(grid_path: Path, workers: int = 3) -> dict[str, Any]:
         p.join()
     status["finished"] = time.strftime("%Y-%m-%d %H:%M:%S")
     status["done"] = len(done_ids(folder))
+    status["failed"] = len(failed_ids(folder))
     (folder / "status.json").write_text(json.dumps(status, indent=1))
     return status
 
@@ -183,6 +195,7 @@ def list_sweeps() -> list[dict[str, Any]]:
             continue
         status = json.loads(status_path.read_text())
         status["done"] = len(done_ids(folder))
+        status["failed"] = len(failed_ids(folder))
         status["running"] = "finished" not in status and _alive(status.get("pid"))
         out.append(status)
     return out
@@ -202,11 +215,9 @@ def read_sweep(name: str) -> list[dict[str, Any]]:
     folder = sweeps_dir() / name
     if not folder.is_dir() or "/" in name or name.startswith("."):
         raise LookupError(f"No sweep named {name!r}.")
-    rows = []
-    for path in sorted(folder.glob("results-w*.jsonl")):
-        for line in path.read_text().splitlines():
-            try:
-                rows.append(json.loads(line))
-            except ValueError:
-                continue
-    return rows
+    by_id: dict[str, dict[str, Any]] = {}
+    for row in _rows(folder):
+        old = by_id.get(row["id"])
+        if old is None or "error" in old or "error" not in row:  # a result beats a failure
+            by_id[row["id"]] = row
+    return list(by_id.values())

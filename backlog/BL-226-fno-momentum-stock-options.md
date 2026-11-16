@@ -182,6 +182,15 @@ run, by its own gate (only after a passing call book); Phase 5 is moot.
 - **Caveats:** daily closes, not tradable quotes (slippage 1–3 % assumed, doubled as a sensitivity); a
   contract missing on the exit day (a corporate action re-strikes it) is booked at zero; results-week skip
   not run (no results calendar); the stock signal's years were searched before (Phase 0 caveat).
+- **Review amendment (2026-11-16): not re-scored.** The nine call books were run **without** Phase 0's
+  F&O ban-period rule (`bans.parquet` was written but no code read it), so a few entries were in stocks no
+  account could open that day. `run_book` now skips and counts them (`banned`), but the figures above and
+  the table in the Log were not re-run and stand as unverified until BL-230. Four registered checks were
+  also not run and are not recorded as passed: the stock sweep's cut-off-copy look-ahead test, deflated
+  Sharpe and PBO beside the Phase 2 ranking, the Phase 3 fill check against the vendor's 1-minute data
+  (200 entries and exits), and the split/bonus adjustment check of every F&O stock's ranking series. The
+  "killed" verdict rests on every call book missing the drawdown rule by a wide margin, which a few ban-day
+  entries are not expected to change; that is a judgement, not a re-score.
 
 ## Risks
 
@@ -315,3 +324,10 @@ Answered 2026-11-15 (Phase 0). As first asked:
   trade across the learning / confirmation cut, the bottom-N filter, the look-back labels in the
   distinctness check, the slow CDF and the script's location. All are tasks of BL-227 Phase 1, where the
   engine moves into the package.
+- 2026-11-16 — PR #450 second review. Fixed in code, with tests: the ban rule is applied in `run_book` (day
+  -> banned symbols from `bans.parquet`, `fno.load_bans`); the F&O list file is in `db_read.data_version()`
+  (so `input_version()` and the Broad ranking caches) and in `search.data_snapshot()` (a digest of its
+  rows up to the run's end date); the put books take the bottom-N's own N, so Trio and the Four-Strategy Mix
+  no longer crash; a body NSE serves that is not a zip stops `obt nse fo-fetch` like any other failed
+  request, with the day on record and the manifest saved. Not fixed, only recorded: the Result's figures
+  were not re-scored and four registered checks were not run (Review amendment above). Re-run: BL-230.

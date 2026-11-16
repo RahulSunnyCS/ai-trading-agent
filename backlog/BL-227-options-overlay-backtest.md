@@ -155,3 +155,11 @@ BL-228's (26-week return and the 40-week average) unless the owner says otherwis
 - 2026-11-15 — owner: a custom strategy from the picker, not only saved favourites. "Custom strategy…"
   sets the look-backs (1-52 weeks), top N, exit rank, rebalance (weekly / every 2 weeks / monthly) and
   score (rank-sum / volatility-adjusted); the rest is BL-226's grid base (`overlay_runs.CUSTOM_BASE`).
+- 2026-11-16 — PR #452 review (7 bugs). Fixed: a saved favourite is re-run with `signal_delay >= 1` and
+  Friday-close execution (it kept its own, so a delay-0 favourite's calls were bought on the close that
+  ranked them); **this moves the BL-226 parity figure for such a favourite**, to be re-read in BL-230. Also:
+  the last weeks of a default run were all "no contract" (sessions to an expiry are counted in weekdays past
+  the lake's last day); the chosen expiry is never before the exit day (a short `min_sessions_left` booked a
+  lapsed contract at zero); the Run button no longer waits for ever on a forgotten job; a stored favourite is
+  not replaced by the headline; the slippage field keeps what is typed; every cache is keyed on
+  `db_read.data_version()` (stock bars, F&O list) and a favourite's re-run on a hash of its saved settings.

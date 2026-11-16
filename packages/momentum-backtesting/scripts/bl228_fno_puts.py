@@ -150,17 +150,20 @@ def bans() -> set[tuple[pd.Timestamp, str]]:
     return {(pd.Timestamp(d), s) for d, s in zip(df["date"], df["symbol"], strict=True)}
 
 
-def entry_lists(weak: dict, all_sessions, banned, gate_down: dict | None):
+def entry_lists(weak: dict, all_sessions, banned, gate_down: dict | None, until=None):
     """{entry day: symbols}: the signal week's list entered on the next week's rebalance day,
     banned names dropped; with `gate_down`, only where it says the market was falling at the
     signal week's last session. Every rebalance day is kept (an empty list holds nothing) so each
-    entry has its exit."""
+    entry has its exit. With `until`, nothing after that day is listed or counted: the learning
+    run must not read, tally or load the option rows of the confirmation weeks."""
     weeks = sorted(weak)
     out, skipped = {}, 0
     for w0, w1 in zip(weeks[:-1], weeks[1:], strict=True):
         d = ob.rebalance_day(w1, all_sessions)
         if d is None or d < FIRST_ENTRY:
             continue
+        if until is not None and d > until:
+            break
         names = weak[w0]
         if gate_down is not None and not gate_down.get(w0, False):
             names = []
@@ -298,7 +301,7 @@ def score(trades: pd.DataFrame, weeks: list[pd.Timestamp]) -> dict:
 # ---------------------------------------------------------------------------------------------
 
 
-def build(out: Path, *, mirror: bool = False):
+def build(out: Path, *, mirror: bool = False, until=None):
     all_sessions = ob.sessions()
     prices, membership, to_base = universe()
     weeks = list(prices.index)
@@ -309,13 +312,13 @@ def build(out: Path, *, mirror: bool = False):
         if mirror:
             m = mirror_list(prices, membership, to_base, n)
             lists[(n, "mirror")], skipped[(n, "mirror")] = entry_lists(
-                m, all_sessions, banned, None
+                m, all_sessions, banned, None, until
             )
             continue
         weak = weak_list(prices, membership, to_base, n)
         for form in FORMS:
             lists[(n, form)], skipped[(n, form)] = entry_lists(
-                weak, all_sessions, banned, down if form == "gated" else None
+                weak, all_sessions, banned, down if form == "gated" else None, until
             )
     days = sorted(set().union(*[set(v) for v in lists.values()]))
     symbols = {s.split("|", 1)[0] for v in lists.values() for x in v.values() for s in x}
@@ -352,7 +355,9 @@ def build(out: Path, *, mirror: bool = False):
 
 def run_all(out: Path, *, confirm_books: list[str] | None, mirror: bool = False):
     out.mkdir(parents=True, exist_ok=True)
-    lists, days, all_sessions, chains, spots, lots = build(out, mirror=mirror)
+    # a learning run builds learning days only: its counts and ban tally are learning counts
+    until = ob.LEARN_END if confirm_books is None else None
+    lists, days, all_sessions, chains, spots, lots = build(out, mirror=mirror, until=until)
     suffix = "-mirror" if mirror else ""
     learn_w = [d for d in days if d <= ob.LEARN_END]
     conf_w = [d for d in days if d >= ob.CONFIRM_START]

@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-15
+Last updated: 2026-11-16
 
 ## Open
 
@@ -82,6 +82,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-206](BL-206-dir-exits-scale-out.md) | Directional exits, wide: per-leg targets, profit lock and trail, and a two-lot scale-out, on the Dir settings Adaptive picks, at 0.5 % slippage (BL-105 killed the one-lot profit rules; the scale-out, leg targets, T1's settings and slippage are new) | P2 | Planned | research | options |
 | [BL-219](BL-219-gold-dir-forward-paper-test.md) | Forward paper test of GOLDM Dir in the expiry week: nightly journal over six gold expiries, 18:00 spread snapshot | P2 | In progress; built, waits for the merges and a scheduler restart (first session 2026-11-23) | research | options / trading-data |
 | [BL-227](BL-227-options-overlay-backtest.md) | Options overlay backtest: run a Momentum strategy's picks as bought stock options from the dashboard, calls and puts (downward momentum, market switch); book vs shares, minimum capital, winners, trades | P2 | In progress (page built; daily data refresh open) | feature | momentum / options / dashboard |
+| [BL-230](BL-230-options-overlay-rescore.md) | Re-score the options-overlay record after the PR #450–#454 review fixes: BL-226 with the ban rule, BL-228's registered extras, BL-229 round 1 on the fixed engine, BL-227's parity figure | P2 | Planned | research | momentum / options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -96,7 +97,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
-| [BL-229](BL-229-options-overlay-sweep.md) | Options overlay sweep (round 1): hold, ITM / delta strikes, expiry, stop / target, exposure, calls filter over BL-226's candidates and the mirror pool; 1,320 runs, train 2020-23, test 2024-26 | Killed: none of five carried passes on test (all fail the weekly interval); hold, the NIFTY filter on calls and ITM1 / delta 0.7 helped; mirror pool lost on test | 2026-11-16 |
+| [BL-229](BL-229-options-overlay-sweep.md) | Options overlay sweep (round 1): hold, ITM / delta strikes, expiry, stop / target, exposure, calls filter over BL-226's candidates and the mirror pool; 1,320 runs, train 2020-23, test 2024-26 | Killed, then **void** (review: engine sizing bugs; re-run = BL-230): none of five carried passed on test; the 'hold, NIFTY filter, ITM1 / delta 0.7 helped' read is void | 2026-11-16 |
 | [BL-228](BL-228-fno-falling-stock-puts.md) | Puts on falling F&O stocks against cash: the weakest-momentum F&O stocks with their own trend down (every week or NIFTY-gated), and the owner's mirror pool (stocks and their inverse charts ranked together) | Killed at learning: all 12 put books lose; the mirror pool makes money from its calls but fails the drawdown and interval rules; confirmation not read | 2026-11-15 |
 | [BL-226](BL-226-fno-momentum-stock-options.md) | F&O stock momentum through options: point-in-time F&O list from the bhavcopy, stock-only sweep for three candidates, then their calls weekly | Killed: no call book passes on 2024-07 → 2026-11 (all fail drawdown, 7 of 9 lose); 2020-24 gains were leverage. Kept: NSE F&O history, F&O list, `fno` universe | 2026-11-15 |
 | [BL-218](BL-218-mcx-commodity-options-sweep.md) | MCX commodity options sweep: Dir, Widesl, Buy on four minis, expiry week vs the week before | One pass: GOLDM Dir expiry week (18:00 ITM1 SL21 cost×1, ₹1,606 a session on the test year after charges and 1% slippage); crude, gas, silver, Widesl and the Buys fail | 2026-11-11 |

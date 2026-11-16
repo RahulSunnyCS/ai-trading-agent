@@ -63,7 +63,9 @@ export function OverlaySweeps({ onOpen }: { onOpen: (settings: Partial<OverlayRe
     name ? `${LIST_URL}/${encodeURIComponent(name)}` : `${LIST_URL}/none`,
     { enabled: name !== null, ...(status?.running ? { intervalMs: 60_000 } : {}) },
   );
-  const [sort, setSort] = useState<SortKey>('test');
+  // selection reads the train window only: the test window stays shut until it is opened on purpose
+  const [sort, setSort] = useState<SortKey>('train');
+  const [showTest, setShowTest] = useState(false);
   const [limit, setLimit] = useState(30);
   const data = rows.data && rows.data.name === name ? rows.data.rows : [];
   const sorted = useMemo(
@@ -108,20 +110,36 @@ export function OverlaySweeps({ onOpen }: { onOpen: (settings: Partial<OverlayRe
             ariaLabel="Sort sweep by"
             size="sm"
             value={sort}
-            options={[
-              { value: 'test', label: 'Test total' },
-              { value: 'train', label: 'Train total' },
-              { value: 'test_dd', label: 'Test drawdown' },
-              { value: 'total', label: 'Whole period' },
-            ]}
+            options={
+              showTest
+                ? [
+                    { value: 'train', label: 'Train total' },
+                    { value: 'test', label: 'Test total' },
+                    { value: 'test_dd', label: 'Test drawdown' },
+                    { value: 'total', label: 'Whole period' },
+                  ]
+                : [{ value: 'train', label: 'Train total' }]
+            }
             onChange={setSort}
           />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-2"
+            onClick={() => {
+              if (showTest) setSort('train');
+              setShowTest(!showTest);
+            }}
+          >
+            {showTest ? 'Hide the test window' : 'Show the test window'}
+          </Button>
         </div>
       </header>
       <div className="px-4 pb-4">
         <p className="mb-2 text-xs text-muted">
-          One row per setting tried. Pick on the train window; the test window is the check, and
-          with many rows a few will look good by chance.
+          One row per setting tried, best train window first. Pick on the train window; the test
+          window is the check, so it stays hidden until you open it, and with many rows a few will
+          look good by chance.
         </p>
         <Table maxHeight={560}>
           <THead>
@@ -134,15 +152,19 @@ export function OverlaySweeps({ onOpen }: { onOpen: (settings: Partial<OverlayRe
             <Th align="right" dense>
               Train DD
             </Th>
-            <Th align="right" dense>
-              Test total
-            </Th>
-            <Th align="right" dense>
-              Test DD
-            </Th>
-            <Th align="right" dense>
-              Test top 5 %
-            </Th>
+            {showTest ? (
+              <>
+                <Th align="right" dense>
+                  Test total
+                </Th>
+                <Th align="right" dense>
+                  Test DD
+                </Th>
+                <Th align="right" dense>
+                  Test top 5 %
+                </Th>
+              </>
+            ) : null}
             <Th align="right" dense>
               Trades
             </Th>
@@ -166,21 +188,25 @@ export function OverlaySweeps({ onOpen }: { onOpen: (settings: Partial<OverlayRe
                   <Td numeric align="right" dense>
                     {formatPct(r.windows?.train.max_dd, 0)}
                   </Td>
-                  <Td numeric align="right" dense>
-                    <span
-                      className={
-                        (r.windows?.test.total_rs ?? 0) >= 0 ? 'text-positive' : 'text-negative'
-                      }
-                    >
-                      {formatInr(r.windows?.test.total_rs, { sign: true, compact: true })}
-                    </span>
-                  </Td>
-                  <Td numeric align="right" dense>
-                    {formatPct(r.windows?.test.max_dd, 0)}
-                  </Td>
-                  <Td numeric align="right" dense>
-                    {formatPct(r.windows?.test.top5pct_share, 0)}
-                  </Td>
+                  {showTest ? (
+                    <>
+                      <Td numeric align="right" dense>
+                        <span
+                          className={
+                            (r.windows?.test.total_rs ?? 0) >= 0 ? 'text-positive' : 'text-negative'
+                          }
+                        >
+                          {formatInr(r.windows?.test.total_rs, { sign: true, compact: true })}
+                        </span>
+                      </Td>
+                      <Td numeric align="right" dense>
+                        {formatPct(r.windows?.test.max_dd, 0)}
+                      </Td>
+                      <Td numeric align="right" dense>
+                        {formatPct(r.windows?.test.top5pct_share, 0)}
+                      </Td>
+                    </>
+                  ) : null}
                   <Td numeric align="right" dense>
                     {formatInt(r.stats?.trades)}
                   </Td>

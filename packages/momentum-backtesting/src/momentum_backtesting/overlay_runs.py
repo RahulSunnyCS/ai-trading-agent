@@ -34,6 +34,21 @@ def _favourite(fid: str) -> dict:
     raise LookupError("That saved strategy is not a favourite any more.")
 
 
+def _digest(fid: str | None) -> str | None:
+    """A hash of a favourite's saved settings (its members' configs), so a cached re-run does not
+    outlive an edit of the favourite. None for no favourite or one that is gone."""
+    if not fid:
+        return None
+    import hashlib
+
+    try:
+        record = _favourite(fid)
+    except (LookupError, FileNotFoundError):
+        return None
+    configs = [m.get("config") for m in record.get("members") or [record]]
+    return hashlib.sha1(json.dumps(configs, sort_keys=True, default=str).encode()).hexdigest()[:12]
+
+
 def strategies() -> list[dict[str, Any]]:
     """The Broad favourites and groups the page can re-run on F&O stocks, headline first."""
     from . import runs_store
@@ -158,7 +173,12 @@ def strategy_inputs(
         arr = np.array(sessions, dtype="datetime64[ns]")
         sleeves, equities = [], []
         for cfg in configs:
-            body = {**cfg, "broad_universe": "fno", "start": start, "end": end}
+            # the option legs are bought at the rebalance day's close, so the holdings must come
+            # from the week before (as the custom strategies, the puts and the mirror pool do): a
+            # favourite saved with signal_delay 0 would be ranked on the very close it is bought at
+            body = {**cfg, "broad_universe": "fno", "start": start, "end": end,
+                    "signal_delay": max(int(cfg.get("signal_delay") or 0), 1),
+                    "execution": "fri_close"}  # fmt: skip
             body.pop("dataset_label", None)
             req = api.BacktestRequest(**body)
             ranking = api._broad_ranking(req)
@@ -174,7 +194,7 @@ def strategy_inputs(
         return ov.Inputs(sleeves=sleeves, stock_equity=blend, strategy_name=record.get("name"))
 
     # a few strategy re-runs kept (each holds weekly weights and equity), newest last
-    who = json.dumps(custom, sort_keys=True) if custom is not None else fid
+    who = json.dumps(custom, sort_keys=True) if custom is not None else f"{fid}:{_digest(fid)}"
     return ov.LAKE.remember(f"strategy:{who}:{start}:{end}", make, group="favourite", keep=4)
 
 
@@ -193,8 +213,8 @@ def run_request(body: dict[str, Any], *, capital_table: bool = True) -> dict[str
     if custom is not None:
         custom_config(custom)  # refuse a bad custom strategy before any work
     body = {**body, "favourite_id": fid, "custom": custom}
-    key = json.dumps({**body, "_lake": ov.LAKE.newest, "_table": capital_table}, sort_keys=True,
-                     default=str)  # fmt: skip
+    key = json.dumps({**body, "_lake": ov.LAKE.version, "_favourite": _digest(fid),
+                      "_table": capital_table}, sort_keys=True, default=str)  # fmt: skip
     with _CACHE_LOCK:
         if key in _CACHE:
             _CACHE.move_to_end(key)

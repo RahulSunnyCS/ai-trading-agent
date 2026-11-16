@@ -1,5 +1,7 @@
 """BL-227: the options overlay engine on synthetic chains (no lake needed)."""
 
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -52,6 +54,64 @@ def test_expiry_needs_ten_sessions_and_strikes_count_outward():
     s = ov.Settings(moneyness="ATM", min_sessions_left=10)
     trades, _ = _run(ov.Leg(picks={D0: ["ABC"]}, right="CE"), s, chains)
     assert trades[0]["expiry"] == NEAR
+
+
+def test_sessions_to_an_expiry_past_the_lakes_last_day_go_on_in_weekdays():
+    # the lake holds days to 2024-03-08; an entry on 2024-03-01 has 5 more sessions in it and the
+    # weekdays 03-11 .. 03-28 (14) to the expiry. Counted in the lake alone it would have 5 and
+    # every expiry of the last weeks would be refused.
+    sessions = np.array(pd.bdate_range("2024-01-01", "2024-03-08"), dtype="datetime64[ns]")
+    day, far = pd.Timestamp("2024-03-01"), np.datetime64("2024-03-28", "ns")
+    assert ov._sessions_to(sessions, day, far) == 19
+    assert ov._sessions_to(sessions, day, np.datetime64("2024-03-06", "ns")) == 3  # inside it
+    rows = pd.DataFrame({"expiry": [pd.Timestamp("2024-03-28")]})
+    assert ov._expiry(rows, day, sessions, 19) == pd.Timestamp("2024-03-28")
+    assert ov._expiry(rows, day, sessions, 20) is None
+
+
+def test_the_contract_lives_to_the_exit_day_whatever_min_sessions_left_says():
+    # an expiry 3 sessions out would lapse before the exit 5 sessions out and be booked at nothing
+    early = pd.Timestamp("2024-01-10")
+    strikes = [90.0, 95.0, 100.0, 105.0, 110.0]
+    rows = pd.concat([_rows(D0, early, strikes, "CE", 5.0), _chain(D0)], ignore_index=True)
+    chains = {(D0, "ABC"): rows, (D1, "ABC"): _chain(D1, exit_price=12.0)}
+    lots = pd.Series(100, index=pd.MultiIndex.from_tuples(
+        [(D0, "ABC", e) for e in (early, NEAR, NEXT)]), dtype=float)  # fmt: skip
+    s = ov.Settings(moneyness="ATM", min_sessions_left=1, slippage=0.0)
+    (t,), _ = _run(ov.Leg(picks={D0: ["ABC"]}, right="CE"), s, chains, lots)
+    assert t["expiry"] == NEAR  # not the 2024-01-10 contract
+
+
+def test_the_lake_cache_key_moves_with_the_shared_data_version(tmp_path, monkeypatch):
+    from momentum_backtesting import db_read
+
+    (tmp_path / "date=2024-03-01").mkdir()
+    monkeypatch.setattr(ov, "_fo_dir", lambda: tmp_path)
+    version = {"now": ("bars", 1)}
+    monkeypatch.setattr(db_read, "data_version", lambda root=None: version["now"])
+    lake = ov.Lake()
+    first = lake.version
+    assert lake.remember("k", lambda: "old") == "old"
+    assert lake.remember("k", lambda: "never") == "old"  # same data: served from the cache
+    version["now"] = ("bars", 2)  # a stock-bar top-up: no new F&O day
+    assert lake.version != first and lake.newest == "2024-03-01"
+    assert lake.remember("k", lambda: "new") == "new"  # the cache was emptied
+
+
+def test_a_favourites_digest_follows_its_saved_settings(monkeypatch):
+    from momentum_backtesting import overlay_runs as runs
+
+    record = {"id": "f", "members": [{"config": {"lookbacks": [4, 13]}}]}
+    monkeypatch.setattr(runs, "_favourite", lambda fid: record)
+    before = runs._digest("f")
+    record["members"][0]["config"]["lookbacks"] = [4, 26]
+    assert runs._digest("f") != before and runs._digest(None) is None
+
+    def gone(fid):
+        raise LookupError(fid)
+
+    monkeypatch.setattr(runs, "_favourite", gone)
+    assert runs._digest("f") is None
 
 
 def test_sizing_one_lot_premium_and_pnl():
@@ -279,7 +339,8 @@ def test_itm_delta_expiry_skip_exposure_and_caps():
     assert t["strike"] == 90.0  # the deepest strike has the highest delta
     s = ov.Settings(moneyness="ATM", min_sessions_left=15, sizing="exposure", sizing_value=1.0,
                     capital=100_000.0)  # fmt: skip
-    (t,), _ = _run(leg(), s, chains)
+    exposed = ov.Leg(picks={D0: ["ABC"]}, right="CE", weekly_total=100_000.0)
+    (t,), _ = _run(exposed, s, chains)
     assert t["lots"] >= 1
     two = ov.Leg(picks={D0: ["ABC", "ABC"]}, right="CE")
     trades, counts = _run(two, ov.Settings(min_sessions_left=15, max_positions=1), chains)
@@ -296,3 +357,97 @@ def test_a_stop_closes_on_the_first_daily_close_through_it():
                          _lots(), set(), ARR, counts, between=[mid, D1])  # fmt: skip
     assert t["exit_how"] == "stop" and t["exit"] == mid and t["p1"] == 3.0
     assert t["week_end"] == D1 and counts.stopped == 1
+
+
+def test_exposure_is_the_legs_own_share_of_the_capital():
+    # a leg given half the capital's exposure buys about half the lots of one given all of it,
+    # whatever the capital is (it used to size every leg on the whole capital)
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0)}
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, sizing="exposure", sizing_value=1.0,
+                    capital=100_000.0, slippage=0.0)  # fmt: skip
+    (whole,), _ = _run(ov.Leg(picks={D0: ["ABC"]}, right="CE", weekly_total=100_000.0), s, chains)
+    (half,), _ = _run(ov.Leg(picks={D0: ["ABC"]}, right="CE", weekly_total=50_000.0), s, chains)
+    assert whole["lots"] > 2 and half["lots"] == pytest.approx(whole["lots"] / 2, abs=1)
+
+
+def test_a_held_week_splits_the_budget_over_kept_and_new_contracts():
+    xyz = lambda day, **kw: _chain(day, **kw).assign(symbol="XYZ")  # noqa: E731
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0),
+              (D1, "XYZ"): xyz(D1), (D2, "ABC"): _chain(D2, exit_price=12.0),
+              (D2, "XYZ"): xyz(D2, exit_price=8.0)}  # fmt: skip
+    spots = pd.DataFrame({"ABC": [101.0, 104.0, 99.0], "XYZ": [100.0] * 3}, index=[D0, D1, D2])
+    idx = [(d, sym, e) for d in (D0, D1, D2) for sym in ("ABC", "XYZ") for e in (NEAR, NEXT)]
+    lots = pd.Series(100.0, index=pd.MultiIndex.from_tuples(idx))
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0, hold=True)
+    # week 2: ABC is kept, XYZ is new; the week's 3,200 is over both, so XYZ gets 1,600 (2 lots at
+    # 800 a lot), not all 3,200
+    leg = ov.Leg(picks={D0: ["ABC"], D1: ["ABC", "XYZ"], D2: []}, right="CE", weekly_total=3200.0)
+    rows = ov.run_leg(leg, s, [D0, D1, D2], chains, spots, lots, set(), ARR, ov.BookCounts())
+    new = [r for r in rows if r["symbol"] == "XYZ"]
+    assert len(new) == 1 and new[0]["lots"] == 2 and not new[0]["held_in"]
+
+
+def test_a_contract_is_not_held_past_the_last_week_or_the_position_cap():
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0),
+              (D2, "ABC"): _chain(D2, exit_price=15.0)}  # fmt: skip
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.01, hold=True)
+    # the run ends at D1: its picks are never traded, so the week-1 contract is sold, with costs
+    leg = ov.Leg(picks={D0: ["ABC"], D1: ["ABC"]}, right="CE")
+    (t,) = ov.run_leg(leg, s, [D0, D1], chains, SPOTS, _lots(), set(), ARR, ov.BookCounts())
+    assert not t["held_out"] and t["sell"] == pytest.approx(12.0 * 0.99 * 100)
+    assert t["costs"] == pytest.approx(ov.costs(t["buy"], t["sell"], D1, orders=2))
+    # next week's cap of 1 keeps XYZ, not ABC: ABC is sold, not left to vanish
+    capped = replace(s, max_positions=1)
+    leg = ov.Leg(picks={D0: ["ABC"], D1: ["XYZ", "ABC"]}, right="CE")
+    rows = ov.run_leg(
+        leg, capped, [D0, D1, D2], chains, SPOTS, _lots(), set(), ARR, ov.BookCounts()
+    )
+    assert not rows[0]["held_out"]
+
+
+def test_two_sleeves_buying_one_stock_the_same_day_are_two_positions():
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0)}
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15)
+    ids = []
+    for slot in (0, 1):
+        leg = ov.Leg(picks={D0: ["ABC"]}, right="CE", tag="calls", slot=slot)
+        (t,), _ = _run(leg, s, chains)
+        ids.append(t["pos_id"])
+    assert ids[0] != ids[1]
+
+
+def test_weeks_won_counts_the_weeks_not_the_positions_last_week():
+    # one contract held two weeks: +400 the first, -900 the second. As positions that is one losing
+    # position booked in its last week (0 of 1 weeks won); as weeks it is 1 of 2.
+    chains = {(D0, "ABC"): _chain(D0), (D1, "ABC"): _chain(D1, exit_price=12.0),
+              (D2, "ABC"): _chain(D2, exit_price=3.0)}  # fmt: skip
+    s = ov.Settings(moneyness="ATM", min_sessions_left=15, slippage=0.0, hold=True)
+    leg = ov.Leg(picks={D0: ["ABC"], D1: ["ABC"]}, right="CE")
+    rows = pd.DataFrame(ov.run_leg(leg, s, [D0, D1, D2], chains, SPOTS, _lots(), set(), ARR,
+                                   ov.BookCounts()))  # fmt: skip
+    pos = ov.positions_of(rows)
+    assert len(pos) == 1 and ov.trade_stats(pos)["weeks_won"] == 0.0
+    assert ov.trade_stats(pos, per_week=rows)["weeks_won"] == 0.5
+
+
+def test_the_refill_trial_leaves_the_hold_state_as_it_found_it(monkeypatch):
+    # week 3's trial play fills `leg.held`; the real week-3 play must still see week 2's, not it
+    seen = []
+    counts = ov.BookCounts()
+    pnl = {D0: 350.0, D1: -500.0, D2: 0.0}
+
+    def fake(leg, s, d0, d1, chains, spots, lots, bans, sessions, tally, **kw):
+        seen.append((d0, "real" if tally is counts else "trial", dict(leg.held)))
+        leg.held = {("ABC", "CE"): {"from": "real" if tally is counts else "trial"}}
+        if d0 == D2:
+            tally.no_capital += 1  # the pick is too dear for the account: refill
+        return [{"pnl": pnl[d0], "buy": 0.0}]
+
+    monkeypatch.setattr(ov, "trade_week", fake)
+    d3 = pd.Timestamp("2024-01-26")
+    leg = ov.Leg(picks={}, right="CE")
+    s = ov.Settings(capital=1300.0, profit_step=100.0, withdraw_share=1.0, refill=True, hold=True)
+    ov.run_booked([leg], s, [D0, D1, D2, d3], {}, SPOTS, _lots(), set(), ARR, counts)
+    at_d2 = [(kind, held) for day, kind, held in seen if day == D2]
+    assert [kind for kind, _ in at_d2] == ["trial", "real"]
+    assert at_d2[1][1] == {("ABC", "CE"): {"from": "real"}}  # week 2's kept contract, untouched

@@ -4,6 +4,7 @@ import type {
   OverlayCallFilter,
   OverlayCustom,
   OverlayDirection,
+  OverlayJob,
   OverlayMarketFilter,
   OverlayMoneyness,
   OverlayRequest,
@@ -302,4 +303,32 @@ export function tradesByDay(result: OverlayResult): string[] {
     }
     return lines.join('\n');
   });
+}
+
+/**
+ * Whether the page is still waiting on a run. A failed poll ends the wait whatever the last good
+ * answer was: `usePolledResource` keeps that answer on screen, so a job last seen "running" would
+ * otherwise wait for ever once the service restarted and forgot it (a 404 on every poll).
+ */
+export function jobRunning(state: {
+  starting: boolean;
+  jobId: string | null;
+  job: OverlayJob | null;
+  pollError: string | null;
+}): boolean {
+  if (state.starting) return true;
+  if (state.jobId === null || state.pollError !== null) return false;
+  return state.job === null || state.job.status === 'running';
+}
+
+/** The slippage field's text for a stored fraction: 0.07 → "7" (not 7.000000000000001). */
+export function slippageText(value: number | null): string {
+  return value === null ? '' : formatNumber(value * 100, 4, { trim: true });
+}
+
+/** What the slippage field's text means: a fraction, or null (blank, not a number, or out of range). */
+export function parseSlippage(text: string): number | null {
+  if (text.trim() === '') return null;
+  const percent = Number(text);
+  return percent >= 0 && percent < 50 ? percent / 100 : null;
 }
