@@ -423,7 +423,14 @@ def _fetch_day(root: Path, day: date, http: Http, manifest: dict) -> str:
             body = http.get(url)
         except NseNotFound:
             continue
-        table = parse_zip(body, fmt, day)  # validate before keeping anything
+        try:
+            table = parse_zip(body, fmt, day)  # validate before keeping anything
+        except (zipfile.BadZipFile, KeyError, ValueError, UnicodeDecodeError) as e:
+            # NSE answers 200 with an HTML or empty body now and then: stop like any other
+            # failure that is not a 404, so `fetch` records the day and saves the manifest
+            raise NseFetchError(
+                f"{url}: not a readable {fmt} file ({type(e).__name__}: {e})"
+            ) from e
         name = url.rsplit("/", 1)[-1]
         _atomic_write(raw_dir(root) / f"{day.year:04d}" / name, body)
         write_day(root, day, table)
