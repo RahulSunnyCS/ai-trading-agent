@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked for an overnight sweep (2026-11-15); research only, no money on it |
-| **Status** | In progress |
+| **Status** | Done — round 1 killed (2026-11-16) |
 | **Type** | research |
 | **Area** | momentum / options |
 | **Created** | 2026-11-15 |
@@ -82,6 +82,47 @@ Committed before any sweep run (the grid file and this section in one commit).
   test verdict; the findings page (`research/momentum/common/options-overlay.md`).
 - **Done when:** verdict in Result; INDEX and TODO closed.
 
+## Result
+
+**Round 1 killed (2026-11-16).** None of the five runs carried from the train window passes on the test weeks
+(2024-01 → 2026-11, ₹15 lakh, after costs, slippage and tax). Every one fails the weekly 90 % interval (5,000
+draws: its lower bound is below zero), three also fail the −50 % drawdown limit, and one loses money.
+
+| Carried (train rank) | Test total | CAGR | Test DD | Weekly 90 % | Trades | Without top 5 % | Shares, same weeks |
+|---|---|---|---|---|---|---|---|
+| 1 Mix, calls, OTM1, hold, exposure 100 % | +₹35.1 L | 52.6 % | −66 % | −1.58 to +4.83 % | 740 | −₹75.3 L | +57 %, −22 % |
+| 2 Mix, calls if NIFTY > 200-DMA, OTM1, hold, 20 %/wk | +₹11.5 L | 22.1 % | −63 % | −0.68 to +1.82 % | 384 | −₹22.0 L | +57 %, −22 % |
+| 3 Trio, calls, ITM2, hold, 20 %/wk | +₹17.8 L | 31.6 % | −60 % | −0.88 to +2.44 % | 123 | −₹3.8 L | +88 %, −28 % |
+| 4 Trio, calls if NIFTY > 200-DMA, ITM1, hold, stop −50 %, 20 %/wk | +₹18.6 L | 32.7 % | **−39 %** | −0.74 to +2.43 % | 109 | −₹0.3 L | +88 %, −28 % |
+| 5 12m top 10, calls, ATM, hold, 20 %/wk | −₹6.2 L | −17.0 % | −78 % | −2.04 to +1.33 % | 809 | −₹74.6 L | +33 %, −19 % |
+
+- **The nearest miss is #4** (Trio, calls only while NIFTY is above its 200-day average, ITM1, hold, a −50 %
+  stop): +124 % on ₹15 lakh against +88 % for the same picks as shares, drawdown −39 % (limit −50 %), but the
+  weekly interval spans zero and its top 5 % of trades are all of its profit (−₹28,000 without them).
+- **In four of five the profit is the top 5 % of trades or more**; without them they lose.
+
+**What the whole grid says (descriptive, read after the verdict; medians over the runs with that setting):**
+- **Hold while picked helps most:** train median +₹16.0 lakh against +₹4.3 lakh selling weekly; test +₹2.2 lakh
+  against −₹2.4 lakh; 56 % of hold runs made money on test against 37 %.
+- **The calls filter (NIFTY above its 200-day average) is the best mode on test:** 64 % positive, median test
+  drawdown −36 %, against 54 % and −54 % for calls always and 52 % / −56 % for the market switch.
+- **The mirror pool fails on test:** 0–2 % of its runs made money, median drawdown −76 % to −85 % (BL-228's
+  learning-only pass did not survive).
+- **Deeper strikes hold up better:** ITM1 and delta 0.7 made money on test in 61–62 % of runs (median drawdown
+  −45 % / −34 %), OTM1 and ATM in 32–33 % (−81 % / −65 %).
+- **Trio Fortnightly is the strongest strategy** (81 % of runs positive on test, median drawdown −35 %); the
+  Four-Strategy Mix and 12m top 10 are near coin-flips.
+- **Little difference:** next expiry against the nearest, the stop or stop-and-target against none, exposure
+  against 20 % of capital (exposure halves the drawdown, −46 % against −62 %, for the same median).
+- **Train rank says little about test rank:** Spearman 0.34 over the 1,320 runs.
+
+**Caveats:** the strategies were chosen on 2020-01 → 2024-06; the test weeks were read by BL-226's and
+BL-228's confirmations; one test row was seen before selection (Log); daily closes, not quotes.
+
+**What it leaves:** the settings that helped are clear (hold, the NIFTY filter on calls, ITM1 / delta 0.7,
+Trio). A round 2 would need a new pre-registration and, honestly, data not yet seen: a forward paper journal
+of #4's settings is the cleaner test.
+
 ## Risks
 
 - **Memory and time:** three workers on an 8 GB Mac (about 0.7 GB each); a run that fails is recorded and the
@@ -108,3 +149,5 @@ Committed before any sweep run (the grid file and this section in one commit).
      lakh, −45 %.
   5. `2293eef6` 12m top 10 weekly, calls, ATM, hold, 20 % a week: +₹62.7 lakh, −55 %.
   All five hold while picked and use the nearest expiry; no mirror or market-switch run made the five.
+- 2026-11-16 — test read for the five (5,000-draw interval): none passes; round 1 killed. Result written; the
+  grid-wide descriptive read added after the verdict.
