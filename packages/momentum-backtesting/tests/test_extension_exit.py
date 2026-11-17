@@ -45,9 +45,9 @@ def config(exit_rank: int = 3, **kw) -> Config:
     )
 
 
-def run(cfg: Config, table: pd.DataFrame | None = None):
+def run(cfg: Config, table: pd.DataFrame | None = None, **kw):
     prices, includes, external = setup()
-    return run_backtest(prices, includes, cfg, external_ranks=external, extension=table)
+    return run_backtest(prices, includes, cfg, external_ranks=external, extension=table, **kw)
 
 
 def acted(result, action: str) -> list[pd.Timestamp]:
@@ -87,6 +87,34 @@ def test_sell_money_goes_to_the_next_name_on_a_buy_week() -> None:
     t = result.trades
     assert acted(result, "SELL") == [WEEKS[5]]  # B then holds the slot; A is not bought back
     assert WEEKS[5] in list(t[(t["action"] == "BUY") & (t["asset"] == "B")]["week"])
+
+
+def test_circuit_locks_are_kept_when_the_mask_joins_them() -> None:
+    # B locked at the upper circuit weeks 5-8 and the table has no column for A: A is still kept
+    # off while stretched, and B's own lock still holds, so C gets the money at week 5.
+    uc = pd.DataFrame({"B": False}, index=WEEKS)
+    uc.iloc[5:9, 0] = True
+    result = run(config(extension_exit=0.7), stretched(), uc_locked=uc)
+    t = result.trades
+    assert acted(result, "SELL") == [WEEKS[5]]
+    bought = t[t["action"] == "BUY"]
+    assert WEEKS[5] in list(bought[bought["asset"] == "C"]["week"])
+    assert not any(WEEKS[5] <= w <= WEEKS[8] for w in bought[bought["asset"] == "B"]["week"])
+    assert not any(WEEKS[5] <= w <= WEEKS[8] for w in a_buys(result))
+
+
+def test_a_lower_circuit_lock_delays_the_sale() -> None:
+    lc = pd.DataFrame(False, index=WEEKS, columns=["A", "B", "C"])
+    lc.loc[WEEKS[5], "A"] = True
+    result = run(config(extension_exit=0.7), stretched(), lc_locked=lc)
+    assert acted(result, "SELL") == [WEEKS[6]]
+
+
+def test_a_week_with_no_value_does_not_rearm_the_trim() -> None:
+    table = stretched()
+    table.iloc[7, 0] = np.nan
+    result = run(config(extension_exit=0.7, extension_action="trim"), table)
+    assert acted(result, "TRIM") == [WEEKS[5], WEEKS[15]]
 
 
 def test_trim_halves_once_per_crossing_and_never_tops_up() -> None:

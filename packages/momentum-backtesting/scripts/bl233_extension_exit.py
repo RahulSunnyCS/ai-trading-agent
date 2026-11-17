@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import multiprocessing as mp
+import subprocess
 import time
 from pathlib import Path
 
@@ -160,6 +161,10 @@ def analyse() -> None:
             med["verdict"] = ("helps" if helps else "killed") if tested else "-"
             out["verdict"][f"{arm}__{basis}"] = med
     RESULT.write_text(json.dumps(out, indent=2) + "\n")
+    # The committed file is Biome-formatted (pre-push checks it); format the rewrite the same way.
+    biome = PKG.parents[1] / "node_modules" / ".bin" / "biome"
+    if biome.exists():
+        subprocess.run([str(biome), "format", "--write", str(RESULT)], check=False)
     for k, v in out["verdict"].items():
         print(k, {m: (round(x, 2) if isinstance(x, float) else x) for m, x in v.items()})
 

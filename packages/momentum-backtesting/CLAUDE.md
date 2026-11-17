@@ -375,6 +375,12 @@ contract, not a shared service).
   `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
   sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
   `scripts/bl085_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
+- **Extension exit (BL-233, killed, off by default):** `Config.extension_exit` (close / 200-day EMA
+  − 1, e.g. 0.70) with `extension_action` `sell` or `trim` (half, once per crossing). Buffer rule only,
+  every week; a name above the level is not bought or topped up (merged into the upper-circuit
+  mask) and the proceeds wait as cash. The table is `categories/extension.py`, passed through
+  `run_broad_backtest` / `api._run_broad`; no API request sets it. Runner:
+  `scripts/bl233_extension_exit.py`; findings: `research/momentum/strategies/broad/extension-exit.md`.
 - **All Fridays (BL-087):** `BacktestRequest.split_fridays` (off by default; a no-op unless
   `rebalance="weekly"` and `rebalance_every > 1`) runs every `rebalance_offset` 0..K-1 with
   `capital / K` and returns one `Result` of the whole account (`tranches.blend_reset`: equal

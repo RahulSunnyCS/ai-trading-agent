@@ -683,6 +683,7 @@ class _Sim:
     _no_buy: _Grid | _FrameGrid | None = field(init=False, repr=False)
     _uc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
     _lc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _extension: _Grid | _FrameGrid | None = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._prices = _grid(self.prices)
@@ -693,13 +694,14 @@ class _Sim:
         self._no_buy = _grid(self.no_buy)
         self._uc_locked = _grid(self.uc_locked)
         self._lc_locked = _grid(self.lc_locked)
+        self._extension = _grid(self.extension)
 
     def extension_at(self, asset: str, week: pd.Timestamp) -> float | None:
         """BL-233: the holding's extension seen at `week`, or None when there is no value."""
-        table = self.extension
-        if table is None or asset not in table.columns:
+        table = self._extension
+        if table is None or not table.has(asset):
             return None
-        value = table.at[week, asset]
+        value = table.at(week, asset)
         return float(value) if np.isfinite(value) else None
 
     def sell_blocked(self, asset: str, week: pd.Timestamp) -> bool:
@@ -1078,8 +1080,10 @@ def run_backtest(
         # money), so a name sold on extension is not bought straight back.
         if extension is None:
             raise ValueError("extension_exit needs the extension table (categories.extension)")
-        extension = extension.reindex(index=prices.index, columns=prices.columns)
-        extension = extension.shift(config.signal_delay).reindex(ranks.index)
+        # Shifted on the ranks' own rows (as the ranks were above), so a ranks index that
+        # differs from prices.index (a skipped or later week) still pairs each week correctly.
+        extension = extension.reindex(index=ranks.index, columns=prices.columns)
+        extension = extension.shift(config.signal_delay)
         above = extension.gt(config.extension_exit)
         if uc_locked is not None:
             columns = uc_locked.columns.union(above.columns)
@@ -1603,7 +1607,9 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             trimmed &= set(lots)
             for asset in [a for a in lots if a != _POOL and a not in stopped]:
                 ext = sim.extension_at(asset, week)
-                if ext is None or ext <= config.extension_exit:
+                if ext is None:
+                    continue  # no value this week: no action, and a trim stays spent
+                if ext <= config.extension_exit:
                     trimmed.discard(asset)
                     continue
                 if sim.sell_blocked(asset, week) or asset in trimmed:
@@ -1620,10 +1626,10 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     value_before = value(asset, week)
                     details = sim.exit_details(asset, week, since, basis, value_before)
                     _, net, tax, fill = sell(asset, 1.0, week)
+                    # Not re-bought this week: the extension mask above makes it unbuyable.
                     sim.record(
                         week, "SELL", asset, reason, value_before, tax=tax, **details, **fill
                     )
-                    stopped.add(asset)
                 proceeds += net
         if is_buy_week or config.sell_every_week:
             # 1. Sell whatever has dropped out. Gated on `is_buy_week` alone when

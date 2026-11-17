@@ -48,7 +48,7 @@ def extension_table(
     columns: list[str], weeks: pd.DatetimeIndex, *, span: int = 200, root: Path | None = None
 ) -> pd.DataFrame:
     """Week x column extension for the engine. Columns are engine columns (`SYM` or `SYM#2`)."""
-    key = (data_version(root), tuple(columns), weeks[0], weeks[-1], len(weeks), span)
+    key = (data_version(root), tuple(columns), tuple(weeks), span)
     hit = _cache.get(key)
     if hit is not None:
         return hit
