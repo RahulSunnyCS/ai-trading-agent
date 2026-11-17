@@ -159,7 +159,7 @@ def analyse() -> None:
             tested = arm in TESTED and basis == "tax"
             med["verdict"] = ("helps" if helps else "killed") if tested else "-"
             out["verdict"][f"{arm}__{basis}"] = med
-    RESULT.write_text(json.dumps(out, indent=1))
+    RESULT.write_text(json.dumps(out, indent=2) + "\n")
     for k, v in out["verdict"].items():
         print(k, {m: (round(x, 2) if isinstance(x, float) else x) for m, x in v.items()})
 
