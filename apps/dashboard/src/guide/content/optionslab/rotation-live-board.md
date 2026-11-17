@@ -29,6 +29,7 @@ Angel One's minute prices can run a few minutes behind the clock.
 | **One panel per list** | The list's total so far, then one row per pick: its state, each leg's entry and its exit or current price, and the pick's P&L. |
 | **State** | **Enters 09:47** before the pick's entry time. **Open** while any leg is held, marked at the last minute's price. **Closed** once every leg has exited (a stop-loss or the exit time). A Widesl pick that re-enters after a stop shows its new leg too. |
 | **Through the day** | Each list's running P&L minute by minute, before slippage. |
+| **Matrix** | Under the chart: one row per pick and one column per time step from 09:15 (5, 15 or 30 minutes, your choice). Each cell is that pick's P&L at the end of the time shown, green for a profit and red for a loss, darker the larger it is. A **·** means the pick had not entered yet (never a zero). An *italic* figure is a pick that has ended (a stop or its exit time), held at its last value. The dashed, blue-headed column is the step still in progress, as at the last minute read. A **Total** row sums each list, on its own colour scale. |
 | **Notes** | Anything to know about this refresh, such as a strike near the edge of the prices read. |
 
 ## The switches

@@ -355,6 +355,10 @@ def _contract_fetcher(
         except FyersCredentialsError:
             raise
         except RuntimeError as error:  # one bad symbol must not lose the day
+            if getattr(error, "rate_limited", False):
+                # a vendor that stays refusing is not one bad symbol: every later contract would
+                # be recorded as missing and the chain written as if collected (2026-11-16)
+                raise
             errors.append(str(error))
             return []
         rows.append((contract, ids[contract.symbol], candles))
@@ -504,8 +508,11 @@ def collect_day(
             entry["requests"] = client.calls - calls_before
             log(f"{spec.name}: {table.num_rows} option bars, {entry['requests']} requests")
     except Exception:
+        raw.flush(current["name"])  # keep the responses already read, whatever stopped the run
         if getattr(client, "flags", None):
             details["flags"] = {k: dict(v) for k, v in client.flags.items()}
+        if hasattr(client, "stats"):
+            details["rate"] = client.stats()
         with connect(root, views=()) as con:
             ingest.finish_run(
                 con,
@@ -522,6 +529,8 @@ def collect_day(
 
     if getattr(client, "flags", None):
         details["flags"] = {k: dict(v) for k, v in client.flags.items()}
+    if hasattr(client, "stats"):
+        details["rate"] = client.stats()
     errors = sum(len(v.get("errors", [])) for v in details.values() if isinstance(v, dict))
     with connect(root, views=()) as con:
         ingest.finish_run(

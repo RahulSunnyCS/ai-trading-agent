@@ -452,3 +452,185 @@ def test_a_coded_too_many_refusal_is_still_a_refused_login():
 
     with pytest.raises(auth.AngelCredentialsError):
         auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)
+
+
+# -- BL-231 Phase 1: a rate limit is waited out, never recorded as a missing contract ------------
+
+LIMITED = (403, {"status": False, "message": "HTTP 403, not JSON: exceeding access rate"})
+
+
+def _limited_client(monkeypatch, answers, **kwargs):
+    from option_backtesting.angelone import client as client_mod
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(client_mod.time, "sleep", sleeps.append)
+    sent: list[int] = []
+
+    def post(path, body, headers):
+        sent.append(1)
+        return answers(len(sent))
+
+    c = AngelClient(auth.Session("jwt", "key"), min_interval_s=0, post=post, **kwargs)
+    return c, sleeps
+
+
+def test_a_rate_limit_is_waited_out_with_growing_cooldowns(monkeypatch):
+    c, sleeps = _limited_client(
+        monkeypatch, lambda n: LIMITED if n <= 6 else (200, {"status": True, "data": []})
+    )
+    assert c._call(CANDLE_PATH, {}) == {"status": True, "data": []}
+    assert sleeps == [5.0, 15.0, 30.0, 60.0, 60.0, 60.0]
+    assert c.rate_limited_answers == 6 and c.rate_wait_s == 230.0
+    assert c.stats()["first_limit"]["call"] == 1
+
+
+def test_a_rate_limit_past_the_budget_raises_a_typed_error(monkeypatch):
+    from option_backtesting.angelone.client import AngelRateLimited
+
+    c, sleeps = _limited_client(monkeypatch, lambda n: LIMITED, rate_budget_s=50)
+    with pytest.raises(AngelRateLimited) as err:
+        c._call(CANDLE_PATH, {})
+    assert sleeps == [5.0, 15.0, 30.0]  # the next 60 s would pass the 50 s budget
+    assert isinstance(err.value, RuntimeError) and err.value.rate_limited is True
+    assert "requests so far" in str(err.value)
+
+
+def test_the_first_refusal_records_the_load_before_it(monkeypatch):
+    c, _ = _limited_client(
+        monkeypatch, lambda n: LIMITED if n == 4 else (200, {"status": True, "data": []})
+    )
+    for _ in range(3):
+        c._call(CANDLE_PATH, {})
+    c._call(CANDLE_PATH, {})  # the 4th is refused, the 5th answers
+    first = c.stats()["first_limit"]
+    assert first == {"call": 4, "last_60s": 4, "last_hour": 4}
+    assert c.stats()["requests"] == 5
+
+
+def test_a_network_error_keeps_the_short_retries(monkeypatch):
+    c, sleeps = _limited_client(
+        monkeypatch,
+        lambda n: (
+            (0, {"status": False, "message": "network: x"}) if n <= 2 else (200, {"status": True})
+        ),
+    )
+    assert c._call(CANDLE_PATH, {}) == {"status": True}
+    assert sleeps == [1, 2]
+    assert c.rate_limited_answers == 0
+
+
+def test_the_contract_fetcher_stops_on_a_rate_limit_but_records_a_bad_symbol():
+    from option_backtesting.angelone.client import AngelRateLimited
+
+    contract = CONTRACTS[1]  # an option
+    key = (contract.expiry, contract.strike, contract.option_type)
+
+    class Client:
+        def __init__(self, error):
+            self.error = error
+
+        def minute_candles(self, symbol, day):
+            raise self.error
+
+    errors: list[str] = []
+    ids = {contract.symbol: 1}
+    fetch = daily._contract_fetcher(
+        Client(RuntimeError("bad symbol")), DAY, contract.expiry, {key: contract}, ids, [], errors
+    )
+    assert fetch(contract.strike, contract.option_type) == [] and errors == ["bad symbol"]
+
+    fetch = daily._contract_fetcher(
+        Client(AngelRateLimited("refused")), DAY, contract.expiry, {key: contract}, ids, [], errors
+    )
+    with pytest.raises(AngelRateLimited):
+        fetch(contract.strike, contract.option_type)
+    assert errors == ["bad symbol"]  # nothing was recorded for the refused one
+
+
+def test_a_day_stopped_by_a_rate_limit_writes_no_partial_chain_and_keeps_its_counts(
+    tmp_path, monkeypatch
+):
+    from option_backtesting.angelone.client import AngelRateLimited
+
+    monkeypatch.setattr(daily, "download_master", lambda segment: "")
+    monkeypatch.setattr(
+        daily, "parse_master", lambda text, names: [c for c in CONTRACTS if c.underlying == "NIFTY"]
+    )
+
+    def rows(base):
+        return [[iso(9, 15 + i), base, base + 1, base - 1, base + 0.5, 2] for i in range(5)]
+
+    series = {"99926000": rows(22500.0), "99926017": rows(15.0), "113": rows(22520.0)}
+    fake = FakeSmartApi(series)
+
+    def post(path, body, headers):
+        if body["symboltoken"] in ("111", "112"):  # the option chain is refused for good
+            return LIMITED
+        return fake(path, body, headers)
+
+    from option_backtesting.angelone import client as client_mod
+
+    monkeypatch.setattr(client_mod.time, "sleep", lambda s: None)
+    client = AngelClient(
+        auth.Session("jwt", "key"),
+        min_interval_s=0,
+        post=post,
+        master_loader=lambda: MASTER,
+        rate_budget_s=10,
+    )
+    client.bind_contracts(CONTRACTS, [daily.UNDERLYINGS["NIFTY"]])
+    root = tmp_path / "data"
+    with pytest.raises(AngelRateLimited):
+        daily.collect_day(
+            client, DAY, ["NIFTY"], root, premium_floor=30, log=lambda _: None, source="angelone"
+        )
+
+    assert not lake.bars_1m_path(root, "option", "NIFTY", DAY).exists()  # not "collected"
+    assert lake.bars_1m_path(root, "index", "NIFTY", DAY).exists()  # what was read is kept
+    assert (root / "raw" / "angelone").exists()  # and so are its raw answers
+    with connect(root, read_only=True) as con:
+        [(status, details)] = con.execute("SELECT status, details FROM ingest_runs").fetchall()
+    assert status == "failed"
+    import json
+
+    assert json.loads(details)["rate"]["rate_limited_answers"] >= 1
+
+
+def test_rate_line_says_when_the_first_refusal_came():
+    from option_backtesting.legwise.evening import rate_line
+
+    quiet = {"requests": 40, "rate_limited_answers": 0, "rate_wait_s": 0.0, "first_limit": None}
+    assert rate_line(quiet) == "Angel One: 40 requests, 0 refused"
+    hit = {
+        "requests": 950,
+        "rate_limited_answers": 3,
+        "rate_wait_s": 50.0,
+        "first_limit": {"call": 917, "last_60s": 150, "last_hour": 917},
+    }
+    text = rate_line(hit)
+    assert "3 refused" in text and "request 917" in text and "150 in the last minute" in text
+
+
+def test_the_fallback_alert_goes_out_once_and_never_stops_the_day(monkeypatch):
+    from option_backtesting import notify
+    from option_backtesting.fyers.auth import FyersCredentialsError
+    from option_backtesting.legwise import evening
+
+    sent = []
+    monkeypatch.setattr(notify, "send", lambda n, **kw: sent.append(n) or (True, ""))
+
+    def collect(day, underlyings, *, source, **kwargs):
+        if source == "fyers":
+            raise FyersCredentialsError("No valid Fyers token")
+        return 0, {"flags": {}}
+
+    monkeypatch.setattr(evening, "collect_detailed", collect)
+    result = evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None)
+    assert result.source == "angelone" and len(sent) == 1
+    assert "Fyers is not logged in" in sent[0].title and "No valid Fyers token" in sent[0].body
+
+    def boom(n, **kw):
+        raise OSError("telegram down")
+
+    monkeypatch.setattr(notify, "send", boom)
+    assert evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None).source == "angelone"

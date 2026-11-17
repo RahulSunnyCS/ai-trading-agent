@@ -92,7 +92,15 @@ Otherwise:
   `_TOTP_SECRET`, one attempt, never retried), `symbols.py` (Fyers contract -> Angel token by
   underlying/expiry/strike/side; instruments keep their Fyers identity), `client.py` (volume
   lots->quantity, no-trade minutes carried forward, OI from `getOIData` for NFO only, the index
-  gap 15:15-15:28 flagged not filled; what was missing lands in `ingest_runs.details.flags`).
+  gap 15:15-15:28 flagged not filled; what was missing lands in `ingest_runs.details.flags`). BL-231 Phase 1: a
+  rate limit (HTTP 429, or SmartAPI's plain-text 403 "exceeding access rate") is waited out with growing
+  cool-downs (5, 15, 30, 60 s, then 60 s) for up to `RATE_BUDGET_S` (20 minutes) per request, then raises
+  `AngelRateLimited`, which `fyers/daily.py`'s contract fetcher does not swallow (a bad symbol is recorded and
+  skipped; a refusing vendor stops the underlying with no partial chain written, the raw answers kept, and a
+  rerun redoes that underlying; finished underlyings are skipped). `client.stats()` (requests, refusals, seconds
+  waited, and the load at the first refusal) is stored under `ingest_runs.details.rate` and logged as one line,
+  which is how the real limits are read off (Phase 2). 2026-11-16: the first refusal came after about 917
+  requests in 17 minutes (the live board shares the account).
   `check.py` + `api/angel_routes.py` — the one guard every Angel One login goes through (the
   09:16 VIX fallback in `rotation/live.py` that bypassed it was removed on 2026-11-09): the dashboard's Test connection (`POST
   /legwise/angel/test`: `begin` takes the lock and passes the guard, then the login runs in a

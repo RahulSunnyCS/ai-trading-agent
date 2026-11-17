@@ -15,7 +15,7 @@ What differs from Fyers, measured on 2026-10-09 (research/bl078) and handled her
 from __future__ import annotations
 
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
 
@@ -28,6 +28,12 @@ CANDLE_PATH = "/rest/secure/angelbroking/historical/v1/getCandleData"
 OI_PATH = "/rest/secure/angelbroking/historical/v1/getOIData"
 #: SmartAPI's historical limit is about 3 requests a second; one call every 0.4 s stays under it.
 MIN_INTERVAL_S = 0.4
+#: A rate limit is waited out, not retried a few times: SmartAPI answers "exceeding access rate"
+#: until a per-minute (and, it seems, a per-hour) window clears, which 15 seconds never did
+#: (2026-11-16: 932 requests, then every call refused). The waits grow, then repeat the last one,
+#: until `RATE_BUDGET_S` of waiting has gone into the one request.
+RATE_COOLDOWNS_S = (5.0, 15.0, 30.0, 60.0)
+RATE_BUDGET_S = 1200.0
 OPEN_MINUTE, LAST_MINUTE = (9, 15), (15, 29)
 _AUTH_CODES = {"AG8001", "AG8002", "AG8003", "AB8051"}  # invalid / expired token
 
@@ -42,6 +48,13 @@ def _minute_epochs(day: date) -> list[int]:
     return out
 
 
+class AngelRateLimited(RuntimeError):
+    """The rate limit outlasted the wait budget. `rate_limited` lets the shared collector (which
+    knows no vendor) stop on it instead of recording one missing contract per refused request."""
+
+    rate_limited = True
+
+
 class AngelClient:
     def __init__(
         self,
@@ -49,13 +62,21 @@ class AngelClient:
         min_interval_s: float = MIN_INTERVAL_S,
         post: Post = post_json,
         master_loader: Callable[[], list[dict]] | None = None,
+        rate_budget_s: float = RATE_BUDGET_S,
     ) -> None:
         self._session = session
         self._min_interval_s = min_interval_s
+        self._rate_budget_s = rate_budget_s
         self._post = post
         self._master_loader = master_loader
         self._last_call = 0.0
         self.calls = 0
+        #: monotonic time of each request in the last hour (for the per-minute / per-hour counts)
+        self._stamps: deque[float] = deque()
+        self.rate_limited_answers = 0
+        self.rate_wait_s = 0.0
+        #: what the load was when the first refusal came: {"call", "last_60s", "last_hour"}
+        self.first_limit: dict | None = None
         self.on_response: Callable[[str, dict, dict], None] | None = None
         self.targets: dict[str, Target] = {}
         #: per underlying: what was missing or synthesised on this day (stored on the run)
@@ -83,23 +104,59 @@ class AngelClient:
     # -- HTTP -----------------------------------------------------------------------------
     def _call(self, path: str, body: dict) -> dict:
         headers = request_headers(self._session.api_key, self._session.public_ip, self._session.jwt)
-        for attempt in range(5):
+        limit_step, rate_waited, network_tries = 0, 0.0, 0
+        while True:
             wait = self._last_call + self._min_interval_s - time.monotonic()
             if wait > 0:
                 time.sleep(wait)
             self._last_call = time.monotonic()
+            self._stamp(self._last_call)
             self.calls += 1
             status, payload = self._post(path, body, headers)
             message = str(payload.get("message") or "")
-            limited = status == 429 or rate_limited(message)
-            if limited and attempt < 4:
-                time.sleep(2**attempt)
+            if status == 429 or rate_limited(message):
+                self._note_limit()
+                delay = RATE_COOLDOWNS_S[min(limit_step, len(RATE_COOLDOWNS_S) - 1)]
+                if rate_waited + delay > self._rate_budget_s:
+                    raise AngelRateLimited(
+                        f"Angel One kept refusing for {rate_waited:.0f} s ({message[:80]}); "
+                        f"{self.calls} requests so far"
+                    )
+                limit_step += 1
+                rate_waited += delay
+                self.rate_wait_s += delay
+                time.sleep(delay)
                 continue
-            if status == 0 and attempt < 4:  # network error
-                time.sleep(2**attempt)
+            if status == 0 and network_tries < 4:  # network error
+                time.sleep(2**network_tries)
+                network_tries += 1
                 continue
             return payload
-        raise AssertionError("unreachable: the last attempt always returns")  # pragma: no cover
+
+    def _stamp(self, now: float) -> None:
+        self._stamps.append(now)
+        while self._stamps and now - self._stamps[0] > 3600:
+            self._stamps.popleft()
+
+    def _note_limit(self) -> None:
+        self.rate_limited_answers += 1
+        if self.first_limit is None:
+            now = time.monotonic()
+            self.first_limit = {
+                "call": self.calls,
+                "last_60s": sum(1 for t in self._stamps if now - t <= 60),
+                "last_hour": len(self._stamps),
+            }
+
+    def stats(self) -> dict:
+        """What the run asked of Angel One and what it refused: stored on the ingest run so the
+        real limits can be read off several evenings (BL-231 Phase 2)."""
+        return {
+            "requests": self.calls,
+            "rate_limited_answers": self.rate_limited_answers,
+            "rate_wait_s": round(self.rate_wait_s, 1),
+            "first_limit": self.first_limit,
+        }
 
     @staticmethod
     def _check(payload: dict, what: str) -> None:
