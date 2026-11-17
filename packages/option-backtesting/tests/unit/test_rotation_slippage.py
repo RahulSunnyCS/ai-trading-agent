@@ -288,3 +288,58 @@ def test_a_day_whose_bars_are_gone_is_tried_once(tmp_path, monkeypatch):
     monkeypatch.setattr("option_backtesting.legwise.market.load_day", gone)
     out = slip_store.fill(root, log=lambda m: None)
     assert tries == [DAY] and len(out["skipped"]) == 3
+
+
+# -- the cost of slippage keeps the stored path (2026-11-17) -------------------------------------
+
+
+def _sim_day(trades, mtm, gross, worst):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(trades=trades, mtm=mtm, gross=gross, worst_mtm=worst)
+
+
+def _trade(entry, exit_, entry_min, exit_min, qty=65):
+    from option_backtesting.legwise.engine import Trade
+
+    return Trade(
+        "ce", (date(2026, 11, 17), 25400.0, "CE"), "sell", qty, entry_min, entry, exit_min, exit_
+    )
+
+
+def test_slip_cost_moves_every_fill_against_the_trade_and_never_helps():
+    trades = [_trade(43.1, 94.8, 2, 160), _trade(48.25, 0.15, 2, 373), _trade(43.1, 94.8, 232, 294)]
+    mtm = [(2, 0.0), (100, 500.0), (160, -3000.0), (200, -3750.5), (294, -3594.5), (373, -3594.5)]
+    cost, worst_extra = slip_store.slip_cost(_sim_day(trades, mtm, -3594.5, -3750.5), 0.5)
+    # qty x 0.5% x (entry + exit), summed over the three trades, whatever the path did
+    assert cost == pytest.approx(65 * 0.005 * ((43.1 + 94.8) + (48.25 + 0.15) + (43.1 + 94.8)))
+    assert cost > 0
+    # the worst point carries only the fills made up to it, never more than the whole day's cost
+    assert -cost <= worst_extra <= 0
+
+
+def test_slip_cost_is_zero_without_slippage_and_for_a_day_with_no_trades():
+    trades = [_trade(43.1, 94.8, 2, 160)]
+    assert slip_store.slip_cost(_sim_day(trades, [(2, 0.0)], -3000.0, -3000.0), 0) == (0.0, 0.0)
+    assert slip_store.slip_cost(_sim_day([], [], 0.0, 0.0), 0.5) == (0.0, 0.0)
+
+
+def test_a_slipped_row_never_comes_out_better_than_the_stored_one(monkeypatch):
+    from option_backtesting.legwise import engine
+
+    trades = [_trade(43.1, 94.8, 2, 160), _trade(43.1, 94.8, 232, 294)]
+    fake = engine.DayResult(
+        date(2026, 11, 17),
+        trades,
+        -3594.5,
+        0.0,
+        -3750.5,
+        100.0,
+        None,
+        mtm=[(2, 0.0), (160, -3750.5), (294, -3594.5)],
+    )
+    monkeypatch.setattr(engine, "simulate_day", lambda *a, **k: fake)
+    row = {"day": "2026-11-17", "net": "-3594.5", "gross": "-3594.5", "worst_mtm": "-3750.5"}
+    out = slip_store.slipped_row(row, object(), object(), 0.5)
+    assert out["net"] < -3594.5 and out["gross"] == out["net"] and out["worst_mtm"] <= -3750.5
+    assert out["n_trades"] == 2

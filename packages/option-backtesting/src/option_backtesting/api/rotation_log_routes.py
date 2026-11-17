@@ -187,7 +187,8 @@ def variant_forensics(variant: str, day: str, cuts: str | None = None) -> Any:
     except ValueError as error:
         return _error(422, str(error))
     spec = load_legwise(strategy_path(variant))
-    if slip := store.reading_slip():  # the Slippage switch: as the stored copy was made
+    # the Slippage switch: a run at slipped prices (its path can differ from the copy's)
+    if slip := store.reading_slip():
         spec = spec.model_copy(
             update={"execution": spec.execution.model_copy(update={"slippage_pct": slip})}
         )

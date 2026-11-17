@@ -4,10 +4,13 @@ as it comes out with `pct` % slippage on every entry and exit (a sell filled low
 higher). The dashboard's Rotation pages read it while their Slippage switch is on
 (`store.slipped`); the ranking, the journal and the stored results never do.
 
-A copied row is the stored row plus what slippage changes: each pick simulated again on the day's
-bars with and without it, and the difference added to the stored net, gross and worst MTM, so a
-day stored under an older engine moves only by the slippage. The stop and trade count are the
-slipped run's own (a fill further away moves the stop with it). Like the stored results, a copied
+A copied row is the stored row minus what slippage costs: the pick simulated once on the day's
+bars as stored, every fill of it moved against the trade (`slip_cost`), the cost taken from the
+stored net, gross and worst MTM, so a day stored under an older engine moves only by the
+slippage. The stop and trade count are the stored run's own: the run is not simulated again
+with slipped prices, because a trigger that a fill 0.5 % away moves can then fall on the other
+side of a bar that touched it and the whole day diverges (until 2026-11-17 it was, and 3,186
+stored rows came out better after slippage than before). Like the stored results, a copied
 day is never rewritten. `rotation update` (and the base's scoring) fill the copy for the day they
 store; `obt rotation slippage-fill` fills every day not there yet.
 """
@@ -54,32 +57,69 @@ def _spec_and_underlying(name: str):
     return load_legwise(strategy_file(name)), underlying
 
 
+def slip_cost(day, pct: float) -> tuple[float, float]:
+    """What `pct` % slippage on every fill of this simulated day takes off, the decisions it made
+    kept as they were: (the day's total, the extra the worst point of its MTM curve carries).
+
+    Every entry and exit of every trade is moved `pct` % against it (a sell filled lower, a buy
+    back higher, a bought leg filled higher and sold lower), so a trade costs
+    `qty x pct x (entry + exit)` whatever its side. The day's path is NOT simulated again with
+    the slipped prices: a trigger (a trailing step, a stop, a re-entry level) that a fill 0.5 %
+    away moves can then fall on the other side of a bar that touched it, and the run diverges
+    (2026-11-17: a re-entered leg's trail step missed by a rupee turned a -3,595 day into
+    +2,476). The worst
+    point is the curve's minimum after the slippage of the fills made up to each minute."""
+    rate = pct / 100.0
+    events: list[tuple[int, float]] = []
+    total = 0.0
+    for t in day.trades:
+        if t.exit_price is None:
+            continue
+        entry, exit_ = t.qty * rate * t.entry_price, t.qty * rate * t.exit_price
+        total += entry + exit_
+        events.append((t.entry_min, entry))
+        if t.exit_min is not None:
+            events.append((t.exit_min, exit_))
+    events.sort()
+    if not day.mtm:  # no curve to read the worst point from: the whole day's cost, the careful side
+        return total, -total
+    paid, i = 0.0, 0
+    slipped_worst, base_worst = day.gross - total, day.gross  # the closing point
+    for minute, value in day.mtm:
+        while i < len(events) and events[i][0] <= minute:
+            paid += events[i][1]
+            i += 1
+        slipped_worst = min(slipped_worst, value - paid)
+        base_worst = min(base_worst, value)
+    return total, slipped_worst - base_worst
+
+
 def slipped_row(row: dict, spec, day_data, pct: float) -> dict:
-    """The stored `row` after `pct` % slippage, from runs on the day's loaded bars."""
+    """The stored `row` after `pct` % slippage: the day simulated once, as stored, and what
+    slippage takes off its fills (`slip_cost`) taken from the stored net, gross and worst MTM, so a
+    day stored under an older engine moves only by the slippage. The stop and the trade count stay
+    the stored run's own."""
     from ..data.reference.loader import default_reference_data
     from ..legwise.engine import simulate_day
     from .lists import SIZING_DATE
 
     reference, sizing = default_reference_data(), date.fromisoformat(SIZING_DATE)
-    slip = spec.model_copy(
-        update={"execution": spec.execution.model_copy(update={"slippage_pct": pct})}
-    )
     a = simulate_day(spec, day_data, reference, sizing)
-    b = simulate_day(slip, day_data, reference, sizing)
+    cost, worst_extra = slip_cost(a, pct)
 
     def moved(column: str, delta: float) -> float:
         return round(float(row[column]) + delta, 2)
 
     return {
         "day": row["day"],
-        "net": moved("net", (b.gross - b.costs) - (a.gross - a.costs)),
-        "gross": moved("gross", b.gross - a.gross),
-        "costs": round(b.costs, 2),
-        "worst_mtm": moved("worst_mtm", b.worst_mtm - a.worst_mtm)
+        "net": moved("net", -cost),
+        "gross": moved("gross", -cost),
+        "costs": round(a.costs, 2),
+        "worst_mtm": moved("worst_mtm", worst_extra)
         if row.get("worst_mtm") not in (None, "")
         else "",
-        "stopped_by": b.stopped_by or "",
-        "n_trades": len(b.trades),
+        "stopped_by": a.stopped_by or "",
+        "n_trades": len(a.trades),
     }
 
 
