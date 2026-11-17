@@ -255,7 +255,7 @@ _PATHS_MAX = 6000  # about 12 distinct picks a day: the whole history is ~1,500
 
 #: Bump when the replay's own code changes what a path is (the engine is also covered by the
 #: reference and strategy mtimes, but a code fix changes none of those files).
-CACHE_VERSION = 2
+CACHE_VERSION = 3  # 3: a slipped path keeps the stored path and costs its fills (2026-11-17)
 
 
 def _mtime(path: Path) -> int:
@@ -432,10 +432,6 @@ def _replay(root: Path, day: date, name: str, loaded: dict) -> tuple[float, ...]
         if underlying not in loaded:
             loaded[underlying] = load_day(root, underlying, day)
         spec = load_legwise(strategy_file(name))
-        if slip := store.reading_slip():  # as the slippage copy (`slip_store`) was made
-            spec = spec.model_copy(
-                update={"execution": spec.execution.model_copy(update={"slippage_pct": slip})}
-            )
         result = simulate_day(
             spec,
             loaded[underlying],
@@ -446,7 +442,12 @@ def _replay(root: Path, day: date, name: str, loaded: dict) -> tuple[float, ...]
         raise PortfolioStopError(f"no collected {underlying} data for {day}") from error
     except MissingReferenceData as error:
         raise PortfolioStopError(f"{name}: reference: {error}") from error
-    return member_from_curve(name, 1, result.mtm, result.gross).pnl
+    mtm, gross = result.mtm, result.gross
+    if slip := store.reading_slip():  # as the slippage copy (`slip_store`) is made
+        from .slip_store import slipped_curve
+
+        mtm, gross = slipped_curve(result, slip)
+    return member_from_curve(name, 1, mtm, gross).pnl
 
 
 def book_day(

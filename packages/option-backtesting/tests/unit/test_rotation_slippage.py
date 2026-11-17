@@ -343,3 +343,16 @@ def test_a_slipped_row_never_comes_out_better_than_the_stored_one(monkeypatch):
     out = slip_store.slipped_row(row, object(), object(), 0.5)
     assert out["net"] < -3594.5 and out["gross"] == out["net"] and out["worst_mtm"] <= -3750.5
     assert out["n_trades"] == 2
+
+
+def test_a_slipped_curve_pays_each_fill_when_it_is_made_and_ends_at_the_slipped_gross():
+    trades = [_trade(43.1, 94.8, 2, 160), _trade(43.1, 94.8, 232, 294)]
+    mtm = [(2, 0.0), (100, 400.0), (160, -3000.0), (232, -3000.0), (294, -3594.5)]
+    curve, gross = slip_store.slipped_curve(_sim_day(trades, mtm, -3594.5, -3750.5), 0.5)
+    entry, exit_ = 65 * 0.005 * 43.1, 65 * 0.005 * 94.8
+    assert [m for m, _ in curve] == [m for m, _ in mtm]
+    assert curve[0][1] == pytest.approx(-entry)  # the first entry is paid at once
+    assert curve[1][1] == pytest.approx(400.0 - entry)
+    assert curve[2][1] == pytest.approx(-3000.0 - entry - exit_)  # the exit at 160
+    assert curve[-1][1] == pytest.approx(-3594.5 - 2 * (entry + exit_))
+    assert gross == pytest.approx(curve[-1][1])

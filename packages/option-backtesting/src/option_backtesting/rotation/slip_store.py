@@ -57,18 +57,11 @@ def _spec_and_underlying(name: str):
     return load_legwise(strategy_file(name)), underlying
 
 
-def slip_cost(day, pct: float) -> tuple[float, float]:
-    """What `pct` % slippage on every fill of this simulated day takes off, the decisions it made
-    kept as they were: (the day's total, the extra the worst point of its MTM curve carries).
-
-    Every entry and exit of every trade is moved `pct` % against it (a sell filled lower, a buy
-    back higher, a bought leg filled higher and sold lower), so a trade costs
-    `qty x pct x (entry + exit)` whatever its side. The day's path is NOT simulated again with
-    the slipped prices: a trigger (a trailing step, a stop, a re-entry level) that a fill 0.5 %
-    away moves can then fall on the other side of a bar that touched it, and the run diverges
-    (2026-11-17: a re-entered leg's trail step missed by a rupee turned a -3,595 day into
-    +2,476). The worst
-    point is the curve's minimum after the slippage of the fills made up to each minute."""
+def _fills(day, pct: float) -> tuple[float, list[tuple[int, float]]]:
+    """What `pct` % slippage takes off each fill of a simulated day: (the day's total, [(minute,
+    cost)] in minute order). Every entry and exit of every trade is moved `pct` % against it (a
+    sell filled lower, a buy back higher, a bought leg filled higher and sold lower), so a trade
+    costs `qty x pct x (entry + exit)` whatever its side."""
     rate = pct / 100.0
     events: list[tuple[int, float]] = []
     total = 0.0
@@ -81,16 +74,36 @@ def slip_cost(day, pct: float) -> tuple[float, float]:
         if t.exit_min is not None:
             events.append((t.exit_min, exit_))
     events.sort()
-    if not day.mtm:  # no curve to read the worst point from: the whole day's cost, the careful side
-        return total, -total
+    return total, events
+
+
+def slipped_curve(day, pct: float) -> tuple[list[tuple[int, float]], float]:
+    """A simulated day's MTM curve and gross after `pct` % slippage, the decisions it made kept as
+    they were: each minute's MTM less the slippage of the fills made up to it, the gross less the
+    whole day's. The day is NOT simulated again with the slipped prices: a trigger (a trailing
+    step, a stop, a re-entry level) that a fill 0.5 % away moves can then fall on the other side
+    of a bar that touched it, and the run diverges (2026-11-17: a re-entered leg's trail step
+    missed by a rupee turned a -3,595 day into +2,476)."""
+    total, events = _fills(day, pct)
+    out: list[tuple[int, float]] = []
     paid, i = 0.0, 0
-    slipped_worst, base_worst = day.gross - total, day.gross  # the closing point
     for minute, value in day.mtm:
         while i < len(events) and events[i][0] <= minute:
             paid += events[i][1]
             i += 1
-        slipped_worst = min(slipped_worst, value - paid)
-        base_worst = min(base_worst, value)
+        out.append((minute, value - paid))
+    return out, day.gross - total
+
+
+def slip_cost(day, pct: float) -> tuple[float, float]:
+    """(the day's slippage, the extra the worst point of its MTM curve carries): the worst point
+    is the curve's minimum after the slippage of the fills made up to each minute."""
+    total, _ = _fills(day, pct)
+    if not day.mtm:  # no curve to read the worst point from: the whole day's cost, the careful side
+        return total, -total
+    curve, gross = slipped_curve(day, pct)
+    slipped_worst = min([gross] + [v for _, v in curve])
+    base_worst = min([day.gross] + [v for _, v in day.mtm])
     return total, slipped_worst - base_worst
 
 
