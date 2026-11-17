@@ -31,7 +31,8 @@ MIN_INTERVAL_S = 0.4
 #: A rate limit is waited out, not retried a few times: SmartAPI answers "exceeding access rate"
 #: until a per-minute (and, it seems, a per-hour) window clears, which 15 seconds never did
 #: (2026-11-16: 932 requests, then every call refused). The waits grow, then repeat the last one,
-#: until `RATE_BUDGET_S` of waiting has gone into the one request.
+#: until `RATE_BUDGET_S` of waiting has gone into the whole run (not each request: a vendor that
+#: keeps refusing must not hold the Angel One login lock for 20 minutes a call).
 RATE_COOLDOWNS_S = (5.0, 15.0, 30.0, 60.0)
 RATE_BUDGET_S = 1200.0
 OPEN_MINUTE, LAST_MINUTE = (9, 15), (15, 29)
@@ -104,7 +105,7 @@ class AngelClient:
     # -- HTTP -----------------------------------------------------------------------------
     def _call(self, path: str, body: dict) -> dict:
         headers = request_headers(self._session.api_key, self._session.public_ip, self._session.jwt)
-        limit_step, rate_waited, network_tries = 0, 0.0, 0
+        limit_step, network_tries = 0, 0
         while True:
             wait = self._last_call + self._min_interval_s - time.monotonic()
             if wait > 0:
@@ -117,13 +118,12 @@ class AngelClient:
             if status == 429 or rate_limited(message):
                 self._note_limit()
                 delay = RATE_COOLDOWNS_S[min(limit_step, len(RATE_COOLDOWNS_S) - 1)]
-                if rate_waited + delay > self._rate_budget_s:
+                if self.rate_wait_s + delay > self._rate_budget_s:
                     raise AngelRateLimited(
-                        f"Angel One kept refusing for {rate_waited:.0f} s ({message[:80]}); "
+                        f"Angel One kept refusing for {self.rate_wait_s:.0f} s ({message[:80]}); "
                         f"{self.calls} requests so far"
                     )
                 limit_step += 1
-                rate_waited += delay
                 self.rate_wait_s += delay
                 time.sleep(delay)
                 continue

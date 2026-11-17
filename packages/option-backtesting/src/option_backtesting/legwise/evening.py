@@ -83,7 +83,7 @@ def collect_detailed(
             # connection test cannot log in on the same account while this session is in use.
             client = AngelClient(
                 stack.enter_context(check.session()),
-                min_interval_s=float(os.environ.get("ANGELONE_MIN_INTERVAL_S", MIN_INTERVAL_S)),
+                min_interval_s=_min_interval(MIN_INTERVAL_S, log),
             )
         elif source == "fyers":
             from ..fyers.auth import resolve_credentials
@@ -109,6 +109,22 @@ def collect_detailed(
     if source == "angelone":
         log(rate_line(client.stats()))
     return errors, manifest
+
+
+def _min_interval(default: float, log: Log) -> float:
+    """ANGELONE_MIN_INTERVAL_S: the gap between candle requests. A blank, non-numeric or
+    non-positive value would crash the run or remove the pacing, so it falls back to the default."""
+    raw = os.environ.get("ANGELONE_MIN_INTERVAL_S", "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        value = 0.0
+    if not value > 0:
+        log(f"ANGELONE_MIN_INTERVAL_S={raw!r} is not a positive number; using {default:g} s")
+        return default
+    return value
 
 
 def rate_line(stats: dict) -> str:
@@ -203,8 +219,12 @@ def _alert_fallback(day: date, reason: str, log: Log) -> None:
     result)."""
     from ..notify import Notification, send
 
+    # once a day: the evening job retries and the owner reruns by hand, each finding Fyers still out
+    marker = data_dir() / "angelone" / f"fallback-alert-{day.isoformat()}.sent"
+    if marker.exists():
+        return
     try:
-        send(
+        delivered, _ = send(
             Notification(
                 source="obt daily",
                 severity="warn",
@@ -215,6 +235,9 @@ def _alert_fallback(day: date, reason: str, log: Log) -> None:
                 ),
             )
         )
+        if delivered:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.touch()
     except Exception as error:  # noqa: BLE001 - an alert that cannot be sent must not stop the day
         log(f"fallback alert not sent: {error}")
 

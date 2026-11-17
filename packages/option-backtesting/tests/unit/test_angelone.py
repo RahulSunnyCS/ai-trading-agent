@@ -611,11 +611,12 @@ def test_rate_line_says_when_the_first_refusal_came():
     assert "3 refused" in text and "request 917" in text and "150 in the last minute" in text
 
 
-def test_the_fallback_alert_goes_out_once_and_never_stops_the_day(monkeypatch):
+def test_the_fallback_alert_goes_out_once_and_never_stops_the_day(monkeypatch, tmp_path):
     from option_backtesting import notify
     from option_backtesting.fyers.auth import FyersCredentialsError
     from option_backtesting.legwise import evening
 
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
     sent = []
     monkeypatch.setattr(notify, "send", lambda n, **kw: sent.append(n) or (True, ""))
 
@@ -632,5 +633,38 @@ def test_the_fallback_alert_goes_out_once_and_never_stops_the_day(monkeypatch):
     def boom(n, **kw):
         raise OSError("telegram down")
 
+    # a retry or rerun of the same day does not alert again
+    again = evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None)
+    assert again.source == "angelone" and len(sent) == 1
+
+    # an alert that cannot be sent never stops the day, and is tried again next time
     monkeypatch.setattr(notify, "send", boom)
-    assert evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None).source == "angelone"
+    other = DAY + timedelta(days=1)
+    assert evening.collect_with_fallback(other, ["NIFTY"], log=lambda m: None).source == "angelone"
+
+
+def test_the_rate_wait_budget_is_for_the_whole_run(monkeypatch):
+    from option_backtesting.angelone.client import AngelRateLimited
+
+    c, sleeps = _limited_client(monkeypatch, lambda n: LIMITED, rate_budget_s=50)
+    with pytest.raises(AngelRateLimited):
+        c._call(CANDLE_PATH, {})
+    assert sum(sleeps) == 50.0
+    with pytest.raises(AngelRateLimited):  # the next request gets no new budget
+        c._call(CANDLE_PATH, {})
+    assert sum(sleeps) == 50.0
+
+
+@pytest.mark.parametrize("raw", ["", "abc", "0", "-1", "nan"])
+def test_a_bad_min_interval_falls_back_to_the_default(monkeypatch, raw):
+    from option_backtesting.legwise.evening import _min_interval
+
+    monkeypatch.setenv("ANGELONE_MIN_INTERVAL_S", raw)
+    assert _min_interval(0.4, lambda m: None) == 0.4
+
+
+def test_a_good_min_interval_is_used(monkeypatch):
+    from option_backtesting.legwise.evening import _min_interval
+
+    monkeypatch.setenv("ANGELONE_MIN_INTERVAL_S", "0.7")
+    assert _min_interval(0.4, lambda m: None) == 0.7
