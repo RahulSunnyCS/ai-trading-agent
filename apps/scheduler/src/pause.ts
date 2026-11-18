@@ -97,13 +97,14 @@ export function pauseNotice(
 
 /**
  * The first session an upload or deploy would still change: today until the last morning job
- * (the 09:21 Quantiply deploy top-up) has run on a trading day, otherwise the next trading day.
- * "Skip next session" pauses through it.
+ * (the `morning-topup` chain: the Quantiply top-up and enable, from 09:19 and over by 09:51 at the
+ * latest, BL-234) has run on a trading day, otherwise the next trading day. "Skip next session"
+ * pauses through it.
  */
 export function nextSession(now: Date = new Date()): string {
   const today = istDay(now);
   const minutes = Math.floor(((now.getTime() + 330 * 60_000) % 86_400_000) / 60_000);
-  if (isTradingDay(today) && minutes < 9 * 60 + 22) return today;
+  if (isTradingDay(today) && minutes < 9 * 60 + 52) return today;
   let day = addDays(today, 1);
   while (!isTradingDay(day)) day = addDays(day, 1);
   return day;

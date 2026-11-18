@@ -236,7 +236,7 @@ handled.
 **`mbt stocks deadlines` (BL-012, 2026-10-07)** prints one read-only JSON line — the age of
 each corporate-action change not yet pinned (`adjust.diff_ca_events`, the same age
 `check_ca_diff_age` fails the Friday sync on above 30 days) and `stock_actions.review_snapshot`'s
-pending split/bonus count. The scheduler's `check-stock-*` jobs (08:40 IST) call it; it never
+pending split/bonus count. The scheduler's `check-stock-*` checks (inside the 08:30 IST `morning-checks` suite) call it; it never
 writes and opens the catalog read-only.
 
 **Forward-signal journal (BL-024, 2026-10-06).** Every weekly run also appends each signal it

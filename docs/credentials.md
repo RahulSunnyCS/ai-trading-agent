@@ -17,7 +17,7 @@ After rotating any of them, confirm the thing that uses it still works (the "Che
 | Telegram bot token (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) | Repo `.env`; GitHub Actions secrets | `@trading/notify`, scheduler alerts | In Telegram, message @BotFather: `/revoke` then use the new token; update `.env` and `gh secret set TELEGRAM_BOT_TOKEN` | `bun run jobs run morning-summary` delivers a message |
 | Cloudflare Access service token (`UPSTREAM_ACCESS_CLIENT_ID`, `UPSTREAM_ACCESS_CLIENT_SECRET`) | Dashboard host environment | Dashboard to the tunnelled research APIs | Cloudflare Zero Trust > Access > Service Auth: create a new token, update both variables together (setting only one makes every request 503), delete the old token. See `docs/remote-dashboard.md` | Dashboard loads Momentum and Options Lab data |
 | `FYERS_APP_SECRET` | Repo `.env`; GitHub Actions secrets for the headless Fyers login | Fyers OAuth **and** the encryption passphrase for `broker_tokens` | Regenerate in the Fyers API dashboard. **It also encrypts `broker_tokens`, so rows written under the old secret become unreadable**: rotate, then log in to Fyers again so the token is re-stored | `uv run mbt token-status` shows a valid token |
-| `gh` CLI login | `gh` keychain on the scheduler laptop | Dispatching the AlgoTest login workflow | `gh auth login` | `gh auth status`; the `gh-auth-check` job checks it daily |
+| `gh` CLI login | `gh` keychain on the scheduler laptop | Dispatching the AlgoTest login workflow | `gh auth login` | `gh auth status`; the `gh-auth-check` check (in `morning-checks`) checks it daily |
 
 ## Rotation routine
 

@@ -31,6 +31,83 @@ export interface SchedulerJob {
   lastRun: SchedulerRun | null;
   needs: JobNeed[];
   group: string | null;
+  /** BL-234: the step ids of a chain, in order; null (or absent from an older scheduler) for a plain job. */
+  chain?: string[] | null;
+}
+
+/**
+ * BL-234 Phase 3: the evening chain, and the steps each platform's "Apply now" runs of it (only
+ * those, not the data steps): export tomorrow's picks, replace what the tool put there, and for
+ * AlgoTest set up execution.
+ */
+export const EVENING_CHAIN = 'evening';
+export const APPLY_NOW_STEPS = {
+  AlgoTest: ['algotest-export', 'algotest-upload', 'algotest-setup'],
+  Quantiply: ['quantiply-export', 'quantiply-upload'],
+} as const;
+
+/** Where one step of a chain's run stands (BL-234). */
+export type StepStatus =
+  | 'ok'
+  | 'failed'
+  | 'skipped'
+  | 'held'
+  | 'late'
+  | 'carried'
+  | 'running'
+  | 'unknown';
+
+export interface SchedulerStep {
+  id: number;
+  run_id: number;
+  step: string;
+  status: StepStatus;
+  started_at: string | null;
+  ended_at: string | null;
+  exit_code: number | null;
+  attempts: number;
+  error: string | null;
+  /** the earlier run whose pass this step carries */
+  carried_from: number | null;
+}
+
+export const STEP_STATUS_LABEL: Record<StepStatus, string> = {
+  ok: 'Passed',
+  failed: 'Failed',
+  skipped: 'Skipped',
+  held: 'Held',
+  late: 'Too late',
+  carried: 'Done earlier',
+  running: 'Running',
+  unknown: 'May have run',
+};
+
+/** The Badge state for a step: a failure is red, a step that may have acted is a warning. */
+export function stepBadge(status: StepStatus): Status {
+  switch (status) {
+    case 'ok':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'running':
+      return 'running';
+    case 'skipped':
+    case 'unknown':
+      return 'attention';
+    default:
+      return 'queued';
+  }
+}
+
+/** A chain's last run can be resumed when it ended and some step did not pass. */
+export function canResume(
+  job: Pick<SchedulerJob, 'chain' | 'lastRun'>,
+  steps: readonly SchedulerStep[] | null,
+): boolean {
+  if (!job.chain || !job.lastRun || job.lastRun.ended_at === null) return false;
+  return (steps ?? []).some(
+    (s) => s.status === 'failed' || s.status === 'skipped' || s.status === 'unknown',
+  );
 }
 
 export interface SchedulerLog {

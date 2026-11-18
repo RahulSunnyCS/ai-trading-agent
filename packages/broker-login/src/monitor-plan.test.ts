@@ -168,18 +168,18 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     },
     // ended
     {
-      id: 'algotest-deploy-check',
-      nextRun: tomorrow('15:35'),
+      id: 'close-out',
+      nextRun: tomorrow('15:30'),
       lastRun: { started_at: slot('09:16'), ended_at: slot('09:17') },
       previousSlot: slot('09:16'),
       previousSlotRun: { ended_at: slot('09:17') },
     },
     // queued behind quantiply-topup in its group: its slot came, no row yet
     {
-      id: 'quantiply-deploy-topup',
-      nextRun: tomorrow('09:21'),
+      id: 'morning-topup',
+      nextRun: tomorrow('09:19'),
       lastRun: { started_at: '2026-10-20T03:51:00Z', ended_at: '2026-10-20T03:52:00Z' },
-      previousSlot: slot('09:21'),
+      previousSlot: slot('09:19'),
       previousSlotRun: null,
     },
   ];
@@ -188,13 +188,13 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     pastCap: [],
   });
   assert.deepEqual(decided(views, PLATFORM_JOBS.quantiply, now), {
-    blocking: ['quantiply-deploy-topup is due (its 09:21 run has not started)'],
+    blocking: ['morning-topup is due (its 09:19 run has not started)'],
     pastCap: [],
   });
   // not scheduled today (yesterday's slot) and not listed: nothing blocks
   const notToday: SchedulerJobView[] = [
     {
-      id: 'quantiply-topup',
+      id: 'morning-topup',
       nextRun: tomorrow('09:19'),
       lastRun: { started_at: '2026-10-20T03:49:00Z', ended_at: '2026-10-20T03:50:00Z' },
       previousSlot: '2026-10-20T03:49:00.000Z',
@@ -229,15 +229,15 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
   const now = ist('2026-10-21', '10:30');
   const running: SchedulerJobView[] = [
     {
-      id: 'quantiply-deploy-topup',
-      nextRun: tomorrow('09:21'),
+      id: 'morning-topup',
+      nextRun: tomorrow('09:19'),
       lastRun: { started_at: slot('10:30'), ended_at: null },
-      previousSlot: slot('09:21'),
+      previousSlot: slot('09:19'),
       previousSlotRun: { ended_at: null },
     },
   ];
   assert.deepEqual(decided(running, PLATFORM_JOBS.quantiply, now), {
-    blocking: ['quantiply-deploy-topup is running (since 10:30)'],
+    blocking: ['morning-topup is running (since 10:30)'],
     pastCap: [],
   });
   // a hand `jobs run` at 13:00 (no slot today's row: a manual run) blocks too
@@ -257,16 +257,16 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
   // a slot that came with no run yet, after the cap: the monitor logs in and says so
   const due: SchedulerJobView[] = [
     {
-      id: 'quantiply-deploy-topup',
-      nextRun: tomorrow('09:21'),
+      id: 'morning-topup',
+      nextRun: tomorrow('09:19'),
       lastRun: null,
-      previousSlot: slot('09:21'),
+      previousSlot: slot('09:19'),
       previousSlotRun: null,
     },
   ];
   assert.deepEqual(decided(due, PLATFORM_JOBS.quantiply, now), {
     blocking: [],
-    pastCap: ['quantiply-deploy-topup is due (its 09:21 run has not started)'],
+    pastCap: ['morning-topup is due (its 09:19 run has not started)'],
   });
 });
 
@@ -281,10 +281,10 @@ test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --no
       previousSlotRun: { ended_at: null },
     },
     {
-      id: 'algotest-evening',
-      nextRun: tomorrow('16:40'),
-      lastRun: { started_at: slot('16:40'), ended_at: slot('16:44') },
-      previousSlot: slot('16:40'),
+      id: 'evening',
+      nextRun: tomorrow('15:45'),
+      lastRun: { started_at: slot('15:45'), ended_at: slot('16:44') },
+      previousSlot: slot('15:45'),
       previousSlotRun: { ended_at: slot('16:44') },
     },
   ];
@@ -292,11 +292,11 @@ test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --no
     'quantiply-deploy is running (since 16:55)',
   ]);
   assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now).blocking, []);
-  assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === 'algotest-evening'));
-  assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-evening'));
-  assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-disable'));
-  // BL-141's capture logs in to both platforms
-  for (const id of ['live-capture', 'live-capture-retry']) {
+  assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === 'evening'));
+  assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'evening'));
+  // BL-234: the close-out chain holds the deploy check, the live capture (it logs in to both
+  // platforms) and the Quantiply switch-off
+  for (const id of ['close-out']) {
     assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === id && j.window === 'evening'));
     assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === id && j.window === 'evening'));
   }
@@ -306,10 +306,7 @@ test('the scheduler API not answering: waits inside a window, says so after its 
   const at = (hhmm: string) =>
     decided(null, PLATFORM_JOBS.quantiply, ist('2026-10-21', hhmm), 'ECONNREFUSED');
   assert.equal(at('09:30').blocking.length, 1);
-  assert.match(
-    at('09:30').blocking[0] ?? '',
-    /ECONNREFUSED.*quantiply-topup \/ quantiply-deploy-topup/,
-  );
+  assert.match(at('09:30').blocking[0] ?? '', /ECONNREFUSED.*morning-topup/);
   assert.deepEqual(at('10:05'), { blocking: [], pastCap: [at('09:30').blocking[0] ?? ''] });
   assert.deepEqual(at('13:00'), { blocking: [], pastCap: [] });
   assert.equal(at('16:50').blocking.length, 1);
@@ -361,10 +358,10 @@ test('a due slot inside its catch-up window blocks past the cap, for 30 minutes 
   const wake = ist('2026-10-21', '10:30');
   const due: SchedulerJobView[] = [
     {
-      id: 'quantiply-deploy-topup',
-      nextRun: tomorrow('09:21'),
+      id: 'morning-topup',
+      nextRun: tomorrow('09:19'),
       lastRun: null,
-      previousSlot: slot('09:21'),
+      previousSlot: slot('09:19'),
       previousSlotRun: null,
       catchUpHours: 3,
     },

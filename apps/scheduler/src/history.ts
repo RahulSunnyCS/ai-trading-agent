@@ -27,6 +27,36 @@ export interface RunRow {
   error: string | null;
 }
 
+/**
+ * Where a chain's step stands (BL-234): `ok` ran and passed, `failed`, `skipped` (a step it
+ * requires did not pass, or an earlier failure ended the chain), `held` (the stop button or the
+ * settings pause), `late` (its `notAfter` time had passed when the chain got to it), `carried` (passed in the earlier run this one resumed), `running`, and
+ * `unknown` (it was running when the scheduler stopped: it may have done its work).
+ */
+export type StepStatus =
+  | 'ok'
+  | 'failed'
+  | 'skipped'
+  | 'held'
+  | 'late'
+  | 'carried'
+  | 'running'
+  | 'unknown';
+
+export interface StepRow {
+  id: number;
+  run_id: number;
+  step: string;
+  status: StepStatus;
+  started_at: string | null;
+  ended_at: string | null;
+  exit_code: number | null;
+  attempts: number;
+  error: string | null;
+  /** the earlier run whose pass this step carries */
+  carried_from: number | null;
+}
+
 export class History {
   private readonly db: Database;
 
@@ -60,6 +90,103 @@ export class History {
     }
     this.db.exec('CREATE INDEX IF NOT EXISTS runs_job_started ON runs (job, started_at)');
     this.db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+    // BL-234: one row per step of a chain's run.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS run_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL,
+      step TEXT NOT NULL,
+      status TEXT NOT NULL,
+      started_at TEXT,
+      ended_at TEXT,
+      exit_code INTEGER,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      carried_from INTEGER
+    )`);
+    this.db.exec('CREATE INDEX IF NOT EXISTS run_steps_run ON run_steps (run_id)');
+  }
+
+  /** A step of a chain's run begins (status `running`); returns its row id. */
+  startStep(runId: number, step: string, at: Date): number {
+    const row = this.db
+      .query(
+        `INSERT INTO run_steps (run_id, step, status, started_at) VALUES (?, ?, 'running', ?) RETURNING id`,
+      )
+      .get(runId, step, at.toISOString()) as { id: number };
+    return row.id;
+  }
+
+  /** A step ended, was skipped, held, or carried from an earlier run. */
+  finishStep(
+    id: number,
+    status: StepStatus,
+    exitCode: number | null,
+    attempts: number,
+    at: Date,
+    error: string | null = null,
+  ): void {
+    this.db
+      .query(
+        'UPDATE run_steps SET status = ?, ended_at = ?, exit_code = ?, attempts = ?, error = ? WHERE id = ?',
+      )
+      .run(status, at.toISOString(), exitCode, attempts, error, id);
+  }
+
+  /** A step that did not run this time: skipped, held, or done in an earlier run (`carriedFrom`). */
+  recordStep(
+    runId: number,
+    step: string,
+    status: StepStatus,
+    at: Date,
+    error: string | null = null,
+    carriedFrom: number | null = null,
+  ): void {
+    this.db
+      .query(
+        `INSERT INTO run_steps (run_id, step, status, started_at, ended_at, exit_code, attempts, error, carried_from)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      )
+      .run(
+        runId,
+        step,
+        status,
+        at.toISOString(),
+        at.toISOString(),
+        status === 'ok' || status === 'carried' || status === 'held' || status === 'late'
+          ? 0
+          : null,
+        error,
+        carriedFrom,
+      );
+  }
+
+  /** The steps of a run, in the order they started. */
+  steps(runId: number): StepRow[] {
+    return this.db
+      .query('SELECT * FROM run_steps WHERE run_id = ? ORDER BY id')
+      .all(runId) as StepRow[];
+  }
+
+  /**
+   * The run before `beforeId` that served the same slot of `job`, for a chain to resume from. A
+   * manual run has no slot: see `lastOfDay`.
+   */
+  previousForSlot(job: string, scheduledFor: Date, beforeId: number): RunRow | null {
+    return (this.db
+      .query(
+        'SELECT * FROM runs WHERE job = ? AND scheduled_for = ? AND id < ? ORDER BY id DESC LIMIT 1',
+      )
+      .get(job, scheduledFor.toISOString(), beforeId) ?? null) as RunRow | null;
+  }
+
+  /** The latest run of `job` before `beforeId` that started at or after `since` (a manual resume). */
+  lastSince(job: string, since: Date, beforeId: number): RunRow | null {
+    return (this.db
+      .query(
+        `SELECT * FROM runs WHERE job = ? AND id < ? AND started_at >= ? AND exit_code IS NOT -1
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get(job, beforeId, since.toISOString()) ?? null) as RunRow | null;
   }
 
   /**
@@ -225,6 +352,14 @@ export class History {
     for (const row of rows) {
       if (rowAlive(row, alive, groupAlive)) continue;
       this.finish(row.id, -2, 0, at, 'interrupted: the scheduler stopped while this was running');
+      // BL-234: a step that was running may or may not have done its work: a resume never repeats
+      // it unasked
+      this.db
+        .query(
+          `UPDATE run_steps SET status = 'unknown', ended_at = ?, error = ?
+           WHERE run_id = ? AND status = 'running'`,
+        )
+        .run(at.toISOString(), 'cut off while running: it may have done its work', row.id);
       reaped++;
     }
     return reaped;

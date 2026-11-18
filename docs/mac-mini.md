@@ -69,8 +69,8 @@ Dry-run the logins: `DRY_RUN=1 bun run --filter @ata/scheduler jobs run broker-l
 
 ## 7. Compare before cutting over
 For a day or two, leave the laptop as the live scheduler and run `jobs status` and the
-read-only checks on the mini (`jobs run check-nifty50-membership`, `check-lot-sizes`,
-`calendar-upkeep`, `check-stock-ca-baseline-age`) — they only look, never change data.
+read-only checks on the mini (`jobs run morning-checks` and `jobs run evening-checks`: the Nifty 50
+list, lot sizes, calendar, stock data, expiry calendar and `gh` login) — they only look, never change data.
 
 ## 8. Cut over
 1. On the laptop: `deploy/launchd/uninstall.sh` (stops its scheduler; its data stays).

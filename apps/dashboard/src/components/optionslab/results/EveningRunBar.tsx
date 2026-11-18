@@ -9,7 +9,7 @@
  * log in the disclosure, which takes its own line of that bar when open.
  *
  * The API only knows the runs it started itself; the scheduled 15:45 run is the scheduler's. So
- * when the API has no finished run, the last run is the scheduler's `options-evening` (when the
+ * when the API has no finished run, the last run is the scheduler's `evening` chain (when the
  * scheduler API is reachable), else the latest collected day: never "no run" after a run happened.
  */
 
@@ -30,8 +30,8 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Skeleton } from '../../ui/Skeleton';
 
-/** The scheduler's id for the evening run. */
-export const EVENING_JOB_ID = 'options-evening';
+/** The scheduler's id for the evening run: since BL-234 Phase 3 a chain (the data, the message, the uploads). */
+export const EVENING_JOB_ID = 'evening';
 
 function TokenBadge({ token, now }: { token: DataStatus['token']; now: Date }) {
   if (!token.ok) {
@@ -75,7 +75,7 @@ function LastRun({
   now,
 }: {
   job: DailyJob;
-  /** The scheduler's latest `options-evening` run, when the scheduler API answered. */
+  /** The scheduler's latest `evening` run, when the scheduler API answered. */
   scheduled: SchedulerRun | null;
   /** The newest collected session, the last resort. */
   latestDay: string | null;

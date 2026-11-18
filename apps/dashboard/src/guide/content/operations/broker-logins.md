@@ -19,7 +19,7 @@ You do not need the laptop. At **08:05** on trading days a job (`fyers-login-rem
 with a link to this screen on the hosted dashboard. Open it on your phone, tap **Log in again**,
 tick Fyers' human check yourself, enter your TOTP and PIN, and you are done: Fyers sends the
 browser back to the hosted dashboard, which passes the login to the laptop. At **15:30** a second
-job (`fyers-login-recheck`) asks again if you still have not logged in, before the evening
+step of the 15:30 close-out chain (`fyers-login-recheck`) asks again if you still have not logged in, before the evening
 collection. Each says nothing when the login is fine.
 
 A phone login needs the laptop awake with two things running: the Momentum service and the

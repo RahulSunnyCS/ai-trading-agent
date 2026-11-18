@@ -31,7 +31,9 @@ describe('pause (BL-140 Phase 4)', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
   it('stops exactly the jobs that upload, enable or deploy, never the switch-off or a read', () => {
-    for (const id of PAUSE_JOBS) expect(JOBS.some((j) => j.id === id)).toBe(true);
+    // a held id is a job, or (BL-234) the hold id of a chain step
+    const heldIds = JOBS.flatMap((j) => [j.id, ...(j.chain ?? []).map((s) => s.holdId ?? '')]);
+    for (const id of PAUSE_JOBS) expect(heldIds).toContain(id);
     expect([...PAUSE_JOBS]).toEqual([...STOP_HELD_JOBS]);
     for (const kept of [
       'quantiply-disable',
@@ -130,8 +132,8 @@ describe('pause (BL-140 Phase 4)', () => {
 
   it('the next session is today until the last morning job has had its time, else the next trading day', () => {
     expect(nextSession(ist('2026-10-23', '08:00'))).toBe('2026-10-23');
-    expect(nextSession(ist('2026-10-23', '09:21'))).toBe('2026-10-23');
-    expect(nextSession(ist('2026-10-23', '09:22'))).toBe('2026-10-26'); // Friday: Monday next
+    expect(nextSession(ist('2026-10-23', '09:51'))).toBe('2026-10-23');
+    expect(nextSession(ist('2026-10-23', '09:52'))).toBe('2026-10-26'); // Friday: Monday next
     expect(nextSession(ist('2026-10-24', '10:00'))).toBe('2026-10-26'); // a Saturday
     expect(nextSession(ist('2026-10-26', '16:50'))).toBe('2026-10-27');
   });

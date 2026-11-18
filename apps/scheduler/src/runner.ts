@@ -1,10 +1,11 @@
-import { spawn } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { type ChainResult, type StepOutcome, runChain } from './chain.js';
 import type { History, Trigger } from './history.js';
-import { JOBS, type Job } from './jobs.js';
+import { JOBS, type Job, groupsOf } from './jobs.js';
 import { pausedReason } from './pause.js';
-import { formatIst, istDay } from './schedule.js';
+import { formatIst, istAt, istDay } from './schedule.js';
+import { NOT_FOUND, runStep } from './step.js';
 import { heldReason } from './stop-hold.js';
 
 export interface RunContext {
@@ -19,6 +20,8 @@ export interface RunContext {
   jobs?: Job[];
   /** In-process jobs (`Job.builtin`), e.g. the morning summary. */
   builtins?: Record<string, Builtin>;
+  /** Waits for a chain step's `notBefore` and retry delays; tests pass a fake. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface BuiltinContext extends RunContext {
@@ -37,83 +40,57 @@ export interface RunResult {
   attempts: number;
   logPath: string;
   error: string | null;
+  /** BL-234: what each step of a chain came to; absent for a job that is not a chain. */
+  steps?: StepOutcome[];
+}
+
+/** How a chain run starts (BL-234); a job that is not a chain ignores them. */
+export interface RunOptions {
+  /** Resume the earlier run of today: its steps that passed are not run again. */
+  resume?: boolean;
+  /** Start at this step; every step before it counts as done (implies resume). */
+  from?: string;
+  /** Ignore any earlier run: every step runs. */
+  fresh?: boolean;
+  /** Run only these steps (the dashboard's Apply now); the others count as done. No resume. */
+  only?: string[];
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Exit code used when a step's executable can't be found, as a shell would. */
-const NOT_FOUND = 127;
-/** Exit code recorded for a step killed at its timeout. */
-const TIMED_OUT = 124;
+/**
+ * In-process serialisation per group (a FIFO mutex); the history table covers other processes.
+ * `acquireGroup` resolves with the release function once every earlier holder has released.
+ */
+const groupTails = new Map<string, Promise<void>>();
 
-function resolveExecutable(cmd: string, cwd: string, path: string): string | null {
-  if (cmd.includes('/')) return isAbsolute(cmd) ? cmd : join(cwd, cmd);
-  return Bun.which(cmd, { PATH: path });
-}
-
-function runStep(
-  step: string[],
-  cwd: string,
-  env: Record<string, string>,
-  logFd: number,
-  timeoutMs: number,
-  onSpawn: (pgid: number) => void = () => undefined,
-): Promise<{ code: number; error: string | null }> {
-  const [cmd = '', ...args] = step;
-  const exe = resolveExecutable(cmd, cwd, env.PATH ?? '');
-  if (!exe) return Promise.resolve({ code: NOT_FOUND, error: `${cmd}: not found on PATH` });
-  return new Promise((resolve) => {
-    // Its own process group, so a timeout ends everything the step started (a `sh -c` step's
-    // commands, a browser), not just the first process: a retry must never overlap a survivor.
-    const child = spawn(exe, args, { cwd, env, stdio: ['ignore', logFd, logFd], detached: true });
-    // detached: the child leads its own group, whose id is its pid. Recorded on the run row, so a
-    // scheduler that stops mid-step does not make the step look ended while it still runs.
-    if (child.pid) {
-      try {
-        onSpawn(child.pid);
-      } catch {
-        // a bookkeeping failure must not fail the step
-      }
-    }
-    const killAll = (signal: NodeJS.Signals) => {
-      try {
-        if (child.pid) process.kill(-child.pid, signal);
-        else child.kill(signal);
-      } catch {
-        child.kill(signal);
-      }
-    };
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      killAll('SIGTERM');
-      setTimeout(() => killAll('SIGKILL'), 10_000).unref();
-    }, timeoutMs);
-    child.on('error', (error) => {
-      clearTimeout(timer);
-      resolve({ code: NOT_FOUND, error: error.message });
-    });
-    child.on('close', (code, signal) => {
-      clearTimeout(timer);
-      if (timedOut)
-        resolve({ code: TIMED_OUT, error: `timed out after ${timeoutMs / 60_000} min` });
-      else resolve({ code: code ?? 1, error: signal ? `killed by ${signal}` : null });
-    });
+function acquireGroup(group: string): Promise<() => void> {
+  const previous = groupTails.get(group) ?? Promise.resolve();
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
   });
+  groupTails.set(
+    group,
+    previous.then(() => gate),
+  );
+  return previous.then(() => release);
 }
 
-/** In-process serialisation per group; the history table covers other processes. */
-const groupChains = new Map<string, Promise<unknown>>();
+async function withGroup<T>(group: string, fn: () => Promise<T>): Promise<T> {
+  const release = await acquireGroup(group);
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
 
-function withGroup<T>(group: string | undefined, fn: () => Promise<T>): Promise<T> {
-  if (!group) return fn();
-  const previous = groupChains.get(group) ?? Promise.resolve();
-  const run = previous.then(fn, fn);
-  groupChains.set(
-    group,
-    run.catch(() => undefined),
-  );
-  return run;
+/** All of `groups`, in a fixed order so two runs holding several never wait on each other. */
+function withGroups<T>(groups: readonly string[], fn: () => Promise<T>): Promise<T> {
+  const [first, ...rest] = groups;
+  if (first === undefined) return fn();
+  return withGroup(first, () => withGroups(rest, fn));
 }
 
 /**
@@ -122,20 +99,21 @@ function withGroup<T>(group: string | undefined, fn: () => Promise<T>): Promise<
  */
 async function waitForGroup(
   job: Job,
+  groups: readonly string[],
   runId: number,
   ctx: RunContext,
   now: () => Date,
 ): Promise<string | null> {
-  if (!job.group) return null;
+  if (groups.length === 0) return null;
   const jobs = ctx.jobs ?? JOBS;
-  const members = jobs.filter((j) => j.group === job.group).map((j) => j.id);
+  const members = jobs.filter((j) => groupsOf(j).some((g) => groups.includes(g))).map((j) => j.id);
   const deadline = now().getTime() + job.timeoutMinutes * 60_000;
   for (;;) {
     ctx.history.reapDead(now());
     const busy = ctx.history.runningBefore(members, runId);
     if (busy.length === 0) return null;
     if (now().getTime() >= deadline) {
-      return `group '${job.group}' still busy with ${busy.map((r) => r.job).join(', ')}`;
+      return `group '${groups.join("', '")}' still busy with ${busy.map((r) => r.job).join(', ')}`;
     }
     await sleep(ctx.busyPollMs ?? 30_000);
   }
@@ -151,8 +129,14 @@ export function runJob(
   ctx: RunContext,
   trigger: Trigger,
   scheduledFor: Date | null = null,
+  options: RunOptions = {},
 ): Promise<RunResult> {
-  return withGroup(job.group, async () => {
+  // The job's own group is held from the start. A chain's steps take theirs when they get to them
+  // (BL-234), so a chain that starts at 15:45 does not wait for the 15:30 close-out's group until
+  // its first step that needs it.
+  const groups = job.group ? [job.group] : [];
+  const held = new Map<string, () => void>();
+  return withGroups(groups, async () => {
     const now = ctx.now ?? (() => new Date());
     const logPath = job.logFile
       ? join(ctx.repoRoot, job.logFile)
@@ -163,18 +147,68 @@ export function runJob(
     // The row goes in first: waiting for the group is then ordered by id, and a crash
     // while waiting or running leaves a row that reapDead can close.
     const runId = ctx.history.start(job.id, trigger, scheduledFor, logPath, now());
+    /** A chain step's group: in-process first, then other processes' open rows. Null = held now. */
+    const acquire = async (group: string): Promise<string | null> => {
+      if (held.has(group)) return null;
+      held.set(group, await acquireGroup(group));
+      return waitForGroup(job, [group], runId, ctx, now);
+    };
     let fd: number | null = null;
     let result = { code: 1, error: null as string | null };
     let attempts = 0;
     try {
       mkdirSync(dir, { recursive: true });
-      const blocked = await waitForGroup(job, runId, ctx, now);
+      const blocked = await waitForGroup(job, groups, runId, ctx, now);
       if (blocked) {
         ctx.history.finish(runId, 1, 0, now(), blocked);
         return { runId, ok: false, exitCode: 1, attempts: 0, logPath, error: blocked };
       }
       fd = openSync(logPath, 'a');
       const logFd = fd;
+      if (job.chain) {
+        if (options.from && !job.chain.some((step) => step.id === options.from)) {
+          const error = `unknown step '${options.from}'. Steps: ${job.chain.map((step) => step.id).join(', ')}`;
+          ctx.history.finish(runId, 2, 0, now(), error);
+          return { runId, ok: false, exitCode: 2, attempts: 0, logPath, error };
+        }
+        const unknown = (options.only ?? []).filter(
+          (id) => !job.chain?.some((step) => step.id === id),
+        );
+        if (unknown.length > 0 || options.only?.length === 0) {
+          const error = `unknown step(s) '${unknown.join("', '")}'. Steps: ${job.chain.map((step) => step.id).join(', ')}`;
+          ctx.history.finish(runId, 2, 0, now(), error);
+          return { runId, ok: false, exitCode: 2, attempts: 0, logPath, error };
+        }
+        // The loop restarting a slot whose run was cut off resumes it on its own (the slot has an
+        // earlier row); a hand run resumes only when asked, and only a run of today.
+        let resumeFrom = null;
+        if (!options.fresh && !options.only) {
+          if (scheduledFor) resumeFrom = ctx.history.previousForSlot(job.id, scheduledFor, runId);
+          else if (options.resume || options.from)
+            resumeFrom = ctx.history.lastSince(job.id, istAt(istDay(now()), '00:00'), runId);
+        }
+        writeSync(
+          logFd,
+          `\n=== ${job.id} · ${trigger}${resumeFrom ? ` · resuming run ${resumeFrom.id}` : ''} · ${formatIst(now())} IST\n`,
+        );
+        const chained: ChainResult = await runChain(job, job.chain, ctx, runId, logFd, now, {
+          resumeFrom,
+          from: options.from,
+          only: options.only,
+          acquire,
+        });
+        writeSync(logFd, `=== exit ${chained.code}\n`);
+        ctx.history.finish(runId, chained.code, 1, now(), chained.error);
+        return {
+          runId,
+          ok: chained.code === 0,
+          exitCode: chained.code,
+          attempts: 1,
+          logPath,
+          error: chained.error,
+          steps: chained.steps,
+        };
+      }
       for (attempts = 1; attempts <= job.retries + 1; attempts++) {
         // BL-143: the stop button's hold (and BL-140's pause), checked after any wait for the group
         // and before every attempt, whoever started the run (schedule, catch-up, `jobs run`, Apply now).
@@ -227,6 +261,7 @@ export function runJob(
       ctx.history.finish(runId, 1, attempts, now(), message);
       return { runId, ok: false, exitCode: 1, attempts, logPath, error: message };
     } finally {
+      for (const release of held.values()) release();
       if (fd !== null) closeSync(fd);
     }
     attempts = Math.min(attempts, job.retries + 1);

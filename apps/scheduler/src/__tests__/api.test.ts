@@ -240,3 +240,81 @@ describe('routing and config', () => {
     expect(apiPort({ SCHEDULER_API_PORT: 'abc' })).toBe(8790);
   });
 });
+
+describe('chains over the API (BL-234)', () => {
+  const chain = (): Job => ({
+    ...job('close', 'true'),
+    steps: [],
+    chain: [
+      { id: 'one', argv: ['/bin/sh', '-c', 'true'], fixHint: 'fix one' },
+      { id: 'two', argv: ['/bin/sh', '-c', 'true'], fixHint: 'fix two' },
+    ],
+  });
+
+  beforeEach(() => {
+    jobs = [...jobs, chain()];
+    handle = createApi({ ctx, jobs, prefsFile });
+  });
+
+  it('lists a chain’s step ids, and null for a plain job', async () => {
+    const body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body.find((j) => j.id === 'close')?.chain).toEqual(['one', 'two']);
+    expect(body.find((j) => j.id === 'fast')?.chain).toBeNull();
+  });
+
+  it('runs a chain and gives its steps at /runs/:id/steps', async () => {
+    const started = (await (await send('POST', '/jobs/close/run')).json()) as { runId: number };
+    for (let i = 0; i < 100 && ctx.history.get(started.runId)?.ended_at == null; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    const steps = (await (await get(`/runs/${started.runId}/steps`)).json()) as Array<{
+      step: string;
+      status: string;
+    }>;
+    expect(steps.map((s) => [s.step, s.status])).toEqual([
+      ['one', 'ok'],
+      ['two', 'ok'],
+    ]);
+    expect((await get('/runs/999/steps')).status).toBe(404);
+  });
+
+  it('refuses a step the chain does not have, and a body that is not JSON', async () => {
+    expect((await send('POST', '/jobs/close/run', { from: 'nope' })).status).toBe(400);
+    expect((await send('POST', '/jobs/close/run', { from: 3 })).status).toBe(400);
+    const bad = await handle(
+      new Request('http://x/jobs/close/run', { method: 'POST', body: 'not json' }),
+    );
+    expect(bad.status).toBe(400);
+  });
+
+  it('accepts a pick of steps, and refuses an unknown or empty one (Apply now)', async () => {
+    expect((await send('POST', '/jobs/close/run', { only: ['one'] })).status).toBe(202);
+    for (let i = 0; i < 100 && ctx.history.last('close')?.ended_at == null; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    expect(ctx.history.steps(ctx.history.last('close')?.id ?? 0).map((s) => s.step)).toEqual([
+      'one',
+    ]);
+    expect((await send('POST', '/jobs/close/run', { only: ['nope'] })).status).toBe(400);
+    expect((await send('POST', '/jobs/close/run', { only: [] })).status).toBe(400);
+    expect((await send('POST', '/jobs/close/run', { only: 'one' })).status).toBe(400);
+  });
+
+  it('lists every group a chain holds, its steps’ included', async () => {
+    const withGroups: Job = {
+      ...chain(),
+      id: 'grouped',
+      chain: [
+        { id: 'a', argv: ['/bin/sh', '-c', 'true'], fixHint: 'f', group: 'catalog' },
+        { id: 'b', argv: ['/bin/sh', '-c', 'true'], fixHint: 'f', group: 'quantiply' },
+      ],
+    };
+    handle = createApi({ ctx, jobs: [...jobs, withGroups], prefsFile });
+    const body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body.find((j) => j.id === 'grouped')?.groups).toEqual(['catalog', 'quantiply']);
+    expect(body.find((j) => j.id === 'fast')?.groups).toEqual([]);
+  });
+
+  it('accepts resume and from for a chain', async () => {
+    const res = await send('POST', '/jobs/close/run', { resume: true, from: 'two' });
+    expect(res.status).toBe(202);
+  });
+});

@@ -7,18 +7,22 @@
 import { PlayCircle } from 'lucide-react';
 import { useState } from 'react';
 
-import { useRunLog, useSchedulerJobs } from '../hooks/useSchedulerJobs';
+import { useRunLog, useRunSteps, useSchedulerJobs } from '../hooks/useSchedulerJobs';
 import { apiPost } from '../lib/api';
 import { EMPTY, formatDuration, formatIstDateTimeShort, formatRelative } from '../lib/format';
 import {
   RUN_STATUS_LABEL,
   SCHEDULER_API,
+  STEP_STATUS_LABEL,
   type SchedulerJob,
+  type SchedulerStep,
+  canResume,
   firstSentence,
   needsConfirmation,
   runDurationMs,
   runNowError,
   runStatus,
+  stepBadge,
 } from '../lib/scheduler';
 import { ConfirmDialog, type ConfirmRequest } from './optionslab/builder/ConfirmDialog';
 import {
@@ -43,6 +47,76 @@ function JobDescription({ job }: { job: SchedulerJob }) {
     <p aria-label={`What ${job.id} does`} className="text-sm text-muted">
       {job.description}
     </p>
+  );
+}
+
+/** BL-234: what each step of a chain's latest run came to, and a Resume that skips the ones that passed. */
+function StepsPanel({
+  job,
+  runId,
+  onResume,
+}: {
+  job: SchedulerJob;
+  runId: number;
+  onResume: (job: SchedulerJob) => void;
+}) {
+  const running = runStatus(job.lastRun) === 'running';
+  const steps = useRunSteps(runId, running);
+  const rows: SchedulerStep[] = steps.data ?? [];
+  return (
+    <Card className="space-y-3">
+      <CardHeader
+        title={`Steps: ${job.id}`}
+        description={`Run #${runId}. A step that failed does not always stop the ones after it.`}
+        actions={
+          canResume(job, steps.data) ? (
+            <Button size="sm" onClick={() => onResume(job)} aria-label={`Resume ${job.id}`}>
+              <PlayCircle className="h-3.5 w-3.5" />
+              Resume
+            </Button>
+          ) : undefined
+        }
+      />
+      {rows.length === 0 ? (
+        <StateMessage
+          variant="empty"
+          title={steps.loading ? 'Loading the steps…' : 'No steps recorded for this run'}
+        />
+      ) : (
+        <Table>
+          <THead>
+            <Th>Step</Th>
+            <Th>Result</Th>
+            <Th align="right">Tries</Th>
+            <Th>Took</Th>
+            <Th>Note</Th>
+          </THead>
+          <tbody>
+            {rows.map((row) => {
+              const ms =
+                row.started_at && row.ended_at
+                  ? Date.parse(row.ended_at) - Date.parse(row.started_at)
+                  : null;
+              return (
+                <TRow key={row.id}>
+                  <Td className="font-medium">{row.step}</Td>
+                  <Td>
+                    <Badge status={stepBadge(row.status)} dot>
+                      {STEP_STATUS_LABEL[row.status] ?? row.status}
+                    </Badge>
+                  </Td>
+                  <Td align="right">{row.attempts || EMPTY}</Td>
+                  <Td className="whitespace-nowrap text-muted">
+                    {ms !== null && Number.isFinite(ms) && ms >= 0 ? formatDuration(ms) : EMPTY}
+                  </Td>
+                  <Td className="max-w-md text-xs text-muted">{row.error ?? EMPTY}</Td>
+                </TRow>
+              );
+            })}
+          </tbody>
+        </Table>
+      )}
+    </Card>
   );
 }
 
@@ -77,11 +151,11 @@ export function JobsView() {
   const [starting, setStarting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
-  async function start(job: SchedulerJob) {
+  async function start(job: SchedulerJob, body: Record<string, unknown> = {}) {
     setStarting(job.id);
     const result = await apiPost<{ runId: number | null }>(
       `${SCHEDULER_API}/jobs/${encodeURIComponent(job.id)}/run`,
-      {},
+      body,
     );
     setStarting(null);
     if (!result.ok) {
@@ -91,6 +165,16 @@ export function JobsView() {
     toast(`Started ${job.id}${result.data.runId ? ` (run #${result.data.runId})` : ''}`);
     setSelected(job.id);
     refetch();
+  }
+
+  /** BL-234: run a chain's steps that did not pass, never the ones that did. */
+  function resume(job: SchedulerJob) {
+    setConfirm({
+      title: `Resume ${job.id}?`,
+      body: 'Steps that passed in the last run are not run again. A step that was cut off while running is never repeated: the run stops and says so. Steps that failed or were skipped run now, and some of them log in to a broker.',
+      confirmLabel: 'Resume',
+      onConfirm: () => void start(job, { resume: true }),
+    });
   }
 
   function runNow(job: SchedulerJob) {
@@ -220,7 +304,17 @@ export function JobsView() {
       </Card>
       {focus ? (
         focus.lastRun ? (
-          <LogPanel key={focus.lastRun.id} job={focus} runId={focus.lastRun.id} />
+          <>
+            {focus.chain ? (
+              <StepsPanel
+                key={`steps-${focus.lastRun.id}`}
+                job={focus}
+                runId={focus.lastRun.id}
+                onResume={resume}
+              />
+            ) : null}
+            <LogPanel key={focus.lastRun.id} job={focus} runId={focus.lastRun.id} />
+          </>
         ) : (
           <Card className="space-y-3">
             <JobDescription job={focus} />

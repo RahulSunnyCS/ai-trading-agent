@@ -54,8 +54,12 @@ export const firstWeekdayOfMonth =
     weekdayOf(day) === weekday && Number(day.slice(8, 10)) <= 7;
 
 export interface Schedule {
-  /** IST wall-clock time, 'HH:MM'. */
-  at: string;
+  /**
+   * IST wall-clock time, 'HH:MM'; or several (BL-234), each a slot of its own on every day the
+   * rule allows. A job run at several times is one job with one history: the loop serves the most
+   * recent slot only, so a laptop that slept through two of them runs the later one once.
+   */
+  at: string | string[];
   on: DayRule;
   /** How `status` describes it, e.g. 'trading days 08:00'. */
   label: string;
@@ -64,13 +68,22 @@ export interface Schedule {
 /** Search horizon: long enough for yearly jobs. */
 const HORIZON_DAYS = 400;
 
+/** A schedule's times of day, earliest first. */
+export function timesOf(s: Schedule): string[] {
+  return (Array.isArray(s.at) ? [...s.at] : [s.at]).sort();
+}
+
 /** The most recent scheduled instant at or before `now`, or null. */
 export function previousDue(s: Schedule, now: Date): Date | null {
   const today = istDay(now);
+  const times = timesOf(s).reverse();
   for (let i = 0; i <= HORIZON_DAYS; i++) {
     const day = addDays(today, -i);
-    const at = istAt(day, s.at);
-    if (s.on(day) && at.getTime() <= now.getTime()) return at;
+    if (!s.on(day)) continue;
+    for (const time of times) {
+      const at = istAt(day, time);
+      if (at.getTime() <= now.getTime()) return at;
+    }
   }
   return null;
 }
@@ -78,10 +91,14 @@ export function previousDue(s: Schedule, now: Date): Date | null {
 /** The first scheduled instant strictly after `now`, or null. */
 export function nextDue(s: Schedule, now: Date): Date | null {
   const today = istDay(now);
+  const times = timesOf(s);
   for (let i = 0; i <= HORIZON_DAYS; i++) {
     const day = addDays(today, i);
-    const at = istAt(day, s.at);
-    if (s.on(day) && at.getTime() > now.getTime()) return at;
+    if (!s.on(day)) continue;
+    for (const time of times) {
+      const at = istAt(day, time);
+      if (at.getTime() > now.getTime()) return at;
+    }
   }
   return null;
 }

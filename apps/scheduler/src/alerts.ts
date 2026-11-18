@@ -58,6 +58,10 @@ export async function alertResult(
   result: RunResult,
   history: History,
 ): Promise<void> {
+  if (!result.ok && job.chain) {
+    await alertChain(sink, job, result);
+    return;
+  }
   if (!result.ok) {
     if (job.alertsItself && !RUNNER_CODES.has(result.exitCode) && result.attempts > 0) return;
     await sink(
@@ -81,6 +85,47 @@ export async function alertResult(
       'scheduler.recovered',
     );
   }
+}
+
+/**
+ * BL-234: a chain's failure is ONE message that names each step that failed or was skipped, with
+ * that step's own fix and what passed. A step that sends its own Telegram (`alertsItself`) and
+ * really ran is left out, as a whole job that does so is; when nothing else is left, nothing is sent.
+ */
+async function alertChain(sink: AlertSink, job: Job, result: RunResult): Promise<void> {
+  const steps = result.steps ?? [];
+  const problems = steps.filter((s) => s.status === 'failed' || s.status === 'skipped');
+  const loud = problems.filter(
+    (s) =>
+      !(
+        s.alertsItself &&
+        s.status === 'failed' &&
+        !RUNNER_CODES.has(s.exitCode ?? 0) &&
+        s.attempts > 0
+      ),
+  );
+  // no step ran (a refused resume, an unknown step): the run's own error is the message
+  if (problems.length > 0 && loud.length === 0) return;
+  const passed = steps.filter((s) => s.status === 'ok' || s.status === 'carried').map((s) => s.id);
+  await sink(
+    [
+      `❌ ${job.id} failed${problems.length > 0 ? ` (${problems.length} of ${steps.length} steps)` : ''}`,
+      `Scheduler, ${formatIst(new Date())} IST`,
+      '',
+      job.description,
+      ...(loud.length > 0
+        ? loud.map(
+            (s) =>
+              `• ${s.id}: ${s.error ?? `exit ${s.exitCode}`}${s.status === 'failed' ? `\n  Fix: ${s.fixHint}` : ''}`,
+          )
+        : [result.error ?? `exit ${result.exitCode}`]),
+      ...(passed.length > 0 ? ['', `Passed: ${passed.join(', ')}`] : []),
+      '',
+      `Log: ${result.logPath}`,
+      `Run again from the failed step with: bun run --filter @ata/scheduler jobs run ${job.id} --resume`,
+    ].join('\n'),
+    'scheduler.failure',
+  );
 }
 
 export async function alertMissed(sink: AlertSink, job: Job, slot: Date): Promise<void> {

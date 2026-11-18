@@ -297,7 +297,7 @@ describe('Jobs', () => {
       job('algotest-deploy', run({ exit_code: 1, error: 'exit 1' })),
       job('algotest-deploy-check', run({ exit_code: 1, ended_at: '2026-10-27T10:08:32.000Z' })),
       job('old-failure', run({ exit_code: 1, ended_at: '2026-10-26T10:00:00.000Z' })),
-      job('options-evening', run({ ended_at: '2026-10-27T10:28:28.000Z' })),
+      job('evening', run({ ended_at: '2026-10-27T10:28:28.000Z' })),
       job('running', run({ ended_at: null, exit_code: null })),
       job('never', null),
     ];

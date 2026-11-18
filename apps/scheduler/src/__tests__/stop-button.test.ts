@@ -407,7 +407,13 @@ describe('stop hold: no job that could upload, deploy or enable runs while it is
   });
 
   it('every held job exists, and the disable safety net is never held', () => {
-    for (const id of STOP_HELD_JOBS) expect(JOBS.some((j) => j.id === id)).toBe(true);
+    // a held id is a job, or (BL-234) the hold id of a chain step
+    const heldIds = JOBS.flatMap((j) => [j.id, ...(j.chain ?? []).map((s) => s.holdId ?? '')]);
+    for (const id of STOP_HELD_JOBS) expect(heldIds).toContain(id);
+    // every step of a chain that is held says so; the switch-off and the reads are not
+    for (const j of JOBS)
+      for (const s of j.chain ?? [])
+        if (s.id === 'quantiply-disable') expect(s.holdId).toBeUndefined();
     expect(STOP_HELD_JOBS).not.toContain('quantiply-disable');
   });
 
