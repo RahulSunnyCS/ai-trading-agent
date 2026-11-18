@@ -406,7 +406,7 @@ async function main(): Promise<number> {
     const ownedPresent = [...existing].filter((n) => /^(T1|Core) · /.test(n));
     const deployed =
       mode === 'evening' ? await deployedNames(page, ownedPresent) : new Set<string>();
-    const p = plan(mode, wanted, ledger, existing, deployed);
+    const p = plan(mode, wanted, ledger, existing, deployed, manifest.day);
     // A list whose export is not ready keeps its strategies until it is (no delete without a
     // replacement on the way).
     const PREFIX: Record<string, string> = { core: 'Core · ', t1: 'T1 · ' };
