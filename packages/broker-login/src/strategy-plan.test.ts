@@ -15,6 +15,7 @@ import {
   parseLedger,
   plan,
   savedId,
+  summary,
 } from './strategy-plan.js';
 
 const row = (action: 'upload' | 'delete', name: string, sha = 'a', ok = true): LedgerRow => ({
@@ -100,6 +101,11 @@ test('evening replaces an unchanged pick uploaded for an earlier session, keeps 
   );
   assert.deepEqual(p.refreshed, [`${P}A`, `${P}B`]);
   assert.deepEqual(p.keep, []);
+  assert.ok(
+    summary(p, 'evening').includes(
+      `fresh copy (unchanged, uploaded for an earlier day): ${P}A, ${P}B`,
+    ),
+  );
   // a retry the same evening (uploads already for 2026-10-21) keeps them
   const retry = [...ledger, { ...row('upload', `${P}A`), day: '2026-10-21' }];
   const again = plan(
