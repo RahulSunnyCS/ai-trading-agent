@@ -218,7 +218,10 @@ week, until disabled.
   A STOP also writes `STOP` beside the ledger, and every later run holds its deletes until the owner removes it.
   The id comes from the save answer, else from the one new id a fresh listing shows under the name; an upload
   whose id cannot be read is flagged at once. A strategy named by the tool stays the tool's even if the owner edits
-  it in place ("Update" keeps its id); rename it to keep it. Uploads before 2026-10-20 had no id: `--record-ids`
+  it in place ("Update" keeps its id); rename it to keep it. The evening run never carries a pick over to the
+  next session: every strategy it uploaded for an earlier session is deleted and the next session's picks uploaded
+  afresh, an unchanged one included, so an edit made on AlgoTest during the day never trades again (owner,
+  2026-11-18; `plan` `refreshed`); a retry the same evening keeps what it already uploaded for that session. Uploads before 2026-10-20 had no id: `--record-ids`
   adds it once from the listing (ledger only); it cannot tell a tool upload from the owner's copy of the same
   name, so it was run once, supervised.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) activates strategies on /live. `--morning` (BL-197 Phase 2,

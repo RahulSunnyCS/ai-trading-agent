@@ -557,10 +557,11 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-evening',
     description:
-      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones, then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
+      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes every strategy the tool uploaded for an earlier session and uploads tomorrow's picks afresh (a pick that stays is replaced too, since the owner may have edited it on AlgoTest during the day; owner, 2026-11-18; a retry the same evening keeps what it already uploaded), then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
     // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
     // results are incomplete (a late Fyers login), so the retries carry it to 20:40. It deletes the
-    // strategies it uploaded that tomorrow drops (--allow-delete, owner 2026-10-20): AlgoTest's own
+    // strategies it uploaded for an earlier session, kept or dropped (--allow-delete, owner 2026-10-20;
+    // kept ones too since 2026-11-18): AlgoTest's own
     // API call by each strategy's id, never one deployed on /live or one it did not upload, and it
     // stops at once if any other strategy vanishes with a delete.
     schedule: { at: '16:40', on: tradingDays, label: 'trading days 16:40' },
