@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-16
+Last updated: 2026-11-20
 
 ## Open
 
@@ -84,6 +84,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-220](BL-220-friday-size-down.md) | Friday size-down: trade fewer Adaptive picks on Fridays (drop the lowest pick, skip, or no starts from 13:00), tested on NIFTY 2022–24 and 20 forward Fridays, not the days that suggested it | P2 | In progress; Phase 1 passed narrowly (NIFTY 2022–24: Friday ₹81 vs ₹192, p 0.012); A2 on 2021–24 NIFTY T1: R1 and R2 pass, R3 fails; Phase 2 waits for 20 Fridays (~2 Apr 2027) | research | options |
 | [BL-227](BL-227-options-overlay-backtest.md) | Options overlay backtest: run a Momentum strategy's picks as bought stock options from the dashboard, calls and puts (downward momentum, market switch); book vs shares, minimum capital, winners, trades | P2 | Planned | feature | momentum / options / dashboard |
 | [BL-230](BL-230-options-overlay-rescore.md) | Re-score the options-overlay record after the PR #450–#454 review fixes: BL-226 with the ban rule, BL-228's registered extras, BL-229 round 1 on the fixed engine, BL-227's parity figure | P2 | Planned | research | momentum / options |
+| [BL-237](BL-237-expiry-eve-straddle-pair.md) | Expiry-eve straddle pair: sell the expiring index's ATM straddle, buy the other index's, 15:30 to 09:20 (NIFTY and SENSEX, fit year then test year) | P2 | In progress | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
