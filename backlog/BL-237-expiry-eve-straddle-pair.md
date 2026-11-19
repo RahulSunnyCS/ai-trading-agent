@@ -3,11 +3,11 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's own idea, a new overnight shape the repo has not tested (every other strategy here closes the same day) |
-| **Status** | In progress — Phase 0 pre-registered, nothing run |
+| **Status** | Done — killed on the registered rule: pooled net −₹455 a trade (fit, 89 trades) and −₹541 (test, 105), lower bounds below zero, both streams negative in both windows |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-20 |
-| **Depends on** | the legwise market loader and reference data (`legwise/market.py`, `data/reference`); BL-009's bar conventions |
+| **Depends on** | the legwise market loader and reference data (`legwise/market.py`, `data/reference`); BL-009's bar conventions; BL-159 / BL-160 (the earlier overnight short-straddle reads) |
 | **TODO.md row** | 3.11.37 |
 
 ## Context
@@ -107,6 +107,50 @@ trial.
   findings page for the pair.
 - **Done when:** the pass or kill is stated against the rule above, with the intervals.
 
+## Result (2026-11-20; run once, `research/bl237/sim.py check` then `analyse.py`; 194 eve trades, 396 non-eve placebo)
+
+Net per trade in rupees after ₹23.6 an order (8 orders) and 0.5% slippage on every fill, one lot each, exit 09:17 on the
+expiry day (amendment 1). The simulator was checked on three trades against the raw bars (entry = the 15:29 close, exit =
+the 09:16 close, the arithmetic redone longhand to the paisa) before anything was read.
+
+| Window | Trades | Pooled mean, 90% interval | NIFTY-eve (sell NIFTY, buy SENSEX) | SENSEX-eve (sell SENSEX, buy NIFTY) | Max drawdown |
+|---|---|---|---|---|---|
+| Fit 2024-10-09 → 2025-10-08 | 89 | **−₹455 [−650, −263]** | −₹283 [−473, −67] (49) | −₹665 [−966, −354] (40) | ₹40,485 |
+| Test 2025-10-09 → 2026-11-18 | 105 | **−₹541 [−780, −325]** | −₹511 [−841, −179] (56) | −₹576 [−1,088, −173] (49) | ₹63,701 |
+
+**Rule: killed.** Neither window's lower bound is above zero and neither stream is positive in either window; the interval
+sits wholly below zero in both. Worst trade −₹9,176 (SENSEX eve 2026-03-18, gap −2.01%), 36% of trades won.
+
+Descriptive (not rules; all 194 eves unless stated):
+- **The pair is a zero before costs.** Gross with no slippage and no brokerage: −₹16 a trade (+₹13 fit, −₹41 test). The
+  ₹189 brokerage and about ₹300 of slippage on ~₹30,000 of premium (₹10,800 sold + ₹19,200 bought) make up the −₹502.
+- **The sold leg alone is positive, the bought leg pays for it.** Sold straddle alone: +₹121 a trade net (NIFTY +₹349, 77%
+  winners; SENSEX −₹149). Bought straddle alone: −₹622 (NIFTY-eve's bought SENSEX −₹754; 14% winners). The other index's
+  straddle bleeds more theta and spread than the gap pays back, and is no hedge on the big-gap nights.
+- **Big gaps decide it.** By the sold index's overnight gap: under 0.25% (105 trades) −₹81 a trade; 0.25–0.5% (47) −₹365;
+  over 0.5% (42) −₹1,707. The five worst are all gaps of 0.7% to 2.8% against the short.
+- **No eve effect.** The same structure on non-eve sessions (the sold index's weekly more than one session away) loses a
+  similar amount: −₹441 to −₹601 a trade in each window and stream.
+- **Weekday:** Monday eves 85 trades −₹558; Wednesday eves 97 trades −₹447; ten Friday and two Tuesday eves, too few to read.
+
+Skipped and flagged, as registered (nothing zero-filled): 27 eve trades could not be built: 21 are eves where the BOUGHT
+index's own weekly expires on the eve itself (its contracts do not exist the next morning: Thursday NIFTY expiries before
+the 2025 calendar change, a few holiday shifts), the rest are a contract missing from the eve's file; 2 eves are excluded by
+data_quality (2024-11-01 Muhurat, 2025-10-21 short session). The 21 skip the same kind of trade (buy-side on its own expiry
+day), mostly in the fit year; using the other index's NEXT weekly for those eves would be a different registered rule and
+was not run. No eve leg was stale (last real bar before 15:20).
+
+### Disclosure added after the run (2026-11-20)
+Phase 0 did not cite BL-159 / BL-160, which read NIFTY's short overnight straddle into expiry morning (unhedged and with OTM6
+wings) over this same 2024-10 → 2026-10 learning period and found the unhedged sold leg positive there, then failed it on
+2022–24. This item's sold-NIFTY-alone figure (+₹349, +₹374 fit, +₹328 test) is consistent with that finding, not new
+evidence, and its fit and test windows are not unseen for the sold leg. It does not touch the verdict: the registered
+quantity here is the pair, and the pair is killed. Found by reading `research/options/strategies/overnight-straddle/` after
+the run; it should have been read before Phase 0 was written.
+
+Phase 2's extra deliverable is the findings page: the BL-237 rows added to
+`research/options/strategies/overnight-straddle/README.md`.
+
 ## Risks
 
 - Cross-index margin: the exchanges give no offset between a NIFTY short and a SENSEX long, so the real capital is the
@@ -120,6 +164,7 @@ the bought straddle to its own expiry instead.
 
 ## Log
 
+- 2026-11-20 — ran once and closed: KILLED (pooled −₹455 fit, −₹541 test); skip list and the BL-159/160 disclosure recorded in Result.
 - 2026-11-20 — Phase 0 amendment 1, before any run: exit moved from 09:20 to 09:17 on the expiry day (owner).
 - 2026-11-20 — created from the owner's message; design questions answered in chat (exit 09:20 on E, 1 lot each, no
   stops); Phase 0 written before any run.

@@ -235,7 +235,8 @@ def write(trades, skipped):
 
 def check(root: Path, ref: ReferenceData):
     """Three hand-checked trades: raw bars printed, then the arithmetic done again longhand. Not scored."""
-    trades, _ = run_all(root, ref)
+    trades, skipped = run_all(root, ref)
+    write(trades, skipped)  # the one pass: the check prints three trades only, nothing is aggregated here
     eves = [t for t in trades if t["kind"] == "eve"]
     picks = [eves[0], eves[len(eves) // 2], eves[-1]]
     days = Days(root)
