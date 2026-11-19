@@ -126,3 +126,41 @@ def test_plan_lots_uses_the_equal_split_for_a_rebalancing_lot_and_the_old_rule_w
     )
     plan = {r["symbol"]: r for r in out["lots"][0]["plan"]["rows"]}
     assert plan["ACMESOLAR"]["action"] == "SELL" and plan["CUPID"]["quantity"] == 0
+
+
+def test_the_leftover_buys_a_held_name_whose_slice_was_under_a_share_in_rank_order():
+    held = {"CUPID": 10.0}
+    prices = {"CUPID": 366.0, "SANSERA": 4720.0, "PVR": 1700.0}
+    # CUPID (rank 1, held) and SANSERA both get a slice under their price; PVR is not affordable
+    plan = orders.plan_equal_split(
+        held,
+        prices,
+        {"CUPID": 1.0, "SANSERA": 1.0, "PVR": 1.0},
+        keep=frozenset(held),
+        cash=1_000.0,
+    )
+    orders.use_leftover(plan, ["CUPID", "SANSERA", "PVR"])
+    by = rows(plan)
+    assert by["CUPID"].action == "ADD" and by["CUPID"].quantity >= 1
+    assert plan.cash_after >= 0
+
+
+def test_the_recipe_drops_a_name_the_engine_sold_even_when_it_still_ranks_inside_the_exit_rank():
+    import pandas as pd
+
+    from momentum_backtesting import api
+
+    week = pd.Timestamp("2026-11-20")
+    result = type("R", (), {})()
+    result.weights = pd.DataFrame({"CUPID": [0.5], "NEW": [0.5]}, index=[week])
+    acted = pd.DataFrame(
+        [
+            {"asset": "SOLD", "action": "SELL", "rank": None, "value": 1.0},
+            {"asset": "NEW", "action": "BUY", "rank": 2.0, "value": 2.0},
+        ]
+    )
+    ranks = pd.Series({"SOLD": 5.0, "CUPID": 4.0, "NEW": 2.0, "FAR": 90.0})
+    req = type("Q", (), {"broad_category_exit_rank": 19, "max_position": 0.25, "cap_band": 0.05})()
+    recipe = api._equal_split_recipe(req, result, acted, ranks, week)
+    assert recipe["keep"] == ["CUPID", "NEW"]  # SOLD ranks 5 but was sold; FAR is outside
+    assert recipe["slices"] == {"NEW": 2.0}

@@ -71,22 +71,23 @@ LEFTOVER_NOTE = "one share from the leftover cash"
 def use_leftover(result: OrderPlan, order: list[str]) -> OrderPlan:
     """Spend what a fresh buy left over on the names it could not afford (owner, 2026-11-05).
 
-    The names a plan skipped for being under one share (`SKIP`, a name the portfolio does not hold
-    yet) are taken in `order` (the model's rank, best first); each gets ONE share while the cash
-    left covers it and its charges, and the first one that does not stops the rule: a lower-ranked
-    name is never bought ahead of a better one. Changes the plan in place (sells, buys, charges,
-    cash after, the row's action, quantity and note) and returns it."""
+    The names a plan skipped for being under one share (`SKIP`, a new name or a held one whose
+    equal-split slice was under a share) are taken in `order` (the model's rank, best first);
+    each gets ONE share while the cash left covers it and its charges, and the first one that
+    does not stops the rule: a lower-ranked name is never bought ahead of a better one. Changes
+    the plan in place (sells, buys, charges, cash after, the row's action, quantity and note)
+    and returns it."""
     rows = {r.symbol: r for r in result.rows}
     for name in order:
         row = rows.get(name)
-        if row is None or row.action != "SKIP" or row.held > 0 or not row.price:
+        if row is None or row.action != "SKIP" or not row.price:
             continue
         if not row.note.startswith("less than one share"):
             continue
         cost = row.price + buy_charges(row.price)
         if cost > result.cash_after:
             break
-        row.action, row.quantity, row.note = "BUY", 1, LEFTOVER_NOTE
+        row.action, row.quantity, row.note = ("ADD" if row.held > 0 else "BUY"), 1, LEFTOVER_NOTE
         row.order_value = row.price
         if result.portfolio_value > 0:  # the row's share of the lot after the buy
             row.target = max(row.target, row.price / result.portfolio_value)

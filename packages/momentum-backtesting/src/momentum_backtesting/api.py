@@ -2803,10 +2803,16 @@ def _equal_split_recipe(
         if float(t.value) > 0
     }
     book = {n for n in _model_holdings_or_idle(result, week) if n not in (IDLE, CASH)}
+    # what the engine sold this week is gone, whatever rank the stock still has
+    sold = (
+        {str(t.asset) for t in acted.itertuples() if str(t.action) == "SELL"}
+        if len(acted)
+        else set()
+    )
     inside = {str(n) for n, r in ranks.items() if pd.notna(r) and r <= req.broad_category_exit_rank}
     return {
         "slices": slices,
-        "keep": sorted(book | inside),
+        "keep": sorted((book | inside) - sold),
         "max_position": req.max_position,
         "cap_band": req.cap_band,
     }
@@ -3894,8 +3900,8 @@ def _lot_label(name: str, week: str, start: str | None, rebalance: dict | None) 
 def lot_rule() -> str:
     """How a due lot that holds shares is rebalanced (BL-236, owner 2026-11-19): `equal` (the
     default) trades what the sleeve's backtest trades that week; `target` is the BL-142 rule, an
-    order to the sleeve's end weights. `MOMENTUM_LOT_RULE=target` switches it back (the API
-    reads it at start)."""
+    order to the sleeve's end weights. `MOMENTUM_LOT_RULE=target` switches it back (read on each
+    call; the launchd Momentum API keeps the environment it started with, so restart it)."""
     return (
         "target"
         if os.environ.get("MOMENTUM_LOT_RULE", "equal").strip().lower() == "target"
