@@ -15,7 +15,7 @@ import {
   formatPct,
   formatPp,
 } from '../../../lib/format';
-import { LOT_ORDER_STATUS } from '../../../lib/momentumLots';
+import { LOT_ORDER_STATUS, LOT_RULE_TEXT } from '../../../lib/momentumLots';
 import type {
   MomentumKiteOrder,
   MomentumOrderPreview,
@@ -599,6 +599,9 @@ function LotOrders({
             </Badge>
             {lot.budget != null && lot.status !== 'not due' ? (
               <span className="text-muted">{formatInr(lot.budget)}</span>
+            ) : null}
+            {lot.status === 'rebalance' && lot.rule ? (
+              <span className="text-muted">{LOT_RULE_TEXT[lot.rule]}</span>
             ) : null}
             {lot.status === 'not due' && lot.next ? (
               <span className="text-muted">next {formatDay(lot.next)}</span>
