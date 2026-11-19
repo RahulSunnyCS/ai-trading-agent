@@ -74,7 +74,7 @@ jobs:
   # workflow was created today, whatever its result. Quantiply's failure fails the run,
   # so without this every backstop would send Angel One another login - with a wrong
   # PIN, refused attempts that GitHub repeats until Angel locks the account (the
-  # laptop's angel-login-check hold can't see these).
+  # laptop's Angel One refusal hold can't see these).
   backstop-check:
     runs-on: ubuntu-latest
     outputs:

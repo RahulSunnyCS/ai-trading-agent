@@ -579,7 +579,7 @@ contract, not a shared service).
   collateral, never below 0. `mbt kite remind --send` is the Fri
   13:30 `kite-login-reminder` job (`--when monday`: the Mon 08:45 `kite-login-reminder-monday`).
   `kite_login.py` (`mbt kite auto-login`, owner 2026-10-28, off until `KITE_AUTO_LOGIN=on`) logs
-  in unattended on Kite's own page, every trading day from the 08:02 `broker-login` job (Fridays and
+  in unattended on Kite's own page, every trading day from the `morning-open` chain's `quantiply-login` step (Fridays and
   Mondays only until 2026-11-06);
   `finish_login` (exchange, save, holdings read) is shared with `/api/kite/callback`.
   `login_nudge.py` gives it and `mbt token-remind` (the 08:05 / 15:30 Fyers reminders) the link to

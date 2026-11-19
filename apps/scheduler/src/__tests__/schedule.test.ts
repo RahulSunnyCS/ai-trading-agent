@@ -89,7 +89,12 @@ describe('job registry', () => {
 
   it('keeps every chain well formed: no job-level retries, unique steps, requires point backwards (BL-234)', () => {
     const chains = JOBS.filter((j) => j.chain);
-    expect(chains.map((j) => j.id).sort()).toEqual(['close-out', 'evening', 'morning-topup']);
+    expect(chains.map((j) => j.id).sort()).toEqual([
+      'close-out',
+      'evening',
+      'morning-open',
+      'morning-topup',
+    ]);
     for (const job of chains) {
       expect(job.steps, job.id).toEqual([]);
       expect(job.retries, job.id).toBe(0); // a step retries on its own, never the whole chain
@@ -297,25 +302,30 @@ describe('T1 parallel track', () => {
 });
 
 describe('Angel One login check', () => {
-  const angel = JOBS.find((job) => job.id === 'angel-login-check');
+  // BL-234 Phase 4: the 08:00 check is the first step of the morning-open chain
+  const chain = JOBS.find((job) => job.id === 'morning-open');
+  const angel = chain?.chain?.find((s) => s.id === 'angel-check');
 
-  it('runs the guarded check at 08:00 on trading days, as a scheduled run', () => {
-    expect(angel?.schedule.at).toBe('08:00');
-    expect(angel?.schedule.on('2026-10-17')).toBe(false); // Saturday
-    expect(angel?.schedule.on('2026-10-19')).toBe(true); // Monday
+  it('runs the guarded check first, at 08:00 on trading days, as a scheduled run', () => {
+    expect(chain?.chain?.[0]?.id).toBe('angel-check');
+    expect(chain?.schedule.at).toBe('08:00');
+    expect(chain?.schedule.on('2026-10-17')).toBe(false); // Saturday
+    expect(chain?.schedule.on('2026-10-19')).toBe(true); // Monday
     expect(angel?.cwd).toBe('packages/option-backtesting');
-    expect(angel?.steps).toEqual([['uv', 'run', 'obt', 'angel', 'test', '--scheduled']]);
+    expect(angel?.argv).toEqual(['uv', 'run', 'obt', 'angel', 'test', '--scheduled']);
   });
 
-  it('retries once, after its own 60 s cool-down, and catches up only until 09:10', () => {
-    expect(angel?.retries).toBe(1);
-    expect((angel?.retryDelayMinutes ?? 0) * 60).toBeGreaterThan(60);
-    expect(angel?.catchUpHours).toBeCloseTo(70 / 60);
+  it('never stops the logins, has no retry, and is dropped after 09:10 with a mention', () => {
+    // the old 5-minute retry only helped a network blip and would have held Quantiply back
+    expect(angel?.retries ?? 0).toBe(0);
+    expect(angel?.onFail).toBe('continue');
+    expect(angel?.notAfter).toBe('09:10');
+    expect(angel?.alertLate).toBe(true);
     // the scheduler sends the failure alert: the CLI only exits non-zero
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 33 jobs', () => {
+  it('has 30 jobs', () => {
     // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
     // BL-012: + check-expiry-calendar (Y4), check-blocked-dates (Y3), universe-refresh-reminder (S3)
     // BL-024: + momentum-journal-score
@@ -332,7 +342,8 @@ describe('Angel One login check', () => {
     // quantiply-deploy-topup (2 become morning-topup)
     // BL-234 Phase 3: - options-evening, options-rotation-result, options-rotation-t1-update,
     // algotest-evening, quantiply-evening (5 become the evening chain)
-    expect(JOBS).toHaveLength(33);
+    // BL-234 Phase 4: - broker-login, angel-login-check, quantiply-deploy, algotest-activate, + morning-open
+    expect(JOBS).toHaveLength(30);
   });
 });
 
@@ -572,9 +583,14 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
     // BL-234: the switch-off is a close-out step (15:30 chain, 15:40 earliest) before the 16:45 upload
     expect(job('close-out')?.chain?.map((s) => s.id)).toContain('quantiply-disable');
     expect(minutes('close-out')).toBeLessThan(minutes('evening'));
-    // BL-172: the switch-on is in the morning, after the 08:00 login, before the first entry
-    expect(minutes('quantiply-deploy')).toBeGreaterThan(8 * 60);
-    expect(minutes('quantiply-deploy')).toBeLessThan(9 * 60 + 15);
+    // BL-172 / BL-234 Phase 4: the switch-on is a step of the morning-open chain (08:00), after
+    // Quantiply's login and before AlgoTest's, which waits for its 08:16 window
+    expect(minutes('morning-open')).toBeGreaterThanOrEqual(8 * 60);
+    expect(minutes('morning-open')).toBeLessThan(9 * 60);
+    const morning = job('morning-open')?.chain?.map((s) => s.id) ?? [];
+    expect(morning.indexOf('quantiply-login')).toBeLessThan(morning.indexOf('quantiply-deploy'));
+    expect(morning.indexOf('quantiply-deploy')).toBeLessThan(morning.indexOf('algotest-login'));
+    expect(stepOf('morning-open', 'quantiply-deploy')?.notAfter).toBe('09:05');
     // BL-234: the top-up and its enable are one chain, in that order
     expect(job('morning-topup')?.chain?.map((s) => s.id)).toEqual([
       'quantiply-export',
@@ -582,7 +598,7 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
       'quantiply-deploy-topup',
     ]);
     // one group: a deploy waits for the upload (and its retries); logins never overlap
-    for (const id of ['close-out', 'morning-topup', 'quantiply-deploy']) {
+    for (const id of ['close-out', 'morning-topup']) {
       expect(job(id)?.group).toBe('quantiply');
       expect(job(id)?.schedule.on('2026-10-20')).toBe(false); // a market holiday
     }
@@ -604,8 +620,9 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
   });
 
   it('never retries an enable; both accounts run, each with --apply', () => {
-    expect(job('quantiply-deploy')?.retries).toBe(0);
-    const morning = job('quantiply-deploy')?.steps.at(-1)?.at(-1) ?? '';
+    const morningStep = stepOf('morning-open', 'quantiply-deploy');
+    expect(morningStep?.retries ?? 0).toBe(0);
+    const morning = morningStep?.argv.at(-1) ?? '';
     expect(morning).toContain('--broker angelone --mode enable --morning --apply');
     expect(morning).toContain('--broker finvasia --mode enable --morning --apply');
     const topup = stepOf('morning-topup', 'quantiply-deploy-topup');

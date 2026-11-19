@@ -99,3 +99,15 @@ export function loginLine(status: LoginStatus | null): string | null {
   }
   return `✅ Logged in: ${lines.map((x) => x.name).join(' · ') || 'nothing asked'}`;
 }
+
+/**
+ * BL-234 Phase 4 (the `morning-open` chain's last step): the switch-on step wrote no report file
+ * because it did not run (its login failed, the stop button or a pause held it, or it was too
+ * late). The message still goes, with the login line and why there is no switch-on to report.
+ */
+export function switchOnNotRun(day: string, login: string | null): string {
+  return [
+    `⚠️ Quantiply morning switch-on ${day}: not run (the Quantiply login failed, the stop hold or a pause held it, or it was too late): check Quantiply before 09:17; the 09:19 top-up chain enables what is left`,
+    ...(login ? ['', login] : []),
+  ].join('\n');
+}

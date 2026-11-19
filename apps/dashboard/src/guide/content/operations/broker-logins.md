@@ -59,7 +59,7 @@ its `.env` (API key, client code, PIN and TOTP seed). The card shows whether tha
 | Login works | The last check logged in. The client code is shown masked (`R1•••56`). |
 | Last check failed | The last check did not log in. The line under it says why: **Login refused** (Angel One rejected the client code, PIN or TOTP), **Could not reach Angel One** (network), **Angel One unavailable** (their server error), or **Login error**. |
 
-**Last check** is the newest Angel One login: the automatic check (the `angel-login-check` job,
+**Last check** is the newest Angel One login: the automatic check (the first step of the `morning-open` chain,
 08:00 on trading days, see [Jobs](app:/jobs)), your own **Test connection**, or the evening
 collection's login, with the time and how long it took. **Last collection from Angel One** is the
 last day the evening run actually collected from it.
@@ -94,9 +94,9 @@ the hosted dashboard's `/api/momentum/kite/callback`, so a login works from your
 | Connected | Today's login is valid, until 06:00 IST tomorrow. The account ID is shown. |
 | Not logged in today | Log in before Friday's 14:15 orders, or before Monday's open. |
 
-On every trading day the 08:02 morning login (with Angel One and AlgoTest) can log in to Kite for you
+On every trading day the morning login (the `morning-open` chain's Quantiply step, from 08:00) can log in to Kite for you
 (`KITE_AUTO_LOGIN=on` in `.env`, with your Kite user ID, password and TOTP key; off by default).
-Its result is in the 08:10 message, and a failure is sent at once; the card then shows Not logged
+Its result is in the morning message (about 08:20), and a failure is sent at once; the card then shows Not logged
 in today and the reminders below still come. Zerodha says automating its login is not allowed, so
 switching it on is a risk to the Kite account you accept.
 
@@ -115,10 +115,10 @@ have not logged in that day; they say nothing otherwise.
 ## AlgoTest logins
 
 The broker accounts (Angel One, Finvasia) are logged into [AlgoTest](glossary:algotest) by the
-08:00 `broker-login` job, not from this screen. See [Jobs](app:/jobs). The Angel One card above
+`morning-open` chain (its `quantiply-login` and `algotest-login` steps), not from this screen. See [Jobs](app:/jobs). The Angel One card above
 checks this tool's own data login, not AlgoTest's.
 
-When it is switched on, the same job also logs in to Quantiply, Angel One's algo platform, with the
+When it is switched on, the same chain also logs in to Quantiply, Angel One's algo platform, with the
 same Angel One account. Its result is a line of its own in the job's Telegram report.
 
 ## Common questions

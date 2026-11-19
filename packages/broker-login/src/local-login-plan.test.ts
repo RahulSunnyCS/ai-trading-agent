@@ -5,10 +5,13 @@ import {
   type LoginResult,
   allLoggedIn,
   changedSecrets,
+  combineParts,
   fallback,
   kiteDue,
   kiteResult,
   loginEnv,
+  parsePart,
+  partEnv,
   secretsReminder,
 } from './local-login-plan.js';
 
@@ -147,5 +150,95 @@ describe("Kite's unattended login (owner, 2026-10-28)", () => {
     assert.equal(kiteResult(null), null);
     assert.equal(kiteResult('not json'), null);
     assert.equal(kiteResult('{"status":"MAYBE"}'), null);
+  });
+});
+
+describe('the login in two parts (BL-234 Phase 4)', () => {
+  const env = {
+    ONLY: '',
+    QUANTIPLY_LOGIN: 'on' as const,
+    QUANTIPLY_BROKERS: 'angelone,finvasia',
+  };
+
+  it('parses --part, refusing anything else', () => {
+    assert.equal(parsePart(undefined), 'all');
+    assert.equal(parsePart('quantiply'), 'quantiply');
+    assert.equal(parsePart('algotest'), 'algotest');
+    assert.throws(() => parsePart('shoonya'), /expected quantiply/);
+  });
+
+  it('gives Quantiply · Angel One alone to the first part, AlgoTest and Shoonya to the second', () => {
+    assert.deepEqual(partEnv(env, 'quantiply'), {
+      ONLY: 'none',
+      QUANTIPLY_LOGIN: 'on',
+      QUANTIPLY_BROKERS: 'angelone',
+    });
+    assert.deepEqual(partEnv(env, 'algotest'), {
+      ONLY: '',
+      QUANTIPLY_LOGIN: 'off',
+      QUANTIPLY_BROKERS: 'finvasia',
+    });
+    assert.equal(partEnv(env, 'all'), env);
+  });
+
+  it('asks a part nothing when the settings leave it out', () => {
+    assert.equal(
+      partEnv({ ...env, QUANTIPLY_LOGIN: 'off', QUANTIPLY_BROKERS: '' }, 'quantiply'),
+      null,
+    );
+    assert.equal(
+      partEnv({ ONLY: 'none', QUANTIPLY_LOGIN: 'on', QUANTIPLY_BROKERS: 'angelone' }, 'algotest'),
+      null,
+    );
+    // Shoonya's Quantiply login alone still belongs to the second part
+    assert.deepEqual(
+      partEnv({ ONLY: 'none', QUANTIPLY_LOGIN: 'off', QUANTIPLY_BROKERS: 'finvasia' }, 'algotest'),
+      { ONLY: 'none', QUANTIPLY_LOGIN: 'off', QUANTIPLY_BROKERS: 'finvasia' },
+    );
+  });
+
+  it("combines each part's body, and a part run again replaces its own", () => {
+    const first = {
+      ok: true,
+      result: {
+        algotest: null,
+        quantiply: ok('Quantiply · Angel One'),
+        quantiplyShoonya: null,
+        fatal: null,
+      },
+    };
+    const second = {
+      ok: false,
+      fallback: { parts: ['AlgoTest · Finvasia'], url: 'https://gh/1' },
+      result: {
+        algotest: [fail('Finvasia', 'timeout')],
+        quantiply: null,
+        quantiplyShoonya: ok('Quantiply · Shoonya'),
+        fatal: null,
+      },
+    };
+    const both = combineParts({ quantiply: first, algotest: second });
+    assert.equal(both.ok, false);
+    assert.deepEqual(both.fallback, { parts: ['AlgoTest · Finvasia'], url: 'https://gh/1' });
+    assert.equal(both.result?.quantiply?.status, 'OK');
+    assert.equal(both.result?.algotest?.[0]?.status, 'FAIL');
+    assert.equal(both.result?.quantiplyShoonya?.status, 'OK');
+    const fixed = combineParts({
+      quantiply: first,
+      algotest: { ok: true, result: { ...second.result, algotest: [ok('Finvasia')] } },
+    });
+    assert.equal(fixed.ok, true);
+    assert.equal(fixed.fallback, undefined);
+  });
+
+  it('is nothing to log in only when every part says so', () => {
+    assert.equal(
+      combineParts({ a: { ok: true, nothing: true }, b: { ok: true, nothing: true } }).nothing,
+      true,
+    );
+    assert.equal(
+      combineParts({ a: { ok: true, nothing: true }, b: { ok: true } }).nothing,
+      undefined,
+    );
   });
 });

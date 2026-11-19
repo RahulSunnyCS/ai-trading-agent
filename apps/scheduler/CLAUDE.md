@@ -180,29 +180,45 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
 - `group: 'catalog'` is for anything that writes the DuckDB catalog (`TRADING_DATA_ROOT`).
 - `group: 'quantiply'` holds the Quantiply jobs (upload, enable, disable), so an enable runs after the upload
-  before it, retries included (`quantiply-deploy` 08:10 waits for the 08:02 `broker-login`, BL-172; the
+  before it, retries included (`morning-open`'s steps (BL-234 Phase 4) take it at the first Quantiply step; the
   `morning-topup` chain runs the 09:19 top-up, then its enable, in order; the `close-out` chain (15:30) holds the
   switch-off and the live capture; the `evening` chain's Quantiply upload steps wait for both). It does not space their TOTP logins (the next job
   starts the moment one ends): `packages/broker-login/src/quantiply-session.ts` waits out the last window each
   account typed a code in (a file stamp), and the deployer retries a refused code once. The enables have
-  `retries: 0` like `algotest-activate`: a second attempt could act on a half-finished first. `quantiply-disable`
+  `retries: 0` like the `morning-open` activation: a second attempt could act on a half-finished first. `quantiply-disable`
   is the safety net and runs whatever `QUANTIPLY_DEPLOY` and the deploy switch say.
-- `broker-login` (BL-172, 08:02) runs the login on the Mac (`packages/broker-login/src/local-login.ts`), in the
-  `quantiply` group so the 08:10 `quantiply-deploy` and the 08:11 `algotest-activate` (BL-197 Phase 2: last
-  evening's list activated on AlgoTest /live for every list an AlgoTest row uploads, `--from-settings`; it replaced the 09:16 `algotest-deploy` and the 09:18
-  `algotest-topup` on 2026-11-04) start after it; `retries: 0` on purpose: a second run would
-  resend a refused PIN, and the job hands what failed to GitHub itself. The 09:00 summary reads its
-  `<state>/broker-login/<day>.json` first, GitHub's runs only when the Mac did not run or handed parts over.
-- `angel-login-check` (trading days 08:00) runs `obt angel test --scheduled`: one Angel One
-  SmartAPI login through the same guard as the dashboard's Test connection and the collector
-  (one login at a time, 60 s cool-down). Its single retry is 5 minutes later, past its own
-  cool-down, and a login Angel One refused is not re-sent for 15 minutes with the same settings,
-  so the retry only helps a network blip. The check re-reads the `ANGELONE_*` keys from `.env`
-  itself, so the scheduler's start-time snapshot of `.env` does not matter for it. The scheduler
-  sends the failure alert (the job does not alert itself). `broker-login`'s GitHub run logs in
-  to Angel One too (AlgoTest's Angel One login from 08:15 unless BROKER_LOGIN_ONLY=finvasia, and
-  Quantiply's at about 08:02 when QUANTIPLY_LOGIN is on), where this job's hold can't see it;
-  see the comment on the job in `jobs.ts`.
+- `morning-open` (BL-234 Phase 4, trading days 08:00) is the morning as one chain, replacing the four clock-chained jobs
+  `angel-login-check` (08:00), `broker-login` (08:02), `quantiply-deploy` (08:10) and `algotest-activate` (08:11);
+  `options-rotation-pick` (08:45) and `morning-summary` (09:00) stay fixed-time jobs (owner, 2026-11-18). Owner's
+  order: **Quantiply is switched on first (about 08:06), before AlgoTest's 08:16 window**, and its one Telegram message
+  goes once at the end (about 08:20; 2026-11-19). Steps (`jobs.ts` is the one place that lists times, timeouts and
+  fixes): `angel-check` (`obt angel test --scheduled`: never stops the rest, no retry (the old 5-minute retry only
+  helped a blip and would hold Quantiply back), not after 09:10) → `quantiply-login` (`local-login.ts --part
+  quantiply`: Quantiply · Angel One and Kite; not after 09:05) → `quantiply-deploy` (both accounts, REAL MONEY;
+  `requires` the login; held as `quantiply-deploy`; not after 09:05, the 09:19 `morning-topup` chain is the net) →
+  `algotest-login` (`--part algotest`: the AlgoTest brokers, then Quantiply · Shoonya; `notBefore` 08:16, not after
+  12:40) → `algotest-catch-up` (a list switched in after 16:40 is exported, uploaded and set up first; never fails;
+  held as `algotest-activate`) → `algotest-activate` (REAL MONEY; `requires` the AlgoTest login; not after 12:40) →
+  `morning-message` (`morning-report.ts --chain`: the login line and each Quantiply account's report, or "switch-on
+  not run"). Failure policy: a failed check stops nothing; a failed Quantiply login skips only Quantiply's switch-on; a
+  failed AlgoTest login skips only the activation. Every login and activation step has NO retries (a refused PIN sent
+  again locks an account; a second activation double-activates) and a step cut off mid-run is `unknown`, so a resume
+  refuses (exit 4) and the owner decides with `--from`. A step past its `notAfter` is `late` and, with `alertLate`, the
+  run counts it as a problem and the one alert names it (it is never waited for); the chain's `catchUpHours` is the
+  old login window (7 h), each step has its own limit. The `quantiply` group is taken at the first Quantiply step and
+  let go after the last step that needs it (`algotest-activate`), the span the old jobs held it (other chains still use it). The stop hold and the pause hold the
+  `quantiply-deploy`, `algotest-catch-up` and `algotest-activate` steps under their old job ids (`holdId`); the logins
+  and the message are never held. Each login part records its own body under `parts` in `<state>/broker-login/<day>.json`
+  (the file's top level is them combined, which the 09:00 summary and the message read), hands only its own failures
+  to GitHub, and the last asked part sets `LOCAL_LOGIN_DONE` (a part that failed sets it at once, so a refused PIN is
+  not sent again by the backstop). The Quantiply login waits for the next 30-second TOTP window before its first
+  Angel One code, because the check ran on the same seed seconds before. `jobs run morning-open --dry-run [--at HH:MM]`
+  prints the order, the 08:16 wait and any hold or late skip without starting anything (`chain-plan.ts`; steps taken as
+  instant). The check's refusal hold: `obt angel test --scheduled` waits out a login in flight and the 60 s cool-down; a
+  login Angel One refused is not sent again for 15 minutes with the same settings. `broker-login`'s GitHub run logs in
+  to Angel One too (AlgoTest's Angel One login from 08:15 unless BROKER_LOGIN_ONLY=finvasia, and Quantiply's when
+  QUANTIPLY_LOGIN is on), where this chain's hold can't see it. The 09:00 summary reads the status file first, GitHub's
+  runs only when the Mac did not run or handed parts over.
 - `trade-monitor` (BL-143, trading days 09:04, `packages/broker-login/src/trade-monitor.ts`) runs all
   session long under `caffeinate -i`, so it is not in the `quantiply` group (it would hold the 09:19 /
   09:21 top-ups all day). It makes no login and holds no session 09:10-09:25, and none on a platform after that

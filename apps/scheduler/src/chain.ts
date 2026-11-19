@@ -22,6 +22,8 @@ export interface StepOutcome {
   attempts: number;
   error: string | null;
   alertsItself: boolean;
+  /** A `late` outcome that the alert names (`ChainStep.alertLate`). */
+  alertLate?: boolean;
   fixHint: string;
 }
 
@@ -102,6 +104,7 @@ export async function runChain(
       attempts,
       error,
       alertsItself: step.alertsItself ?? false,
+      ...(step.alertLate ? { alertLate: true } : {}),
       fixHint: step.fixHint,
     });
 
@@ -266,7 +269,9 @@ export async function runChain(
     }
   }
 
-  const problems = outcomes.filter((o) => o.status === 'failed' || o.status === 'skipped');
+  const problems = outcomes.filter(
+    (o) => o.status === 'failed' || o.status === 'skipped' || (o.status === 'late' && o.alertLate),
+  );
   if (problems.length === 0) return { code: 0, error: null, steps: outcomes };
   const first = problems.find((o) => o.status === 'failed');
   return {

@@ -407,7 +407,7 @@ export function angelLine(status: AngelStatus | null, now: number): StatusLine {
   }
 }
 
-/** The 08:02 morning broker login (scheduler job `broker-login`): its latest run. */
+/** The morning broker logins (the scheduler's `morning-open` chain, BL-234 Phase 4): its latest run. */
 export function brokerLoginLine(job: SchedulerJob | null, now: number): StatusLine {
   const label = 'Morning login';
   if (!job) return { label, text: 'job not found', tone: 'neutral' };

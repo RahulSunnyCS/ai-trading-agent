@@ -223,9 +223,10 @@ describe('BL-143: the trade monitor job', () => {
       if (!job) throw new Error(`no ${id}`);
       return { minutes: maxRunMinutes(job), steps: job.steps.length };
     };
-    // the morning activation (BL-197 Phase 2): the catch-up and the activation, one attempt, plus
-    // its group's wait
-    expect(at('algotest-activate')).toEqual({ minutes: 30 * 2 + 30, steps: 2 });
+    // BL-234 Phase 4: the morning-open chain adds each step's own timeout (no step retries): the
+    // check 5, the Quantiply login 15, its switch-on 10, the AlgoTest login 25, the catch-up 25, the
+    // activation 15 and the message 5 (the chain's own `quantiply` group is taken per step, so no group wait)
+    expect(at('morning-open')).toEqual({ minutes: 5 + 15 + 10 + 25 + 25 + 15 + 5, steps: 0 });
     // BL-234: a chain adds each step's attempts and delays: the export (two attempts, 2 min
     // apart), the top-up (the same), the enable (one attempt), plus the group's wait
     expect(at('morning-topup')).toEqual({ minutes: 10 * 2 + 2 + (10 * 2 + 2) + 10 + 10, steps: 0 });
@@ -272,7 +273,7 @@ describe('BL-143: the trade monitor job', () => {
     const dir = mkdtempSync(join(tmpdir(), 'bl143-pgid-'));
     const history = new History(join(dir, 'scheduler.db'));
     const job = {
-      ...JOBS[0],
+      ...(JOBS.find((j) => !j.chain) as Job),
       id: 'pgid-probe',
       steps: [['/bin/sh', '-c', 'true']],
       cwd: '.',

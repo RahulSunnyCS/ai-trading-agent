@@ -160,7 +160,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
   const views: SchedulerJobView[] = [
     // the activation's catch-up (the Mac slept through 08:11) is still running
     {
-      id: 'algotest-activate',
+      id: 'morning-open',
       nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('09:18'), ended_at: null },
       previousSlot: slot('08:11'),
@@ -184,11 +184,15 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     },
   ];
   assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now), {
-    blocking: ['algotest-activate is running (since 09:18)'],
+    blocking: ['morning-open is running (since 09:18)'],
     pastCap: [],
   });
+  // the morning chain logs in to Quantiply as well, so it blocks there too
   assert.deepEqual(decided(views, PLATFORM_JOBS.quantiply, now), {
-    blocking: ['morning-topup is due (its 09:19 run has not started)'],
+    blocking: [
+      'morning-open is running (since 09:18)',
+      'morning-topup is due (its 09:19 run has not started)',
+    ],
     pastCap: [],
   });
   // not scheduled today (yesterday's slot) and not listed: nothing blocks
@@ -208,7 +212,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
   // a slot about to come blocks (a --now run at 09:12, an activation catch-up due 09:16) ...
   const later: SchedulerJobView[] = [
     {
-      id: 'algotest-activate',
+      id: 'morning-open',
       nextRun: slot('09:16'),
       lastRun: null,
       previousSlot: '2026-10-20T03:46:00.000Z',
@@ -216,7 +220,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
     },
   ];
   assert.deepEqual(decided(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:12')), {
-    blocking: ['algotest-activate runs at 09:16'],
+    blocking: ['morning-open runs at 09:16'],
     pastCap: [],
   });
   // ... one further ahead does not (the 09:05 margin login, 11 minutes before it)
@@ -243,7 +247,7 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
   // a hand `jobs run` at 13:00 (no slot today's row: a manual run) blocks too
   const manual: SchedulerJobView[] = [
     {
-      id: 'algotest-activate',
+      id: 'morning-open',
       nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('13:00'), ended_at: null },
       previousSlot: slot('08:11'),
@@ -270,14 +274,14 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
   });
 });
 
-test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --now run', () => {
+test('the evening jobs (must-fix 1): the 15:30 close-out chain running blocks a hand --now run', () => {
   const now = ist('2026-10-21', '17:02');
   const views: SchedulerJobView[] = [
     {
-      id: 'quantiply-deploy',
-      nextRun: tomorrow('16:55'),
-      lastRun: { started_at: slot('16:55'), ended_at: null },
-      previousSlot: slot('16:55'),
+      id: 'close-out',
+      nextRun: tomorrow('15:30'),
+      lastRun: { started_at: slot('15:30'), ended_at: null },
+      previousSlot: slot('15:30'),
       previousSlotRun: { ended_at: null },
     },
     {
@@ -289,9 +293,12 @@ test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --no
     },
   ];
   assert.deepEqual(decided(views, PLATFORM_JOBS.quantiply, now).blocking, [
-    'quantiply-deploy is running (since 16:55)',
+    'close-out is running (since 15:30)',
   ]);
-  assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now).blocking, []);
+  // the close-out logs in to both platforms
+  assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now).blocking, [
+    'close-out is running (since 15:30)',
+  ]);
   assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === 'evening'));
   assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'evening'));
   // BL-234: the close-out chain holds the deploy check, the live capture (it logs in to both
@@ -318,7 +325,7 @@ test('a "running" row older than its longest run is one nothing closed: ignored 
   const noon = ist('2026-10-21', '12:00');
   const open = (maxRunMinutes?: number): SchedulerJobView[] => [
     {
-      id: 'algotest-activate',
+      id: 'morning-open',
       nextRun: tomorrow('08:11'),
       lastRun: { started_at: slot('09:30'), ended_at: null },
       previousSlot: slot('08:11'),
@@ -343,7 +350,7 @@ test('a "running" row older than its longest run is one nothing closed: ignored 
     previousSlotRun: v.previousSlotRun && { ...v.previousSlotRun, alive: true },
   }));
   assert.deepEqual(decided(alive, PLATFORM_JOBS.algotest, noon).blocking, [
-    'algotest-activate is running (since 09:30)',
+    'morning-open is running (since 09:30)',
   ]);
   // ... and one it reports not alive is judged by its age
   const dead = alive.map((v) => ({

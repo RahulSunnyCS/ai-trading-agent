@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { combineReports, loginLine } from './morning-report-plan.js';
+import { combineReports, loginLine, switchOnNotRun } from './morning-report-plan.js';
 
 const line = (text: string) => `${JSON.stringify({ text })}\n`;
 const expect_ = (got: string | null, want: string) => assert.equal(got, want);
@@ -97,5 +97,15 @@ describe('one morning switch-on message (BL-172)', () => {
   it('no report at all is said, never silence', () => {
     assert.match(combineReports(null, '2026-10-28'), /no account reported/);
     assert.match(combineReports('not json\n', '2026-10-28'), /no account reported/);
+  });
+});
+
+describe('the switch-on that did not run (BL-234 Phase 4)', () => {
+  it('says so, with the login line', () => {
+    const text = switchOnNotRun('2026-11-19', '✅ Logged in: Quantiply · Angel One');
+    assert.match(text, /^⚠️ Quantiply morning switch-on 2026-11-19: not run/);
+    assert.match(text, /09:19 top-up chain enables what is left/);
+    assert.ok(text.endsWith('✅ Logged in: Quantiply · Angel One'));
+    assert.ok(!switchOnNotRun('2026-11-19', null).includes('Logged in'));
   });
 });

@@ -80,21 +80,30 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
 
 ## Source layout
 
-- `src/local-login.ts` (+ pure `src/local-login-plan.ts`) — BL-172: the scheduler's 08:02 `broker-login` job. Derives
-  `ONLY` / `QUANTIPLY_LOGIN` / `QUANTIPLY_BROKERS` from the automation settings (`loginEnv`, the GitHub variables'
-  rule), runs `main.ts` here with the repo `.env`, reads its outcome (`LOGIN_RESULT_FILE`), hands to GitHub only
-  the parts that failed for a reason another machine could fix (`fallback`: dispatch inputs `only` (`both` = both
-  brokers), `quantiply`, `quantiply_shoonya`; a refusal matching `REFUSED` never), sets the repository variable
-  `LOCAL_LOGIN_DONE` (UTC day) so the workflow's crons skip, and writes `<scheduler state>/broker-login/<IST day>.json`
-  for the 09:00 summary. Its Quantiply logins do not take `quantiply-session.ts`'s stamp yet (08:02 is clear of the
-  08:00 `angel-login-check` window; the 08:10 deployer waits for it, same scheduler group). On every trading day
-  with `KITE_AUTO_LOGIN=on` (`kiteDue`; Fridays and Mondays only until 2026-11-06) it also runs `uv run --directory ../momentum-backtesting mbt kite auto-login`
-  beside `main.ts` (owner, 2026-10-28): its outcome is the status file's `kite` (the 08:10 `loginLine` and the 09:00
-  summary's Kite line), a failure is alerted at once, and Kite is never handed to GitHub.
-- `src/morning-report.ts` (+ pure `src/morning-report-plan.ts`) — BL-172: the 08:10 `quantiply-deploy` job sets
-  `MORNING_REPORT_FILE`; each account's `quantiply-deploy.ts --morning` run adds its report there (`deliver`) and this
-  sends them as one Telegram message (a warning heading if either account needs a look; "no account reported" if
-  the file is empty).
+- `src/local-login.ts` (+ pure `src/local-login-plan.ts`) — BL-172, split in two for BL-234 Phase 4: the Mac's morning
+  login, run by the scheduler's `morning-open` chain as `--part quantiply` (Quantiply · Angel One, and Kite) and
+  `--part algotest` (the AlgoTest brokers, then Quantiply · Shoonya); no `--part` is the whole login in one run, as
+  before. Derives `ONLY` / `QUANTIPLY_LOGIN` / `QUANTIPLY_BROKERS` from the automation settings (`loginEnv`, the GitHub
+  variables' rule), narrows them to the part (`partEnv`; a part the settings ask nothing of exits 0 as "nothing"), runs
+  `main.ts` here with the repo `.env`, reads its outcome (`LOGIN_RESULT_FILE`), hands to GitHub only the parts of its own
+  that failed for a reason another machine could fix (`fallback`: dispatch inputs `only` (`both` = both brokers),
+  `quantiply`, `quantiply_shoonya`; a refusal matching `REFUSED` never), and writes `<scheduler state>/broker-login/<IST
+  day>.json` for the morning message and the 09:00 summary: each part's own body under `parts`, the top level the parts
+  combined (`combineParts`), so a part run again replaces only itself. The repository variable `LOCAL_LOGIN_DONE` (UTC
+  day, so the workflow's crons skip) is set when the last asked part ends, and at once by a part that failed (the Mac
+  tried; a refused PIN must not be sent again). The Quantiply part waits for the next TOTP window before its first
+  code (the Angel One check ran on the same seed seconds before) and again after the login (the switch-on logs in
+  next); `main.ts`'s Quantiply logins do not take `quantiply-session.ts`'s stamp. On every trading day with
+  `KITE_AUTO_LOGIN=on` (`kiteDue`; Fridays and Mondays only until 2026-11-06) the Quantiply part also runs `uv run
+  --directory ../momentum-backtesting mbt kite auto-login` beside `main.ts` (owner, 2026-10-28): its outcome is the
+  status file's `kite` (the morning message's `loginLine` and the 09:00 summary's Kite line), a failure is alerted at
+  once, and Kite is never handed to GitHub.
+- `src/morning-report.ts` (+ pure `src/morning-report-plan.ts`) — BL-172: the Quantiply switch-on's account reports as
+  one Telegram message. The `morning-open` chain's `quantiply-deploy` step sets `MORNING_REPORT_FILE` (`morning-report.ts
+  --path`, a file in the scheduler's state dir); each account's `quantiply-deploy.ts --morning` run adds its report
+  there (`deliver`), and the chain's last step (`--chain 2`) sends them as one message after both logins and the
+  activation (a warning heading if either account needs a look; "not run" with the login line when the switch-on was
+  skipped, held or late).
 - `src/main.ts` — entry point: runs Quantiply (if on) before or after the AlgoTest logins (`run-plan.ts`), waits for the AlgoTest login window, runs each broker's `login()`, sends one Telegram report for both
 - `src/brokers/{angelone,finvasia}.ts` — one file per broker, each exporting a `Broker` (see `src/brokers/types.ts`)
 - `src/selectors.ts` — every Playwright locator in the package, single-file fix on redesign
@@ -225,7 +234,7 @@ week, until disabled.
   adds it once from the listing (ledger only); it cannot tell a tool upload from the owner's copy of the same
   name, so it was run once, supervised.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) activates strategies on /live. `--morning` (BL-197 Phase 2,
-  scheduler `algotest-activate` 08:11, in the login's group) activates last evening's list: with `--from-settings` (the three jobs) every book an AlgoTest row uploads, each from its `latest-<book>.json`, one login each, a book with no export reported and failed under `--apply`; the job first runs a catch-up step (`obt rotation algotest-export --from-settings --preview --only-missing` (exit 3 when no list is missing, which ends the chain) `&&` the top-up upload `&&` `--from-settings --setup`; `exit 0`, so it never blocks the activation): a row switched after 16:40 to a list no row had then still trades; or the export `--latest <book>`
+  the `algotest-activate` step of the scheduler's `morning-open` chain, after the AlgoTest login) activates last evening's list: with `--from-settings` (the three jobs) every book an AlgoTest row uploads, each from its `latest-<book>.json`, one login each, a book with no export reported and failed under `--apply`; the job first runs a catch-up step (`obt rotation algotest-export --from-settings --preview --only-missing` (exit 3 when no list is missing, which ends the chain) `&&` the top-up upload `&&` `--from-settings --setup`; `exit 0`, so it never blocks the activation): a row switched after 16:40 to a list no row had then still trades; or the export `--latest <book>`
   points at (the 16:40 run's `--next` export, source `preview`, for today; any other export is refused, so a catch-up never trades the 09:16 list), every strategy not yet deployed, through
   `planDeploy` like the old 09:16 run; the Buy add-on is left out when no AlgoTest row has it on now (`morningPicks`,
   `algotestAddon`: the settings are read again in the morning, since the export read them the evening before). The
@@ -272,8 +281,8 @@ week, until disabled.
   open session 09:10-09:25** (the 09:18-09:21 Quantiply top-ups log in; neither platform is known to
   keep two sessions per user), checked at every login (after the lock wait) and every use of an open session;
   `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. Before every login, at any
-  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-activate`,
-  the `evening` chain (BL-234); Quantiply `morning-topup`, `evening`, `quantiply-deploy`; both: the
+  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `morning-open`,
+  the `evening` chain (BL-234); Quantiply `morning-open`, `morning-topup`, `evening`; both: the
   `close-out` chain (BL-234: the deploy check, BL-141's `live-capture` and its retry, `quantiply-disable`)), and again under the
   login lock right before the login (`jobsStillToEnd`, then `jobsWait`). A run of one of them in progress today
   always blocks (a 10:30 wake into a deploy-topup catch-up, a hand `jobs run`, an orphaned step after a scheduler
