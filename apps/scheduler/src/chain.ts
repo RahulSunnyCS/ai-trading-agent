@@ -1,6 +1,6 @@
 import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { RunRow, StepRow, StepStatus } from './history.js';
+import type { StepRow, StepStatus } from './history.js';
 import type { ChainStep, Job } from './jobs.js';
 import { pausedReason } from './pause.js';
 import type { RunContext } from './runner.js';
@@ -26,8 +26,11 @@ export interface StepOutcome {
 }
 
 export interface ChainOptions {
-  /** The earlier run to resume: its steps that passed are not run again. */
-  resumeFrom?: RunRow | null;
+  /**
+   * What each step last came to in the runs this one resumes (`History.priorSteps`): the ones that
+   * passed are not run again, one that was cut off mid-run stops the resume.
+   */
+  prior?: Map<string, StepRow> | null | undefined;
   /** Start at this step: every step before it counts as already done. */
   from?: string | undefined;
   /** Run only these steps; the others are left out of the run and count as done. */
@@ -37,6 +40,8 @@ export interface ChainOptions {
    * not (another job holds it past the wait), or null.
    */
   acquire?: ((group: string) => Promise<string | null>) | undefined;
+  /** Lets a group go once no later step needs it, so another job need not wait for the chain's end. */
+  release?: ((group: string) => void) | undefined;
 }
 
 export interface ChainResult {
@@ -64,9 +69,7 @@ export async function runChain(
   const history = ctx.history;
   const sleep = ctx.sleep ?? defaultSleep;
   const log = (text: string) => writeSync(logFd, `${text}\n`);
-  const prior = new Map<string, StepRow>();
-  if (options.resumeFrom)
-    for (const row of history.steps(options.resumeFrom.id)) prior.set(row.step, row);
+  const prior = options.prior ?? new Map<string, StepRow>();
   const fromIndex = options.from ? chain.findIndex((s) => s.id === options.from) : -1;
 
   // A step that was running when the last run was cut off may have done its work (a login sent, an
@@ -102,7 +105,20 @@ export async function runChain(
       fixHint: step.fixHint,
     });
 
+  // The last step that needs each group among those that run: after it the group is let go.
+  const lastUse = new Map<string, number>();
+  for (const [i, step] of chain.entries())
+    if (step.group && (!options.only || options.only.includes(step.id))) lastUse.set(step.group, i);
+  const holding = new Set<string>();
+
   for (const [i, step] of chain.entries()) {
+    for (const group of [...holding]) {
+      if ((lastUse.get(group) ?? -1) < i) {
+        holding.delete(group);
+        options.release?.(group);
+        log(`· ${group} group let go: no later step needs it`);
+      }
+    }
     // not picked (Apply now runs one platform's steps): left out, and counted as done so the steps
     // that require it still run
     if (options.only && !options.only.includes(step.id)) {
@@ -186,6 +202,7 @@ export async function runChain(
 
     const rowId = history.startStep(runId, step.id, now());
     const blocked = step.group && options.acquire ? await options.acquire(step.group) : null;
+    if (step.group && !blocked) holding.add(step.group);
     if (blocked) {
       history.finishStep(rowId, 'failed', 1, 0, now(), blocked);
       state.set(step.id, 'failed');

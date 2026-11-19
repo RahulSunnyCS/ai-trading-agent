@@ -104,6 +104,13 @@ export class History {
       carried_from INTEGER
     )`);
     this.db.exec('CREATE INDEX IF NOT EXISTS run_steps_run ON run_steps (run_id)');
+    // BL-234: the groups a chain's run holds right now (a chain takes a group at its first step that
+    // needs it and lets go after its last), so another job waits only while one is really held.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS run_groups (
+      run_id INTEGER NOT NULL,
+      grp TEXT NOT NULL,
+      PRIMARY KEY (run_id, grp)
+    )`);
   }
 
   /** A step of a chain's run begins (status `running`); returns its row id. */
@@ -168,25 +175,61 @@ export class History {
   }
 
   /**
-   * The run before `beforeId` that served the same slot of `job`, for a chain to resume from. A
-   * manual run has no slot: see `lastOfDay`.
+   * What each step of `job` last came to in the runs a resume builds on: those that served the same
+   * slot, or (a hand run, no slot) those that began at or after `since`, all before `beforeId`.
+   * The LATEST row of a step wins, so a run that recorded no steps (a refused resume) or only some
+   * (an Apply now) never hides a step that passed in an earlier run, and a step that failed again
+   * later is not counted as passed.
    */
-  previousForSlot(job: string, scheduledFor: Date, beforeId: number): RunRow | null {
-    return (this.db
+  priorSteps(
+    job: string,
+    beforeId: number,
+    from: { slot: Date } | { since: Date },
+  ): Map<string, StepRow> {
+    const where =
+      'slot' in from ? 'r.scheduled_for = ?' : 'r.started_at >= ? AND r.exit_code IS NOT -1';
+    const value = 'slot' in from ? from.slot.toISOString() : from.since.toISOString();
+    const rows = this.db
       .query(
-        'SELECT * FROM runs WHERE job = ? AND scheduled_for = ? AND id < ? ORDER BY id DESC LIMIT 1',
+        `SELECT s.* FROM run_steps s JOIN runs r ON r.id = s.run_id
+         WHERE r.job = ? AND r.id < ? AND ${where} ORDER BY s.run_id, s.id`,
       )
-      .get(job, scheduledFor.toISOString(), beforeId) ?? null) as RunRow | null;
+      .all(job, beforeId, value) as StepRow[];
+    const latest = new Map<string, StepRow>();
+    for (const row of rows) latest.set(row.step, row);
+    return latest;
   }
 
-  /** The latest run of `job` before `beforeId` that started at or after `since` (a manual resume). */
-  lastSince(job: string, since: Date, beforeId: number): RunRow | null {
-    return (this.db
+  /** A chain's run takes a group (BL-234). */
+  holdRunGroup(runId: number, group: string): void {
+    this.db.query('INSERT OR IGNORE INTO run_groups (run_id, grp) VALUES (?, ?)').run(runId, group);
+  }
+
+  /** A chain's run lets a group go: another job may take it while the chain goes on. */
+  releaseRunGroup(runId: number, group: string): void {
+    this.db.query('DELETE FROM run_groups WHERE run_id = ? AND grp = ?').run(runId, group);
+  }
+
+  /**
+   * Unfinished runs that hold `group` now: a job that has it as its own `group` (held for the whole
+   * run), or a chain run that has taken it and not yet let it go. `olderThan` keeps two jobs that
+   * start together from waiting on each other; a chain step asks without it, since a newer run may
+   * hold the group when the chain gets to its step. `exceptRun` is the asking run itself.
+   */
+  groupHolders(
+    group: string,
+    ownGroupJobs: string[],
+    exceptRun: number,
+    olderThan: number = Number.MAX_SAFE_INTEGER,
+  ): RunRow[] {
+    const marks = ownGroupJobs.map(() => '?').join(', ');
+    const own = ownGroupJobs.length > 0 ? `job IN (${marks}) OR ` : '';
+    return this.db
       .query(
-        `SELECT * FROM runs WHERE job = ? AND id < ? AND started_at >= ? AND exit_code IS NOT -1
-         ORDER BY id DESC LIMIT 1`,
+        `SELECT * FROM runs WHERE ended_at IS NULL AND id < ? AND id != ?
+           AND (${own}id IN (SELECT run_id FROM run_groups WHERE grp = ?))`,
       )
-      .get(job, beforeId, since.toISOString()) ?? null) as RunRow | null;
+      .all(olderThan, exceptRun, ...ownGroupJobs, group) as RunRow[];
   }
 
   /**
@@ -298,6 +341,7 @@ export class History {
   }
 
   finish(id: number, exitCode: number, attempts: number, at: Date, error: string | null = null) {
+    this.db.query('DELETE FROM run_groups WHERE run_id = ?').run(id);
     this.db
       .query('UPDATE runs SET ended_at = ?, exit_code = ?, attempts = ?, error = ? WHERE id = ?')
       .run(at.toISOString(), exitCode, attempts, error, id);

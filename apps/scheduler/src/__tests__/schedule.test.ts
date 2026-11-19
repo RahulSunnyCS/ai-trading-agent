@@ -195,9 +195,16 @@ describe('job registry', () => {
         id.startsWith('algotest') ? 'algotest-evening' : 'quantiply-evening',
       );
     }
-    // only the Quantiply steps need the Quantiply group; AlgoTest has none
-    expect(step('algotest-upload')?.group).toBeUndefined();
-    expect(step('quantiply-upload')?.group).toBe('quantiply');
+    // every platform-login step takes the `quantiply` group, AlgoTest's too: they wait for the
+    // close-out's capture and switch-off, which log in to both platforms, as the 16:40 slot used to
+    for (const id of [
+      'algotest-export',
+      'algotest-upload',
+      'algotest-setup',
+      'quantiply-export',
+      'quantiply-upload',
+    ])
+      expect(step(id)?.group, id).toBe('quantiply');
     // the AlgoTest upload keeps its delete flag (owner, 2026-10-20)
     expect(step('algotest-upload')?.argv).toContain('--allow-delete');
   });
@@ -584,7 +591,13 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
       job('evening')
         ?.chain?.filter((s) => s.group === 'quantiply')
         .map((s) => s.id),
-    ).toEqual(['quantiply-export', 'quantiply-upload']);
+    ).toEqual([
+      'algotest-export',
+      'algotest-upload',
+      'algotest-setup',
+      'quantiply-export',
+      'quantiply-upload',
+    ]);
     // the loop starts due jobs in this order: a disable caught up with the upload goes first
     const ids = JOBS.map((j) => j.id);
     expect(ids.indexOf('close-out')).toBeLessThan(ids.indexOf('evening'));

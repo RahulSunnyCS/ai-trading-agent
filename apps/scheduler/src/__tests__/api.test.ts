@@ -313,6 +313,27 @@ describe('chains over the API (BL-234)', () => {
     expect(body.find((j) => j.id === 'fast')?.groups).toEqual([]);
   });
 
+  it('refuses an Apply now whose every picked step is held, and accepts one with a step that is not', async () => {
+    writeFileSync(
+      join(dir, 'stop-hold.json'),
+      JSON.stringify({ at: '2026-11-19T03:00:00Z', by: 'test' }),
+    );
+    ctx.env.SCHEDULER_STATE_DIR = dir;
+    const held: Job = {
+      ...chain(),
+      id: 'ev',
+      chain: [
+        { id: 'up', argv: ['/bin/sh', '-c', 'true'], fixHint: 'f', holdId: 'quantiply-evening' },
+        { id: 'read', argv: ['/bin/sh', '-c', 'true'], fixHint: 'f' },
+      ],
+    };
+    handle = createApi({ ctx, jobs: [...jobs, held], prefsFile });
+    const res = await send('POST', '/jobs/ev/run', { only: ['up'] });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain('held');
+    expect((await send('POST', '/jobs/ev/run', { only: ['up', 'read'] })).status).toBe(202);
+  });
+
   it('accepts resume and from for a chain', async () => {
     const res = await send('POST', '/jobs/close/run', { resume: true, from: 'two' });
     expect(res.status).toBe(202);

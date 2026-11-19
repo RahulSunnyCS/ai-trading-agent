@@ -295,6 +295,55 @@ describe('resuming a chain', () => {
     expect(marks()).toEqual(['c']);
   });
 
+  it('does not repeat a passed step after a refused resume left a run with no steps', async () => {
+    const dead = ctx.history.start('c', 'schedule', null, join(dir, 'x.log'), new Date());
+    const done = ctx.history.startStep(dead, 'a', new Date());
+    ctx.history.finishStep(done, 'ok', 0, 1, new Date());
+    ctx.history.startStep(dead, 'b', new Date()); // started, never ended
+    ctx.history.reapDead(
+      new Date(),
+      () => false,
+      () => false,
+    );
+    // the owner resumes: refused, and that run records no step rows
+    const refused = await runJob(chainJob('c', three('fixed')), ctx, 'manual', null, {
+      resume: true,
+    });
+    expect(refused.exitCode).toBe(4);
+    expect(ctx.history.steps(refused.runId)).toEqual([]);
+    // resuming again must still see `a` passed and `b` unknown: it refuses again, running nothing
+    const again = await runJob(chainJob('c', three('fixed')), ctx, 'manual', null, {
+      resume: true,
+    });
+    expect(again.exitCode).toBe(4);
+    expect(marks()).toEqual([]);
+    // and once the owner starts at `b`, `a` is still carried, never run
+    writeFileSync(join(dir, 'fixed'), '');
+    const from = await runJob(chainJob('c', three('fixed')), ctx, 'manual', null, { from: 'b' });
+    expect(statuses(from)).toEqual({ a: 'carried', b: 'ok', c: 'ok' });
+    expect(marks()).toEqual(['b', 'c']);
+  });
+
+  it('does not repeat a passed step after an Apply now run of some steps', async () => {
+    const chain = chainJob('evening', [step('a'), step('b'), step('c', {}, 'false')]);
+    const first = await runJob(chain, ctx, 'manual');
+    expect(statuses(first)).toEqual({ a: 'ok', b: 'ok', c: 'failed' });
+    await runJob(chain, ctx, 'manual', null, { only: ['a'] }); // Apply now of one step
+    const resumed = await runJob(chain, ctx, 'manual', null, { resume: true });
+    // `b` passed in the first run and was not touched since: carried, not run again
+    expect(statuses(resumed)).toEqual({ a: 'carried', b: 'carried', c: 'failed' });
+    expect(marks().filter((m) => m === 'b')).toHaveLength(1);
+  });
+
+  it('a step that failed again after passing is run again on resume', async () => {
+    const chain = chainJob('c', [step('a'), step('b')]);
+    await runJob(chain, ctx, 'manual');
+    await runJob(chainJob('c', [step('a', {}, 'false'), step('b')]), ctx, 'manual');
+    const resumed = await runJob(chain, ctx, 'manual', null, { resume: true });
+    expect(statuses(resumed).a).toBe('ok'); // its latest row was `failed`, so it ran
+    expect(marks().filter((m) => m === 'a')).toHaveLength(3);
+  });
+
   it('refuses a step id the chain does not have', async () => {
     const result = await runJob(chainJob('c', three('fixed')), ctx, 'manual', null, {
       from: 'nope',
@@ -461,22 +510,61 @@ describe('a chain’s groups (BL-234 Phase 3)', () => {
     expect(result.error).toContain("group 'quantiply' still busy with close-out");
   });
 
-  it('holds the group to the end of the chain, so a later job waits behind it', async () => {
-    const job = chainJob('evening', [step('up', { group: 'quantiply' }), step('tail')]);
-    const waiter = chainJob('close-out', [step('x')], { group: 'quantiply' });
-    ctx.jobs = [job, waiter];
-    const order: string[] = [];
-    const first = runJob(job, ctx, 'manual').then((r) => {
-      order.push('evening');
+  /** A step that does not end until the test says so. */
+  const gate = (name: string) => join(dir, name);
+  const gated = (id: string, file: string, extra: Partial<ChainStep> = {}) =>
+    step(id, extra, `while [ ! -e ${file} ]; do sleep 0.02; done`);
+  const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('holds the group while a later step still needs it, so another job waits', async () => {
+    const release = gate('go1');
+    const job = chainJob('evening', [
+      gated('first', release, { group: 'quantiply' }),
+      step('second', { group: 'quantiply' }),
+    ]);
+    const other = chainJob('close-out', [step('x')], { group: 'quantiply' });
+    ctx.jobs = [job, other];
+    const first = runJob(job, ctx, 'manual');
+    await tick(60); // `first` is running and holds the group
+    let otherDone = false;
+    const second = runJob(other, ctx, 'manual').then((r) => {
+      otherDone = true;
       return r;
     });
-    // started a moment later, it must wait for the evening chain's row to close
-    await new Promise((r) => setTimeout(r, 30));
-    const second = runJob(waiter, ctx, 'manual').then((r) => {
-      order.push('close-out');
-      return r;
-    });
+    await tick(150);
+    expect(otherDone).toBe(false); // `second` of the chain still needs the group
+    writeFileSync(release, '');
     await Promise.all([first, second]);
-    expect(order).toEqual(['evening', 'close-out']);
+    expect(otherDone).toBe(true);
+  });
+
+  it('lets the group go after the last step that needs it, not at the chain’s end', async () => {
+    const release = gate('go2');
+    const job = chainJob('evening', [
+      step('uses', { group: 'catalog' }),
+      gated('tail', release), // a long step that needs no group
+    ]);
+    const other = chainJob('mcx', [step('y')], { group: 'catalog' });
+    ctx.jobs = [job, other];
+    const running = runJob(job, ctx, 'manual');
+    await tick(80); // `uses` has run; the chain is now in `tail`
+    const done = await runJob(other, ctx, 'manual'); // starts while the chain is still running
+    expect(done.ok).toBe(true);
+    expect(ctx.history.last('evening')?.ended_at).toBeNull(); // the chain has not ended
+    expect(ctx.history.groupHolders('catalog', [], 0)).toEqual([]); // and holds nothing
+    writeFileSync(release, '');
+    expect((await running).ok).toBe(true);
+  });
+
+  it('takes a group again when a later step needs it after letting it go', async () => {
+    const job = chainJob('evening', [
+      step('data', { group: 'catalog' }),
+      step('mid'),
+      step('again', { group: 'catalog' }),
+    ]);
+    ctx.jobs = [job];
+    const result = await runJob(job, ctx, 'manual');
+    expect(result.ok).toBe(true);
+    expect(marks()).toEqual(['data', 'mid', 'again']);
   });
 });

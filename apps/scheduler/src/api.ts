@@ -210,6 +210,19 @@ export function createApi({
     };
   }
 
+  /** Why every step picked from a chain is held (stop hold or pause), or null when one can run. */
+  function heldPick(job: Job, only: readonly string[]): string | null {
+    const picked = (job.chain ?? []).filter((step) => only.includes(step.id));
+    const reasons = picked.map((step) =>
+      step.holdId
+        ? (heldReason(step.holdId, ctx.env) ?? pausedReason(step.holdId, ctx.env, now()))
+        : null,
+    );
+    return picked.length > 0 && reasons.every((reason) => reason !== null)
+      ? (reasons[0] ?? null)
+      : null;
+  }
+
   async function startRun(id: string, req: Request): Promise<Response> {
     const job = jobs.find((j) => j.id === id);
     if (!job) return fail(404, `unknown job '${id}'`);
@@ -220,6 +233,10 @@ export function createApi({
     // BL-143: Apply now and Run now say so at once (runJob would only record it as held)
     const held = heldReason(job.id, ctx.env) ?? pausedReason(job.id, ctx.env, now());
     if (held) return fail(409, held);
+    // BL-234: a chain's held steps are held by their `holdId`, not by the chain's id. An Apply now
+    // that picks only held steps would start and do nothing, so say so at once, as before.
+    const pickedHeld = options.only ? heldPick(job, options.only) : null;
+    if (pickedHeld) return fail(409, pickedHeld);
     const before = ctx.history.last(job.id)?.id ?? 0;
     inFlight.add(job.id);
     void runJob(job, { ...ctx, jobs }, 'manual', null, options).finally(() =>

@@ -987,6 +987,7 @@ const BASE_JOBS: Job[] = [
         noRetryExitCodes: [3],
         retryDelayMinutes: 60,
         onFail: 'continue',
+        group: 'quantiply',
         holdId: 'algotest-evening',
         fixHint:
           'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
@@ -1013,6 +1014,7 @@ const BASE_JOBS: Job[] = [
         retryDelayMinutes: 60,
         requires: ['algotest-export'],
         onFail: 'continue',
+        group: 'quantiply',
         holdId: 'algotest-evening',
         fixHint:
           'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
@@ -1035,6 +1037,7 @@ const BASE_JOBS: Job[] = [
         retryDelayMinutes: 60,
         requires: ['algotest-upload'],
         onFail: 'continue',
+        group: 'quantiply',
         holdId: 'algotest-evening',
         fixHint:
           'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',

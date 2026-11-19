@@ -38,17 +38,20 @@ summary flags anything but `main`).
   the step by: set it on every step that uploads, enables or deploys). A chain has NO job-level retries (a
   test pins `retries: 0`). Every step is a row in `run_steps` (`ok`, `failed`, `skipped`, `held`, `late`,
   `carried`, `running`, `unknown`). **Resume:** the loop restarting a slot whose run was cut off
-  (`restartIfInterruptedUntil`) resumes the earlier run of that slot by itself; a hand run resumes only with
-  `jobs run <chain> --resume` (the latest run of today), `--from <step>` (every step before it counts as done) or
-  starts over with `--fresh`. A step that passed is not run again (`carried`); a step that was `running` when
+  (`restartIfInterruptedUntil`) resumes that slot by itself; a hand run resumes only with `jobs run <chain> --resume`
+  (the runs of today), `--from <step>` (every step before it counts as done) or starts over with `--fresh`. What each
+  step LAST came to across those runs decides (`History.priorSteps`: the latest row of a step wins), so a refused
+  resume (no step rows) or an Apply now (some) never hides a step that passed, and a step that failed again after
+  passing runs again. A step that passed is not run again (`carried`); a step that was `running` when
   the run was cut off is `unknown` (`reapDead`) and a resume REFUSES (exit 4) rather than repeat it, because a
   login sent or an algo enabled must not repeat: say so in the alert, and the owner picks `--from <step>` to run
   it or `--from <the next>` to skip it. The alert (`alertChain`) is ONE message naming each failed or skipped
   step with its own `fixHint`, and what passed; a step that `alertsItself` and really ran is left out. A chain
-  takes a step's `group` when it gets to that step and holds it to the end (Phase 3: the `evening` chain starts
-  at 15:45 without waiting for the close-out's `quantiply` group, and takes it only at its first Quantiply step;
-  it holds no deadlock risk while no other job needs both groups; `groupsOf(job, only)` is every group a run
-  holds). `jobs run <chain> --only a,b` / `{"only": [...]}` runs just those steps (the dashboard's Apply now:
+  takes a step's `group` when it gets to that step and lets it go after the last step that needs it (Phase 3: the
+  `evening` chain starts at 15:45 without waiting for the close-out's `quantiply` group, takes it at its first
+  AlgoTest step, and lets `catalog` go after `t1-update` for the whole upload stretch; the groups a chain holds now
+  are rows in `run_groups`, so another job waits only while one is really held; two jobs that each take one group
+  and then want the other's would deadlock, and none does; `groupsOf(job, only)` is every group a run can hold). `jobs run <chain> --only a,b` / `{"only": [...]}` runs just those steps (the dashboard's Apply now:
   the others count as done, no rows, no resume). `step.ts` holds `runStep` (one spawned command,
   its own process group, a timeout) for the runner and the chain.
 - `src/history.ts` — `bun:sqlite` run history (`runs` table). Deliberately not the DuckDB

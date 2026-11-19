@@ -150,9 +150,9 @@ per-step failure policy. The rest moved to Phase 2 (below).
   results are gone: the uploads cannot start before the data is in.
 - **Runner additions it needed:**
   - **Step groups, taken lazily.** A step may name a `group` (`catalog` for the data steps, `quantiply` for the
-    Quantiply steps; AlgoTest has none). A chain takes a group when it reaches that step and holds it to the
-    end, so the chain starts at 15:45 without waiting for the 15:30 close-out's `quantiply` group, which it
-    meets only at its first Quantiply step (about 16:40), after the switch-off. Without this the whole evening
+    AlgoTest and Quantiply steps). A chain takes a group when it reaches that step and holds it until the last step that needs it (first
+    built as 'to the end'; the review fix lets it go earlier), so the chain starts at 15:45 without waiting for
+    the 15:30 close-out's `quantiply` group, which it meets only at its first upload step, after the switch-off. Without this the whole evening
     would have started about 40 minutes late. `groupsOf(job, only)` is every group a run holds.
   - **`only`.** `jobs run evening --only a,b` and `{"only": [...]}` run just those steps; the others count as
     done, leave no rows and never resume. The dashboard's **Apply now** buttons (Settings › Automation) now run
@@ -174,6 +174,13 @@ per-step failure policy. The rest moved to Phase 2 (below).
     `catalog` and `quantiply` groups meanwhile. The old jobs ran in parallel, so one platform's failure did not
     delay the other's. Both uploads are only needed by 08:02 / 08:11, so I kept the old retry counts.
   - The Options Lab run bar reads the chain as the evening run, so an upload failure shows there as failed.
+  - **Fixed after the PR #459 review (2026-11-19):** resume now takes the latest row of each step across the
+    runs of the slot or day (`priorSteps`), so a refused resume or an Apply now cannot make it repeat a passed
+    step; a chain lets a group go after its last step that needs it (`run_groups`), so the evening chain no
+    longer holds `catalog` through the uploads; the AlgoTest steps take the `quantiply` group, so they start
+    after the close-out as the 16:40 slot did; an Apply now whose every picked step is held answers 409 again.
+    Still open from that review: the monitor lists the whole `evening` chain as a login job, the unscheduled
+    check `Job`s kept for the suites, and the repeated chain descriptions across docs.
   - A group held by a lazily taking chain can in principle deadlock with a job that needs both groups; none does.
 
 ### Phase 4 — `morning-open` chain (real money; last)
@@ -249,3 +256,5 @@ Found when reading the code on 2026-11-18, to settle in the phase that meets eac
   because the Momentum panel reads those jobs by id and fixed time. Nothing committed; scheduler not restarted.
 - 2026-11-19 — Phase 3 built: the `evening` chain replaces five jobs (37 → 33), with step groups taken lazily
   and `only` runs for Apply now. Nothing committed; scheduler not restarted.
+- 2026-11-19 — Fixed the four main findings of the PR #459 review (resume across refused and Apply now runs,
+  group release after the last use, AlgoTest in the `quantiply` group, Apply now 409 for held steps).

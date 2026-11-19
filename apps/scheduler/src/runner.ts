@@ -1,7 +1,7 @@
 import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type ChainResult, type StepOutcome, runChain } from './chain.js';
-import type { History, Trigger } from './history.js';
+import type { History, StepRow, Trigger } from './history.js';
 import { JOBS, type Job, groupsOf } from './jobs.js';
 import { pausedReason } from './pause.js';
 import { formatIst, istAt, istDay } from './schedule.js';
@@ -103,17 +103,32 @@ async function waitForGroup(
   runId: number,
   ctx: RunContext,
   now: () => Date,
+  /**
+   * Wait only for older runs (a job's start, so two that start together order themselves by id), or
+   * for any run that holds the group (a chain step, which meets a newer holder too).
+   */
+  olderOnly = true,
 ): Promise<string | null> {
   if (groups.length === 0) return null;
   const jobs = ctx.jobs ?? JOBS;
-  const members = jobs.filter((j) => groupsOf(j).some((g) => groups.includes(g))).map((j) => j.id);
   const deadline = now().getTime() + job.timeoutMinutes * 60_000;
   for (;;) {
     ctx.history.reapDead(now());
-    const busy = ctx.history.runningBefore(members, runId);
-    if (busy.length === 0) return null;
+    const busy = new Map<number, string>();
+    for (const group of groups) {
+      // a job's own `group` is held for its whole run; a chain's steps' groups, while it holds them
+      const own = jobs.filter((j) => j.group === group).map((j) => j.id);
+      const holders = ctx.history.groupHolders(
+        group,
+        own,
+        runId,
+        olderOnly ? runId : Number.MAX_SAFE_INTEGER,
+      );
+      for (const row of holders) busy.set(row.id, row.job);
+    }
+    if (busy.size === 0) return null;
     if (now().getTime() >= deadline) {
-      return `group '${groups.join("', '")}' still busy with ${busy.map((r) => r.job).join(', ')}`;
+      return `group '${groups.join("', '")}' still busy with ${[...busy.values()].join(', ')}`;
     }
     await sleep(ctx.busyPollMs ?? 30_000);
   }
@@ -147,11 +162,24 @@ export function runJob(
     // The row goes in first: waiting for the group is then ordered by id, and a crash
     // while waiting or running leaves a row that reapDead can close.
     const runId = ctx.history.start(job.id, trigger, scheduledFor, logPath, now());
-    /** A chain step's group: in-process first, then other processes' open rows. Null = held now. */
+    /**
+     * A chain step's group: in-process first, then other processes' open rows. Null = held now. The
+     * chain lets it go after the last step that needs it (`release`), not at its end.
+     */
     const acquire = async (group: string): Promise<string | null> => {
       if (held.has(group)) return null;
       held.set(group, await acquireGroup(group));
-      return waitForGroup(job, [group], runId, ctx, now);
+      ctx.history.holdRunGroup(runId, group);
+      const blocked = await waitForGroup(job, [group], runId, ctx, now, false);
+      if (blocked) release(group);
+      return blocked;
+    };
+    const release = (group: string): void => {
+      const letGo = held.get(group);
+      if (!letGo) return;
+      held.delete(group);
+      ctx.history.releaseRunGroup(runId, group);
+      letGo();
     };
     let fd: number | null = null;
     let result = { code: 1, error: null as string | null };
@@ -179,23 +207,28 @@ export function runJob(
           ctx.history.finish(runId, 2, 0, now(), error);
           return { runId, ok: false, exitCode: 2, attempts: 0, logPath, error };
         }
-        // The loop restarting a slot whose run was cut off resumes it on its own (the slot has an
-        // earlier row); a hand run resumes only when asked, and only a run of today.
-        let resumeFrom = null;
+        // The loop restarting a slot whose run was cut off resumes it on its own (the slot has
+        // earlier rows); a hand run resumes only when asked, from the runs of today. What each step
+        // last came to across those runs decides (`priorSteps`), so a refused resume or an Apply now
+        // never hides a step that passed.
+        let prior: Map<string, StepRow> | null = null;
         if (!options.fresh && !options.only) {
-          if (scheduledFor) resumeFrom = ctx.history.previousForSlot(job.id, scheduledFor, runId);
+          if (scheduledFor) prior = ctx.history.priorSteps(job.id, runId, { slot: scheduledFor });
           else if (options.resume || options.from)
-            resumeFrom = ctx.history.lastSince(job.id, istAt(istDay(now()), '00:00'), runId);
+            prior = ctx.history.priorSteps(job.id, runId, {
+              since: istAt(istDay(now()), '00:00'),
+            });
         }
         writeSync(
           logFd,
-          `\n=== ${job.id} · ${trigger}${resumeFrom ? ` · resuming run ${resumeFrom.id}` : ''} · ${formatIst(now())} IST\n`,
+          `\n=== ${job.id} · ${trigger}${prior && prior.size > 0 ? ' · resuming' : ''} · ${formatIst(now())} IST\n`,
         );
         const chained: ChainResult = await runChain(job, job.chain, ctx, runId, logFd, now, {
-          resumeFrom,
+          prior,
           from: options.from,
           only: options.only,
           acquire,
+          release,
         });
         writeSync(logFd, `=== exit ${chained.code}\n`);
         ctx.history.finish(runId, chained.code, 1, now(), chained.error);
@@ -261,7 +294,7 @@ export function runJob(
       ctx.history.finish(runId, 1, attempts, now(), message);
       return { runId, ok: false, exitCode: 1, attempts, logPath, error: message };
     } finally {
-      for (const release of held.values()) release();
+      for (const group of [...held.keys()]) release(group);
       if (fd !== null) closeSync(fd);
     }
     attempts = Math.min(attempts, job.retries + 1);
