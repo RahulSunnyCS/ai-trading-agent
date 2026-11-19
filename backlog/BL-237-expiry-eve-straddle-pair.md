@@ -87,6 +87,13 @@ own eve, margin optimisation, and any live or paper order.
 - **Will not run:** another exit time, stops, lot ratios, another entry time, a single-stream version after seeing which
   stream is better, and any threshold chosen from the descriptive cuts; a run for either needs `override: <reason>`.
 
+### Phase 0 amendment 1 — 2026-11-20, before any run (supersedes the exit time above)
+The owner (2026-11-20, while the simulator was being written): "End time be 9:17." The exit is **09:17 on the expiry day**
+(the close of the 09:16 bar, the engine's price at 09:17; the same print as 09:16:59), not 09:20. Everything else in
+Phase 0 stands: entry 15:30, 1 lot each, no stops, the same windows, statistic, seed and pass / kill rule. No trade or
+result had been computed when this was written; the original 09:20 line stays above as the first registration. Still one
+trial.
+
 ### Phase 1 — Simulator and check
 - **Tasks:** `research/bl237/sim.py` (the two-day loader and the pair simulation, reusing `legwise.market.load_day`,
   `data.resolver.resolve_strike`, `ReferenceData`); three hand-checked trades; skip list.
@@ -113,5 +120,6 @@ the bought straddle to its own expiry instead.
 
 ## Log
 
+- 2026-11-20 — Phase 0 amendment 1, before any run: exit moved from 09:20 to 09:17 on the expiry day (owner).
 - 2026-11-20 — created from the owner's message; design questions answered in chat (exit 09:20 on E, 1 lot each, no
   stops); Phase 0 written before any run.
