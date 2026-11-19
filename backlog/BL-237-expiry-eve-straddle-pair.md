@@ -151,6 +151,18 @@ the run; it should have been read before Phase 0 was written.
 Phase 2's extra deliverable is the findings page: the BL-237 rows added to
 `research/options/strategies/overnight-straddle/README.md`.
 
+### Follow-ups after the verdict (2026-11-20, descriptive, not registered; owner's questions in chat)
+Both read the same trades or the same two years, so they are leads at most, never findings.
+- **Sell the straddle alone** (the pair's sold leg, 194 eves): +₹121 a trade net, intervals include zero in both windows and
+  both indexes (NIFTY +₹349, SENSEX −₹149); under 0.5% gaps +₹1,000 a trade, over 0.5% −₹3,058; the worst night −₹31,954.
+  Same lead BL-160 found for NIFTY and failed on 2022–24.
+- **Buy every session, 15:30 → 09:17, `research/bl237/long_only.py`** (NIFTY and SENSEX, 2024-10 → 2026-11, ~510 nights an
+  index, one lot, net of 0.5% slippage and 4 orders): ATM straddle −₹285 (NIFTY) and −₹256 (SENSEX) a night; OTM1 strangle
+  −₹260 and −₹273; OTM2 strangle −₹251 and −₹230; 26–30% winners. Gross of costs about zero (−₹39 to +₹16), so the loss is
+  the ₹94–₹189-per-night brokerage plus slippage on ₹13,000–17,500 of premium. Nights with a gap under 0.5% lose about
+  ₹800–1,100 and gaps above 1% (70 nights) win about ₹6,400, so the strategy is a bet on the gap; a straddle that expires the
+  next morning loses more (−₹554 against −₹194).
+
 ## Risks
 
 - Cross-index margin: the exchanges give no offset between a NIFTY short and a SENSEX long, so the real capital is the
