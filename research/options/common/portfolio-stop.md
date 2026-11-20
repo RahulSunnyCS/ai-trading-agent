@@ -35,6 +35,7 @@ most 10% lower than with no stop.
 | BL-194 | ₹9k–16k, ₹18k, ₹20k, none on T1's Dir ×2 (4-lot) days, against ₹9k + the Dir's stop (₹12–13k) | T1 Adaptive with the expiry rule and SL150% cap, 2025-01-10 → 2026-10-30 (437 days, 218 4-lot), net of brokerage, minute replay | **No level beats ₹9k + the Dir's stop**; ₹9k −₹51 a day [−129, +15] (−₹104 [−232, −1] on the last year), ₹11k −₹47 [−91, −7] on the last year; ₹14k+ change 2 days, gain only from one the rule stopped, and deepen the worst day; the rule fires on 1 % of 4-lot days | [BL-194][bl194] |
 | BL-208 | On top of today's stop: trail 3:2 (continuous and ₹2k per ₹3k), lock at ₹0 after +₹5k, both; neighbours trail 1:1 / 3:1, lock 3k / 8k → 0, 5k → 2.5k | T1 Adaptive, Dir ×2 book (Shoonya) and 3-lot book (Angel One), 2025-01-10 → 2026-11-04 (440 days), net of brokerage, minute replay | **No owner arm clearly helps**: the trails are about neutral (+₹12 to +₹45 a day; the stepped trail clears zero on the 3-lot book only with the prompting day in) and trim the worst days a little; the break-even lock costs ₹58–163 a day | [BL-208][bl208] |
 | BL-239 | On top of today's stop: trail 1:1 stepped (every ₹3,000 of profit moves it up ₹3,000); neighbours stepped 3:2, 3:1, continuous 1:1 | T1 from-scratch picks (BL-238), Dir ×2 and 3-lot books, 2025-01-10 → 2026-11-19 (450 days), net of brokerage, minute replay, 0% slippage (0.5% beside) | **Killed on return** (−₹16 [−115, +81] and +₹33 [−41, +110] a lot-day, intervals include zero) **but the deepest drawdown falls 29% / 32%** (₹51.4k → ₹36.4k; ₹37.6k → ₹25.5k); protection at no clear cost, the owner's call | [BL-239][bl239] |
+| BL-241 | 33 arms on top of the ₹9k stop: trails (X ∈ 1k/2k/3k/5k, Y/X ∈ ¼/½/1), locks (A 3k/5k/8k, B 0/1k/2.5k) and lock-and-trails; fit 2025-01-10 → 2025-10-08, top three per book confirmed once on 2025-10-09 → 2026-11-19 | T1 from-scratch picks (BL-238), Dir ×2 and 3-lot books, net of brokerage, minute replay, 0% slippage | **One pass of six**: 3-lot book, trail 3000:3000: +₹9 a lot-day [−84, +95], deepest drawdown ₹37.6k → ₹25.5k (−32%), worst 5% better. Dir ×2: finalists cut the drawdown 29–36% but cost ₹30–₹69 a day (bound ₹25): none passes. No interval clears zero on return | [BL-241][bl241] |
 
 ## What we know
 
@@ -81,5 +82,6 @@ most 10% lower than with no stop.
 [bl194]: ../../../backlog/BL-194-t1-book-stop-dir2.md
 [bl131]: ../../../backlog/BL-131-book-daily-stop.md
 [bl132]: ../../../backlog/BL-132-mtm-stop-from-day-lows.md
+[bl241]: ../../../backlog/BL-241-portfolio-stop-variants.md
 [bl239]: ../../../backlog/BL-239-portfolio-stop-trail-1to1.md
 [bl208]: ../../../backlog/BL-208-t1-book-trail-and-lock.md

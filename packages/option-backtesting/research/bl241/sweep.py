@@ -42,7 +42,7 @@ TOP_N = 3
 def build_arms() -> dict[str, portfolio.Trail | None]:
     arms: dict[str, portfolio.Trail | None] = {"base": None}
     for x in (1000, 2000, 3000, 5000):
-        for k, ratio in (("q", 0.25), ("h", 0.5), ("1", 1.0)):
+        for ratio in (0.25, 0.5, 1.0):
             arms[f"sl_{x}_{int(x * ratio)}"] = portfolio.Trail("sl", x=float(x), y=x * ratio)
     for a in (3000, 5000, 8000):
         for b in (0, 1000, 2500):

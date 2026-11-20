@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a registered sweep, no live change |
-| **Status** | In progress |
+| **Status** | Done — one arm passes on one book (3-lot, stepped 1:1 trail); Dir ×2: none passes (cost bound) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-20 |
@@ -70,6 +70,45 @@ Any live change or deploy call; a per-strategy MTM SL trail; a different base st
 ### Phase 2 — Run and record
 - Run F, write the selected arms, run K once; record both here, in `INDEX.md` and `research/options/common/portfolio-stop.md`.
 
+## Result (2026-11-20)
+
+Run as registered: F read first, the three finalists per book chosen by the fixed rule, K read once. 450 days minus
+seven skipped (16-24 Sep 2026, a stored trade count missing); net of brokerage; 0% slippage primary.
+
+**Fit window F (2025-01-10 → 2025-10-08, 184 days).** Base: Dir ×2 +₹1,405 a lot-day, deepest drawdown ₹33,912; 3-lot
++₹1,198, ₹25,806. Locks at +₹3,000 cut the drawdown most (20–26%) but cost ₹33–₹148 a day and were excluded by the
+cost bound. Stepped trails cut it 1–16% at +₹1 to +₹106 a day; lock ≥ +₹5,000 and the lock-and-trails at +₹5,000 are
+near-copies of one rule (14% on the 3-lot book, +₹70 to +₹150 a day, the same few days). Advanced: **Dir ×2** trail
+2000:2000, 1000:1000, 3000:3000; **3 lots** trail 3000:3000, lock 5000→0, lock 5000→1000.
+
+**Confirmation window K (2025-10-09 → 2026-11-19, 266 days), change vs the ₹9k stop alone per lot-day [90%], deepest
+drawdown base → arm:**
+
+| Book | Arm | Change | Drawdown | Worst 5% of days | Pass |
+|---|---|---|---|---|---|
+| Dir ×2 (base +₹2,016, ₹51,428) | trail 2000:2000 | −63 [−222, +89] | ₹36,104 (−30%) | −9,930 vs −10,546 | no (cost) |
+| | trail 1000:1000 | −30 [−175, +120] | ₹32,771 (−36%) | −9,658 | no (cost, by ₹5) |
+| | trail 3000:3000 | −69 [−213, +71] | ₹36,433 (−29%) | −9,975 | no (cost) |
+| 3 lots (base +₹1,588, ₹37,565) | **trail 3000:3000** | **+9 [−84, +95]** | **₹25,530 (−32%)** | **−8,695 vs −9,301** | **yes** |
+| | lock 5000→0 | −67 [−210, +66] | ₹29,251 (−22%) | −8,963 | no (cost) |
+| | lock 5000→1000 | −49 [−182, +81] | ₹28,077 (−25%) | −8,963 | no (cost) |
+
+**Verdict by the registered rule:** one pass out of six: the **stepped 1:1 trail (every ₹3,000 of profit, stop up
+₹3,000) on the 3-lot book**: no cost (+₹9 a day, interval spans zero), deepest drawdown 32% shallower, the worst 5% of days
+better. On the **Dir ×2 book** every finalist cut the drawdown 29–36% but cost ₹30–₹69 a day, outside the ₹25 bound; none
+passes. At 0.5% slippage (a check) the 3-lot trail reads −₹1 [−80, +84] with the drawdown ₹36,868 against ₹41,824
+(−12%); the Dir ×2 finalists −₹40 to −₹70 with drawdowns 25–29% shallower. All-days figures (descriptive): 3-lot trail
+3000:3000 +₹33 a day, ₹25,530 against ₹37,565; Dir ×2 trail 1000:1000 +₹4 a day (₹32,771 against ₹51,428), the cheapest
+Dir ×2 arm over all days though not the pass.
+
+Caveats as registered: one of three on a book is optimistic (winner's curse); the deepest drawdown of a 13-month window rests
+on one or two episodes (the Oct–Nov 2026 fall dominates it, 0.5% slippage trims the gain to −12%); minute closes understate
+the peak and a live stop fills past its level, so live results read worse; K is not virgin and the pool is in-sample. No
+interval clears zero on return: this is protection at no measurable cost on one book, not a gain. Quantiply's clientwise
+dialog offers `trailingStoploss` / `lockProfit` / `trailProfit` / `lockTrailProfit` but the tool has never saved one and
+what its numbers mean is not captured: a manual save must be read back first.
+
 ## Log
 
 - 2026-11-20 — created from the owner's request; Phase 0 registered before any run.
+- 2026-11-20 — F read, finalists chosen by the fixed rule, K read once; one pass (3-lot, trail 3000:3000), Dir ×2 none.
