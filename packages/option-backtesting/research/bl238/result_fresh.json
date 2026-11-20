@@ -1,0 +1,70 @@
+{
+ "fresh": {
+  "s0_stop": {
+   "whole": {
+    "days": 464,
+    "net": 816255.0,
+    "mean_per_lot_day": 1759.2,
+    "max_drawdown": 33553.0,
+    "drawdown_now": 15722.0
+   },
+   "from_2025_01_10": {
+    "days": 457,
+    "net": 822398.0,
+    "mean_per_lot_day": 1799.6,
+    "max_drawdown": 33553.0,
+    "drawdown_now": 15722.0
+   }
+  },
+  "s0_no_stop": {
+   "whole": {
+    "days": 464,
+    "net": 807394.0,
+    "mean_per_lot_day": 1740.1,
+    "max_drawdown": 39653.0,
+    "drawdown_now": 21822.0
+   },
+   "from_2025_01_10": {
+    "days": 457,
+    "net": 816014.0,
+    "mean_per_lot_day": 1785.6,
+    "max_drawdown": 39653.0,
+    "drawdown_now": 21822.0
+   }
+  },
+  "s5_stop": {
+   "whole": {
+    "days": 464,
+    "net": 576828.0,
+    "mean_per_lot_day": 1243.2,
+    "max_drawdown": 37812.0,
+    "drawdown_now": 24057.0
+   },
+   "from_2025_01_10": {
+    "days": 457,
+    "net": 587171.0,
+    "mean_per_lot_day": 1284.8,
+    "max_drawdown": 37812.0,
+    "drawdown_now": 24057.0
+   }
+  },
+  "s5_no_stop": {
+   "whole": {
+    "days": 464,
+    "net": 566663.0,
+    "mean_per_lot_day": 1221.3,
+    "max_drawdown": 46176.0,
+    "drawdown_now": 32421.0
+   },
+   "from_2025_01_10": {
+    "days": 457,
+    "net": 580105.0,
+    "mean_per_lot_day": 1269.4,
+    "max_drawdown": 46176.0,
+    "drawdown_now": 32421.0
+   }
+  }
+ },
+ "first_pick_day": "2025-01-01",
+ "last_day": "2026-11-19"
+}

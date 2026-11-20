@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — T1 is what real money trades; its return and drawdown should be reproducible from raw bars |
-| **Status** | In progress |
+| **Status** | Done — does not match on the registered rule (rule 3, picks 92.6%); return and drawdown agree |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-20 |
@@ -90,6 +90,57 @@ live change. It audits what exists; it does not look for something better.
   findings page (`research/options/common/rotation-ranking.md`); `INDEX.md`.
 - **Done when:** result and verdict are committed.
 
+## Result (2026-11-20)
+
+Run once, as registered. Fresh simulations of all 521 variants on 532 lake days (five, 20-26 Sep 2024,
+could not be simulated for NIFTY: no lot size on file before the 26 Sep 2024 expiry; they are
+dropped, leaving 527 days and a first pick on 2025-01-01, 464 pick days to 2026-11-19). Ranking by
+`pick.score_history` on the fresh results only; picks re-run fresh; T1 book stop ₹9,000; engine costs
+are zero. Figures one lot per strategy.
+
+**Fresh, whole window (464 days):**
+
+| | Net | Mean per lot-day | Deepest drawdown | Below its high now |
+|---|---|---|---|---|
+| 0% slippage, book stop | ₹8,16,255 | ₹1,759 | ₹33,553 | ₹15,722 |
+| 0% slippage, no stop | ₹8,07,394 | ₹1,740 | ₹39,653 | ₹21,822 |
+| 0.5% slippage, book stop | ₹5,76,828 | ₹1,243 | ₹37,812 | ₹24,057 |
+| 0.5% slippage, no stop | ₹5,66,663 | ₹1,221 | ₹46,176 | ₹32,421 |
+
+**Against the stored figures, on the stored window (2025-01-10 → 2026-11-17, 448 days):**
+
+| | Fresh | Stored | Difference |
+|---|---|---|---|
+| Net, 0% slippage | ₹8,06,738 | ₹8,11,166 | −0.5% |
+| Deepest drawdown, 0% | ₹33,553 | ₹32,223 | +4.1% |
+| Net, 0.5% slippage | ₹5,76,089 | ₹5,90,870 | −2.5% |
+| Deepest drawdown, 0.5% | ₹37,812 | ₹36,632 | +3.2% |
+| Same three picks | 415 of 448 days | | 92.6% |
+
+**Verdict by the registered rule: does not match.** Rule 1 (net within 2%) and rule 2 (drawdown
+within 10%) hold; rule 3 (picks equal on at least 95% of days) fails at 92.6%. Return and drawdown
+are reproduced; the pick lists are not quite.
+
+**What differs.**
+- *Result cells:* 266,482 of 267,273 comparable variant-days are the same within ₹1. The 791 that differ
+  are all on two days: 2026-11-06 (402 cells, up to ₹10.8k, e.g. `S_ditm1_1002` fresh −3,096, stored
+  +7,744) and 2026-11-18 (389 cells). Both days were collected from Angel One (the Fyers token was
+  missing) and later overwritten from Fyers (the 9 Nov and 19 Nov repair runs); their stored results
+  were computed on the Angel One bars and never re-scored. So the stored results of those two days
+  are stale, not the fresh ones.
+- *Picks, 33 days:* 10 in Jan-Mar 2025 (the fresh history starts 27 Sep 2024, eight sessions before
+  the stored one, and the stored day file has SENSEX days-to-expiry `unknown` on five days of Oct
+  2024 that the lake gives a value; likely, not isolated), 23 in Sep-Nov 2026 (10 of them on journal
+  days from 19 Oct, where the live pick used the evening list; two, 11 and 16 Nov, follow the stale
+  6 Nov cells; the rest not explained). Only 1 of the 33 days has a different weekday, VIX band
+  or expiry label. A second pass to isolate the cause is on the registered will-not-run list.
+- *The live list for Thu 19 Nov* (made on the evening of 18 Nov from the stale 18 Nov cells) holds
+  `S_wide_0917` where the fresh ranking has `S_p320_0917`: one pick of three.
+
+Caveats as registered: the 223 T1 files were chosen on 2024-10-09 → 2025-10-08, so this shows the
+figures are reproducible, not that T1 would have been found without hindsight; the 09:15 VIX open is
+used for every day (the live pick has used the previous close since 2026-11-09).
+
 ## Risks
 
 - About 600 days × 521 variants of simulation: a long run on one laptop; it is resumable.
@@ -103,3 +154,5 @@ None; the owner gave the method on 2026-11-20.
 ## Log
 
 - 2026-11-20 — created from the owner's request; Phase 0 registered before any run.
+- 2026-11-20 — amendment, no result read: the five days 20-26 Sep 2024 cannot be simulated for NIFTY (no lot size on file) and are dropped from the window.
+- 2026-11-20 — run once; result and verdict above (rule 3 fails). Stored results of 6 and 18 Nov are stale (Angel One bars, repaired from Fyers, not re-scored).

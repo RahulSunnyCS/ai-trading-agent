@@ -127,6 +127,14 @@ def stage_sim() -> None:
 
 def load_sim() -> tuple[list[date], list[str], np.ndarray, dict[date, dict]]:
     days = [date.fromisoformat(x) for x in json.loads((OUT / "days.json").read_text())]
+    # a day on which a variant cannot be simulated (20-26 Sep 2024: no NIFTY lot size on file before
+    # the 2024-09-26 expiry) is not a usable day for the whole pool: dropped, and said so
+    unusable = [
+        d for d in days if json.loads((SIM / f"{d.isoformat()}.json").read_text())["errors"]
+    ]
+    if unusable:
+        print("dropped (a variant cannot be simulated):", [d.isoformat() for d in unusable])
+    days = [d for d in days if d not in unusable]
     names = pool_names()
     net = np.full((len(days), len(names)), np.nan)
     attrs_by: dict[date, dict] = {}
