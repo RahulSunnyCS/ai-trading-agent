@@ -4,15 +4,15 @@ import type {
   OverlayCallFilter,
   OverlayCustom,
   OverlayDirection,
-  OverlayJob,
   OverlayMarketFilter,
   OverlayMoneyness,
   OverlayRequest,
   OverlayResult,
   OverlaySizing,
+  OverlayStart,
   OverlayTrade,
 } from '../types/optionsOverlay';
-import { formatInr, formatNumber, formatPct } from './format';
+import { formatDay, formatInr, formatInt, formatNumber, formatPct } from './format';
 
 export const DIRECTION_LABEL: Record<OverlayDirection, string> = {
   calls: 'Calls on the picks',
@@ -305,6 +305,54 @@ export function tradesByDay(result: OverlayResult): string[] {
   });
 }
 
+// ---------------------------------------------------------------------------------------------
+// Fresh starts: the page's settings started afresh with the capital on many days
+// ---------------------------------------------------------------------------------------------
+
+/** How a start ended: above the capital it began with, washed out (its account fell below the
+ * wash-out level at some point), or neither. */
+export type StartOutcome = 'above' | 'washed' | 'below';
+
+export function startOutcome(start: OverlayStart, capital: number): StartOutcome {
+  if (start.end_rs > capital) return 'above';
+  return start.washed_out ? 'washed' : 'below';
+}
+
+/** The tooltip of one start's bar. */
+export function startHover(start: OverlayStart): string {
+  const taken = start.taken_rs
+    ? ` (${formatInr(start.taken_rs, { compact: true })} taken out)`
+    : '';
+  const washed = start.washed_out ? ' · washed out' : '';
+  const unpaid = start.unaffordable
+    ? ` · ${formatInt(start.unaffordable)} picks it could not pay for`
+    : '';
+  return [
+    `Start ${formatDay(start.first_day)} → ${formatDay(start.last_day)}`,
+    `Ended ${formatInr(start.end_rs, { compact: true })}${taken}`,
+    `Account low ${formatInr(start.low_rs, { compact: true })}${washed}`,
+    `${formatInt(start.trades)} trades${unpaid}`,
+  ].join('<br>');
+}
+
+/** The log axis's floor (an end below it is drawn at it) and ticks, as multiples of capital. */
+export function startsAxis(
+  capital: number,
+  best: number,
+): { floor: number; top: number; tickvals: number[]; ticktext: string[] } {
+  const floor = capital / 100;
+  const multiples = [0.01, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
+  const top = Math.max(best, capital);
+  const tickvals = multiples.map((m) => m * capital).filter((v) => v <= top * 1.5);
+  // the axis ends above the tallest thing drawn, not above the last tick (ticks stop at 1.5 x top)
+  return {
+    floor,
+    top: Math.max(top, ...tickvals),
+    tickvals,
+    ticktext: tickvals.map((v) => formatInr(v, { compact: true })),
+  };
+}
+
 /**
  * Whether the page is still waiting on a run. A failed poll ends the wait whatever the last good
  * answer was: `usePolledResource` keeps that answer on screen, so a job last seen "running" would
@@ -313,7 +361,7 @@ export function tradesByDay(result: OverlayResult): string[] {
 export function jobRunning(state: {
   starting: boolean;
   jobId: string | null;
-  job: OverlayJob | null;
+  job: { status: 'running' | 'done' | 'failed' } | null;
   pollError: string | null;
 }): boolean {
   if (state.starting) return true;

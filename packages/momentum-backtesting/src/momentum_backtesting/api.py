@@ -4958,6 +4958,19 @@ def _run_options_overlay(body: dict) -> dict:
 OVERLAY_JOBS = _PreviewJobs(_run_options_overlay)
 
 
+def _run_overlay_starts(body: dict) -> dict:
+    from . import overlay_runs
+
+    try:
+        return overlay_runs.starts_request(body)
+    except (ValueError, LookupError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error)) from error
+
+
+# The same settings started afresh on many days (the "Fresh starts" card; a run per start).
+OVERLAY_STARTS_JOBS = _PreviewJobs(_run_overlay_starts)
+
+
 class OverlayCustomStrategy(BaseModel):
     """BL-227: a custom Broad strategy on F&O stocks (`overlay_runs.CUSTOM_BASE` plus these)."""
 
@@ -5000,6 +5013,15 @@ class OptionsOverlayRequest(BaseModel):
     max_positions: int | None = Field(None, ge=1, le=50)
     max_weekly_premium: float | None = Field(None, gt=0, le=5)
     split: str | None = None  # train / test split day
+
+
+class OverlayStartsRequest(OptionsOverlayRequest):
+    """The page's settings started afresh with `capital` every `every_months` months, each run
+    for `years` (`options_overlay.starts`)."""
+
+    every_months: Literal[1, 3, 6] = 3
+    years: int = Field(1, ge=1, le=3)
+    washout: float = Field(0.2, gt=0, lt=1)  # a start washed out below this share of capital
 
 
 class _BacktestJobs:
@@ -6560,6 +6582,17 @@ def create_app() -> FastAPI:
         job = OVERLAY_JOBS.get(job_id)
         if job is None:
             raise HTTPException(404, "Unknown overlay run (the service may have restarted).")
+        return job
+
+    @app.post("/api/options-overlay/starts/jobs", status_code=202)
+    def start_overlay_starts(req: OverlayStartsRequest) -> dict:
+        return OVERLAY_STARTS_JOBS.start(req.model_dump())
+
+    @app.get("/api/options-overlay/starts/jobs/{job_id}")
+    def overlay_starts_job(job_id: str) -> dict:
+        job = OVERLAY_STARTS_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown starts run (the service may have restarted).")
         return job
 
     @app.post("/api/rebalance-preview/jobs", status_code=202)

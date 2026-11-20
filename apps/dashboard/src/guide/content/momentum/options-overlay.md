@@ -128,6 +128,30 @@ booked at zero. Costs: ₹20 an order, STT on the sale, exchange and SEBI charge
   day bought, the day sold, the quantity, the premium paid and the P&L; a contract re-struck by a
   corporate action says so, and one that vanished reads "Contract gone: booked at 0".
 
+## Fresh starts
+
+A small sleeve (a lakh or two of a much larger portfolio) is better judged by what a start usually
+returns and how often it is lost than by one start's drawdown. The **Fresh starts** card runs the
+run bar's settings afresh with the capital on many days: on the first of every month, quarter or
+half-year from the start date, each held for one, two or three years (only starts whose whole
+horizon is in the data). **Run starts** runs them all; it takes a few minutes the first time and
+seconds after a page run of the same settings.
+
+- Each start is **its own account**: a one-lot book buys only the picks the account can pay for that
+  week, and other sizings scale with the account. Profit booking works as set; without it nothing is
+  taken out.
+- A start **ends** at its capital plus the after-tax total, money taken out included.
+- A start is **washed out** when its trading account fell below the wash-out level (10–50 % of the
+  capital; 20 % by default) at any week's close, even if it recovered later.
+- The strategy's picks are its run over the page's whole window, joined on each start day.
+
+The tiles show the **median end** (the typical start), how many **ended above** their capital, how
+many **washed out**, the **average end** (pulled up by the few large wins), the best and the worst.
+The chart has one bar per start day on a log scale: green ended above the capital, red washed out,
+grey neither; the solid line is the capital, the dotted line the wash-out level, and an end below a
+hundredth of the capital is drawn at that hundredth. Hover a bar for its dates, its end, its lowest
+account and its trades.
+
 ## Limits
 
 Daily closes, not tradable quotes; the slippage is an assumption. Stock options are monthly, so a

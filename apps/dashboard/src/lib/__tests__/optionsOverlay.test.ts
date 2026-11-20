@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import type { OverlayJob, OverlayResult, OverlayTrade } from '../../types/optionsOverlay';
+import type {
+  OverlayJob,
+  OverlayResult,
+  OverlayStart,
+  OverlayTrade,
+} from '../../types/optionsOverlay';
+import { formatInr } from '../format';
 import {
   DEFAULT_CUSTOM,
   DEFAULT_REQUEST,
@@ -13,6 +19,9 @@ import {
   requestProblem,
   sellText,
   slippageText,
+  startHover,
+  startOutcome,
+  startsAxis,
   tradeText,
   tradesByDay,
 } from '../optionsOverlay';
@@ -100,6 +109,54 @@ describe('custom strategy', () => {
     expect(requestChips({ ...base, custom: DEFAULT_CUSTOM }, customName(DEFAULT_CUSTOM))[0]).toBe(
       'Custom · top 10 · 52w · weekly',
     );
+  });
+});
+
+describe('fresh starts', () => {
+  const start: OverlayStart = {
+    start: '2024-07-01',
+    first_day: '2024-07-05',
+    last_day: '2025-06-27',
+    end_rs: 15_000,
+    taken_rs: 0,
+    low_rs: 12_000,
+    washed_out: true,
+    max_dd: -0.9,
+    trades: 41,
+    unaffordable: 33,
+  };
+
+  it('calls a start above, washed out or neither', () => {
+    expect(startOutcome(start, 100_000)).toBe('washed');
+    expect(startOutcome({ ...start, washed_out: false }, 100_000)).toBe('below');
+    expect(startOutcome({ ...start, end_rs: 391_817 }, 100_000)).toBe('above');
+  });
+
+  it('says what a start did in its tooltip', () => {
+    const text = startHover(start);
+    expect(text).toContain(`Ended ${formatInr(15_000, { compact: true })}`);
+    expect(text).toContain('washed out');
+    expect(text).toContain('41 trades · 33 picks it could not pay for');
+    expect(startHover({ ...start, unaffordable: 0 })).not.toContain('could not pay');
+  });
+
+  it('puts the log ticks at multiples of the capital up to the best start', () => {
+    const axis = startsAxis(100_000, 2_400_000);
+    expect(axis.floor).toBe(1_000);
+    expect(axis.tickvals).toEqual([
+      1_000, 10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000,
+    ]);
+    expect(axis.ticktext[4]).toBe('₹1.00 L');
+  });
+
+  it('ends the axis above the best start even when the last tick is lower', () => {
+    // capital 1 L, best 3 L: the ticks stop at 2 L (5 L is past 1.5 x 3 L), so a top taken from
+    // the ticks would clip the best bar
+    const axis = startsAxis(100_000, 300_000);
+    expect(Math.max(...axis.tickvals)).toBe(200_000);
+    expect(axis.top).toBe(300_000);
+    expect(startsAxis(100_000, 130_000).top).toBe(130_000);
+    expect(startsAxis(100_000, 20_000).top).toBe(100_000);
   });
 });
 

@@ -201,7 +201,8 @@ def strategy_inputs(
 SETTING_FIELDS = tuple(ov.Settings.__dataclass_fields__)
 
 
-def run_request(body: dict[str, Any], *, capital_table: bool = True) -> dict[str, Any]:
+def _prepare(body: dict[str, Any]) -> tuple[ov.Settings, dict[str, Any]]:
+    """The settings, and the body with the strategy it reads (none for puts and the mirror)."""
     settings = ov.Settings(**{k: body[k] for k in SETTING_FIELDS if k in body})
     settings.validate()
     # puts and the mirror pool read no strategy: compared with NIFTY, not some favourite's shares
@@ -212,22 +213,57 @@ def run_request(body: dict[str, Any], *, capital_table: bool = True) -> dict[str
         raise ValueError("Pick a strategy: calls are bought on its holdings.")
     if custom is not None:
         custom_config(custom)  # refuse a bad custom strategy before any work
-    body = {**body, "favourite_id": fid, "custom": custom}
-    key = json.dumps({**body, "_lake": ov.LAKE.version, "_favourite": _digest(fid),
-                      "_table": capital_table}, sort_keys=True, default=str)  # fmt: skip
+    return settings, {**body, "favourite_id": fid, "custom": custom}
+
+
+def _inputs(settings: ov.Settings, body: dict[str, Any]) -> ov.Inputs:
+    fid, custom = body["favourite_id"], body["custom"]
+    if fid or custom is not None:
+        return strategy_inputs(fid, settings.start, settings.end, custom)
+    return ov.Inputs()
+
+
+def _cached(key: str, make) -> dict[str, Any]:
     with _CACHE_LOCK:
         if key in _CACHE:
             _CACHE.move_to_end(key)
             return _CACHE[key]
-    inputs = (
-        strategy_inputs(fid, settings.start, settings.end, custom)
-        if fid or custom is not None
-        else ov.Inputs()
-    )
-    result = ov.run(settings, inputs, capital_table=capital_table)
-    result["favourite_id"] = fid
+    result = make()
     with _CACHE_LOCK:
         _CACHE[key] = result
         while len(_CACHE) > _CACHE_KEPT:
             _CACHE.popitem(last=False)
     return result
+
+
+def run_request(body: dict[str, Any], *, capital_table: bool = True) -> dict[str, Any]:
+    settings, body = _prepare(body)
+    key = json.dumps({**body, "_lake": ov.LAKE.version, "_favourite": _digest(body["favourite_id"]),
+                      "_table": capital_table}, sort_keys=True, default=str)  # fmt: skip
+
+    def make() -> dict[str, Any]:
+        result = ov.run(settings, _inputs(settings, body), capital_table=capital_table)
+        result["favourite_id"] = body["favourite_id"]
+        return result
+
+    return _cached(key, make)
+
+
+def starts_request(body: dict[str, Any]) -> dict[str, Any]:
+    """The page's settings started afresh on many days (`options_overlay.starts`): the body is
+    a run's plus `every_months`, `years` and `washout`. The strategy is re-run once over the
+    page's whole window; each start joins it on its day."""
+    every = body.get("every_months", 3)
+    years = body.get("years", 1)
+    washout = body.get("washout", 0.2)
+    settings, body = _prepare(body)
+    key = json.dumps({**body, "_lake": ov.LAKE.version, "_favourite": _digest(body["favourite_id"]),
+                      "_starts": True}, sort_keys=True, default=str)  # fmt: skip
+
+    def make() -> dict[str, Any]:
+        result = ov.starts(settings, _inputs(settings, body), every_months=int(every),
+                           years=int(years), washout=float(washout))  # fmt: skip
+        result["favourite_id"] = body["favourite_id"]
+        return result
+
+    return _cached(key, make)
