@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — one pre-registered test, no live change |
-| **Status** | In progress |
+| **Status** | Done — killed on both books (interval includes zero); the trail cuts the deepest drawdown by about a third at no clear cost |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-20 |
@@ -67,6 +67,35 @@ candidates; a break-even lock; other windows.
 ### Phase 2 — Run and record
 - Run once; record result and verdict here, in `INDEX.md` and `research/options/common/portfolio-stop.md`.
 
+## Result (2026-11-20)
+
+Run once as registered: 450 days (2025-01-10 → 2026-11-19; seven days 16-24 Sep 2026 skipped, a stored trade count
+missing), net of brokerage, one lot a pick, 0% slippage primary. Per lot-day, change of the stepped 1:1 trail vs the
+₹9k book stop alone, with the 90% block-bootstrap interval:
+
+| Book | Window | Base ₹/day | Trail 1:1 stepped vs base | Deepest drawdown base → trail |
+|---|---|---|---|---|
+| Dir ×2 | all (450 d) | +1,766 | −16 [−115, +81] | ₹51,428 → ₹36,433 (−29%) |
+| Dir ×2 | last year (239 d) | +2,011 | −76 [−242, +70] | |
+| 3 lots | all | +1,429 | +33 [−41, +110] | ₹37,565 → ₹25,530 (−32%) |
+| 3 lots | last year | +1,574 | +10 [−95, +102] | |
+
+**Verdict by the registered rule: killed on both books.** Every interval includes zero, so the trail does not beat
+the stop on return. It was not asked to: the second half of the rule (drawdown no deeper) holds easily.
+
+Neighbours (descriptive): stepped 3:2 −4 / +3 a day, stepped 3:1 −3 / −3, continuous 1:1 −44 / +8, with
+drawdown cut 18% / 11% (Dir ×2), 19% / 10% (3 lots) for 3:2 / 3:1. At 0.5% slippage (the fixed method): trail 1:1
+stepped +1 [−86, +93] (Dir ×2) and +47 [−13, +114] (3 lots) over all days, −78 and −1 over the last year; the stepped
+3:1 reads +16 [−3, +37] and +16 [+1, +35] all days and +22 [+0, +51] and +17 [+0, +42] last year, about ₹1,000 a day
+less than base is not at stake: it is the only neighbour with a lower bound at zero, and it is a neighbour.
+
+Reading: the stepped 1:1 trail fires early on 26 days (Dir ×2) and 23 days (3 lots) of 450. It gave up
+₹52.9k on 12 of them and saved ₹45.5k on 14 (Dir ×2); ₹28.1k given up on 9 and ₹43.1k saved on 14 (3 lots). The
+deepest drawdown falls by about a third because a few bad runs are cut earlier. The cost or gain per day is within
+noise either way, so this is protection bought at an unknown price, the owner's call, not a finding. Caveats as
+registered: minute closes understate the peak, a live stop fills past its level, the pool and window are in-sample.
+
 ## Log
 
 - 2026-11-20 — created from the owner's question; Phase 0 registered before any run.
+- 2026-11-20 — run once; killed on both books by the registered rule (intervals include zero); drawdown −29% / −32% at no clear cost.

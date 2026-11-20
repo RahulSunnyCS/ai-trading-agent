@@ -1,0 +1,913 @@
+{
+ "slip0": {
+  "summary": {
+   "dir2": {
+    "all": {
+     "from": "2025-01-10",
+     "to": "2026-11-19",
+     "days": 450,
+     "four_lot_days": 227,
+     "base": {
+      "per_day": 1766.1145555555556,
+      "total": 794751.55,
+      "max_drawdown": -51427.74999999988,
+      "worst_day": -14356.199999999997,
+      "worst_5pct_mean": -11017.286363636364
+     },
+     "trail_1_1_stepped": {
+      "per_day": 1749.688666666667,
+      "total": 787359.9000000001,
+      "max_drawdown": -36432.74999999988,
+      "worst_day": -14356.199999999997,
+      "worst_5pct_mean": -10516.827272727274,
+      "vs_base": {
+       "mean": -16.425888888888885,
+       "ci90": [
+        -114.78560555555558,
+        81.47280555555552
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 26,
+      "given_up": {
+       "days": 12,
+       "sum": -52917.99999999999
+      },
+      "saved": {
+       "days": 14,
+       "sum": 45526.35
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 1762.5853333333337,
+      "total": 793163.4000000001,
+      "max_drawdown": -41892.49999999988,
+      "worst_day": -14356.199999999997,
+      "worst_5pct_mean": -10654.536363636364,
+      "vs_base": {
+       "mean": -3.5292222222222134,
+       "ci90": [
+        -75.94951666666665,
+        60.18894999999999
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 18,
+      "given_up": {
+       "days": 9,
+       "sum": -26811.249999999996
+      },
+      "saved": {
+       "days": 9,
+       "sum": 25223.1
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 1763.1978888888889,
+      "total": 793439.05,
+      "max_drawdown": -46871.49999999988,
+      "worst_day": -14356.199999999997,
+      "worst_5pct_mean": -10802.59090909091,
+      "vs_base": {
+       "mean": -2.916666666666675,
+       "ci90": [
+        -54.71641666666667,
+        33.96569444444443
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 10,
+      "given_up": {
+       "days": 2,
+       "sum": -13677.75
+      },
+      "saved": {
+       "days": 8,
+       "sum": 12365.249999999996
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 1722.0040000000001,
+      "total": 774901.8,
+      "max_drawdown": -34621.749999999985,
+      "worst_day": -13270.500000000004,
+      "worst_5pct_mean": -10519.968181818183,
+      "vs_base": {
+       "mean": -44.11055555555556,
+       "ci90": [
+        -164.74426111111117,
+        73.68273333333329
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 46,
+      "given_up": {
+       "days": 22,
+       "sum": -83508.7
+      },
+      "saved": {
+       "days": 23,
+       "sum": 63658.94999999999
+      }
+     }
+    },
+    "last_year": {
+     "from": "2025-11-20",
+     "to": "2026-11-19",
+     "days": 239,
+     "four_lot_days": 123,
+     "base": {
+      "per_day": 2011.1539748953976,
+      "total": 480665.80000000005,
+      "max_drawdown": -51427.74999999994,
+      "worst_day": -13608.7,
+      "worst_5pct_mean": -10608.379166666666
+     },
+     "trail_1_1_stepped": {
+      "per_day": 1934.865690376569,
+      "total": 462432.9,
+      "max_drawdown": -36432.74999999994,
+      "worst_day": -12712.899999999996,
+      "worst_5pct_mean": -9989.679166666665,
+      "vs_base": {
+       "mean": -76.28828451882845,
+       "ci90": [
+        -241.5333682008368,
+        70.34476987447698
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 13,
+      "given_up": {
+       "days": 6,
+       "sum": -37831.15
+      },
+      "saved": {
+       "days": 7,
+       "sum": 19598.250000000004
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 1975.453138075314,
+      "total": 472133.30000000005,
+      "max_drawdown": -41892.49999999994,
+      "worst_day": -12712.899999999996,
+      "worst_5pct_mean": -10253.95,
+      "vs_base": {
+       "mean": -35.700836820083666,
+       "ci90": [
+        -156.0892782426778,
+        58.21464435146445
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 9,
+      "given_up": {
+       "days": 5,
+       "sum": -20626.749999999996
+      },
+      "saved": {
+       "days": 4,
+       "sum": 12094.25
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 1994.4050209205022,
+      "total": 476662.80000000005,
+      "max_drawdown": -46871.49999999994,
+      "worst_day": -12712.899999999996,
+      "worst_5pct_mean": -10316.208333333334,
+      "vs_base": {
+       "mean": -16.748953974895404,
+       "ci90": [
+        -111.69142259414225,
+        43.703294979079466
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 5,
+      "given_up": {
+       "days": 1,
+       "sum": -10591.75
+      },
+      "saved": {
+       "days": 4,
+       "sum": 6588.749999999998
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 1917.3531380753138,
+      "total": 458247.4,
+      "max_drawdown": -31815.899999999965,
+      "worst_day": -11689.15,
+      "worst_5pct_mean": -10096.687499999998,
+      "vs_base": {
+       "mean": -93.80083682008369,
+       "ci90": [
+        -267.6409518828453,
+        80.37515690376561
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 23,
+      "given_up": {
+       "days": 11,
+       "sum": -52075.5
+      },
+      "saved": {
+       "days": 12,
+       "sum": 29657.1
+      }
+     }
+    }
+   },
+   "three": {
+    "all": {
+     "from": "2025-01-10",
+     "to": "2026-11-19",
+     "days": 450,
+     "four_lot_days": 0,
+     "base": {
+      "per_day": 1428.716666666667,
+      "total": 642922.5000000001,
+      "max_drawdown": -37564.74999999988,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -9613.89318181818
+     },
+     "trail_1_1_stepped": {
+      "per_day": 1462.086888888889,
+      "total": 657939.1000000001,
+      "max_drawdown": -25530.249999999884,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -8975.438636363637,
+      "vs_base": {
+       "mean": 33.370222222222225,
+       "ci90": [
+        -41.44425000000002,
+        109.91875
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 23,
+      "given_up": {
+       "days": 9,
+       "sum": -28128.0
+      },
+      "saved": {
+       "days": 14,
+       "sum": 43144.600000000006
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 1431.2222222222222,
+      "total": 644050.0,
+      "max_drawdown": -30382.499999999884,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -9253.252272727274,
+      "vs_base": {
+       "mean": 2.5055555555555578,
+       "ci90": [
+        -53.74386111111111,
+        49.36763888888889
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 14,
+      "given_up": {
+       "days": 5,
+       "sum": -17860.5
+      },
+      "saved": {
+       "days": 9,
+       "sum": 18988.0
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 1425.5400000000002,
+      "total": 641493.0000000001,
+      "max_drawdown": -33628.99999999988,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -9315.286363636364,
+      "vs_base": {
+       "mean": -3.1766666666666667,
+       "ci90": [
+        -55.82705555555556,
+        32.730888888888884
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 11,
+      "given_up": {
+       "days": 2,
+       "sum": -13677.75
+      },
+      "saved": {
+       "days": 9,
+       "sum": 12248.25
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 1436.4301111111113,
+      "total": 646393.55,
+      "max_drawdown": -24188.15000000008,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -8720.49090909091,
+      "vs_base": {
+       "mean": 7.713444444444431,
+       "ci90": [
+        -94.68495555555558,
+        110.48350555555554
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 48,
+      "given_up": {
+       "days": 18,
+       "sum": -59302.799999999996
+      },
+      "saved": {
+       "days": 28,
+       "sum": 62773.849999999984
+      }
+     }
+    },
+    "last_year": {
+     "from": "2025-11-20",
+     "to": "2026-11-19",
+     "days": 239,
+     "four_lot_days": 0,
+     "base": {
+      "per_day": 1574.3788702928873,
+      "total": 376276.55000000005,
+      "max_drawdown": -37564.74999999994,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -9260.108333333332
+     },
+     "trail_1_1_stepped": {
+      "per_day": 1584.0958158995818,
+      "total": 378598.9,
+      "max_drawdown": -25530.24999999994,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -8592.995833333332,
+      "vs_base": {
+       "mean": 9.716945606694555,
+       "ci90": [
+        -95.35639121338914,
+        102.16419456066943
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 10,
+      "given_up": {
+       "days": 4,
+       "sum": -13907.400000000003
+      },
+      "saved": {
+       "days": 6,
+       "sum": 16229.750000000002
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 1555.1194560669458,
+      "total": 371673.55000000005,
+      "max_drawdown": -30382.49999999994,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -8879.233333333332,
+      "vs_base": {
+       "mean": -19.259414225941416,
+       "ci90": [
+        -118.60753138075314,
+        54.204236401673654
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 7,
+      "given_up": {
+       "days": 3,
+       "sum": -14344.249999999998
+      },
+      "saved": {
+       "days": 4,
+       "sum": 9741.25
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 1555.0336820083685,
+      "total": 371653.05000000005,
+      "max_drawdown": -33628.99999999994,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -8974.816666666668,
+      "vs_base": {
+       "mean": -19.345188284518837,
+       "ci90": [
+        -113.96093096234311,
+        40.0470711297071
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 5,
+      "given_up": {
+       "days": 1,
+       "sum": -10591.75
+      },
+      "saved": {
+       "days": 4,
+       "sum": 5968.249999999998
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 1512.9577405857742,
+      "total": 361596.9,
+      "max_drawdown": -24188.15000000001,
+      "worst_day": -10249.4,
+      "worst_5pct_mean": -8532.370833333332,
+      "vs_base": {
+       "mean": -61.421129707113025,
+       "ci90": [
+        -213.0014539748954,
+        82.48326359832626
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 24,
+      "given_up": {
+       "days": 10,
+       "sum": -39338.75
+      },
+      "saved": {
+       "days": 13,
+       "sum": 24659.09999999999
+      }
+     }
+    }
+   }
+  },
+  "skipped": [
+   "2026-09-16: a stored trade count is missing",
+   "2026-09-17: a stored trade count is missing",
+   "2026-09-18: a stored trade count is missing",
+   "2026-09-21: a stored trade count is missing",
+   "2026-09-22: a stored trade count is missing",
+   "2026-09-23: a stored trade count is missing",
+   "2026-09-24: a stored trade count is missing"
+  ],
+  "verdict": {
+   "dir2": "killed",
+   "three": "killed"
+  }
+ },
+ "slip0.5": {
+  "summary": {
+   "dir2": {
+    "all": {
+     "from": "2025-01-10",
+     "to": "2026-11-19",
+     "days": 450,
+     "four_lot_days": 227,
+     "base": {
+      "per_day": 1097.6299716666667,
+      "total": 493933.48725,
+      "max_drawdown": -57250.983750000014,
+      "worst_day": -14018.164749999998,
+      "worst_5pct_mean": -11786.49818181818
+     },
+     "trail_1_1_stepped": {
+      "per_day": 1098.3998822222222,
+      "total": 494279.94700000004,
+      "max_drawdown": -41842.59625,
+      "worst_day": -14018.164749999998,
+      "worst_5pct_mean": -11351.87043181818,
+      "vs_base": {
+       "mean": 0.7699105555555839,
+       "ci90": [
+        -85.69595408333333,
+        93.21241880555557
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 21,
+      "given_up": {
+       "days": 9,
+       "sum": -43342.582749999994
+      },
+      "saved": {
+       "days": 12,
+       "sum": 43689.04250000001
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 1123.4005994444444,
+      "total": 505530.26975,
+      "max_drawdown": -47184.82374999998,
+      "worst_day": -14018.164749999998,
+      "worst_5pct_mean": -11362.534056818182,
+      "vs_base": {
+       "mean": 25.770627777777797,
+       "ci90": [
+        -15.303559166666657,
+        74.73552305555557
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 16,
+      "given_up": {
+       "days": 7,
+       "sum": -12656.777499999998
+      },
+      "saved": {
+       "days": 9,
+       "sum": 24253.560000000005
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 1113.1501161111112,
+      "total": 500917.55225,
+      "max_drawdown": -52610.07374999998,
+      "worst_day": -14018.164749999998,
+      "worst_5pct_mean": -11734.126443181816,
+      "vs_base": {
+       "mean": 15.52014444444446,
+       "ci90": [
+        -2.9269587499999923,
+        37.29775958333336
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 9,
+      "given_up": {
+       "days": 2,
+       "sum": -4134.091249999997
+      },
+      "saved": {
+       "days": 7,
+       "sum": 11118.156250000004
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 1096.3981183333335,
+      "total": 493379.15325000003,
+      "max_drawdown": -38762.026249999995,
+      "worst_day": -13563.879999999996,
+      "worst_5pct_mean": -11188.868727272726,
+      "vs_base": {
+       "mean": -1.2318533333332906,
+       "ci90": [
+        -107.38286736111108,
+        110.17412925
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 47,
+      "given_up": {
+       "days": 19,
+       "sum": -69362.42324999999
+      },
+      "saved": {
+       "days": 28,
+       "sum": 68808.08925000002
+      }
+     }
+    },
+    "last_year": {
+     "from": "2025-11-20",
+     "to": "2026-11-19",
+     "days": 239,
+     "four_lot_days": 123,
+     "base": {
+      "per_day": 1289.4482887029292,
+      "total": 308178.14100000006,
+      "max_drawdown": -57250.983750000014,
+      "worst_day": -13589.395000000002,
+      "worst_5pct_mean": -11572.452916666667
+     },
+     "trail_1_1_stepped": {
+      "per_day": 1211.068468619247,
+      "total": 289445.364,
+      "max_drawdown": -41842.59625,
+      "worst_day": -13569.914999999994,
+      "worst_5pct_mean": -11241.902291666667,
+      "vs_base": {
+       "mean": -78.37982008368199,
+       "ci90": [
+        -224.22411710251043,
+        59.09003917364015
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 11,
+      "given_up": {
+       "days": 7,
+       "sum": -37128.8895
+      },
+      "saved": {
+       "days": 4,
+       "sum": 18396.112500000003
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 1297.7890470711295,
+      "total": 310171.58225,
+      "max_drawdown": -47184.82374999998,
+      "worst_day": -13569.914999999994,
+      "worst_5pct_mean": -11241.902291666667,
+      "vs_base": {
+       "mean": 8.340758368200863,
+       "ci90": [
+        -57.9325120292887,
+        80.25594142259419
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 7,
+      "given_up": {
+       "days": 3,
+       "sum": -9177.71875
+      },
+      "saved": {
+       "days": 4,
+       "sum": 11171.160000000007
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 1311.2868242677823,
+      "total": 313397.551,
+      "max_drawdown": -52610.07374999998,
+      "worst_day": -13569.914999999994,
+      "worst_5pct_mean": -11428.087291666669,
+      "vs_base": {
+       "mean": 21.83853556485357,
+       "ci90": [
+        0.0,
+        51.00561715481174
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 3,
+      "given_up": {
+       "days": 0,
+       "sum": 0.0
+      },
+      "saved": {
+       "days": 3,
+       "sum": 5219.410000000003
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 1256.3024278242676,
+      "total": 300256.28024999995,
+      "max_drawdown": -38762.026249999995,
+      "worst_day": -13563.879999999996,
+      "worst_5pct_mean": -11278.2728125,
+      "vs_base": {
+       "mean": -33.14586087866105,
+       "ci90": [
+        -194.21289408995816,
+        124.80961453974903
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 23,
+      "given_up": {
+       "days": 11,
+       "sum": -40733.29125
+      },
+      "saved": {
+       "days": 12,
+       "sum": 32811.43050000001
+      }
+     }
+    }
+   },
+   "three": {
+    "all": {
+     "from": "2025-01-10",
+     "to": "2026-11-19",
+     "days": 450,
+     "four_lot_days": 0,
+     "base": {
+      "per_day": 913.0670244444445,
+      "total": 410880.161,
+      "max_drawdown": -41824.07374999998,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9741.695045454546
+     },
+     "trail_1_1_stepped": {
+      "per_day": 959.6081066666668,
+      "total": 431823.64800000004,
+      "max_drawdown": -36868.46250000002,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9473.30984090909,
+      "vs_base": {
+       "mean": 46.54108222222222,
+       "ci90": [
+        -12.813731611111134,
+        113.73893650000001
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 19,
+      "given_up": {
+       "days": 8,
+       "sum": -18032.485500000003
+      },
+      "saved": {
+       "days": 11,
+       "sum": 38975.9725
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 926.1714994444446,
+      "total": 416777.17475000006,
+      "max_drawdown": -34232.23125,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9565.093534090907,
+      "vs_base": {
+       "mean": 13.104475000000017,
+       "ci90": [
+        -22.696519722222206,
+        51.8653126388889
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 14,
+      "given_up": {
+       "days": 6,
+       "sum": -12100.1175
+      },
+      "saved": {
+       "days": 8,
+       "sum": 17997.131250000006
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 929.5560911111112,
+      "total": 418300.24100000004,
+      "max_drawdown": -38283.441249999916,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9610.063920454546,
+      "vs_base": {
+       "mean": 16.489066666666666,
+       "ci90": [
+        0.821808333333342,
+        35.16323402777779
+       ],
+       "reading": "above zero"
+      },
+      "fired_early_days": 8,
+      "given_up": {
+       "days": 1,
+       "sum": -2490.419999999999
+      },
+      "saved": {
+       "days": 7,
+       "sum": 9910.499999999998
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 947.0873344444444,
+      "total": 426189.3005,
+      "max_drawdown": -39542.24874999991,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9079.465170454547,
+      "vs_base": {
+       "mean": 34.02031000000001,
+       "ci90": [
+        -58.530962527777795,
+        130.63768005555553
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 45,
+      "given_up": {
+       "days": 17,
+       "sum": -49606.10599999999
+      },
+      "saved": {
+       "days": 28,
+       "sum": 64915.2455
+      }
+     }
+    },
+    "last_year": {
+     "from": "2025-11-20",
+     "to": "2026-11-19",
+     "days": 239,
+     "four_lot_days": 0,
+     "base": {
+      "per_day": 1019.1019905857742,
+      "total": 243565.37575000004,
+      "max_drawdown": -41824.07375000001,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9693.412916666666
+     },
+     "trail_1_1_stepped": {
+      "per_day": 1018.4103556485356,
+      "total": 243400.075,
+      "max_drawdown": -36868.462499999936,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9287.225,
+      "vs_base": {
+       "mean": -0.6916349372385028,
+       "ci90": [
+        -89.13658127615066,
+        88.99649932008369
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 9,
+      "given_up": {
+       "days": 5,
+       "sum": -14961.243250000003
+      },
+      "saved": {
+       "days": 4,
+       "sum": 14795.942500000001
+      }
+     },
+     "trail_3_2_stepped": {
+      "per_day": 1019.2381412133892,
+      "total": 243597.91575000001,
+      "max_drawdown": -33814.80375000002,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9329.635625,
+      "vs_base": {
+       "mean": 0.13615062761508545,
+       "ci90": [
+        -60.166982217573214,
+        63.44072175732222
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 7,
+      "given_up": {
+       "days": 3,
+       "sum": -9081.73
+      },
+      "saved": {
+       "days": 4,
+       "sum": 9114.270000000006
+      }
+     },
+     "trail_3_1_stepped": {
+      "per_day": 1036.3368546025106,
+      "total": 247684.50825000004,
+      "max_drawdown": -38283.44125000003,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -9452.647083333333,
+      "vs_base": {
+       "mean": 17.234864016736406,
+       "ci90": [
+        0.0,
+        41.79827405857741
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 3,
+      "given_up": {
+       "days": 0,
+       "sum": 0.0
+      },
+      "saved": {
+       "days": 3,
+       "sum": 4119.132500000001
+      }
+     },
+     "trail_1_1_continuous": {
+      "per_day": 1007.1645397489541,
+      "total": 240712.32500000004,
+      "max_drawdown": -39542.24874999997,
+      "worst_day": -10649.28,
+      "worst_5pct_mean": -8957.4625,
+      "vs_base": {
+       "mean": -11.937450836820078,
+       "ci90": [
+        -144.767709623431,
+        120.6826036610878
+       ],
+       "reading": "includes zero"
+      },
+      "fired_early_days": 22,
+      "given_up": {
+       "days": 9,
+       "sum": -31400.07625
+      },
+      "saved": {
+       "days": 13,
+       "sum": 28547.025499999996
+      }
+     }
+    }
+   }
+  },
+  "skipped": [
+   "2026-09-16: a stored trade count is missing",
+   "2026-09-17: a stored trade count is missing",
+   "2026-09-18: a stored trade count is missing",
+   "2026-09-21: a stored trade count is missing",
+   "2026-09-22: a stored trade count is missing",
+   "2026-09-23: a stored trade count is missing",
+   "2026-09-24: a stored trade count is missing"
+  ],
+  "verdict": null
+ }
+}
