@@ -86,8 +86,7 @@ the stop on return. It was not asked to: the second half of the rule (drawdown n
 Neighbours (descriptive): stepped 3:2 −4 / +3 a day, stepped 3:1 −3 / −3, continuous 1:1 −44 / +8, with
 drawdown cut 18% / 11% (Dir ×2), 19% / 10% (3 lots) for 3:2 / 3:1. At 0.5% slippage (the fixed method): trail 1:1
 stepped +1 [−86, +93] (Dir ×2) and +47 [−13, +114] (3 lots) over all days, −78 and −1 over the last year; the stepped
-3:1 reads +16 [−3, +37] and +16 [+1, +35] all days and +22 [+0, +51] and +17 [+0, +42] last year, about ₹1,000 a day
-less than base is not at stake: it is the only neighbour with a lower bound at zero, and it is a neighbour.
+3:1 reads +16 [−3, +37] and +16 [+1, +35] all days and +22 [+0, +51] and +17 [+0, +42] last year: the only arm whose lower bound reaches zero, a neighbour that cannot be adopted from this item.
 
 Reading: the stepped 1:1 trail fires early on 26 days (Dir ×2) and 23 days (3 lots) of 450. It gave up
 ₹52.9k on 12 of them and saved ₹45.5k on 14 (Dir ×2); ₹28.1k given up on 9 and ₹43.1k saved on 14 (3 lots). The
