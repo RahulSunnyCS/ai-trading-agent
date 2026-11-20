@@ -87,7 +87,7 @@ def main():
     for k, n in sorted(by_reason.items(), key=lambda kv: -kv[1])[:12]:
         print(f"    skipped {n:>3}: {k[0]} {k[1]}")
     print(
-        f"stale legs (last real bar before 15:20) among eve trades: {int(sum(r['stale_legs'] for r in eve))} of {4 * len(eve) * 2}"
+        f"stale legs (last real bar before 15:20) among eve trades: {int(sum(r['stale_legs'] for r in eve))} of {4 * len(eve)}"
     )
 
     verdict = {}

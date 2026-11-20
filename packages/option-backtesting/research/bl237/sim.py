@@ -158,7 +158,7 @@ def trade(
             if p_in is None:
                 return f"{role} {side}: contract not in the eve's file"
             if p_out is None:
-                return f"{role} {side}: no price at 09:17 on the expiry day"
+                return f"{role} {side}: no price at 09:17 on the expiry day (a contract that expired on the eve has none)"
             out[f"{role}_{side}_in"], out[f"{role}_{side}_out"] = p_in, p_out
             out[f"{role}_{side}_stale"] = int(m_in is not None and m_in < STALE_ENTRY_MIN)
             legs.append((role, lot, p_in, p_out))

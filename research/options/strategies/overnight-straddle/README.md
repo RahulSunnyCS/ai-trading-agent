@@ -60,7 +60,7 @@ table):
   zero before costs and loses −₹455 (fit) and −₹541 (test) a trade after them; the sold leg alone is +₹121 a trade (NIFTY
   +₹349, SENSEX −₹149, consistent with BL-160's unhedged NIFTY DTE 0), but the bought straddle on the other index loses
   −₹622 a trade and is no cushion on gaps above 0.5% (−₹1,707 a trade). The same pair on non-eve nights loses as much, so
-  there is no eve effect. 21 of the 215 eves could not be built because the bought index's own weekly expired that day
+  there is no eve effect. 21 of 221 eve trades attempted could not be built because the bought index's own weekly expired that day
   (skipped and listed, not run with the next weekly). Its windows overlap BL-160's learning period, so the sold-leg figure
   is not new evidence.
 - **NIFTY 2022-01 → 2024-10 is now used up for overnight-straddle questions.** BL-160's registered test used

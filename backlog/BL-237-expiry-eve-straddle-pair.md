@@ -101,7 +101,7 @@ trial.
 - **Done when:** the three trades match the raw bars to the paisa and the skip list prints.
 
 ### Phase 2 — The run
-- **Tasks:** `research/bl237/run.py` (every eve, both streams, with and without slippage) and `analyse.py` (windows,
+- **Tasks:** `research/bl237/sim.py` (every eve, both streams, with and without slippage; `check` writes `results/`) and `analyse.py` (windows,
   bootstrap, drawdown, descriptive cuts).
 - **Deliverables:** `research/bl237/results/` (git-ignored) and the result in this item; `research/options/strategies/`
   findings page for the pair.
@@ -134,16 +134,27 @@ Descriptive (not rules; all 194 eves unless stated):
 - **Weekday:** Monday eves 85 trades −₹558; Wednesday eves 97 trades −₹447; ten Friday and two Tuesday eves, too few to read.
 
 Skipped and flagged, as registered (nothing zero-filled): 27 eve trades could not be built: 21 are eves where the BOUGHT
-index's own weekly expires on the eve itself (its contracts do not exist the next morning: Thursday NIFTY expiries before
-the 2025 calendar change, a few holiday shifts), the rest are a contract missing from the eve's file; 2 eves are excluded by
-data_quality (2024-11-01 Muhurat, 2025-10-21 short session). The 21 skip the same kind of trade (buy-side on its own expiry
-day), mostly in the fit year; using the other index's NEXT weekly for those eves would be a different registered rule and
-was not run. No eve leg was stale (last real bar before 15:20).
+index's own weekly expires on the eve itself (its contracts do not exist the next morning): 10 are Thursday eves between
+2024-10 and 2025-01 (NIFTY's then Thursday expiry) and 11 are holiday-shifted expiries; 15 fall in the fit year and 6 in the
+test year. The other 6 are a contract missing from the eve's file. 2 SESSIONS (not eves) are excluded by data_quality
+(2024-11-01 Muhurat, 2025-10-21 short session). No eve leg was stale (last real bar before 15:20).
+
+Clarifications added after the run (2026-11-20, from the Opus review on the PR; no rule changed, no number re-run):
+- **The registration is ambiguous on the bought straddle's expiry.** Phase 0 says both "nearest weekly expiry on or after D"
+  and "its own next weekly, 1 to 6 sessions away". The code took the first reading (`>= D`), which picks a bought contract that
+  settles at the eve's close on the 21 trades above, so they were skipped as the registration says (never zero-filled). The
+  second reading would run them on the next weekly; that was not run. It cannot flip the kill: the 15 fit skips would need
+  about +₹2,700 each just to bring the fit mean to zero, and the 6 test skips about +₹9,500 each (the review's arithmetic).
+  `long_only.py` takes the other reading (strictly after D) because it has no eve.
+- **E is the holiday calendar's next trading day** with bars for both indexes (`sim.next_trading_day`), not "the next day both
+  indexes have collected bars". No eve trade differs between the two; only 4 placebo trades (Budget weekend sessions) do.
+- The 21 skips are logged as "no price at 09:17 on the expiry day"; the real cause is that the bought contract expired on the eve.
+- There is no `run.py`: `sim.py check` writes `results/` and `analyse.py` reads it.
 
 ### Disclosure added after the run (2026-11-20)
 Phase 0 did not cite BL-159 / BL-160, which read NIFTY's short overnight straddle into expiry morning (unhedged and with OTM6
-wings) over this same 2024-10 → 2026-10 learning period and found the unhedged sold leg positive there, then failed it on
-2022–24. This item's sold-NIFTY-alone figure (+₹349, +₹374 fit, +₹328 test) is consistent with that finding, not new
+wings) over this same 2024-10 → 2026-10 learning period and found the unhedged sold leg positive there; BL-160's registered
+test (the hedged OTM6 cell) failed on 2022–24, and the unhedged cell reported beside it was +₹168, t 0.90. This item's sold-NIFTY-alone figure (+₹349, +₹374 fit, +₹328 test) is consistent with that finding, not new
 evidence, and its fit and test windows are not unseen for the sold leg. It does not touch the verdict: the registered
 quantity here is the pair, and the pair is killed. Found by reading `research/options/strategies/overnight-straddle/` after
 the run; it should have been read before Phase 0 was written.
@@ -159,7 +170,7 @@ Both read the same trades or the same two years, so they are leads at most, neve
 - **Buy every session, 15:30 → 09:17, `research/bl237/long_only.py`** (NIFTY and SENSEX, 2024-10 → 2026-11, ~510 nights an
   index, one lot, net of 0.5% slippage and 4 orders): ATM straddle −₹285 (NIFTY) and −₹256 (SENSEX) a night; OTM1 strangle
   −₹260 and −₹273; OTM2 strangle −₹251 and −₹230; 26–30% winners. Gross of costs about zero (−₹39 to +₹16), so the loss is
-  the ₹94–₹189-per-night brokerage plus slippage on ₹13,000–17,500 of premium. Nights with a gap under 0.5% lose about
+  the ₹94-a-night brokerage (4 orders) plus slippage on ₹13,000–17,500 of premium. Nights with a gap under 0.5% lose about
   ₹800–1,100 and gaps above 1% (70 nights) win about ₹6,400, so the strategy is a bet on the gap; a straddle that expires the
   next morning loses more (−₹554 against −₹194).
 
