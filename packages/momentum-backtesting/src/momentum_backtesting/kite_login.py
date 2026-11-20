@@ -1,5 +1,5 @@
-"""Kite's unattended login (owner, 2026-10-28; every trading day from 2026-11-06), inside the morning
-broker login (`packages/broker-login/src/local-login.ts` runs `mbt kite auto-login`), so
+"""Kite's unattended login (owner, 2026-10-28; every trading day from 2026-11-06), inside the
+morning broker login (`packages/broker-login/src/local-login.ts` runs `mbt kite auto-login`), so
 its result is in the same Telegram report. Off until `KITE_AUTO_LOGIN=on`.
 
 Zerodha's stated position is that automating the Kite login is not allowed
