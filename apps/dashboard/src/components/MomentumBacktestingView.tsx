@@ -80,6 +80,7 @@ import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
 import { MomentumRunBar } from './momentum/backtest/MomentumRunBar';
 import { MomentumSettingsChips } from './momentum/backtest/MomentumSettingsChips';
 import { SavedHeadlineRun } from './momentum/backtest/SavedHeadlineRun';
+import { OptionsOverlayView } from './momentum/overlay/OptionsOverlayView';
 import {
   SAVED_STRATEGIES_URL,
   SavedStrategiesView,
@@ -106,6 +107,12 @@ const SECTIONS: Array<{ id: MomentumSection; label: string; description: string 
     id: 'scores',
     label: 'Momentum Scores',
     description: 'Explore current stock and sector momentum.',
+  },
+  {
+    id: 'options',
+    label: 'Options overlay',
+    description:
+      "A strategy's picks held as bought stock options: calls, puts on falling stocks, the mirror pool or a market switch.",
   },
   {
     id: 'saved',
@@ -1016,7 +1023,7 @@ export function MomentumBacktestingView() {
       />
       {/* Backtest is an analytics page: its run bar says what it does, and the first screen is
           kept for the result. */}
-      {section === 'backtest' ? null : (
+      {section === 'backtest' || section === 'options' ? null : (
         <p className="text-sm text-muted">
           {SECTIONS.find((item) => item.id === section)?.description}
         </p>
@@ -1029,6 +1036,8 @@ export function MomentumBacktestingView() {
       >
         {section === 'scores' ? (
           <MomentumScoresView />
+        ) : section === 'options' ? (
+          <OptionsOverlayView />
         ) : section === 'week' ? (
           <ThisWeekView weekly={weekly} />
         ) : section === 'journal' ? (
