@@ -119,11 +119,15 @@ total, largest drawdown per lot, and the arm minus V0 on the same days with the 
 | V3 5 %, SL3 | +1,599 | +2,94,267 | 22,382 | −34 [−372, +316] |
 | V4 15 %, SL3 × band | +1,635 | +3,00,850 | 22,382 | +1 [−219, +227] |
 
-On the 0.5 % slippage copy (a check, not a second test) every arm is below V0: V1 −278 [−653, +104], V2 −220,
-V3 −138, V4 −36.
+V1's drawdown is 14 % deeper than V0's (24,403 / 21,340 = 1.14; worked out here from the two figures).
 
-**Verdict: killed.** The registered pass rule needs the V1 − V0 mean on F to be non-negative; it is −₹68 (and −₹278 at
-0.5 % slippage), with a deeper drawdown (24,403 against 21,340). Rule (3) fails, so no reading of K can change the
+On the 0.5 % slippage copy (a check, not a second test; picks ranked on the unslipped results as production does,
+then scored on the copy; V0 +1,128, drawdown 27,966): V1 −58 [−454, +396], V2 −319 [−619, −20], V3 −39 [−378, +315],
+V4 +11 [−209, +241]. V1, V2 and V3 are below V0; V4 is above it, by an interval that includes zero. Results:
+`research/bl232/result_F_2026-11-20.json`.
+
+**Verdict: killed.** The registered pass rule needs the V1 − V0 mean on F to be non-negative; it is −₹68 (and −₹58 at
+0.5 % slippage, a check; the rule is read at 0 %), with a deeper drawdown (24,403 against 21,340, 14 % deeper). Rule (3) fails, so no reading of K can change the
 verdict, and **K (2025-10-09 → 2026-11-16) was not read**; it stays unused for this question.
 
 What the arms say (descriptive, F only, none adoptable):
@@ -150,3 +154,11 @@ None open; the owner asked for the test as written (2026-11-16).
 - 2026-11-16 — created from the owner's question (family-band 15 % with Dir, Widesl ≤ 100, Widesl > 100);
   Phase 0 registered before any run; arms, windows and pass rule fixed above.
 - 2026-11-16 — Phase 1: script parity with list C passed (69 days). Phase 2: F read once; V1 − V0 = −₹68 [−462, +377], so pass rule (3) failed; killed. K left unread. Findings page `research/options/common/rotation-ranking.md` updated.
+- 2026-11-20 — review fix (PR #455). The first 0.5 % check ranked on the slipped results, which production never does
+  (`pick.load_history` reads under `store.slipped(0.0)`), so each arm picked differently on that pass; its figures
+  (V1 −278 [−653, +104], V2 −220, V3 −138, V4 −36, "every arm below V0") were wrong. `run.py` now ranks once on the
+  unslipped results and scores those picks on each slippage copy; F re-run (F only, K unread): the 0 % table is
+  unchanged to the rupee and the 0.5 % check reads V1 −58, V2 −319, V3 −39, V4 +11. Verdict unchanged (rule 3 is read at
+  0 %). Also added the registered assertion that no family label is derived from a result (labels come from the strategy
+  files, computed before any result is read and checked again after), removed an unused constant, and renamed the
+  result file to `result_F_2026-11-20.json`. Phase 0 (pass rule, arms, windows) not edited.

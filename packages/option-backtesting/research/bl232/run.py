@@ -49,7 +49,6 @@ DRAWS = 2000
 BLOCK = 5
 
 BASE_C = LISTS["C"].weights  # recent .15 weekday .30 dte .30 vix .20 rfam .05
-SCALE = 0.85 / 0.95
 
 
 def arm_list(rfam: float) -> RotationList:
@@ -93,8 +92,7 @@ def codes(keys: list[str]) -> np.ndarray:
     return np.unique(keys, return_inverse=True)[1]
 
 
-def family_keys(names: list[str]) -> dict[str, np.ndarray]:
-    sl3 = sl3_labels(names)
+def family_keys(names: list[str], sl3: list[str]) -> dict[str, np.ndarray]:
     bands = [band_of(V.parts(n)[2]) for n in names]
     return {
         "typeband": family_index(names),  # production key
@@ -112,8 +110,11 @@ ARMS = {
 }
 
 
-def picks_by_arm(m, attrs, names, days_filter):
-    keys = family_keys(names)
+def picks_by_arm(m, attrs, names, sl3, days_filter):
+    # production ranks on the unslipped stored results (pick.load_history: store.slipped(0.0)),
+    # so the matrix handed in here must have been read at 0 % slippage
+    assert store.reading_slip() == 0.0, "ranking must read the unslipped results"
+    keys = family_keys(names, sl3)
     lists = {a: arm_list(r) for a, (r, _) in ARMS.items()}
     days = m.days
     out = {a: {} for a in ARMS}
@@ -215,34 +216,46 @@ def summarise(m, arms_picks, lo, hi):
 def main(stage: str) -> None:
     names = variant_names() + track_names("t1")
     attrs = store.read_days(ROOT, "weekdays")
-    sl3 = sl3_labels(names)
+    sl3 = sl3_labels(names)  # from the strategy files only; computed before any result is read
     counts = {k: int(sum(1 for x in sl3 if x == k)) for k in sorted(set(sl3))}
     print("SL3 family sizes:", counts)
     assert counts.get("wide_le100") == 75, counts  # registered: 60/40 stop-loss variants only
     if stage == "check":
-        m = store.load_matrix(names, ROOT)
+        with store.slipped(0.0):
+            m = store.load_matrix(names, ROOT)
+        assert sl3 == sl3_labels(names), "a family label changed once results were read"
 
         def spot(d: date) -> bool:  # a span before the BL-192 cap and one after it
             return date(2025, 1, 10) <= d <= date(2025, 3, 31) or date(2026, 10, 26) <= d <= date(
                 2026, 11, 16
             )
 
-        picks, parity = picks_by_arm(m, attrs, names, spot)
+        picks, parity = picks_by_arm(m, attrs, names, sl3, spot)
         print("parity (V0 vs production list C):", parity["days"], "days, bad:", parity["bad"][:5])
         sys.exit(1 if parity["bad"] else 0)
 
     lo, hi = WINDOWS[stage]
-    out_json = HERE / f"result_{stage}.json"
+    out_json = HERE / f"result_{stage}_{date.today().isoformat()}.json"
     if stage == "K":
-        assert (HERE / "result_F.json").exists(), "read F first (registered order)"
-        if out_json.exists() and "--override" not in sys.argv:
+        assert list(HERE.glob("result_F_*.json")), "read F first (registered order)"
+        if list(HERE.glob("result_K_*.json")) and "--override" not in sys.argv:
             sys.exit("K was read already: the registration reads it once")
     results = {}
+    # Rank once on the unslipped results, as production does (pick.load_history reads under
+    # store.slipped(0.0)); the parity assert inside picks_by_arm compares V0 with pick._rank on that
+    # same history. The picks are then scored on each slippage copy (as research/bl216/range_fit.py).
+    with store.slipped(0.0):
+        m0 = store.load_matrix(names, ROOT)
+        picks, parity = picks_by_arm(m0, attrs, names, sl3, lambda d: lo <= d <= hi)
+    assert not parity["bad"], f"parity failed on {parity['bad'][:5]}"
+    assert sl3 == sl3_labels(names), "a family label changed once results were read"
     for slip in (0.0, 0.5):
-        with store.slipped(slip):
-            m = store.load_matrix(names, ROOT)
-            picks, parity = picks_by_arm(m, attrs, names, lambda d: lo <= d <= hi)
-        assert not parity["bad"], f"parity failed on {parity['bad'][:5]}"
+        if slip == 0.0:
+            m = m0
+        else:
+            with store.slipped(slip):
+                m = store.load_matrix(names, ROOT)
+            assert m.days == m0.days and list(m.names) == list(m0.names), "slippage copy differs"
         res, _ = summarise(m, picks, lo, hi)
         results[f"slip{slip:g}"] = {"summary": res, "parity_days": parity["days"]}
         if stage == "K":
@@ -254,7 +267,15 @@ def main(stage: str) -> None:
             )
             results[f"slip{slip:g}"]["forward_descriptive"] = fwd
     out_json.write_text(
-        json.dumps({"window": [lo.isoformat(), hi.isoformat()], "results": results}, indent=1)
+        json.dumps(
+            {
+                "window": [lo.isoformat(), hi.isoformat()],
+                "ranking": "unslipped stored results (production rule); picks scored per slippage copy",
+                "results": results,
+            },
+            indent=1,
+        )
+        + "\n"
     )
     r = results["slip0"]["summary"]
     print(f"\n== window {stage} {lo}..{hi}, {r['V0']['days']} days, stored 0% slippage ==")
