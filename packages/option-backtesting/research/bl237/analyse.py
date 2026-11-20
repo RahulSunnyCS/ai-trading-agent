@@ -25,7 +25,16 @@ def load():
     for r in rows:
         r["eve"] = date.fromisoformat(r["eve"])
         for k, v in r.items():
-            if k not in ("eve", "expiry_day", "sold", "bought", "sold_expiry", "bought_expiry", "kind", "window"):
+            if k not in (
+                "eve",
+                "expiry_day",
+                "sold",
+                "bought",
+                "sold_expiry",
+                "bought_expiry",
+                "kind",
+                "window",
+            ):
                 r[k] = float(v) if v not in ("", None) else float("nan")
     return sorted(rows, key=lambda r: (r["eve"], r["sold"]))
 
@@ -64,28 +73,45 @@ def main():
     rows = load()
     eve = [r for r in rows if r["kind"] == "eve"]
     placebo = [r for r in rows if r["kind"] == "placebo"]
-    skipped = list(csv.reader(open(HERE / "results" / "skipped.csv")))[1:]
+    with open(HERE / "results" / "skipped.csv") as f:
+        skipped = list(csv.reader(f))[1:]
     print(f"trades: {len(eve)} eves, {len(placebo)} placebo; skipped {len(skipped)}")
     by_reason = defaultdict(int)
     for _, stream, reason in skipped:
-        by_reason[(stream.split("/")[-1] if stream else "-", reason.split(":")[0] if reason.startswith("data_quality") else reason)] += 1
+        by_reason[
+            (
+                stream.split("/")[-1] if stream else "-",
+                reason.split(":")[0] if reason.startswith("data_quality") else reason,
+            )
+        ] += 1
     for k, n in sorted(by_reason.items(), key=lambda kv: -kv[1])[:12]:
         print(f"    skipped {n:>3}: {k[0]} {k[1]}")
-    print(f"stale legs (last real bar before 15:20) among eve trades: {int(sum(r['stale_legs'] for r in eve))} of {4 * len(eve) * 2}")
+    print(
+        f"stale legs (last real bar before 15:20) among eve trades: {int(sum(r['stale_legs'] for r in eve))} of {4 * len(eve) * 2}"
+    )
 
     verdict = {}
     for window in ("fit", "test"):
         w = [r for r in eve if r["window"] == window]
-        print(f"\n=== {window.upper()} window: eves {w[0]['eve']} -> {w[-1]['eve']}" if w else f"\n=== {window.upper()}: none")
+        print(
+            f"\n=== {window.upper()} window: eves {w[0]['eve']} -> {w[-1]['eve']}"
+            if w
+            else f"\n=== {window.upper()}: none"
+        )
         pooled = np.array([r["pair_net"] for r in w])
         print(line("PRIMARY pooled net (0.5% slip)", pooled, True))
         for sold in ("NIFTY", "SENSEX"):
             s = np.array([r["pair_net"] for r in w if r["sold"] == sold])
             print(line(f"  {sold}-eve (sell {sold})", s, True))
         lo, _ = boot(pooled)
-        stream_means = {sd: float(np.mean([r["pair_net"] for r in w if r["sold"] == sd] or [float('nan')])) for sd in ("NIFTY", "SENSEX")}
+        stream_means = {
+            sd: float(np.mean([r["pair_net"] for r in w if r["sold"] == sd] or [float("nan")]))
+            for sd in ("NIFTY", "SENSEX")
+        }
         verdict[window] = (lo > 0, all(m > 0 for m in stream_means.values()))
-        print(f"  lower bound {lo:.0f} -> {'above zero' if lo > 0 else 'NOT above zero'}; stream means {stream_means}")
+        print(
+            f"  lower bound {lo:.0f} -> {'above zero' if lo > 0 else 'NOT above zero'}; stream means {stream_means}"
+        )
 
     print("\n=== RULE")
     ok = all(a and b for a, b in verdict.values())
@@ -99,24 +125,32 @@ def main():
         if not w:
             continue
         print(f"-- {window}")
-        for label, key in (("pair net, 0.5% slippage", "pair_net"), ("pair net, no slippage", "pair_net_noslip"),
-                           ("pair gross, no slippage", "pair_g"), ("sold straddle alone, net 0.5%", "sold_net"),
-                           ("bought straddle alone, net 0.5%", "bought_net")):
+        for label, key in (
+            ("pair net, 0.5% slippage", "pair_net"),
+            ("pair net, no slippage", "pair_net_noslip"),
+            ("pair gross, no slippage", "pair_g"),
+            ("sold straddle alone, net 0.5%", "sold_net"),
+            ("bought straddle alone, net 0.5%", "bought_net"),
+        ):
             print(line(label, np.array([r[key] for r in w])))
         for sd in ("NIFTY", "SENSEX"):
             s = [r for r in w if r["sold"] == sd]
             print(line(f"  sold {sd}: sold leg net", np.array([r["sold_net"] for r in s])))
             print(line(f"  sold {sd}: bought leg net", np.array([r["bought_net"] for r in s])))
-    print("-- placebo: the same structure on sessions that are not an eve (sold index's weekly is >1 session away)")
+    print(
+        "-- placebo: the same structure on sessions that are not an eve (sold index's weekly is >1 session away)"
+    )
     for window in ("fit", "test"):
         for sd in ("NIFTY", "SENSEX"):
-            s = np.array([r["pair_net"] for r in placebo if r["window"] == window and r["sold"] == sd])
+            s = np.array(
+                [r["pair_net"] for r in placebo if r["window"] == window and r["sold"] == sd]
+            )
             print(line(f"  {window} sell {sd}", s))
     print("-- eve trades by weekday of the eve")
     for wd in range(5):
         s = np.array([r["pair_net"] for r in eve if r["eve"].weekday() == wd])
         if len(s):
-            print(line(f"  {['Mon','Tue','Wed','Thu','Fri'][wd]}", s))
+            print(line(f"  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][wd]}", s))
     print("-- eve trades by |overnight gap| in the sold index")
     gaps = np.array([abs(r["sold_gap_pct"]) for r in eve])
     nets = np.array([r["pair_net"] for r in eve])
@@ -125,9 +159,17 @@ def main():
         print(line(f"  {name}", nets[m]))
     sp = np.array([(r["sold_CE_in"] + r["sold_PE_in"]) * r["sold_lot"] for r in eve])
     bp = np.array([(r["bought_CE_in"] + r["bought_PE_in"]) * r["bought_lot"] for r in eve])
-    print(f"-- mean premium sold Rs {sp.mean():.0f}, bought Rs {bp.mean():.0f} (one straddle, one lot)")
+    print(
+        f"-- mean premium sold Rs {sp.mean():.0f}, bought Rs {bp.mean():.0f} (one straddle, one lot)"
+    )
     worst = sorted(eve, key=lambda r: r["pair_net"])[:5]
-    print("-- the five worst eve trades: " + "; ".join(f"{r['eve']} sell {r['sold']} {r['pair_net']:.0f} (gap {r['sold_gap_pct']:.2f}%)" for r in worst))
+    print(
+        "-- the five worst eve trades: "
+        + "; ".join(
+            f"{r['eve']} sell {r['sold']} {r['pair_net']:.0f} (gap {r['sold_gap_pct']:.2f}%)"
+            for r in worst
+        )
+    )
 
 
 if __name__ == "__main__":

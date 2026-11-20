@@ -23,11 +23,12 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+from trading_data import db, lake, quality
+
 from option_backtesting.data.providers.base import Right
 from option_backtesting.data.reference.loader import ReferenceData
 from option_backtesting.data.resolver import resolve_strike
 from option_backtesting.legwise import market
-from trading_data import db, lake, quality
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
@@ -39,7 +40,9 @@ SIZING = date(2026, 10, 12)
 SLIP = 0.005
 COST_PER_ORDER = 20.0 * 1.18
 ENTRY_MIN = market.minute_index("15:30")  # 375: price_at reads the close of the 15:29 bar
-EXIT_MIN = market.minute_index("09:17")  # 2: price_at reads the close of the 09:16 bar (amendment 1)
+EXIT_MIN = market.minute_index(
+    "09:17"
+)  # 2: price_at reads the close of the 09:16 bar (amendment 1)
 STALE_ENTRY_MIN = market.minute_index("15:20")  # a last real bar before 15:20 is counted as stale
 
 
@@ -84,7 +87,9 @@ class Day:
             self._bars[key] = out
         return self._bars[key]
 
-    def price_at(self, key: tuple[date, float, str], minute: int) -> tuple[float | None, int | None]:
+    def price_at(
+        self, key: tuple[date, float, str], minute: int
+    ) -> tuple[float | None, int | None]:
         """(price, minute of the real bar it came from) by `Series.price_at`'s rule."""
         bars = self.bars(key)
         before = [m for m in bars if m <= minute - 1]
@@ -116,9 +121,7 @@ def straddle_keys(d: Day, expiry: date, ref: ReferenceData) -> tuple[float, dict
     spot = d.spot.price_at(ENTRY_MIN) if d.spot is not None else None
     if spot is None:
         return "no index price at 15:30"
-    strike = resolve_strike(
-        d.underlying, "ATM", Right.CE, spot, as_of=d.day, reference=ref
-    ).strike
+    strike = resolve_strike(d.underlying, "ATM", Right.CE, spot, as_of=d.day, reference=ref).strike
     return spot, {"CE": (expiry, float(strike), "CE"), "PE": (expiry, float(strike), "PE")}
 
 
@@ -131,8 +134,14 @@ def trade(
     es, eb = ds.nearest_expiry(), db_.nearest_expiry()
     if es is None or eb is None:
         return "no listed expiry"
-    out: dict = {"eve": eve, "expiry_day": exp, "sold": sold, "bought": bought,
-                 "sold_expiry": es, "bought_expiry": eb}
+    out: dict = {
+        "eve": eve,
+        "expiry_day": exp,
+        "sold": sold,
+        "bought": bought,
+        "sold_expiry": es,
+        "bought_expiry": eb,
+    }
     legs = []
     for role, d_in, d_out, e in (("sold", ds, xs, es), ("bought", db_, xb, eb)):
         sk = straddle_keys(d_in, e, ref)
@@ -193,13 +202,11 @@ def run_all(root: Path, ref: ReferenceData, last: date | None = None):
     for i, eve in enumerate(common):
         exp_day = next_trading_day(ref, eve)
         if exp_day not in avail["NIFTY"] or exp_day not in avail["SENSEX"]:
-            if i + 1 < len(common) or exp_day <= (last or date.max):
-                if exp_day <= common[-1]:
-                    skipped.append((eve, "", "next session has no bars for both indexes"))
+            if (i + 1 < len(common) or exp_day <= (last or date.max)) and exp_day <= common[-1]:
+                skipped.append((eve, "", "next session has no bars for both indexes"))
             continue
         bad = [
-            f"{u} {d} {excluded[u][d]}"
-            for u in INDEXES for d in (eve, exp_day) if d in excluded[u]
+            f"{u} {d} {excluded[u][d]}" for u in INDEXES for d in (eve, exp_day) if d in excluded[u]
         ]
         if bad:
             skipped.append((eve, "", "data_quality: " + "; ".join(bad)))
@@ -236,7 +243,9 @@ def write(trades, skipped):
 def check(root: Path, ref: ReferenceData):
     """Three hand-checked trades: raw bars printed, then the arithmetic done again longhand. Not scored."""
     trades, skipped = run_all(root, ref)
-    write(trades, skipped)  # the one pass: the check prints three trades only, nothing is aggregated here
+    write(
+        trades, skipped
+    )  # the one pass: the check prints three trades only, nothing is aggregated here
     eves = [t for t in trades if t["kind"] == "eve"]
     picks = [eves[0], eves[len(eves) // 2], eves[-1]]
     days = Days(root)
@@ -245,21 +254,35 @@ def check(root: Path, ref: ReferenceData):
         for role, u in (("sold", t["sold"]), ("bought", t["bought"])):
             din, dout = days.get(u, t["eve"]), days.get(u, t["expiry_day"])
             e, k = t[f"{role}_expiry"], t[f"{role}_strike"]
-            print(f"  {role} {u}: spot at 15:30 {t[f'{role}_spot']}, ATM {k:g}, expiry {e}, lot {t[f'{role}_lot']}")
+            print(
+                f"  {role} {u}: spot at 15:30 {t[f'{role}_spot']}, ATM {k:g}, expiry {e}, lot {t[f'{role}_lot']}"
+            )
             for side in ("CE", "PE"):
                 key = (e, k, side)
                 bi, bo = din.bars(key), dout.bars(key)
                 last_in = sorted(m for m in bi if m <= 374)[-3:]
                 first_out = sorted(m for m in bo if m <= 3)[:4]
-                print(f"    {side} eve bars (min idx: open/close) "
-                      + ", ".join(f"{market.minute_label(m)}:{bi[m][0]}/{bi[m][1]}" for m in last_in))
-                print(f"    {side} expiry-day bars "
-                      + ", ".join(f"{market.minute_label(m)}:{bo[m][0]}/{bo[m][1]}" for m in first_out))
-                print(f"    {side} used: in {t[f'{role}_{side}_in']}  out {t[f'{role}_{side}_out']}")
+                print(
+                    f"    {side} eve bars (min idx: open/close) "
+                    + ", ".join(f"{market.minute_label(m)}:{bi[m][0]}/{bi[m][1]}" for m in last_in)
+                )
+                print(
+                    f"    {side} expiry-day bars "
+                    + ", ".join(
+                        f"{market.minute_label(m)}:{bo[m][0]}/{bo[m][1]}" for m in first_out
+                    )
+                )
+                print(
+                    f"    {side} used: in {t[f'{role}_{side}_in']}  out {t[f'{role}_{side}_out']}"
+                )
         s_pnl = sum((t[f"sold_{s}_in"] - t[f"sold_{s}_out"]) * t["sold_lot"] for s in ("CE", "PE"))
-        b_pnl = sum((t[f"bought_{s}_out"] - t[f"bought_{s}_in"]) * t["bought_lot"] for s in ("CE", "PE"))
-        print(f"  longhand gross: sold {s_pnl:.2f}, bought {b_pnl:.2f}, pair {s_pnl + b_pnl:.2f}; "
-              f"code gross {t['pair_g']:.2f}; net after slippage and 8 orders {t['pair_net']:.2f}")
+        b_pnl = sum(
+            (t[f"bought_{s}_out"] - t[f"bought_{s}_in"]) * t["bought_lot"] for s in ("CE", "PE")
+        )
+        print(
+            f"  longhand gross: sold {s_pnl:.2f}, bought {b_pnl:.2f}, pair {s_pnl + b_pnl:.2f}; "
+            f"code gross {t['pair_g']:.2f}; net after slippage and 8 orders {t['pair_net']:.2f}"
+        )
         assert abs(s_pnl + b_pnl - t["pair_g"]) < 1e-6
 
 

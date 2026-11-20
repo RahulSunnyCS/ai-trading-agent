@@ -11,15 +11,15 @@ expiry STRICTLY AFTER D (a weekly that expires on D itself is gone by 15:30, so 
 from __future__ import annotations
 
 import sys
-from datetime import date
 from pathlib import Path
 
 import numpy as np
+from trading_data import db, quality
+
 from option_backtesting.data.providers.base import Right
 from option_backtesting.data.reference.loader import ReferenceData
 from option_backtesting.data.resolver import resolve_strike
 from option_backtesting.legwise import market
-from trading_data import db, quality
 
 STRUCTURES = ("ATM", "OTM1", "OTM2")  # ATM = straddle; OTMn = strangle n steps out on each side
 
@@ -53,7 +53,11 @@ def run(root: Path, ref: ReferenceData):
             spot_out = dout.spot.price_at(sim.EXIT_MIN) if dout.spot is not None else None
             for rule in STRUCTURES:
                 keys = [
-                    (exp, float(resolve_strike(u, rule, side, spot, as_of=d, reference=ref).strike), s_)
+                    (
+                        exp,
+                        float(resolve_strike(u, rule, side, spot, as_of=d, reference=ref).strike),
+                        s_,
+                    )
                     for side, s_ in ((Right.CE, "CE"), (Right.PE, "PE"))
                 ]
                 legs, ok = [], True
@@ -69,13 +73,20 @@ def run(root: Path, ref: ReferenceData):
                     continue
                 gross = sum((po - pi) * lot for pi, po in legs)
                 slipped = sum((po * (1 - sim.SLIP) - pi * (1 + sim.SLIP)) * lot for pi, po in legs)
-                out.append({
-                    "u": u, "rule": rule, "day": d, "window": "fit" if d <= sim.FIT_END else "test",
-                    "net": slipped - 4 * sim.COST_PER_ORDER, "gross": gross,
-                    "gap": abs((spot_out - spot) / spot * 100) if spot_out else float("nan"),
-                    "to_exp": (exp - e).days, "weekday": d.weekday(),
-                    "premium": sum(pi for pi, _ in legs) * lot,
-                })
+                out.append(
+                    {
+                        "u": u,
+                        "rule": rule,
+                        "day": d,
+                        "window": "fit" if d <= sim.FIT_END else "test",
+                        "net": slipped - 4 * sim.COST_PER_ORDER,
+                        "gross": gross,
+                        "gap": abs((spot_out - spot) / spot * 100) if spot_out else float("nan"),
+                        "to_exp": (exp - e).days,
+                        "weekday": d.weekday(),
+                        "premium": sum(pi for pi, _ in legs) * lot,
+                    }
+                )
     return out, skipped
 
 
@@ -84,8 +95,10 @@ def show(label: str, rows: list[dict], key: str = "net"):
     if not len(v):
         return
     lo, hi = an.boot(v)
-    print(f"  {label:<26} n={len(v):>3} mean {v.mean():>7.0f}  90% [{lo:>6.0f},{hi:>6.0f}]  win {100 * (v > 0).mean():>3.0f}%  "
-          f"worst {v.min():>7.0f}  best {v.max():>7.0f}  maxDD {an.max_dd(v):>8.0f}  total {v.sum():>9.0f}")
+    print(
+        f"  {label:<26} n={len(v):>3} mean {v.mean():>7.0f}  90% [{lo:>6.0f},{hi:>6.0f}]  win {100 * (v > 0).mean():>3.0f}%  "
+        f"worst {v.min():>7.0f}  best {v.max():>7.0f}  maxDD {an.max_dd(v):>8.0f}  total {v.sum():>9.0f}"
+    )
 
 
 def main():
@@ -95,14 +108,28 @@ def main():
     for rule in STRUCTURES:
         rr = [r for r in rows if r["rule"] == rule]
         name = "ATM straddle" if rule == "ATM" else f"{rule} strangle"
-        print(f"\n##### {name}: {len(rr)} nights, mean premium Rs {np.mean([r['premium'] for r in rr]):.0f}")
-        for key, title in (("net", "NET (0.5% slippage, 4 orders)"), ("gross", "GROSS (no slippage, no brokerage)")):
+        print(
+            f"\n##### {name}: {len(rr)} nights, mean premium Rs {np.mean([r['premium'] for r in rr]):.0f}"
+        )
+        for key, title in (
+            ("net", "NET (0.5% slippage, 4 orders)"),
+            ("gross", "GROSS (no slippage, no brokerage)"),
+        ):
             print(f" {title}")
             for w in ("fit", "test", "all"):
                 for u in ("NIFTY", "SENSEX"):
-                    show(f"{w} {u}", [r for r in rr if (w == "all" or r["window"] == w) and r["u"] == u], key)
+                    show(
+                        f"{w} {u}",
+                        [r for r in rr if (w == "all" or r["window"] == w) and r["u"] == u],
+                        key,
+                    )
         print(" NET by |overnight gap|, both indexes, all nights")
-        for lo, hi, n in ((0, .25, "<0.25%"), (.25, .5, "0.25-0.5%"), (.5, 1, "0.5-1%"), (1, 99, ">1%")):
+        for lo, hi, n in (
+            (0, 0.25, "<0.25%"),
+            (0.25, 0.5, "0.25-0.5%"),
+            (0.5, 1, "0.5-1%"),
+            (1, 99, ">1%"),
+        ):
             show(n, [r for r in rr if lo <= r["gap"] < hi])
         print(" NET: the straddle expires next morning (0 days) vs later")
         show("expires E", [r for r in rr if r["to_exp"] == 0])
