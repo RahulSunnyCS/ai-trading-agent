@@ -70,8 +70,7 @@ def _init() -> None:
     from option_backtesting.data.reference.loader import default_reference_data
     from option_backtesting.legwise.schema import load_legwise
     from option_backtesting.rotation.lists import SIZING_DATE
-    from option_backtesting.rotation.variants import strategy_path
-    from option_backtesting.rotation.variants import underlying_of
+    from option_backtesting.rotation.variants import strategy_path, underlying_of
 
     names = pool_names()
     _G["names"] = names
@@ -198,8 +197,7 @@ def stage_paths() -> None:
     from option_backtesting.legwise.schema import load_legwise
     from option_backtesting.rotation import portfolio, slip_store
     from option_backtesting.rotation.lists import SIZING_DATE
-    from option_backtesting.rotation.variants import strategy_path
-    from option_backtesting.rotation.variants import underlying_of
+    from option_backtesting.rotation.variants import strategy_path, underlying_of
 
     picks = list(csv.DictReader((HERE / "picks_by_day.csv").open()))
     ref, sizing = default_reference_data(), date.fromisoformat(SIZING_DATE)
