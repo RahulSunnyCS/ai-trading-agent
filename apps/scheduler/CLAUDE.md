@@ -21,11 +21,39 @@ summary flags anything but `main`).
 - `src/schedule.ts` — IST time (fixed UTC+05:30; India has no DST) and schedules. A
   schedule is a time plus a day predicate (`tradingDays`, `onWeekdays(…)`), not a cron
   string, because "trading days" and "first Sunday" are not expressible in cron.
-  `tradingDays` comes from `@trading/market-reference`'s `isTradingDay`.
+  `tradingDays` comes from `@trading/market-reference`'s `isTradingDay`. `at` may be a list of
+  times (BL-234: `contract-notes` runs at 00:00, 07:30, 10:30 and 15:30): each is a slot of
+  its own, but the job has one history and `decide()` serves only the latest slot, so a laptop that slept
+  through two runs the later one once.
 - `src/runner.ts` — runs a job's steps with the repo `.env` parsed in-process (`env.ts`),
   a launchd-safe PATH, per-step timeout, whole-job retries, and logs to
   `<logDir>/<job>/<IST date>.log`. Jobs in the same `group` never overlap: in-process by
   a promise chain, across processes by unfinished rows in the history table.
+- `src/chain.ts` + `src/step.ts` — BL-234: a job with a `chain` (a list of `ChainStep`s, `steps` left empty) is a
+  chain: each step starts when the one before ends, not at a clock time, and carries what a whole job used to:
+  its own `timeoutMinutes`, `retries` / `retryDelayMinutes` / `noRetryExitCodes`, `onFail` (`stop`, the default,
+  ends the chain and marks the rest `skipped`; `continue` runs on), `requires` (skipped when a named step did
+  not pass; held when it was held), `notBefore` / `notAfter` (`HH:MM` IST: wait for it, or record the step
+  `late`, which is no failure), `alertsItself`, `logFile` and `holdId` (the id the stop hold and the pause know
+  the step by: set it on every step that uploads, enables or deploys). A chain has NO job-level retries (a
+  test pins `retries: 0`). Every step is a row in `run_steps` (`ok`, `failed`, `skipped`, `held`, `late`,
+  `carried`, `running`, `unknown`). **Resume:** the loop restarting a slot whose run was cut off
+  (`restartIfInterruptedUntil`) resumes that slot by itself; a hand run resumes only with `jobs run <chain> --resume`
+  (the runs of today), `--from <step>` (every step before it counts as done) or starts over with `--fresh`. What each
+  step LAST came to across those runs decides (`History.priorSteps`: the latest row of a step wins), so a refused
+  resume (no step rows) or an Apply now (some) never hides a step that passed, and a step that failed again after
+  passing runs again. A step that passed is not run again (`carried`); a step that was `running` when
+  the run was cut off is `unknown` (`reapDead`) and a resume REFUSES (exit 4) rather than repeat it, because a
+  login sent or an algo enabled must not repeat: say so in the alert, and the owner picks `--from <step>` to run
+  it or `--from <the next>` to skip it. The alert (`alertChain`) is ONE message naming each failed or skipped
+  step with its own `fixHint`, and what passed; a step that `alertsItself` and really ran is left out. A chain
+  takes a step's `group` when it gets to that step and lets it go after the last step that needs it (Phase 3: the
+  `evening` chain starts at 15:45 without waiting for the close-out's `quantiply` group, takes it at its first
+  AlgoTest step, and lets `catalog` go after `t1-update` for the whole upload stretch; the groups a chain holds now
+  are rows in `run_groups`, so another job waits only while one is really held; two jobs that each take one group
+  and then want the other's would deadlock, and none does; `groupsOf(job, only)` is every group a run can hold). `jobs run <chain> --only a,b` / `{"only": [...]}` runs just those steps (the dashboard's Apply now:
+  the others count as done, no rows, no resume). `step.ts` holds `runStep` (one spawned command,
+  its own process group, a timeout) for the runner and the chain.
 - `src/history.ts` — `bun:sqlite` run history (`runs` table). Deliberately not the DuckDB
   catalog, so recording a run never competes with a job for its single writer.
 - `src/loop.ts` — `bun run jobs serve`: every 30 s, `decide()` each job from the run
@@ -58,6 +86,8 @@ summary flags anything but `main`).
   writer or its step's process group exists), its longest run `maxRunMinutes` (timeout x steps x attempts, the
   retry delays, one timeout of group wait) and `catchUpHours`: the trade monitor reads these before every platform
   login; dead rows are closed first, `reapDead`), `GET /runs?job=&limit=`,
+  `GET /runs/:id/steps` (a chain run's step rows; the Jobs page's Steps panel), `GET /jobs` lists a chain's step ids
+  as `chain`, `POST /jobs/:id/run` takes `{"resume": true}`, `{"from": "<step>"}` or `{"fresh": true}` for a chain,
   `GET /runs/:id/log?tail=200` (refuses paths outside the log dir and
   `packages/momentum-backtesting/data`, symlinks resolved), `POST /jobs/:id/run` (manual run;
   202 + run id, 409 if the job or its group is busy), `GET`/`PUT /notifications` (catalogue +
@@ -67,7 +97,7 @@ summary flags anything but `main`).
 - `src/pause.ts` — BL-140 Phase 4: while the settings' pause covers a job's session (the evening jobs prepare the
   next trading session, the morning top-ups and deploys are for today), `PAUSE_JOBS` (= the stop hold's jobs) are
   held by `runJob` and the API's run routes (`pausedReason`, beside `heldReason`); unreadable settings hold them too.
-  `quantiply-disable` and the read-only jobs are never held. `nextSession` feeds the page's "Skip next session";
+  `quantiply-disable` (a `close-out` step with no `holdId`) and the read-only jobs are never held. A chain step is held by its `holdId`, so the held lists below still name the old job ids (`quantiply-topup`, `quantiply-deploy-topup`). `nextSession` feeds the page's "Skip next session";
   the 09:00 summary says a pause is on (`pauseNotice`).
 - `src/automation.ts` — BL-140's automation settings. Three master switches (logins, uploads, deploy) and one
   row per platform + broker (`algotest|quantiply` × `finvasia|angelone`: login, list none/core/t1, upload,
@@ -126,6 +156,16 @@ detail as its error, so the normal failure alert goes out with the job's `fixHin
 daily, so an unfixed problem repeats at most once a day. Inject anything that touches the
 network or disk so the test needs neither. One group per file keeps parallel PRs from clashing.
 
+**Suites (BL-234).** The daily checks run as two jobs, not one each: `morning-checks` (trading days
+08:30) and `evening-checks` (17:00), listed in `checks/index.ts` (`SUITES`). A check named there stays
+defined in its module (description, fix hint, retries are read from it) but is not scheduled on its
+own; to add a daily check to a suite, add its id to that list. A suite (`checkSuite` in `checks/types.ts`)
+runs every member and never stops at a problem; a member with `retries` is retried alone, after its
+delay, so the others run once; the result is ONE failure that names each problem with its own fix, so a
+bad morning is one Telegram message. A check that fires only on its own day (`margin-reminder`,
+`credential-rotation-reminder`) or does real work (`weekly-digest`) stays a job of its own. Run a suite
+by hand with `bun run jobs run morning-checks`.
+
 What each file holds (BL-012 inventory numbers): `drift` S1 Nifty 50 list, S2 lot sizes, Y4
 `check-expiry-calendar` (the Fyers NSE + BSE masters' listed option expiries against
 `expiry_calendar.csv`, holiday shifts from `holidays.csv`, years with no holiday rows skipped,
@@ -140,8 +180,9 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
 - `group: 'catalog'` is for anything that writes the DuckDB catalog (`TRADING_DATA_ROOT`).
 - `group: 'quantiply'` holds the Quantiply jobs (upload, enable, disable), so an enable runs after the upload
-  before it, retries included (`quantiply-deploy` 08:10 waits for the 08:02 `broker-login`, BL-172;
-  `quantiply-deploy-topup` 09:21 for `quantiply-topup` 09:19). It does not space their TOTP logins (the next job
+  before it, retries included (`quantiply-deploy` 08:10 waits for the 08:02 `broker-login`, BL-172; the
+  `morning-topup` chain runs the 09:19 top-up, then its enable, in order; the `close-out` chain (15:30) holds the
+  switch-off and the live capture; the `evening` chain's Quantiply upload steps wait for both). It does not space their TOTP logins (the next job
   starts the moment one ends): `packages/broker-login/src/quantiply-session.ts` waits out the last window each
   account typed a code in (a file stamp), and the deployer retries a refused code once. The enables have
   `retries: 0` like `algotest-activate`: a second attempt could act on a half-finished first. `quantiply-disable`
@@ -201,6 +242,10 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
 ```bash
 bun run jobs status          # every job: schedule, last run, next run
 bun run jobs run <job-id>    # run one now (recorded as manual)
+bun run jobs run <chain> --resume          # BL-234: today's earlier run's steps that passed are not run again
+bun run jobs run <chain> --from <step-id>  # start at a step; the steps before it count as done
+bun run jobs run <chain> --fresh           # ignore an earlier run
+bun run jobs run evening --only algotest-export,algotest-upload,algotest-setup   # just those steps (Apply now)
 bun run jobs serve           # the long-running scheduler
 bun run jobs settings        # the current automation settings (BL-140); `settings set <file.json>` saves a version
 bun run test                 # bun test

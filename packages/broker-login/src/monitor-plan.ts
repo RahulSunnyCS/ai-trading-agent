@@ -163,14 +163,16 @@ export function mergeLogins<K extends string>(
 /**
  * The two windows the scheduler's platform jobs log in in. Inside one, a job may be "due" or about
  * to run; after its end (the cap) only a run that is actually in progress still blocks.
- * Morning: quantiply-topup's two attempts and the queued quantiply-deploy-topup end by 09:51; the
- * 08:11 AlgoTest activation (BL-197 Phase 2) is long over, unless a catch-up after sleep runs it. Evening: the 15:35 / 15:40
- * deploy check and disable, the 15:40 / 15:55 live-results capture (BL-141), the 16:40 / 16:45
- * uploads and the 16:55 enable.
+ * Morning: the `morning-topup` chain (BL-234: the Quantiply top-up and enable, from 09:19, each step
+ * with its own retries) ends by about 09:51; the 08:11 AlgoTest activation (BL-197 Phase 2) is long
+ * over, unless a catch-up after sleep runs it. Evening: the `close-out` chain from 15:30 (the deploy
+ * check, the live-results capture of BL-141, the Quantiply switch-off, its retry, ending about
+ * 16:30) and the `evening` chain from 15:45 (BL-234: the data, the 16:00 message, then the AlgoTest
+ * and Quantiply uploads, about 16:40 on a normal day, later after a retry).
  */
 export const WAIT_WINDOWS = {
   morning: { from: 9 * 60 + 10, until: 10 * 60 },
-  evening: { from: 15 * 60 + 35, until: 17 * 60 + 30 },
+  evening: { from: 15 * 60 + 30, until: 17 * 60 + 30 },
 } as const;
 export type WaitWindow = keyof typeof WAIT_WINDOWS;
 /** The morning cap. */
@@ -197,21 +199,20 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
     // BL-197 Phase 2: the 08:11 activation of the evening list (the 09:16 deploy and the 09:18
     // top-up were retired with it)
     { id: 'algotest-activate', window: 'morning' },
-    { id: 'algotest-deploy-check', window: 'evening' },
-    { id: 'algotest-evening', window: 'evening' },
-    // BL-141: the 15:40 capture and its 15:55 retry log in to both platforms
-    { id: 'live-capture', window: 'evening' },
-    { id: 'live-capture-retry', window: 'evening' },
+    // BL-234: the 15:30 close-out chain: the deploy check, and the live capture and its retry (they
+    // log in to both platforms)
+    { id: 'close-out', window: 'evening' },
+    // BL-234 Phase 3: the evening chain: the data steps, then the AlgoTest and Quantiply uploads
+    { id: 'evening', window: 'evening' },
   ],
   quantiply: [
     { id: 'broker-login', window: 'morning' },
-    { id: 'quantiply-topup', window: 'morning' },
-    { id: 'quantiply-deploy-topup', window: 'morning' },
-    { id: 'quantiply-disable', window: 'evening' },
-    { id: 'quantiply-evening', window: 'evening' },
+    // BL-234: the 09:19 top-up and enable chain
+    { id: 'morning-topup', window: 'morning' },
+    // the 15:30 close-out chain: the capture and its retry, and the switch-off
+    { id: 'close-out', window: 'evening' },
+    { id: 'evening', window: 'evening' },
     { id: 'quantiply-deploy', window: 'morning' },
-    { id: 'live-capture', window: 'evening' },
-    { id: 'live-capture-retry', window: 'evening' },
   ],
 };
 

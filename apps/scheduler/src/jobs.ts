@@ -19,12 +19,95 @@ import {
  * row older than this, only when the row's processes are gone (`GET /jobs` says `alive`).
  */
 export function maxRunMinutes(job: Job): number {
+  const wait = job.group ? job.timeoutMinutes : 0;
+  // BL-234: a chain's steps each have their own timeout, retries and delays
+  if (job.chain) {
+    return (
+      job.chain.reduce((sum, step) => {
+        const retries = step.retries ?? 0;
+        const timeout = step.timeoutMinutes ?? job.timeoutMinutes;
+        return sum + timeout * (retries + 1) + (step.retryDelayMinutes ?? 0) * retries;
+      }, 0) + wait
+    );
+  }
   const attempts = job.retries + 1;
   return (
     job.timeoutMinutes * Math.max(1, job.steps.length) * attempts +
     job.retryDelayMinutes * job.retries +
-    (job.group ? job.timeoutMinutes : 0)
+    wait
   );
+}
+
+/**
+ * One step of a chain (BL-234). A chain is a job whose steps start when the one before ends, not
+ * at a clock time, and each carries what a whole job used to: its own timeout, retries, failure
+ * policy, alert, log file and hold. A step's id is also its name in the run's step table and in
+ * `jobs run <chain> --from <id>`.
+ */
+export interface ChainStep {
+  id: string;
+  /** argv, no shell. */
+  argv: string[];
+  /** Repo-relative; the chain's `cwd` when omitted. */
+  cwd?: string;
+  /** The chain's `timeoutMinutes` when omitted. */
+  timeoutMinutes?: number;
+  /** Extra attempts of this step alone, `retryDelayMinutes` apart. 0 when omitted. */
+  retries?: number;
+  retryDelayMinutes?: number;
+  /** Exit codes that are never retried (a refused login, a conflict the owner must look at). */
+  noRetryExitCodes?: number[];
+  /**
+   * What a failure of this step does to the steps after it: `stop` (the default) ends the chain,
+   * `continue` runs on. A step that must not run without another says so in `requires`.
+   */
+  onFail?: 'stop' | 'continue';
+  /**
+   * Steps that must have succeeded (run, or done earlier in a run this one resumes). When one did
+   * not, this step is skipped and the run says why. A step whose required step was held (stop
+   * button, pause) is held too.
+   */
+  requires?: string[];
+  /** `HH:MM` IST: the step waits until then, never starts earlier (e.g. the 16:00 message). */
+  notBefore?: string;
+  /**
+   * `HH:MM` IST: a step the chain reaches after this is not run and is recorded `late`, which is
+   * not a failure (a laptop that slept through the morning has no use for the 09:19 top-up).
+   */
+  notAfter?: string;
+  /** The step's command sends its own Telegram on failure, so the scheduler does not repeat it. */
+  alertsItself?: boolean;
+  /** Repo-relative fixed log file for this step's output, instead of the chain's log. */
+  logFile?: string;
+  /**
+   * The id the stop button's hold (`STOP_HELD_JOBS`) and the settings pause (`PAUSE_JOBS`) know this
+   * step by: the id of the job it was before it joined the chain. Set on every step that uploads,
+   * enables or deploys; without it the step is never held.
+   */
+  holdId?: string;
+  /**
+   * The group this step needs (see `Job.group`). A chain holds the groups of the steps that run, from
+   * its start to its end, so give a group only to the steps that need it: an Apply now of one
+   * platform's upload then does not wait for the catalog.
+   */
+  group?: JobGroup;
+  /** The command to put in this step's failure alert. */
+  fixHint: string;
+}
+
+/** Jobs that never run at the same time (see `Job.group`). */
+export type JobGroup = 'catalog' | 'quantiply' | 'contract-notes';
+
+/**
+ * The groups a run of `job` holds: its own `group`, and (BL-234) those of the chain steps that run,
+ * which is every step, or only the `only` ones of a run that picks some (the dashboard's Apply now).
+ */
+export function groupsOf(job: Job, only?: readonly string[]): JobGroup[] {
+  const groups = new Set<JobGroup>();
+  if (job.group) groups.add(job.group);
+  for (const step of job.chain ?? [])
+    if (step.group && (!only || only.includes(step.id))) groups.add(step.group);
+  return [...groups].sort();
 }
 
 export interface Job {
@@ -36,6 +119,12 @@ export interface Job {
    * argv (no shell), executed in `cwd`, relative to the repo root.
    */
   steps: string[][];
+  /**
+   * BL-234: a chain, instead of `steps`/`builtin` (leave `steps` empty). Its steps follow each
+   * other without a clock time and fail, retry and alert one by one. A chain has no job-level
+   * retries: `retries` stays 0, and a step retries on its own.
+   */
+  chain?: ChainStep[];
   cwd: string;
   timeoutMinutes: number;
   /** Extra attempts after a failure, `retryDelayMinutes` apart. */
@@ -58,9 +147,9 @@ export interface Job {
    * runs after the upload before it, retries included. (The group does not space their logins:
    * the next job starts the moment one ends. `quantiply-session.ts` does, with a file stamp of
    * the last TOTP window each account typed a code from.)
-   * `contract-notes` = the two contract-notes runs, which write the same store and bookmark.
+   * `contract-notes` = the contract-notes run (one job at four times since BL-234); the group keeps a hand run from overlapping the scheduler's, as both write the same store and bookmark.
    */
-  group?: 'catalog' | 'quantiply' | 'contract-notes';
+  group?: JobGroup;
   /**
    * Where it can run: `home` needs a residential IP (NSE, niftyindices),
    * `gui` a desktop session for a headed browser, `postgres` the local DB.
@@ -98,23 +187,6 @@ const BROKER_LOGIN = 'packages/broker-login';
 const CONTRACT_NOTES = 'packages/contract-notes';
 const CONTRACT_NOTES_FIX =
   'cd packages/contract-notes && node run.js --dry-run  (the log names the account, session and PDF; after a fix, node run.js --day <day>)';
-
-/** The 00:00 contract-notes run again at `at`, every day, for notes that arrived after it. */
-function contractNotesRetry(id: string, at: string, catchUpHours: number): Job {
-  return {
-    id,
-    description: `The 00:00 contract-notes run again at ${at}, for notes that arrived after it (BL-168); reads only mail newer than the bookmark, so with nothing new it is a few seconds`,
-    schedule: { at, on: everyDay, label: `every day ${at}` },
-    steps: [['node', 'run.js']],
-    cwd: CONTRACT_NOTES,
-    timeoutMinutes: 15,
-    retries: 1,
-    retryDelayMinutes: 20,
-    catchUpHours,
-    group: 'contract-notes',
-    fixHint: CONTRACT_NOTES_FIX,
-  };
-}
 
 const FRIDAY = onWeekdays(5);
 const THURSDAY = onWeekdays(4);
@@ -197,7 +269,6 @@ const BASE_JOBS: Job[] = [
       'Check the ANGELONE_* settings in .env, then Broker logins › Angel One › Test connection (or: cd packages/option-backtesting && uv run obt angel test)',
   },
   fyersReminder('fyers-login-reminder', '08:05', 'morning', 1), // after ~09:05 the pick is near
-  fyersReminder('fyers-login-recheck', '15:30', 'evening', 0.25), // the collection starts 15:45
   {
     // BL-142: the 14:15 orders read the Kite holdings and free cash, and a Kite token dies at
     // 06:00. When Kite is the holdings source and today has no valid login, Telegram the owner
@@ -402,113 +473,6 @@ const BASE_JOBS: Job[] = [
     fixHint: 'cd packages/momentum-backtesting && uv run mbt verify history --send',
   },
   {
-    id: 'options-evening',
-    description:
-      "The evening run: collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (`obt rotation update`, BL-058), rebuild missing derived tables, store the T1 track's results, then (only from 16:00, so normally a no-op) send the result. The 16:00 Telegram result is the next job's (`options-rotation-result`)",
-    schedule: { at: '15:45', on: tradingDays, label: 'trading days 15:45' },
-    // One job, five steps in order: each needs the day the one before it collected, and the run
-    // stops at the first failure. Every step is idempotent (obt daily skips data already
-    // collected, a stored rotation variant-day is never rewritten, derived rebuilds only what is
-    // missing), so a retry re-runs the whole chain cheaply. The last two (BL-125) are
-    // `--soft-fail`: a problem Telegrams its own alert and exits 0, so neither ever fails this job
-    // (whose retries would re-run `obt daily` and resend its summary).
-    // - The T1 update takes seconds; if it fails, the 16:00 message says T1 is not ready and the
-    //   21:00 job is the catch-up.
-    // - The result step sends nothing before 16:00 (the 16:00 job does). It is there for the day
-    //   this job only succeeds on a late retry (17:15, ...): the 16:00 job has given up by then and
-    //   a failed slot is never caught up, so this sends the result as soon as the data is in.
-    //   The sent markers make the two jobs safe together.
-    steps: [
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'daily'],
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update'],
-      ['uv', 'run', '--directory', TRADING_DATA, 'tdata', 'derived', 'rebuild'],
-      [
-        'uv',
-        'run',
-        '--directory',
-        OPTIONS,
-        'obt',
-        'rotation',
-        'update',
-        '--track',
-        't1',
-        '--soft-fail',
-      ],
-      [
-        'uv',
-        'run',
-        '--directory',
-        OPTIONS,
-        'obt',
-        'rotation',
-        'result',
-        '--not-before',
-        '16:00',
-        '--soft-fail',
-      ],
-    ],
-    cwd: '.',
-    timeoutMinutes: 90, // per step
-    // Contracts that expire today cannot be downloaded tomorrow, so keep trying through
-    // the evening (15:45, 17:15, 18:45, 20:15) — usually it is waiting on a Fyers login.
-    retries: 3,
-    retryDelayMinutes: 90,
-    catchUpHours: 7.25, // until 23:00
-    group: 'catalog',
-    fixHint:
-      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation update --track t1',
-  },
-  {
-    id: 'options-rotation-result',
-    description:
-      "Telegram the day's rotation result at 16:00 (BL-125): Adaptive's and the T1 track's one-lot net paper gain and tomorrow's strategies in full (`obt rotation result`). Retried every 5 minutes while the evening run's results are incomplete; sends what exists at 16:25, and the T1 part later if it was missing",
-    // The evening run (15:45) takes about 10 minutes and its T1 update takes seconds, so 16:00
-    // is normally enough. Not in the catalog group: it only reads the rotation
-    // journal and result files. An attempt that finds Adaptive (or, before 16:25, T1) incomplete
-    // exits 2 and is retried; when the retries run out the owner gets the scheduler's failure
-    // alert instead of silence. Sent markers make every retry safe (no double send).
-    schedule: { at: '16:00', on: tradingDays, label: 'trading days 16:00' },
-    steps: [
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result', '--wait-until', '16:25'],
-    ],
-    cwd: '.',
-    timeoutMinutes: 10,
-    retries: 7, // 16:00, 16:05 ... 16:35
-    retryDelayMinutes: 5,
-    // Catch-up covers a 16:00 slot missed while the laptop slept (until 22:00), not a failed run:
-    // when the evening run only succeeds on a late retry, its own last step (`result
-    // --not-before 16:00`) sends the message, and the 21:00 job's result step is the net under it.
-    catchUpHours: 6,
-    fixHint:
-      'If the evening run only finished on a later retry, its last step sends the result itself; otherwise: uv run --directory packages/option-backtesting obt rotation result  (the evening run must have stored the results first; add --force to resend)',
-  },
-  {
-    id: 'options-rotation-t1-update',
-    description:
-      "Catch-up for the T1 parallel track (`obt rotation update --track t1`): stores any day the evening run did not (its 223 extra variants only, in their own folder; the live results are never touched), then `obt rotation result` sends the T1 part of the day's result if it was not ready at 16:00",
-    // The evening run does this at about 15:55 now (BL-125); this is the net under it, after the
-    // last retry (20:15). Idempotent: it scores every Core-298 day the track lacks, and the result
-    // step is a no-op once everything has been sent. Steps: first `result --soft-fail` sends
-    // anything still owed (a T1 problem must never cost the day's Adaptive result, and it never
-    // fails the job), then the update is strict, so a T1 failure fails the job and its 22:00 /
-    // 23:00 retries try again, and the last `result` sends the T1 part once it is in. The 08:45
-    // entry job repeats the update as a catch-up before the track's entry.
-    schedule: { at: '21:00', on: tradingDays, label: 'trading days 21:00' },
-    steps: [
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result', '--soft-fail'],
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1'],
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result'],
-    ],
-    cwd: '.',
-    timeoutMinutes: 20,
-    retries: 2,
-    retryDelayMinutes: 60,
-    catchUpHours: 2.5, // until 23:30
-    group: 'catalog',
-    fixHint:
-      'uv run --directory packages/option-backtesting obt rotation update --track t1  (add --backfill to fill every missing day), then obt rotation result',
-  },
-  {
     id: 'options-rotation-pick',
     description:
       "Record the day's rotation entry (lists A, B, C, REF) and the T1 parallel track's Adaptive entry from last evening's list, before 09:17 (BL-058). The evening list is the source of truth (owner, 2026-11-09): no 09:16 re-pick and no morning Telegram message; only a failure alerts the owner, privately",
@@ -555,50 +519,6 @@ const BASE_JOBS: Job[] = [
       "cd packages/option-backtesting && uv run obt rotation live-board refresh  (one refresh now, the same as the card's Refresh button)",
   },
   {
-    id: 'algotest-evening',
-    description:
-      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes every strategy the tool uploaded for an earlier session and uploads tomorrow's picks afresh (a pick that stays is replaced too, since the owner may have edited it on AlgoTest during the day; owner, 2026-11-18; a retry the same evening keeps what it already uploaded), then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
-    // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
-    // results are incomplete (a late Fyers login), so the retries carry it to 20:40. It deletes the
-    // strategies it uploaded for an earlier session, kept or dropped (--allow-delete, owner 2026-10-20;
-    // kept ones too since 2026-11-18): AlgoTest's own
-    // API call by each strategy's id, never one deployed on /live or one it did not upload, and it
-    // stops at once if any other strategy vanishes with a delete.
-    schedule: { at: '16:40', on: tradingDays, label: 'trading days 16:40' },
-    steps: [
-      [
-        'uv',
-        'run',
-        '--directory',
-        '../option-backtesting',
-        'obt',
-        'rotation',
-        'algotest-export',
-        '--from-settings',
-        '--next',
-      ],
-      [
-        'node_modules/.bin/tsx',
-        'src/strategy-upload.ts',
-        '--from-settings',
-        '--mode',
-        'evening',
-        '--apply',
-        '--allow-delete',
-      ],
-      // BL-197: Setup Execution for every list's picks just uploaded (re-saving a set-up sheet is safe)
-      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--from-settings', '--setup', '--apply'],
-    ],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 15,
-    retries: 4,
-    noRetryExitCodes: [3], // a conflict, a read-back that differs, a delete only the owner can sort out, or a STOP
-    retryDelayMinutes: 60,
-    catchUpHours: 4,
-    fixHint:
-      'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
-  },
-  {
     id: 'algotest-activate',
     description:
       "Activate last evening's list on AlgoTest's /live right after the morning login (BL-197 Phase 2): every list an AlgoTest row in Settings › Automation uploads (Tuned, Classic or both, each from its own export; a list switched in after 16:40 is exported, uploaded and set up first), each strategy the 16:40 run (or that catch-up) uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose row uploads that list, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading a list",
@@ -637,142 +557,116 @@ const BASE_JOBS: Job[] = [
       "First read each strategy's Deployed count on algotest.in/live (the alert says what it showed): one already deployed must not be activated again. Activate only the rest by hand (Activate, tick both brokers); then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --morning  (dry run)",
   },
   {
-    id: 'algotest-deploy-check',
+    // BL-234 Phase 2: what used to be six jobs from 15:30 to 15:55, as one chain. Each step starts when
+    // the one before it ends (a clock time only where one is real: every pick has exited at 15:28,
+    // and the evening collector's Angel One login starts 15:45), and a failed step never stops the
+    // next ones: `quantiply-disable` is the safety net (a Quantiply algo left enabled trades again on
+    // its weekday) and must run whatever the capture did. In the quantiply group, so its logins never
+    // overlap another Quantiply job's (the TOTP window stamp in quantiply-session.ts spaces them).
+    id: 'close-out',
     description:
-      'At 15:35, alert if any strategy the tool activates on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on; no AlgoTest login when no AlgoTest row uploads a list and the tool deployed nothing today',
-    schedule: { at: '15:35', on: tradingDays, label: 'trading days 15:35' },
-    steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--from-settings', '--check']],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 5,
-    retries: 1,
-    retryDelayMinutes: 2,
-    catchUpHours: 0,
-    fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
-  },
-  {
-    id: 'live-capture',
-    description:
-      "Record the day's live results (BL-141): for each platform + broker the dashboard's Settings › Automation has on, every strategy that ran today, the tool's (in the uploaders' ledgers) or the owner's own (discretionary), with its live ₹, multiplier and fills where the platform gives them, to TRADING_DATA_ROOT/rotation/live/<day>.jsonl; also back-fills the last 5 trading days that miss a section. Read-only on AlgoTest and Quantiply (GET calls only). One attempt; live-capture-retry reads what it missed. The 16:00 result message puts it beside paper (owner only)",
-    // 15:40: every pick has exited (15:28). In the Quantiply group, ahead of quantiply-disable at
-    // the same minute, so its Angel One login never overlaps another Quantiply job's (the TOTP
-    // window stamp in quantiply-session.ts spaces them). One attempt with a short timeout, so the
-    // disable starts by 15:48 at the latest; --soft-fail leaves the alert to the retry job.
-    // The evening uploads do not wait for it: both platforms keep a day's P&L after its
-    // strategies are deleted (checked 2026-10-20), so a missed day is back-filled later.
-    schedule: { at: '15:40', on: tradingDays, label: 'trading days 15:40' },
-    steps: [['node_modules/.bin/tsx', 'src/live-capture.ts', '--soft-fail']],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 8,
+      "The close of the session, in order (BL-234): the Fyers login re-check, the 15:35 AlgoTest deploy check (a strategy with an execution day ticked would trade again on its own), the live capture (BL-141: every strategy that ran today, read from AlgoTest and Quantiply), the Quantiply switch-off (BL-139: the algos the tool made for today or earlier that are still enabled), Angel One's free margin at the close (BL-168), and the capture's retry. A step that fails does not stop the others; the failure alert names each step with its own fix",
+    schedule: { at: '15:30', on: tradingDays, label: 'trading days 15:30' },
+    steps: [],
+    chain: [
+      {
+        id: 'fyers-login-recheck',
+        argv: ['uv', 'run', 'mbt', 'token-remind', '--send', '--when', 'evening'],
+        cwd: MOMENTUM,
+        timeoutMinutes: 5,
+        onFail: 'continue',
+        // a reminder to log in before the 15:45 collection is of no use after it
+        notAfter: '15:45',
+        fixHint:
+          'Dashboard › Broker logins › Fyers › Log in (or: cd packages/momentum-backtesting && uv run mbt login)',
+      },
+      {
+        id: 'algotest-deploy-check',
+        argv: ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--from-settings', '--check'],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 5,
+        retries: 1,
+        retryDelayMinutes: 2,
+        onFail: 'continue',
+        // 15:35: every pick has exited. Never run late: it was not caught up before either.
+        notBefore: '15:35',
+        notAfter: '15:45',
+        fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
+      },
+      {
+        id: 'live-capture',
+        argv: ['node_modules/.bin/tsx', 'src/live-capture.ts', '--soft-fail'],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 8,
+        onFail: 'continue',
+        // 15:40: every pick has exited (15:28). One attempt with a short timeout, so the switch-off
+        // starts by 15:48 at the latest; --soft-fail leaves the alert to the retry step. The
+        // evening uploads do not wait for it: both platforms keep a day's P&L after its strategies
+        // are deleted (checked 2026-10-20), so a missed day is back-filled later.
+        notBefore: '15:40',
+        fixHint:
+          'cd packages/broker-login && node_modules/.bin/tsx src/live-capture.ts  (reads what is missing; --day D for one day, --force to read it again, --dry-run prints only)',
+      },
+      {
+        id: 'quantiply-disable',
+        argv: ['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'disable'))],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 10,
+        retries: 2,
+        // an algo still running, or a change not made by this run: the owner looks
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 5,
+        // Never gated (not by QUANTIPLY_DEPLOY, the deploy switch, the account's row, the stop hold
+        // or a pause): switching off only lowers what trades, and whatever was enabled must not
+        // repeat. An account with nothing of the tool's for today or earlier is not logged in.
+        // Safe to retry. The 16:45 upload comes after (same group), so it can delete them.
+        onFail: 'continue',
+        fixHint:
+          'In Quantiply, switch off every "Core · " / "T1 · " algo that is still enabled; then check with: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode check',
+      },
+      {
+        id: 'contract-notes-capital',
+        argv: ['uv', 'run', 'obt', 'realised', 'capital'],
+        cwd: OPTIONS,
+        timeoutMinutes: 10,
+        retries: 1,
+        retryDelayMinutes: 15,
+        onFail: 'continue',
+        // BL-168 Phase 4: the Trade book's capital line, one guarded SmartAPI login (it waits behind
+        // the evening collector's, if any). Finvasia is not read: its only figure is AlgoTest's, and
+        // an AlgoTest login now would collide with the live capture; its capital is typed on the page.
+        notBefore: '15:50',
+        fixHint:
+          'Check the ANGELONE_* settings in .env, then run it by hand: cd packages/option-backtesting && uv run obt realised capital',
+      },
+      {
+        id: 'live-capture-retry',
+        argv: ['node_modules/.bin/tsx', 'src/live-capture.ts', '--no-backfill'],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 6,
+        retries: 2, // 15:55, about 16:09, about 16:23: before the 16:45 upload
+        // missing credentials, a Quantiply login held or refused
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 8,
+        // Reads only the sections the day's file does not have as read, so with everything read it
+        // logs in nowhere and exits at once, and a catch-up after a sleep costs nothing.
+        onFail: 'continue',
+        notBefore: '15:55',
+        fixHint:
+          'cd packages/broker-login && node_modules/.bin/tsx src/live-capture.ts --day <day>  (the next evening back-fills it by itself; the 16:00 message said "live not captured")',
+      },
+    ],
+    cwd: '.',
+    timeoutMinutes: 10,
     retries: 0,
     retryDelayMinutes: 0,
     catchUpHours: 6,
     group: 'quantiply',
+    // A scheduler or laptop restart in the middle resumes the chain at the first step not done; a
+    // step that was running is never repeated unasked (the alert says so).
+    restartIfInterruptedUntil: '16:30',
     fixHint:
-      'cd packages/broker-login && node_modules/.bin/tsx src/live-capture.ts  (reads what is missing; --day D for one day, --force to read it again, --dry-run prints only)',
-  },
-  {
-    id: 'live-capture-retry',
-    description:
-      "Read again whatever the 15:40 live capture could not (BL-141): only the platform + broker sections the day's file does not have as read, so an account already read is never logged in to again. Alerts once if the day is still not captured by about 16:30; the next evening's capture back-fills it",
-    // After quantiply-disable (15:40, a few minutes), still in the Quantiply group so its logins
-    // never overlap another Quantiply job's; its retries end by about 16:30, before the 16:45
-    // upload. With everything read it logs in nowhere and exits at once, so a catch-up after a
-    // sleep costs nothing.
-    schedule: { at: '15:55', on: tradingDays, label: 'trading days 15:55' },
-    steps: [['node_modules/.bin/tsx', 'src/live-capture.ts', '--no-backfill']],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 6,
-    retries: 2, // 15:55, about 16:09, about 16:23
-    noRetryExitCodes: [3], // missing credentials, a Quantiply login held or refused
-    retryDelayMinutes: 8,
-    catchUpHours: 6,
-    group: 'quantiply',
-    fixHint:
-      'cd packages/broker-login && node_modules/.bin/tsx src/live-capture.ts --day <day>  (the next evening back-fills it by itself; the 16:00 message said "live not captured")',
-  },
-  {
-    id: 'quantiply-disable',
-    description:
-      "After the session, switch off on each Quantiply account the algos the uploader made for today that are still enabled, and any of an earlier session (BL-139 Phase 4): an enabled Quantiply algo runs again on its weekday next week. Only the tool's algos (its ledger), only finished ones, confirmed by reading the list again. The safety net: always runs, whatever QUANTIPLY_DEPLOY and Automated deployment say",
-    // 15:40: every pick has exited (15:28), and the 16:45 upload comes after (same group), so it
-    // can delete them. Never gated (not by QUANTIPLY_DEPLOY, the deploy switch or the account's
-    // row): switching off only lowers what trades, and whatever was enabled must not repeat. An
-    // account with nothing of the tool's for today or earlier is not logged in. Safe to retry.
-    schedule: { at: '15:40', on: tradingDays, label: 'trading days 15:40' },
-    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'disable'))]],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 2,
-    noRetryExitCodes: [3], // an algo still running, or a change not made by this run: the owner looks
-    retryDelayMinutes: 5,
-    catchUpHours: 8, // before the next session of that weekday, any time this evening will do
-    group: 'quantiply',
-    fixHint:
-      'In Quantiply, switch off every "Core · " / "T1 · " algo that is still enabled; then check with: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode check',
-  },
-  {
-    id: 'quantiply-evening',
-    description:
-      "Put tomorrow's expected picks into Quantiply as algos for tomorrow's weekday (BL-139): for each Quantiply account (Angel One, Shoonya), the list the dashboard's Settings › Automation gives it (BL-140; Core on Angel One until changed). Exports them (`obt rotation quantiply-export --from-settings --next`), then, through Quantiply's API, deletes the finished algos the tool created that tomorrow drops and creates the missing ones; an account the settings leave off is not touched. Never enables (deploys). Does nothing until QUANTIPLY_UPLOAD=on",
-    // After algotest-evening (16:40), so the two never log in at once. The export exits 2 while
-    // the day's results are incomplete (a late Fyers login), so the retries carry it to 20:45.
-    schedule: { at: '16:45', on: tradingDays, label: 'trading days 16:45' },
-    steps: [
-      [
-        'uv',
-        'run',
-        '--directory',
-        '../option-backtesting',
-        'obt',
-        'rotation',
-        'quantiply-export',
-        '--from-settings',
-        '--next',
-      ],
-      // Both accounts always run (a failed step would stop the next); the job fails if either did.
-      ['/bin/sh', '-c', quantiplyUploads('evening')],
-    ],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 4,
-    noRetryExitCodes: [3], // a refused login or a conflict: retrying only repeats it
-    retryDelayMinutes: 60,
-    catchUpHours: 4,
-    group: 'quantiply',
-    fixHint:
-      'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode evening (add --apply once the plan looks right)',
-  },
-  {
-    id: 'quantiply-topup',
-    description:
-      "Create on each Quantiply account any pick of today's entry that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172); deletes nothing and names the algos that are not today's. Since 2026-11-09 the entry is last evening's list, so this normally finds nothing to add. Does nothing until QUANTIPLY_UPLOAD=on",
-    // 09:19: was a minute after the 09:16 pick (retired 2026-11-09; the entry is now recorded at
-    // 08:45 from the evening's list). A changed 09:17 pick is too late either way. Not caught up.
-    schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
-    steps: [
-      [
-        'uv',
-        'run',
-        '--directory',
-        '../option-backtesting',
-        'obt',
-        'rotation',
-        'quantiply-export',
-        '--from-settings',
-        '--morning-rule',
-      ],
-      // Both accounts always run (a failed step would stop the next); the job fails if either did.
-      ['/bin/sh', '-c', quantiplyUploads('topup')],
-    ],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 1,
-    noRetryExitCodes: [3], // a refused login or a conflict: retrying only repeats it
-    retryDelayMinutes: 2,
-    catchUpHours: 0.5,
-    group: 'quantiply',
-    fixHint:
-      'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode topup --apply',
+      'Each failed step in the alert names its own fix. Run the rest with: bun run --filter @ata/scheduler jobs run close-out --resume',
   },
   {
     id: 'quantiply-deploy',
@@ -801,24 +695,6 @@ const BASE_JOBS: Job[] = [
     group: 'quantiply',
     fixHint:
       'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply). Undo: --mode disable --day <session> --apply',
-  },
-  {
-    id: 'quantiply-deploy-topup',
-    description:
-      "After the 09:19 top-up, enable on each Quantiply account today's recorded picks that are not enabled yet (the 08:10 switch-on's net) and switch off an enabled algo the day's entry does not have, if it has not started (BL-139 Phase 4). Never an algo within 90 s of its start (TOO LATE, reported). Same gates as quantiply-deploy",
-    // 09:21: after quantiply-topup (same group). A 09:17 pick that changed is too late either way.
-    // Caught up for 3 hours: later picks (12:02, 13:17) still have time; the 90 s rule protects
-    // each one.
-    schedule: { at: '09:21', on: tradingDays, label: 'trading days 09:21' },
-    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable'))]],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 0,
-    retryDelayMinutes: 0,
-    catchUpHours: 3,
-    group: 'quantiply',
-    fixHint:
-      'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply)',
   },
   {
     id: 'trade-monitor',
@@ -959,7 +835,22 @@ const BASE_JOBS: Job[] = [
       "Read the brokers' contract notes (BL-168): each account's new mail since its bookmark, the PDF kept and its figures stored under TRADING_DATA_ROOT/contract-notes/ (F&O for Finvasia and Angel One, equity for the Momentum account on Zerodha); sessions that can have no note are closed (no trade / no note). Never writes the Google Sheet (trade-analytics keeps it)",
     // Every day, not trading days: a session's notes arrive its evening (Angel One's after
     // midnight), so Saturday's run takes Friday.
-    schedule: { at: '00:00', on: everyDay, label: 'every day 00:00' },
+    // BL-234: one job, four times. It was the 00:00 run plus three jobs for the same command at
+    // 07:30, 10:30 and 15:30. Angel One mails a session's note the next morning, and about one
+    // in four came after 07:30 (up to 17:10), which left the Trade book a day short until
+    // midnight; the owner added 10:30 and 15:30 (2026-10-28). Each run reads only mail newer than
+    // the bookmark, so with nothing new it is a few seconds. Before 16:00 a run never looks for
+    // that day's own note (`lastSession` in packages/contract-notes/calendar.js); a 15:30 attempt
+    // retried after 16:00 lists today as waiting, as the 00:00 run does, and closes nothing
+    // wrongly. The longest gap between slots is 8.5 h (15:30 to 00:00), inside `catchUpHours`, so
+    // a laptop that slept through one slot runs the latest once and sends no "missed" alert while
+    // that run did the same work. `group` stays: a hand run (`jobs run`) never overlaps the
+    // scheduler's.
+    schedule: {
+      at: ['00:00', '07:30', '10:30', '15:30'],
+      on: everyDay,
+      label: 'every day 00:00, 07:30, 10:30, 15:30',
+    },
     steps: [['node', 'run.js']],
     cwd: CONTRACT_NOTES,
     timeoutMinutes: 15,
@@ -969,33 +860,339 @@ const BASE_JOBS: Job[] = [
     group: 'contract-notes',
     fixHint: CONTRACT_NOTES_FIX,
   },
-  // Angel One mails a session's note the next morning, and about one in four came after 07:30
-  // (up to 17:10), which left the Trade book a day short until midnight. The owner added
-  // 10:30 and 15:30 (2026-10-28). Before 16:00 a run never looks for that day's own note
-  // (`lastSession` in packages/contract-notes/calendar.js); a 15:30 attempt retried after
-  // 16:00 lists today as waiting, as the 00:00 run does, and closes nothing wrongly.
-  // Every retry catches up until 23:30, so a laptop that slept through one sends no "missed"
-  // alert while a later retry did the same work; a repeated catch-up costs a few seconds.
-  contractNotesRetry('contract-notes-retry', '07:30', 16),
-  contractNotesRetry('contract-notes-retry-1030', '10:30', 13),
-  contractNotesRetry('contract-notes-retry-1530', '15:30', 8),
   {
-    // BL-168 Phase 4: the Trade book's capital line. Angel One's free margin at the close, one
-    // guarded SmartAPI login (it waits behind the evening collector's, if any). Finvasia is not
-    // read: its only figure is AlgoTest's, and a 15:50 AlgoTest login would collide with the
-    // live capture; its capital is typed on the page.
-    id: 'contract-notes-capital',
+    // BL-234 Phase 3: the evening as one chain (it was five jobs: `options-evening` 15:45,
+    // `options-rotation-result` 16:00, `algotest-evening` 16:40, `quantiply-evening` 16:45 and the
+    // 21:00 `options-rotation-t1-update`). Each step starts when the one before ends, so the uploads
+    // no longer wait for a clock time or retry until the results are in: they cannot start before.
+    // A step that fails ends the chain only where the next steps need it (the data steps); the
+    // message, each platform's upload and the T1 recheck go on whatever the one before did, and the
+    // alert names each step with its own fix. Both platforms' uploads must be in by next morning
+    // (08:02 / 08:11), which is the real deadline.
+    // The groups: the data steps write the catalog (`catalog`); the Quantiply steps log in to
+    // Quantiply (`quantiply`), so they start after the close-out's switch-off, which is listed
+    // before this chain. The AlgoTest steps have none. A run holds the groups of the steps that run
+    // (an Apply now of one platform holds only that platform's).
+    id: 'evening',
     description:
-      "Angel One's free margin at the close into the contract-notes store (BL-168), the Trade book's capital for the day",
-    schedule: { at: '15:50', on: tradingDays, label: 'trading days 15:50' },
-    steps: [['uv', 'run', 'obt', 'realised', 'capital']],
-    cwd: OPTIONS,
-    timeoutMinutes: 10,
-    retries: 1,
-    retryDelayMinutes: 15,
-    catchUpHours: 6,
+      "The evening, in order (BL-234): collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (BL-058), rebuild the derived tables, store the T1 track's results (a T1 problem alerts itself and never stops the rest); at 16:00 or when the data is in, send the day's rotation result (BL-125); then put tomorrow's expected picks into AlgoTest (BL-137: export, replace, set up execution; never deploys) and into Quantiply (BL-139: export, create, delete the finished algos; never enables), each only once its switch (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`) is on; last, the T1 catch-up: store a T1 day that is still missing and send its part of the result. A step that fails does not stop the ones that do not need it; the failure alert names each step with its own fix",
+    schedule: { at: '15:45', on: tradingDays, label: 'trading days 15:45' },
+    steps: [],
+    chain: [
+      {
+        id: 'collect',
+        argv: ['uv', 'run', '--directory', OPTIONS, 'obt', 'daily'],
+        cwd: '.',
+        // Contracts that expire today cannot be downloaded tomorrow, so keep trying through the
+        // evening (15:45, 17:15, 18:45, 20:15): usually it is waiting on a Fyers login.
+        timeoutMinutes: 90,
+        retries: 3,
+        retryDelayMinutes: 90,
+        group: 'catalog',
+        fixHint:
+          'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation update --track t1',
+      },
+      {
+        id: 'rotation-update',
+        argv: ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update'],
+        cwd: '.',
+        timeoutMinutes: 90,
+        retries: 3,
+        retryDelayMinutes: 90,
+        group: 'catalog',
+        fixHint:
+          'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation update --track t1',
+      },
+      {
+        id: 'derived-rebuild',
+        argv: ['uv', 'run', '--directory', TRADING_DATA, 'tdata', 'derived', 'rebuild'],
+        cwd: '.',
+        timeoutMinutes: 90,
+        retries: 3,
+        retryDelayMinutes: 90,
+        group: 'catalog',
+        fixHint:
+          'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation update --track t1',
+      },
+      {
+        id: 't1-update',
+        // --soft-fail: a problem Telegrams its own alert and exits 0, so it never stops the chain.
+        // It takes seconds; if it fails, the message says T1 is not ready and `t1-catch-up` below
+        // is the net. The live update runs before it: the track ranks over the same days.
+        argv: [
+          'uv',
+          'run',
+          '--directory',
+          OPTIONS,
+          'obt',
+          'rotation',
+          'update',
+          '--track',
+          't1',
+          '--soft-fail',
+        ],
+        cwd: '.',
+        timeoutMinutes: 90,
+        group: 'catalog',
+        fixHint:
+          'uv run --directory packages/option-backtesting obt rotation update --track t1  (add --backfill to fill every missing day), then obt rotation result',
+      },
+      {
+        id: 'result',
+        // The 16:00 message (BL-125): Adaptive's and the T1 track's one-lot net paper gain and
+        // tomorrow's strategies in full. Never before 16:00. An attempt that finds Adaptive (or,
+        // before 16:25, T1) incomplete exits 2 and is retried every 5 minutes to about 16:35; the
+        // message goes at 16:25 at the latest, the T1 part later if it was missing. Sent markers make
+        // every retry safe (no double send). A failure does not stop the uploads.
+        argv: [
+          'uv',
+          'run',
+          '--directory',
+          OPTIONS,
+          'obt',
+          'rotation',
+          'result',
+          '--wait-until',
+          '16:25',
+        ],
+        cwd: '.',
+        timeoutMinutes: 10,
+        retries: 7,
+        retryDelayMinutes: 5,
+        onFail: 'continue',
+        notBefore: '16:00',
+        fixHint:
+          'If the evening run only finished on a later retry, its last step sends the result itself; otherwise: uv run --directory packages/option-backtesting obt rotation result  (the evening run must have stored the results first; add --force to resend)',
+      },
+      // AlgoTest (BL-137, BL-197). The export exits 2 while the day's results are incomplete; here
+      // they are complete by construction. Exit 3 (a conflict, a read-back that differs, a delete
+      // only the owner can sort out, or a STOP) is never retried. Held by the stop button and a
+      // pause under the old job's id.
+      {
+        id: 'algotest-export',
+        argv: [
+          'uv',
+          'run',
+          '--directory',
+          '../option-backtesting',
+          'obt',
+          'rotation',
+          'algotest-export',
+          '--from-settings',
+          '--next',
+        ],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 15,
+        retries: 4,
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 60,
+        onFail: 'continue',
+        group: 'quantiply',
+        holdId: 'algotest-evening',
+        fixHint:
+          'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
+      },
+      {
+        id: 'algotest-upload',
+        // It deletes the strategies it uploaded for an earlier session, kept or dropped
+        // (--allow-delete, owner 2026-10-20; kept ones too since 2026-11-18): AlgoTest's own API
+        // call by each strategy's id, never one deployed on /live or one it did not upload, and it
+        // stops at once if any other strategy vanishes with a delete.
+        argv: [
+          'node_modules/.bin/tsx',
+          'src/strategy-upload.ts',
+          '--from-settings',
+          '--mode',
+          'evening',
+          '--apply',
+          '--allow-delete',
+        ],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 15,
+        retries: 4,
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 60,
+        requires: ['algotest-export'],
+        onFail: 'continue',
+        group: 'quantiply',
+        holdId: 'algotest-evening',
+        fixHint:
+          'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
+      },
+      {
+        id: 'algotest-setup',
+        // BL-197: Setup Execution for every list's picks just uploaded (re-saving a set-up sheet is
+        // safe), so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow.
+        argv: [
+          'node_modules/.bin/tsx',
+          'src/strategy-deploy.ts',
+          '--from-settings',
+          '--setup',
+          '--apply',
+        ],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 15,
+        retries: 4,
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 60,
+        requires: ['algotest-upload'],
+        onFail: 'continue',
+        group: 'quantiply',
+        holdId: 'algotest-evening',
+        fixHint:
+          'cd packages/option-backtesting && uv run obt rotation algotest-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode evening (add --apply once the plan looks right); then node_modules/.bin/tsx src/strategy-deploy.ts --latest t1 --setup (add --apply likewise)',
+      },
+      // Quantiply (BL-139). Same exit-3 rule: a refused login or a conflict, retrying only repeats it.
+      {
+        id: 'quantiply-export',
+        argv: [
+          'uv',
+          'run',
+          '--directory',
+          '../option-backtesting',
+          'obt',
+          'rotation',
+          'quantiply-export',
+          '--from-settings',
+          '--next',
+        ],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 10,
+        retries: 4,
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 60,
+        onFail: 'continue',
+        group: 'quantiply',
+        holdId: 'quantiply-evening',
+        fixHint:
+          'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode evening (add --apply once the plan looks right)',
+      },
+      {
+        id: 'quantiply-upload',
+        // Both accounts always run; the step fails if either did.
+        argv: ['/bin/sh', '-c', quantiplyUploads('evening')],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 10,
+        retries: 4,
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 60,
+        requires: ['quantiply-export'],
+        onFail: 'continue',
+        group: 'quantiply',
+        holdId: 'quantiply-evening',
+        fixHint:
+          'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode evening (add --apply once the plan looks right)',
+      },
+      // The T1 catch-up, last: stores any day the track lacks (strict, so a failure is reported and
+      // retried), then sends the T1 part of the result if it was not ready at 16:00 (a no-op once
+      // everything has been sent). It is the net under `t1-update`; it never delays an upload.
+      {
+        id: 't1-catch-up',
+        argv: ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1'],
+        cwd: '.',
+        timeoutMinutes: 20,
+        retries: 2,
+        retryDelayMinutes: 60,
+        onFail: 'continue',
+        group: 'catalog',
+        fixHint:
+          'uv run --directory packages/option-backtesting obt rotation update --track t1  (add --backfill to fill every missing day), then obt rotation result',
+      },
+      {
+        id: 't1-result',
+        argv: ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result'],
+        cwd: '.',
+        timeoutMinutes: 20,
+        onFail: 'continue',
+        fixHint:
+          'If the evening run only finished on a later retry, its last step sends the result itself; otherwise: uv run --directory packages/option-backtesting obt rotation result  (the evening run must have stored the results first; add --force to resend)',
+      },
+    ],
+    cwd: '.',
+    timeoutMinutes: 20,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 7.25, // until 23:00
+    // A restart in the middle resumes at the first step not done; a step that was running is never
+    // repeated unasked (the alert says so).
+    restartIfInterruptedUntil: '23:00',
     fixHint:
-      'Check the ANGELONE_* settings in .env, then run it by hand: cd packages/option-backtesting && uv run obt realised capital',
+      'Each failed step in the alert names its own fix. Run the rest with: bun run --filter @ata/scheduler jobs run evening --resume',
+  },
+  {
+    // BL-234 Phase 2: the 09:19 top-up and the 09:21 enable, as one chain. 09:19 was a minute after
+    // the 09:16 pick (retired 2026-11-09; the entry is recorded at 08:45 from the evening's list); a
+    // changed 09:17 pick is too late either way, so the top-up steps are not run after 09:49. The
+    // enable is the 08:10 switch-on's net and ran for 3 hours after a missed slot (later picks,
+    // 12:02 and 13:17, still have time; the 90 s rule protects each one), so the chain is caught up
+    // for 3 hours and only the top-up steps drop out when late. A failed top-up does not stop the
+    // enable, as before. Each step is held by the stop button and a pause under its old job's id.
+    id: 'morning-topup',
+    description:
+      "Create on each Quantiply account any pick of today's entry that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172); deletes nothing and names the algos that are not in the day's entry. Then enable on each account today's recorded picks that are not enabled yet (the 08:10 switch-on's net) and switch off an enabled algo the day's entry does not have, if it has not started (BL-139 Phase 4). Never an algo within 90 s of its start (TOO LATE, reported)",
+    schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
+    steps: [],
+    chain: [
+      {
+        id: 'quantiply-export',
+        argv: [
+          'uv',
+          'run',
+          '--directory',
+          '../option-backtesting',
+          'obt',
+          'rotation',
+          'quantiply-export',
+          '--from-settings',
+          '--morning-rule',
+        ],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 10,
+        retries: 1,
+        retryDelayMinutes: 2,
+        onFail: 'continue',
+        notAfter: '09:49',
+        holdId: 'quantiply-topup',
+        fixHint:
+          'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode topup --apply',
+      },
+      {
+        id: 'quantiply-topup',
+        argv: ['/bin/sh', '-c', quantiplyUploads('topup')],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 10,
+        retries: 1,
+        // a refused login or a conflict: retrying only repeats it
+        noRetryExitCodes: [3],
+        retryDelayMinutes: 2,
+        requires: ['quantiply-export'],
+        onFail: 'continue',
+        notAfter: '09:49',
+        holdId: 'quantiply-topup',
+        fixHint:
+          'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode topup --apply',
+      },
+      {
+        id: 'quantiply-deploy-topup',
+        argv: ['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable'))],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 10,
+        // no retries: a second attempt could act on a half-finished first
+        onFail: 'continue',
+        holdId: 'quantiply-deploy-topup',
+        fixHint:
+          'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply)',
+      },
+    ],
+    cwd: '.',
+    timeoutMinutes: 10,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 3,
+    group: 'quantiply',
+    restartIfInterruptedUntil: '10:00',
+    fixHint:
+      'Each failed step in the alert names its own fix. Read the alert first: an algo the enable step switched on must not be enabled again; run the rest with: bun run --filter @ata/scheduler jobs run morning-topup --resume',
   },
 ];
 

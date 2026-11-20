@@ -38,7 +38,7 @@ import {
   withViewDefaults,
 } from '../../lib/automation';
 import { formatDay, formatInr, formatIstDateTime } from '../../lib/format';
-import { SCHEDULER_API, runNowError } from '../../lib/scheduler';
+import { APPLY_NOW_STEPS, EVENING_CHAIN, SCHEDULER_API, runNowError } from '../../lib/scheduler';
 import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -113,10 +113,13 @@ export function AutomationSettingsCard() {
   }
 
   /** Run a platform's evening upload now, so a saved change reaches tomorrow's picks today. */
-  async function applyNow(job: string, platform: string) {
+  async function applyNow(platform: keyof typeof APPLY_NOW_STEPS) {
     if (applying) return;
-    setApplying(job);
-    const result = await apiPost<{ runId: number | null }>(`${SCHEDULER_API}/jobs/${job}/run`, {});
+    setApplying(platform);
+    const result = await apiPost<{ runId: number | null }>(
+      `${SCHEDULER_API}/jobs/${EVENING_CHAIN}/run`,
+      { only: APPLY_NOW_STEPS[platform] },
+    );
     setApplying(null);
     if (!result.ok) {
       toast(runNowError(result.status, result.error), 'error');
@@ -485,18 +488,13 @@ export function AutomationSettingsCard() {
               evening run.
             </p>
             <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  ['algotest-evening', 'AlgoTest'],
-                  ['quantiply-evening', 'Quantiply'],
-                ] as const
-              ).map(([job, platform]) => (
+              {(['AlgoTest', 'Quantiply'] as const).map((platform) => (
                 <Button
-                  key={job}
+                  key={platform}
                   variant="secondary"
                   size="sm"
-                  onClick={() => void applyNow(job, platform)}
-                  loading={applying === job}
+                  onClick={() => void applyNow(platform)}
+                  loading={applying === platform}
                   disabled={changes.length > 0 || applying !== null || !applyNowOpen()}
                 >
                   Apply now: {platform}

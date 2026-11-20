@@ -226,9 +226,9 @@ describe('BL-143: the trade monitor job', () => {
     // the morning activation (BL-197 Phase 2): the catch-up and the activation, one attempt, plus
     // its group's wait
     expect(at('algotest-activate')).toEqual({ minutes: 30 * 2 + 30, steps: 2 });
-    expect(at('quantiply-topup')).toEqual({ minutes: 10 * 2 * 2 + 2 + 10, steps: 2 });
-    // one step, one attempt, plus the group's wait
-    expect(at('quantiply-deploy-topup')).toEqual({ minutes: 10 + 10, steps: 1 });
+    // BL-234: a chain adds each step's attempts and delays: the export (two attempts, 2 min
+    // apart), the top-up (the same), the enable (one attempt), plus the group's wait
+    expect(at('morning-topup')).toEqual({ minutes: 10 * 2 + 2 + (10 * 2 + 2) + 10 + 10, steps: 0 });
   });
 
   it("a dead writer with its step's process group still running is not reaped (an orphan)", async () => {
@@ -302,14 +302,14 @@ describe('BL-143: the trade monitor job', () => {
   });
 
   it('other jobs treat an interrupted slot as served', () => {
-    const job = findJob('options-evening');
-    if (!job) throw new Error('no options-evening job');
+    const job = findJob('options-rotation-pick');
+    if (!job) throw new Error('no options-rotation-pick job');
     const history = tmpHistory();
-    const slot = istAt('2026-10-21', '15:45');
-    const id = history.start('options-evening', 'schedule', slot, '/x', slot);
-    history.finish(id, -2, 0, istAt('2026-10-21', '16:00'), 'interrupted');
+    const slot = istAt('2026-10-21', '08:45');
+    const id = history.start('options-rotation-pick', 'schedule', slot, '/x', slot);
+    history.finish(id, -2, 0, istAt('2026-10-21', '08:50'), 'interrupted');
     expect(
-      decide(job, istAt('2026-10-21', '16:05'), history, istAt('2026-10-01', '00:00')).kind,
+      decide(job, istAt('2026-10-21', '08:55'), history, istAt('2026-10-01', '00:00')).kind,
     ).toBe('idle');
     history.close();
   });

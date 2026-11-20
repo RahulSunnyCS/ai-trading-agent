@@ -13,9 +13,9 @@ import {
   withDefaults,
 } from './automation.js';
 import { rowAlive } from './history.js';
-import { JOBS, type Job, maxRunMinutes } from './jobs.js';
+import { JOBS, type Job, groupsOf, maxRunMinutes } from './jobs.js';
 import { nextSession, pausedReason } from './pause.js';
-import { type RunContext, runJob } from './runner.js';
+import { type RunContext, type RunOptions, runJob } from './runner.js';
 import { nextDue, previousDue } from './schedule.js';
 import { heldReason } from './stop-hold.js';
 
@@ -132,6 +132,10 @@ export function createApi({
           catchUpHours: job.catchUpHours,
           needs: job.needs ?? [],
           group: job.group ?? null,
+          // BL-234: every group a run holds, a chain's steps' included
+          groups: groupsOf(job),
+          // BL-234: a chain's steps, in order; the run's own step rows are at GET /runs/:id/steps
+          chain: job.chain?.map((step) => step.id) ?? null,
         };
       }),
     );
@@ -141,6 +145,11 @@ export function createApi({
     const job = url.searchParams.get('job') ?? undefined;
     if (job && !jobs.some((j) => j.id === job)) return fail(404, `unknown job '${job}'`);
     return json(ctx.history.recent(intParam(url.searchParams.get('limit'), 50, 500), job));
+  }
+
+  function runSteps(id: number): Response {
+    if (!ctx.history.get(id)) return fail(404, `no run ${id}`);
+    return json(ctx.history.steps(id));
   }
 
   function runLog(id: number, url: URL): Response {
@@ -153,28 +162,86 @@ export function createApi({
   }
 
   /** Why this job cannot start now, or null. */
-  function busyReason(job: Job): string | null {
-    const members = job.group ? jobs.filter((j) => j.group === job.group).map((j) => j.id) : [];
+  function busyReason(job: Job, only?: readonly string[]): string | null {
+    const groups = groupsOf(job, only);
+    const members = jobs
+      .filter((j) => groupsOf(j).some((g) => groups.includes(g)))
+      .map((j) => j.id);
     const ids = [job.id, ...members];
     if (ids.some((id) => inFlight.has(id))) {
-      return `${job.id} or its group '${job.group ?? '-'}' is already running`;
+      return `${job.id} or its group '${groups.join("', '") || '-'}' is already running`;
     }
     ctx.history.reapDead(now());
     const running = ctx.history.runningBefore(ids, Number.MAX_SAFE_INTEGER);
     return running.length > 0 ? `${running.map((r) => r.job).join(', ')} still running` : null;
   }
 
-  async function startRun(id: string): Promise<Response> {
+  /** BL-234: `{"resume": true}`, `{"from": "<step>"}` or `{"fresh": true}` for a chain; else none. */
+  async function runOptions(req: Request, job: Job): Promise<RunOptions | Response> {
+    const text = await req.text();
+    if (!text.trim()) return {};
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return fail(400, 'body must be JSON');
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return {};
+    const { resume, from, fresh, only } = body as Record<string, unknown>;
+    if (
+      only !== undefined &&
+      (!Array.isArray(only) || only.length === 0 || only.some((id) => typeof id !== 'string'))
+    )
+      return fail(400, '"only" must be a list of step ids');
+    const unknownOnly = ((only as string[] | undefined) ?? []).filter(
+      (id) => !job.chain?.some((step) => step.id === id),
+    );
+    if (unknownOnly.length > 0) return fail(400, `unknown step(s) '${unknownOnly.join("', '")}'`);
+    if (from !== undefined && typeof from !== 'string')
+      return fail(400, '"from" must be a step id');
+    if (typeof from === 'string' && !job.chain?.some((step) => step.id === from)) {
+      return fail(400, `unknown step '${from}'`);
+    }
+    return {
+      ...(resume === true ? { resume: true } : {}),
+      ...(typeof from === 'string' ? { from } : {}),
+      ...(fresh === true ? { fresh: true } : {}),
+      ...(Array.isArray(only) ? { only: only as string[] } : {}),
+    };
+  }
+
+  /** Why every step picked from a chain is held (stop hold or pause), or null when one can run. */
+  function heldPick(job: Job, only: readonly string[]): string | null {
+    const picked = (job.chain ?? []).filter((step) => only.includes(step.id));
+    const reasons = picked.map((step) =>
+      step.holdId
+        ? (heldReason(step.holdId, ctx.env) ?? pausedReason(step.holdId, ctx.env, now()))
+        : null,
+    );
+    return picked.length > 0 && reasons.every((reason) => reason !== null)
+      ? (reasons[0] ?? null)
+      : null;
+  }
+
+  async function startRun(id: string, req: Request): Promise<Response> {
     const job = jobs.find((j) => j.id === id);
     if (!job) return fail(404, `unknown job '${id}'`);
-    const busy = busyReason(job);
+    const options = await runOptions(req, job);
+    if (options instanceof Response) return options;
+    const busy = busyReason(job, options.only);
     if (busy) return fail(409, busy);
     // BL-143: Apply now and Run now say so at once (runJob would only record it as held)
     const held = heldReason(job.id, ctx.env) ?? pausedReason(job.id, ctx.env, now());
     if (held) return fail(409, held);
+    // BL-234: a chain's held steps are held by their `holdId`, not by the chain's id. An Apply now
+    // that picks only held steps would start and do nothing, so say so at once, as before.
+    const pickedHeld = options.only ? heldPick(job, options.only) : null;
+    if (pickedHeld) return fail(409, pickedHeld);
     const before = ctx.history.last(job.id)?.id ?? 0;
     inFlight.add(job.id);
-    void runJob(job, { ...ctx, jobs }, 'manual').finally(() => inFlight.delete(job.id));
+    void runJob(job, { ...ctx, jobs }, 'manual', null, options).finally(() =>
+      inFlight.delete(job.id),
+    );
     // runJob records its row within a few ticks; wait for it so the id can be returned.
     for (let i = 0; i < 100; i++) {
       const row = ctx.history.last(job.id);
@@ -270,14 +337,19 @@ export function createApi({
       if (path === '/runs' && method === 'GET') return listRuns(url);
       const log = path.match(/^\/runs\/(\d+)\/log$/);
       if (log && method === 'GET') return runLog(Number(log[1]), url);
+      const steps = path.match(/^\/runs\/(\d+)\/steps$/);
+      if (steps && method === 'GET') return runSteps(Number(steps[1]));
       const run = path.match(/^\/jobs\/([^/]+)\/run$/);
-      if (run && method === 'POST') return await startRun(decodeURIComponent(run[1] ?? ''));
+      if (run && method === 'POST') return await startRun(decodeURIComponent(run[1] ?? ''), req);
       if (path === '/notifications' && method === 'GET') return listNotifications();
       if (path === '/notifications' && method === 'PUT') return await putNotifications(req);
       if (path === '/settings/automation' && method === 'GET') return automationView();
       if (path === '/settings/automation' && method === 'PUT') return await putAutomation(req);
       const known =
-        ['/jobs', '/runs', '/notifications', '/settings/automation'].includes(path) || log || run;
+        ['/jobs', '/runs', '/notifications', '/settings/automation'].includes(path) ||
+        log ||
+        steps ||
+        run;
       return known ? fail(405, 'method not allowed') : fail(404, 'not found');
     } catch (error) {
       return fail(500, error instanceof Error ? error.message : String(error));

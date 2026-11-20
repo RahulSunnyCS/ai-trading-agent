@@ -111,7 +111,8 @@ def token_remind(
     send: bool = typer.Option(False, help="Send the reminder to Telegram when a login is needed."),
     when: str = typer.Option("morning", help="morning (08:05) | evening (15:30): the wording."),
 ) -> None:
-    """Trading days 08:05 and 15:30 (scheduler jobs `fyers-login-reminder`, `fyers-login-recheck`):
+    """Trading days 08:05 and 15:30 (scheduler: the `fyers-login-reminder` job and the
+    `fyers-login-recheck` step of the `close-out` chain):
     when there is no Fyers token Fyers accepts, remind the owner to log in, with a link to the
     hosted Broker logins page (DASHBOARD_PUBLIC_URL). Silent when the token is good. Always exits 0:
     the reminder is the alert."""

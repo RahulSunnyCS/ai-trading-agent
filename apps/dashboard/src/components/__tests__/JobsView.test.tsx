@@ -60,4 +60,60 @@ describe('JobsView', () => {
     fireEvent.click(screen.getAllByText('Run now').at(-1) as HTMLElement);
     await waitFor(() => expect(posted(fetchMock)).toHaveLength(1));
   });
+
+  it('shows a chain’s steps and resumes it with the steps that passed left alone (BL-234)', async () => {
+    const chain = {
+      ...job('close-out', []),
+      chain: ['live-capture', 'quantiply-disable'],
+      lastRun: {
+        id: 41,
+        job: 'close-out',
+        trigger: 'schedule',
+        scheduled_for: null,
+        started_at: '2026-11-18T10:00:00Z',
+        ended_at: '2026-11-18T10:20:00Z',
+        exit_code: 1,
+        attempts: 1,
+        error: 'live-capture: exit 1',
+      },
+    };
+    const step = (id: number, name: string, status: string, error: string | null) => ({
+      id,
+      run_id: 41,
+      step: name,
+      status,
+      started_at: '2026-11-18T10:00:00Z',
+      ended_at: '2026-11-18T10:05:00Z',
+      exit_code: status === 'ok' ? 0 : 1,
+      attempts: 1,
+      error,
+      carried_from: null,
+    });
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return ok({ runId: 42 }, 202);
+      if (String(url).endsWith('/runs/41/steps'))
+        return ok([
+          step(1, 'live-capture', 'failed', 'exit 1'),
+          step(2, 'quantiply-disable', 'ok', null),
+        ]);
+      if (String(url).includes('/log')) return ok({ run: 41, path: 'x', lines: 200, text: 'log' });
+      return ok([chain]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<JobsView />);
+    fireEvent.click(await screen.findByText('close-out'));
+    expect(await screen.findByText('Steps: close-out')).toBeTruthy();
+    // the job's own last-run badge and the failed step's both say Failed
+    expect((await screen.findAllByText('Failed')).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Passed')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Resume close-out'));
+    expect(await screen.findByText('Resume close-out?')).toBeTruthy();
+    fireEvent.click(screen.getAllByText('Resume').at(-1) as HTMLElement);
+    await waitFor(() =>
+      expect(posted(fetchMock as unknown as ReturnType<typeof stub>)).toHaveLength(1),
+    );
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(String(post?.[0])).toBe('/api/scheduler/jobs/close-out/run');
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({ resume: true });
+  });
 });

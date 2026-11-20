@@ -1,4 +1,9 @@
-import { SCHEDULER_API, type SchedulerJob, type SchedulerLog } from '../lib/scheduler';
+import {
+  SCHEDULER_API,
+  type SchedulerJob,
+  type SchedulerLog,
+  type SchedulerStep,
+} from '../lib/scheduler';
 import { type PolledResourceResult, usePolledResource } from './usePolledResource';
 
 /** Every job with its next run and latest run. Polled, so a manual run shows up as it goes. */
@@ -18,6 +23,18 @@ export function useRunLog(
 ): PolledResourceResult<SchedulerLog> {
   return usePolledResource<SchedulerLog>(`${SCHEDULER_API}/runs/${runId}/log?tail=200`, {
     cache: true,
+    enabled,
+    ...(polling ? { intervalMs: 3_000 } : {}),
+  });
+}
+
+/** One chain run's steps (BL-234). Polls while the run is still going; `enabled: false` fetches nothing. */
+export function useRunSteps(
+  runId: number,
+  polling: boolean,
+  enabled = true,
+): PolledResourceResult<SchedulerStep[]> {
+  return usePolledResource<SchedulerStep[]>(`${SCHEDULER_API}/runs/${runId}/steps`, {
     enabled,
     ...(polling ? { intervalMs: 3_000 } : {}),
   });

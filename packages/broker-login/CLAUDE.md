@@ -209,7 +209,7 @@ week, until disabled.
 
 - `src/strategy-upload.ts` (+ pure `src/strategy-plan.ts`) puts the day's rotation picks into AlgoTest as saved
   strategies through the website (AlgoTest support OK'd it by phone, 2026-10-19). `--apply` needs
-  `ALGOTEST_UPLOAD=on`, deleting also `--allow-delete` (the `algotest-evening` job passes it since 2026-10-20); it
+  `ALGOTEST_UPLOAD=on`, deleting also `--allow-delete` (the `algotest-upload` step of the scheduler's `evening` chain passes it since 2026-10-20); it
   only ever deletes what its ledger (`TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl`) says it uploaded, and never
   one deployed on /live or set to repeat on a weekday there. A delete never clicks: `src/strategy-delete.ts` makes
   AlgoTest's own API call (`docs/algotest-execution.md` §7) for the `_id` recorded in the ledger when the strategy
@@ -251,7 +251,7 @@ week, until disabled.
   sheet's multiplier (the ×2 copies keep the one-lot figure and rely on leg lots), and the 09:25 check reads each
   account's own strategies from the split (`placements`) but not their quantities. Tests: `deploy-quantity.test.ts`,
   `broker-sheet.test.ts` (Chromium against a stand-in of the sheet).
-  `--setup` (BL-197, the last step of `algotest-evening`) sets up the next session's picks instead: each
+  `--setup` (BL-197, the `algotest-setup` step of the scheduler's `evening` chain) sets up the next session's picks instead: each
   sheet checked (multiplier 1, NRML, no day ticked, execution time = entry) and saved with Trade monitoring
   on Candle Close; it deploys nothing, so it needs `ALGOTEST_UPLOAD=on`, not `ALGOTEST_DEPLOY`.
   A sheet set up before (its save button reads "Update Execution Settings": the morning activation reopens
@@ -273,9 +273,8 @@ week, until disabled.
   keep two sessions per user), checked at every login (after the lock wait) and every use of an open session;
   `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. Before every login, at any
   hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-activate`,
-  `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
-  `quantiply-deploy-topup`, `quantiply-disable`, `quantiply-evening`, `quantiply-deploy`; both: BL-141's
-  `live-capture` and `live-capture-retry`), and again under the
+  the `evening` chain (BL-234); Quantiply `morning-topup`, `evening`, `quantiply-deploy`; both: the
+  `close-out` chain (BL-234: the deploy check, BL-141's `live-capture` and its retry, `quantiply-disable`)), and again under the
   login lock right before the login (`jobsStillToEnd`, then `jobsWait`). A run of one of them in progress today
   always blocks (a 10:30 wake into a deploy-topup catch-up, a hand `jobs run`, an orphaned step after a scheduler
   restart) while `GET /jobs` reports it `alive` (its writer or its step's process group exists), however old: a
