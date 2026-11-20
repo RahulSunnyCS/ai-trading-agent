@@ -1,6 +1,6 @@
 """BL-172 Phase 4: the 09:16 pick changes only what starts after 09:17 (owner, 2026-10-28).
 
-The evening uploads tomorrow's expected picks and the 08:10 job switches them on. At 09:16 the real
+The evening uploads tomorrow's expected picks and the morning `morning-open` chain switches them on. At 09:16 the real
 pick is recorded. A strategy that enters at 09:17 cannot be changed by then: the evening's 09:17
 strategy keeps running, and a new 09:17 pick is not added. For the rest, the day's list is chosen
 again with the 09:16 pick's own rule (`score.select`: the top `N_CORE` Widesl / Dir variants by the

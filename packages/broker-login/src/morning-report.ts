@@ -17,8 +17,9 @@ export function chainReportPath(day: string = istToday()): string {
 }
 
 /**
- * BL-172: send the 08:10 switch-on's account reports as one Telegram message, then remove the
- * file. Run by the 08:10 `quantiply-deploy` job after both accounts (now the `morning-open` chain's steps):
+ * BL-172: send the morning switch-on's account reports as one Telegram message, then remove the
+ * file. Run after both accounts by the `morning-open` chain's last step (`--chain`; before BL-234
+ * Phase 4, by the 08:10 `quantiply-deploy` job):
  *
  *   tsx src/morning-report.ts <report file> [<accounts expected>] [--evening]
  *
@@ -49,7 +50,7 @@ async function main(): Promise<number> {
   const evening = process.argv.includes('--evening');
   let expected = evening ? 0 : Number(process.argv[3] ?? 0) || 0;
   if (!evening) {
-    // BL-173: the 08:02 login's outcome is this message's first line (its own report goes
+    // BL-173: the morning login's outcome is this message's first line (its own report goes
     // only on a failure)
     const statusFile = join(dirname(settingsPath()), 'broker-login', `${istToday()}.json`);
     const status = await readFile(statusFile, 'utf8')

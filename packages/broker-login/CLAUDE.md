@@ -99,7 +99,7 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
   status file's `kite` (the morning message's `loginLine` and the 09:00 summary's Kite line), a failure is alerted at
   once, and Kite is never handed to GitHub.
 - `src/morning-report.ts` (+ pure `src/morning-report-plan.ts`) — BL-172: the Quantiply switch-on's account reports as
-  one Telegram message. The `morning-open` chain's `quantiply-deploy` step sets `MORNING_REPORT_FILE` (`morning-report.ts
+  one Telegram message. The `morning-open` chain's `quantiply-deploy` step (and `quantiply-deploy-shoonya`, for the second account) sets `MORNING_REPORT_FILE` (`morning-report.ts
   --path`, a file in the scheduler's state dir); each account's `quantiply-deploy.ts --morning` run adds its report
   there (`deliver`), and the chain's last step (`--chain 2`) sends them as one message after both logins and the
   activation (a warning heading if either account needs a look; "not run" with the login line when the switch-on was

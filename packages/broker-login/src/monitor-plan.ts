@@ -164,7 +164,7 @@ export function mergeLogins<K extends string>(
  * The two windows the scheduler's platform jobs log in in. Inside one, a job may be "due" or about
  * to run; after its end (the cap) only a run that is actually in progress still blocks.
  * Morning: the `morning-topup` chain (BL-234: the Quantiply top-up and enable, from 09:19, each step
- * with its own retries) ends by about 09:51; the 08:11 AlgoTest activation (BL-197 Phase 2) is long
+ * with its own retries) ends by about 09:51; the `morning-open` chain's AlgoTest activation (BL-197 Phase 2) is long
  * over, unless a catch-up after sleep runs it. Evening: the `close-out` chain from 15:30 (the deploy
  * check, the live-results capture of BL-141, the Quantiply switch-off, its retry, ending about
  * 16:30) and the `evening` chain from 15:45 (BL-234: the data, the 16:00 message, then the AlgoTest

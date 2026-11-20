@@ -224,9 +224,10 @@ describe('BL-143: the trade monitor job', () => {
       return { minutes: maxRunMinutes(job), steps: job.steps.length };
     };
     // BL-234 Phase 4: the morning-open chain adds each step's own timeout (no step retries): the
-    // check 5, the Quantiply login 15, its switch-on 10, the AlgoTest login 25, the catch-up 25, the
-    // activation 15 and the message 5 (the chain's own `quantiply` group is taken per step, so no group wait)
-    expect(at('morning-open')).toEqual({ minutes: 5 + 15 + 10 + 25 + 25 + 15 + 5, steps: 0 });
+    // check 5, the Quantiply login 15, its switch-on 10 on each of the two accounts, the AlgoTest login 25,
+    // the catch-up 25, the activation 15 and the message 5 (the chain's own `quantiply` group is taken per
+    // step, so no group wait)
+    expect(at('morning-open')).toEqual({ minutes: 5 + 15 + 10 + 10 + 25 + 25 + 15 + 5, steps: 0 });
     // BL-234: a chain adds each step's attempts and delays: the export (two attempts, 2 min
     // apart), the top-up (the same), the enable (one attempt), plus the group's wait
     expect(at('morning-topup')).toEqual({ minutes: 10 * 2 + 2 + (10 * 2 + 2) + 10 + 10, steps: 0 });

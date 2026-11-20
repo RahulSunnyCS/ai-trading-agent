@@ -12,6 +12,7 @@ import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
 import {
   BACKUP_SECRETS,
+  type GithubRun,
   type LoginEnv,
   type LoginPart,
   type LoginResult,
@@ -20,6 +21,7 @@ import {
   changedSecrets,
   combineParts,
   fallback,
+  githubLoggedInToday,
   kiteDue,
   kiteResult,
   loginEnv,
@@ -32,7 +34,8 @@ import { istToday } from './strategy-plan.js';
 import { waitForNextWindow } from './totp.js';
 
 /**
- * BL-172 Phases 1-2: the 08:00 broker login runs on the Mac (the scheduler's `broker-login` job),
+ * BL-172 Phases 1-2: the morning broker login runs on the Mac (the scheduler's `morning-open` chain, which was the
+ * 08:02 `broker-login` job before BL-234 Phase 4),
  * GitHub's "Daily broker login" only as the backup.
  *
  * 1. Reads Settings › Automation (the scheduler's snapshot) for what to log in: the same rule as
@@ -47,7 +50,7 @@ import { waitForNextWindow } from './totp.js';
  *    the workflow's cron backstops skip: the Mac ran, and anything left is the backup run's.
  * 5. Writes `<scheduler state>/broker-login/<IST day>.json`, which the 09:00 summary reads.
  * 6. With `KITE_AUTO_LOGIN=on` (owner, 2026-10-28; every trading day from 2026-11-06), logs in to Kite at the
- *    same time (`mbt kite auto-login`), its line in the same file and the 08:10 message. A failure
+ *    same time (`mbt kite auto-login`), its line in the same file and the chain's morning message. A failure
  *    is alerted at once; Kite is never handed to GitHub (no Kite secrets there).
  *
  * BL-234 Phase 4: the scheduler's `morning-open` chain runs it in two parts, so Quantiply is switched on
@@ -81,7 +84,7 @@ async function runMain(env: LoginEnv, resultFile: string): Promise<number> {
         ...process.env,
         ...env,
         LOGIN_RESULT_FILE: resultFile,
-        // BL-173: a clean login is said in the 08:10 switch-on message, not on its own
+        // BL-173: a clean login is said in the chain's morning message, not on its own
         LOGIN_QUIET_SUCCESS: '1',
         // never the Actions outputs: Quantiply's result then counts in the exit code
         GITHUB_OUTPUT: '',
@@ -294,9 +297,10 @@ async function loginBrokers(
       }
     }
     try {
+      const at = new Date().toISOString();
       const url = await dispatch({});
       await sendText(telegram, `${text}\n🔗 ${url}`, 'broker.algotest').catch(() => undefined);
-      await status({ ok: false, fallback: { parts: ['all'], url } });
+      await status({ ok: false, fallback: { parts: ['all'], url, at } });
       return 1;
     } catch (dispatchError) {
       await sendText(
@@ -307,7 +311,7 @@ async function loginBrokers(
       return 1;
     }
   }
-  // A catch-up after the Mac slept through 08:02: GitHub's 08:15 / 08:45 backstop may already
+  // A catch-up after the Mac slept through the morning: GitHub's 08:15 / 08:45 backstop may already
   // have logged in (LOCAL_LOGIN_DONE was not set). Logging in again would resend every password.
   if (!dryRun && env !== null) {
     try {
@@ -322,8 +326,9 @@ async function loginBrokers(
           '--json',
           'conclusion,createdAt,url',
         ]),
-      ) as { conclusion: string; createdAt: string; url: string }[];
-      const done = runs.find((r) => r.conclusion === 'success');
+      ) as GithubRun[];
+      // not a run this machine dispatched itself (the Quantiply part's Quantiply-only fallback)
+      const done = githubLoggedInToday(runs, await readStatus(statusFile));
       if (done) {
         console.log(`GitHub already logged in today (${done.url}): nothing to do on the Mac`);
         await status({ ok: true, github: done.url });
@@ -392,6 +397,7 @@ async function loginBrokers(
     return code === 0 ? 1 : code;
   }
   try {
+    const at = new Date().toISOString();
     const url = await dispatch({
       only: fb.only || 'both',
       quantiply: fb.quantiply,
@@ -402,7 +408,7 @@ async function loginBrokers(
       `🔁 Mac broker login failed for ${fb.parts.join(', ')}: trying again on GitHub\n🔗 ${url}${note ? `\n⚠️ ${note}` : ''}`,
       'broker.algotest',
     ).catch(() => undefined);
-    await status({ ok: false, result, fallback: { parts: fb.parts, url } });
+    await status({ ok: false, result, fallback: { parts: fb.parts, url, at } });
   } catch (error) {
     await sendText(
       telegram,

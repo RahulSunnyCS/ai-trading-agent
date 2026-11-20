@@ -236,15 +236,18 @@ const BASE_JOBS: Job[] = [
     // goes once, at the end, when both logins and the activation are known (2026-11-19).
     // REAL MONEY: every login and activation step has no retries (a second run would resend a refused PIN or
     // activate twice) and a step cut off mid-run is never repeated unasked (resume refuses; chain.ts). What a
-    // failure skips: the Angel One check never stops anything; a failed Quantiply login skips only Quantiply's
-    // switch-on (the 09:19 `morning-topup` chain enables what is left); a failed AlgoTest login skips only the
-    // activation. A step past its latest useful time is not run and is NAMED in the alert (`alertLate`), never
-    // waited for. `options-rotation-pick` (08:45) and `morning-summary` (09:00) stay fixed-time jobs.
-    // The `quantiply` group is taken at the first login step and let go after the last step that has it (`algotest-activate`;
-    // the message step needs none), the span the old jobs held it.
+    // failure skips: the Angel One check never stops anything; a failed Quantiply · Angel One login skips only
+    // that account's switch-on (Shoonya's own switch-on does not depend on it; the 09:19 `morning-topup` chain
+    // enables what is left); a failed AlgoTest login skips nothing (the old 08:11 job did not depend on the login:
+    // the activation reads its own state and reports each broker not logged in). A step past its latest useful
+    // time is not run and is NAMED in the alert (`alertLate`), never waited for; the logins keep the old
+    // `broker-login` window (to 15:00), the switch-ons and the activation theirs (09:05, 12:40).
+    // `options-rotation-pick` (08:45) and `morning-summary` (09:00) stay fixed-time jobs.
+    // The `quantiply` group is taken at the first login step and let go after the last step that has it
+    // (`algotest-activate`; the message step needs none), the span the old jobs held it.
     id: 'morning-open',
     description:
-      "The morning, in order (BL-234 Phase 4): Angel One's SmartAPI check (the fallback data source), the Quantiply · Angel One login and Kite's (BL-172), Quantiply's switch-on of today's algos on each account (BL-139 Phase 4: the clientwise MTM SL kept at the Settings figure, then today's algos from last evening's upload, REAL MONEY), AlgoTest's broker logins from 08:16 (Finvasia, Angel One; then Quantiply · Shoonya), last evening's list activated on AlgoTest's /live (BL-197 Phase 2, REAL MONEY: a list switched in after 16:40 is exported, uploaded and set up first), and one Telegram message with the logins and the Quantiply switch-on. What a failure skips: a failed Quantiply login skips only Quantiply's switch-on, a failed AlgoTest login only the activation; a step past its latest time is not run and the alert names it",
+      "The morning, in order (BL-234 Phase 4): Angel One's SmartAPI check (the fallback data source), the Quantiply · Angel One login and Kite's (BL-172), Quantiply's switch-on of today's algos on each account, Angel One then Shoonya (BL-139 Phase 4: the clientwise MTM SL kept at the Settings figure, then today's algos from last evening's upload, REAL MONEY), AlgoTest's broker logins from 08:16 (Finvasia, Angel One; then Quantiply · Shoonya), last evening's list activated on AlgoTest's /live (BL-197 Phase 2, REAL MONEY: a list switched in after 16:40 is exported, uploaded and set up first), and one Telegram message with the logins and the Quantiply switch-on. What a failure skips: a failed Quantiply · Angel One login skips only that account's switch-on, a failed AlgoTest login nothing (the activation reports each broker not logged in); a step past its latest time is not run and the alert names it",
     schedule: { at: '08:00', on: tradingDays, label: 'trading days 08:00' },
     steps: [],
     chain: [
@@ -273,8 +276,9 @@ const BASE_JOBS: Job[] = [
         cwd: BROKER_LOGIN,
         timeoutMinutes: 15,
         onFail: 'continue',
-        // after 09:05 the 09:19 top-up chain's enable is the way in
-        notAfter: '09:05',
+        // the old `broker-login` window (7 h from its slot: Quantiply any time, Kite too). The switch-on
+        // below stops at 09:05: after that the 09:19 top-up chain's enable is the way in
+        notAfter: '15:00',
         alertLate: true,
         group: 'quantiply',
         alertsItself: true,
@@ -282,12 +286,13 @@ const BASE_JOBS: Job[] = [
           'Read the login report first (a refused PIN must not be sent again). Then start "Daily broker login" by hand from GitHub Actions, or: cd packages/broker-login && node_modules/.bin/tsx src/local-login.ts --part quantiply',
       },
       {
-        // Both accounts write their report to one file (`morning-report.ts --path`); the last step sends it.
+        // Quantiply · Angel One's account. The two accounts write their report to one file
+        // (`morning-report.ts --path`); the last step sends it. Needs this account's login.
         id: 'quantiply-deploy',
         argv: [
           '/bin/sh',
           '-c',
-          `F=$(node_modules/.bin/tsx src/morning-report.ts --path) && rm -f "$F" && export MORNING_REPORT_FILE="$F"; (${quantiplyBoth((b) => quantiplyDeploy(b, 'enable', true))}); code=$?; exit $code`,
+          `F=$(node_modules/.bin/tsx src/morning-report.ts --path) && rm -f "$F" && export MORNING_REPORT_FILE="$F"; ${quantiplyDeploy('angelone', 'enable', true)}`,
         ],
         cwd: BROKER_LOGIN,
         timeoutMinutes: 10,
@@ -302,14 +307,35 @@ const BASE_JOBS: Job[] = [
           'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply). Undo: --mode disable --day <session> --apply',
       },
       {
+        // Quantiply · Shoonya's account. It logs in by itself and does NOT wait on the Angel One login (the old
+        // 08:10 job needed none for either account), so one failed Angel One login leaves this one switched on.
+        id: 'quantiply-deploy-shoonya',
+        argv: [
+          '/bin/sh',
+          '-c',
+          `F=$(node_modules/.bin/tsx src/morning-report.ts --path) && export MORNING_REPORT_FILE="$F"; ${quantiplyDeploy('finvasia', 'enable', true)}`,
+        ],
+        cwd: BROKER_LOGIN,
+        timeoutMinutes: 10,
+        // no retries: a second attempt could act on a half-finished first
+        onFail: 'continue',
+        notAfter: '09:05',
+        alertLate: true,
+        holdId: 'quantiply-deploy',
+        group: 'quantiply',
+        fixHint:
+          'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker finvasia --mode enable  (dry run; add --apply). Undo: --mode disable --day <session> --apply',
+      },
+      {
         // AlgoTest rejects broker logins before 08:16: the chain waits for it, so the login starts at 08:16.
         id: 'algotest-login',
         argv: ['node_modules/.bin/tsx', 'src/local-login.ts', '--part', 'algotest'],
         cwd: BROKER_LOGIN,
         timeoutMinutes: 25,
         notBefore: '08:16',
-        // AlgoTest refuses broker logins after 15:40; the activation below was caught up for 4.5 h
-        notAfter: '12:40',
+        // the old `broker-login` window (7 h from its slot; AlgoTest refuses broker logins after 15:40). The
+        // catch-up and the activation below stop at 12:40, the old `algotest-activate` window
+        notAfter: '15:00',
         alertLate: true,
         onFail: 'continue',
         group: 'quantiply',
@@ -351,7 +377,9 @@ const BASE_JOBS: Job[] = [
         ],
         cwd: BROKER_LOGIN,
         timeoutMinutes: 15,
-        requires: ['algotest-login'],
+        // No `requires: algotest-login`: the old 08:11 job did not depend on the login (it reads each broker's
+        // state itself and reports the one not logged in), and the login part exits 1 when only one broker, or
+        // only Quantiply · Shoonya, failed, which must not cost every AlgoTest account its day.
         onFail: 'continue',
         notAfter: '12:40',
         alertLate: true,
@@ -435,7 +463,7 @@ const BASE_JOBS: Job[] = [
     // Friday's orders can be shown the evening before. `mbt orders tentative` plans them exactly
     // as the 14:15 run will (lots included) and writes only tentative_orders.json in the state
     // dir: no orders row, no lot booking, no pending lot. One Telegram, headed tentative; This
-    // week shows the plan until Friday's real orders exist. Kite logs in with the 08:02 morning login every trading day,
+    // week shows the plan until Friday's real orders exist. Kite logs in with the morning login (`morning-open`) every trading day,
     // so the holdings are usually as last read; the plan says so.
     id: 'momentum-orders-tentative',
     description: "Momentum: Friday's orders planned early (tentative), nothing saved",
@@ -591,7 +619,7 @@ const BASE_JOBS: Job[] = [
       "Record the day's rotation entry (lists A, B, C, REF) and the T1 parallel track's Adaptive entry from last evening's list, before 09:17 (BL-058). The evening list is the source of truth (owner, 2026-11-09): no 09:16 re-pick and no morning Telegram message; only a failure alerts the owner, privately",
     // Was the 09:16 pick on the 09:15 VIX open until 2026-11-09. It now ranks with the evening's
     // VIX (the previous close) and records last evening's saved list when the two differ, so it no
-    // longer waits for the open. 08:45: after the 08:11 activation, before the 09:04 monitor and
+    // longer waits for the open. 08:45: after the `morning-open` activation, before the 09:04 monitor and
     // the 09:18 live board, both of which read the entry. Caught up until 09:15, so a missed run
     // still records before the first entry minute.
     schedule: { at: '08:45', on: tradingDays, label: 'trading days 08:45' },
@@ -915,7 +943,7 @@ const BASE_JOBS: Job[] = [
     // A step that fails ends the chain only where the next steps need it (the data steps); the
     // message, each platform's upload and the T1 recheck go on whatever the one before did, and the
     // alert names each step with its own fix. Both platforms' uploads must be in by next morning
-    // (08:02 / 08:11), which is the real deadline.
+    // (the `morning-open` logins and activation), which is the real deadline.
     // The groups: the data steps write the catalog (`catalog`); the Quantiply steps log in to
     // Quantiply (`quantiply`), so they start after the close-out's switch-off, which is listed
     // before this chain. The AlgoTest steps have none. A run holds the groups of the steps that run
@@ -1069,7 +1097,7 @@ const BASE_JOBS: Job[] = [
       {
         id: 'algotest-setup',
         // BL-197: Setup Execution for every list's picks just uploaded (re-saving a set-up sheet is
-        // safe), so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow.
+        // safe), so the `morning-open` chain's `algotest-activate` only has to activate: this list is what trades tomorrow.
         argv: [
           'node_modules/.bin/tsx',
           'src/strategy-deploy.ts',
@@ -1170,13 +1198,13 @@ const BASE_JOBS: Job[] = [
     // BL-234 Phase 2: the 09:19 top-up and the 09:21 enable, as one chain. 09:19 was a minute after
     // the 09:16 pick (retired 2026-11-09; the entry is recorded at 08:45 from the evening's list); a
     // changed 09:17 pick is too late either way, so the top-up steps are not run after 09:49. The
-    // enable is the 08:10 switch-on's net and ran for 3 hours after a missed slot (later picks,
+    // enable is the `morning-open` switch-on's net and ran for 3 hours after a missed slot (later picks,
     // 12:02 and 13:17, still have time; the 90 s rule protects each one), so the chain is caught up
     // for 3 hours and only the top-up steps drop out when late. A failed top-up does not stop the
     // enable, as before. Each step is held by the stop button and a pause under its old job's id.
     id: 'morning-topup',
     description:
-      "Create on each Quantiply account any pick of today's entry that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172); deletes nothing and names the algos that are not in the day's entry. Then enable on each account today's recorded picks that are not enabled yet (the 08:10 switch-on's net) and switch off an enabled algo the day's entry does not have, if it has not started (BL-139 Phase 4). Never an algo within 90 s of its start (TOO LATE, reported)",
+      "Create on each Quantiply account any pick of today's entry that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172); deletes nothing and names the algos that are not in the day's entry. Then enable on each account today's recorded picks that are not enabled yet (the morning switch-on's net) and switch off an enabled algo the day's entry does not have, if it has not started (BL-139 Phase 4). Never an algo within 90 s of its start (TOO LATE, reported)",
     schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
     steps: [],
     chain: [

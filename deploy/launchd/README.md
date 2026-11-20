@@ -109,7 +109,7 @@ job or script in the repo changes them.
    ```bash
    sudo pmset repeat wakeorpoweron MTWRF 07:55:00   # recommended: the 08:00 jobs run on time
    sudo pmset repeat wakeorpoweron MTWRF 08:50:00   # BL-143's first suggestion: wake for the 09:00-09:25 jobs only;
-                                                    # the `morning-open` chain then runs as a catch-up at ~08:50: its 08:05-09:10 steps are late after 09:05 / 09:10 and the alert names them
+                                                    # the `morning-open` chain then runs as a catch-up at ~08:50: its Angel One check (not after 09:10) and the two Quantiply switch-ons (not after 09:05) are late and the alert names them; the logins still run (until 15:00)
    pmset -g sched                                   # check what is set
    ```
 

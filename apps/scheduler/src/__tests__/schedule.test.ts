@@ -325,6 +325,22 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
+  it('keeps the old catch-up windows: the logins 15:00 (the old 7 h), the switch-ons 09:05, the activation 12:40', () => {
+    const win = (id: string) => chain?.chain?.find((s) => s.id === id)?.notAfter;
+    expect(win('quantiply-login')).toBe('15:00'); // Quantiply and Kite: the old `broker-login` window
+    expect(win('algotest-login')).toBe('15:00');
+    expect(win('quantiply-deploy')).toBe('09:05');
+    expect(win('quantiply-deploy-shoonya')).toBe('09:05');
+    expect(win('algotest-catch-up')).toBe('12:40');
+    expect(win('algotest-activate')).toBe('12:40');
+    expect(chain?.catchUpHours).toBe(7);
+  });
+
+  it('the activation does not wait on the AlgoTest login (one broker failing must not cost the other its day)', () => {
+    const activate = chain?.chain?.find((s) => s.id === 'algotest-activate');
+    expect(activate?.requires).toBeUndefined();
+  });
+
   it('has 30 jobs', () => {
     // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
     // BL-012: + check-expiry-calendar (Y4), check-blocked-dates (Y3), universe-refresh-reminder (S3)
@@ -591,6 +607,10 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
     expect(morning.indexOf('quantiply-login')).toBeLessThan(morning.indexOf('quantiply-deploy'));
     expect(morning.indexOf('quantiply-deploy')).toBeLessThan(morning.indexOf('algotest-login'));
     expect(stepOf('morning-open', 'quantiply-deploy')?.notAfter).toBe('09:05');
+    expect(stepOf('morning-open', 'quantiply-deploy-shoonya')?.notAfter).toBe('09:05');
+    expect(morning.indexOf('quantiply-deploy')).toBeLessThan(
+      morning.indexOf('quantiply-deploy-shoonya'),
+    );
     // BL-234: the top-up and its enable are one chain, in that order
     expect(job('morning-topup')?.chain?.map((s) => s.id)).toEqual([
       'quantiply-export',
@@ -622,9 +642,15 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
   it('never retries an enable; both accounts run, each with --apply', () => {
     const morningStep = stepOf('morning-open', 'quantiply-deploy');
     expect(morningStep?.retries ?? 0).toBe(0);
-    const morning = morningStep?.argv.at(-1) ?? '';
-    expect(morning).toContain('--broker angelone --mode enable --morning --apply');
-    expect(morning).toContain('--broker finvasia --mode enable --morning --apply');
+    const shoonyaStep = stepOf('morning-open', 'quantiply-deploy-shoonya');
+    expect(shoonyaStep?.retries ?? 0).toBe(0);
+    // one step an account, so a failed Angel One login does not leave Shoonya switched off
+    expect(morningStep?.argv.at(-1)).toContain('--broker angelone --mode enable --morning --apply');
+    expect(morningStep?.argv.at(-1)).not.toContain('--broker finvasia');
+    expect(shoonyaStep?.argv.at(-1)).toContain('--broker finvasia --mode enable --morning --apply');
+    expect(shoonyaStep?.argv.at(-1)).not.toContain('--broker angelone');
+    expect(morningStep?.requires).toEqual(['quantiply-login']);
+    expect(shoonyaStep?.requires).toBeUndefined();
     const topup = stepOf('morning-topup', 'quantiply-deploy-topup');
     expect(topup?.retries ?? 0).toBe(0);
     const cmd = topup?.argv.at(-1) ?? '';

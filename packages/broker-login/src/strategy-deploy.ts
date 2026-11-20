@@ -53,7 +53,7 @@ import { visibleWithin } from './wait.js';
  *       uploads (Settings › Automation), each from its latest-<book>.json, one login each; the
  *       scheduler's jobs use this so a row switched to another list is never left out (2026-11-05)
  *   tsx src/strategy-deploy.ts --latest t1 --morning [--apply]  BL-197 Phase 2: right after the
- *       08:02 login (scheduler `algotest-activate`, 08:11), activate last evening's list: the export
+ *       AlgoTest login (scheduler `morning-open` chain, step `algotest-activate`), activate last evening's list: the export
  *       the 16:40 run uploaded and set up, for today. The evening list is what trades on AlgoTest;
  *       the 09:16 pick changes nothing there (owner, 2026-11-02). The Buy add-on is left out when no
  *       AlgoTest row has it on now (`algotestAddon`, read again in the morning)

@@ -315,7 +315,7 @@ async function main(): Promise<number> {
   const report = fatal ? `${body}\n${fatalLabel}: ${fatal}` : body;
 
   console.log(`\n${report}`);
-  // BL-173: on the Mac (local-login.ts) a clean login is said in the 08:10 message instead; a
+  // BL-173: on the Mac (local-login.ts) a clean login is said in the `morning-open` chain's message instead; a
   // failure is still sent at once. GitHub's backup runs always report.
   const anyFail =
     fatal !== null ||

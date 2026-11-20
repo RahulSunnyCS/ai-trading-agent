@@ -109,7 +109,7 @@ import { istToday, sha256 } from './strategy-plan.js';
  */
 
 /**
- * BL-172: under the 08:10 job (`--morning` with `MORNING_REPORT_FILE` set) each account's report is
+ * BL-172: under the `morning-open` chain (`--morning` with `MORNING_REPORT_FILE` set) each account's report is
  * added to one file and `morning-report.ts` sends them as one message; anything else, or a file
  * that cannot be written, is sent on its own as before.
  */

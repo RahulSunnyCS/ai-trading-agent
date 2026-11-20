@@ -78,13 +78,14 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
       'angel-check',
       'quantiply-login',
       'quantiply-deploy',
+      'quantiply-deploy-shoonya',
       'algotest-login',
       'algotest-catch-up',
       'algotest-activate',
       'morning-message',
     ]);
     // Quantiply is switched on BEFORE AlgoTest's window; AlgoTest's login waits for 08:16
-    expect(ids.indexOf('quantiply-deploy')).toBeLessThan(ids.indexOf('algotest-login'));
+    expect(ids.indexOf('quantiply-deploy-shoonya')).toBeLessThan(ids.indexOf('algotest-login'));
     expect(real.chain?.find((s) => s.id === 'algotest-login')?.notBefore).toBe('08:16');
     // the old four jobs are gone
     for (const old of [
@@ -105,6 +106,7 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
     for (const id of [
       'quantiply-login',
       'quantiply-deploy',
+      'quantiply-deploy-shoonya',
       'algotest-login',
       'algotest-catch-up',
       'algotest-activate',
@@ -113,6 +115,7 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
     // the steps that upload, enable or deploy are held under the old job ids
     const hold = (id: string) => real.chain?.find((s) => s.id === id)?.holdId;
     expect(hold('quantiply-deploy')).toBe('quantiply-deploy');
+    expect(hold('quantiply-deploy-shoonya')).toBe('quantiply-deploy');
     expect(hold('algotest-catch-up')).toBe('algotest-activate');
     expect(hold('algotest-activate')).toBe('algotest-activate');
     for (const id of ['quantiply-deploy', 'algotest-activate'] as const) {
@@ -139,7 +142,7 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('a failed Quantiply login skips only Quantiply’s switch-on', async () => {
+  it('a failed Quantiply · Angel One login skips only that account’s switch-on, Shoonya’s still runs', async () => {
     const result = await runJob(
       fake({ 'quantiply-login': 1 }),
       ctx,
@@ -149,31 +152,29 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
     expect(marks()).toEqual([
       'angel-check',
       'quantiply-login',
+      'quantiply-deploy-shoonya',
       'algotest-login',
       'algotest-catch-up',
       'algotest-activate',
       'morning-message',
     ]);
     expect(statuses(result)['quantiply-deploy']).toBe('skipped');
+    expect(statuses(result)['quantiply-deploy-shoonya']).toBe('ok');
     expect(statuses(result)['algotest-activate']).toBe('ok');
   });
 
-  it('a failed AlgoTest login skips only the activation (the catch-up and the message still run)', async () => {
+  it('a failed AlgoTest login skips nothing: the activation does not depend on it (the old 08:11 job did not)', async () => {
+    // `local-login.ts --part algotest` exits 1 when only one of the two brokers, or only Quantiply ·
+    // Shoonya, failed: the brokers that did log in must still be activated
     const result = await runJob(
       fake({ 'algotest-login': 1 }),
       ctx,
       'schedule',
       istAt(DAY, '08:00'),
     );
-    expect(marks()).toEqual([
-      'angel-check',
-      'quantiply-login',
-      'quantiply-deploy',
-      'algotest-login',
-      'algotest-catch-up',
-      'morning-message',
-    ]);
-    expect(statuses(result)['algotest-activate']).toBe('skipped');
+    expect(marks()).toEqual(ids);
+    expect(statuses(result)['algotest-login']).toBe('failed');
+    expect(statuses(result)['algotest-activate']).toBe('ok');
     expect(statuses(result)['quantiply-deploy']).toBe('ok');
   });
 
@@ -203,6 +204,7 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
     ]);
     expect(statuses(result)).toMatchObject({
       'quantiply-deploy': 'held',
+      'quantiply-deploy-shoonya': 'held',
       'algotest-catch-up': 'held',
       'algotest-activate': 'held',
     });
@@ -210,11 +212,12 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
   });
 
   describe('a laptop that slept through the morning', () => {
-    it('at 09:30 skips the 09:05 steps, runs the AlgoTest side and names what it skipped', async () => {
+    it('at 09:30 still logs in to Quantiply and AlgoTest, skips the 09:05 switch-ons and names them', async () => {
       at('09:30');
       const job = fake();
       const result = await runJob(job, ctx, 'catch-up', istAt(DAY, '08:00'));
       expect(marks()).toEqual([
+        'quantiply-login',
         'algotest-login',
         'algotest-catch-up',
         'algotest-activate',
@@ -223,31 +226,45 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
       expect(waits).toEqual([]); // 08:16 has passed: no waiting
       expect(statuses(result)).toMatchObject({
         'angel-check': 'late',
-        'quantiply-login': 'late',
-        'quantiply-deploy': 'held',
+        'quantiply-login': 'ok',
+        'quantiply-deploy': 'late',
+        'quantiply-deploy-shoonya': 'late',
       });
       expect(result.ok).toBe(false);
       await alertResult(sink, job, result, ctx.history);
       expect(sent).toHaveLength(1);
       expect(sent[0]).toContain('• angel-check: too late: 09:10 IST has passed');
-      expect(sent[0]).toContain('• quantiply-login: too late: 09:05 IST has passed');
+      expect(sent[0]).toContain('• quantiply-deploy: too late: 09:05 IST has passed');
+      expect(sent[0]).toContain('• quantiply-deploy-shoonya: too late: 09:05 IST has passed');
     });
 
-    it('at 13:00 logs in to nothing and activates nothing, and says so once', async () => {
+    it('at 13:00 still logs in (the old 7 h window), activates nothing and says so once', async () => {
       at('13:00');
       const job = fake();
       const result = await runJob(job, ctx, 'catch-up', istAt(DAY, '08:00'));
-      expect(marks()).toEqual(['morning-message']);
+      expect(marks()).toEqual(['quantiply-login', 'algotest-login', 'morning-message']);
       expect(statuses(result)).toMatchObject({
         'angel-check': 'late',
-        'quantiply-login': 'late',
-        'algotest-login': 'late',
+        'quantiply-login': 'ok',
+        'quantiply-deploy': 'late',
+        'algotest-login': 'ok',
         'algotest-catch-up': 'late',
-        'algotest-activate': 'held',
+        'algotest-activate': 'late',
       });
       await alertResult(sink, job, result, ctx.history);
       expect(sent).toHaveLength(1);
-      expect(sent[0]).toContain('• algotest-login: too late: 12:40 IST has passed');
+      expect(sent[0]).toContain('• algotest-activate: too late: 12:40 IST has passed');
+    });
+
+    it('at 15:30 is past every login window: only the message runs', async () => {
+      at('15:30');
+      const result = await runJob(fake(), ctx, 'catch-up', istAt(DAY, '08:00'));
+      expect(marks()).toEqual(['morning-message']);
+      expect(statuses(result)).toMatchObject({
+        'quantiply-login': 'late',
+        'algotest-login': 'late',
+        'algotest-activate': 'late',
+      });
     });
   });
 
@@ -257,7 +274,12 @@ describe('the morning-open chain (BL-234 Phase 4)', () => {
     // an earlier run of this slot: the check and Quantiply's steps passed, the AlgoTest login was
     // running when the scheduler stopped (it may have sent a PIN)
     const cut = h.start('morning-open', 'schedule', slot, '', slot);
-    for (const id of ['angel-check', 'quantiply-login', 'quantiply-deploy']) {
+    for (const id of [
+      'angel-check',
+      'quantiply-login',
+      'quantiply-deploy',
+      'quantiply-deploy-shoonya',
+    ]) {
       const row = h.startStep(cut, id, slot);
       h.finishStep(row, 'ok', 0, 1, slot);
     }
@@ -295,14 +317,16 @@ describe('the dry run (BL-234 Phase 4)', () => {
     const late = planChain(real, { start: istAt(DAY, '09:30'), env: { SCHEDULER_STATE_DIR: dir } });
     expect(Object.fromEntries(late.map((l) => [l.step, l.action]))).toMatchObject({
       'angel-check': 'late',
-      'quantiply-login': 'late',
-      'quantiply-deploy': 'held',
+      'quantiply-login': 'run',
+      'quantiply-deploy': 'late',
+      'quantiply-deploy-shoonya': 'late',
       'algotest-login': 'run',
       'algotest-activate': 'run',
     });
     writeFileSync(join(dir, 'stop-hold.json'), JSON.stringify({ at: 'x', by: 'test' }));
     const held = planChain(real, { start: istAt(DAY, '08:00'), env: { SCHEDULER_STATE_DIR: dir } });
     expect(held.find((l) => l.step === 'quantiply-deploy')?.action).toBe('held');
+    expect(held.find((l) => l.step === 'quantiply-deploy-shoonya')?.action).toBe('held');
     expect(held.find((l) => l.step === 'algotest-activate')?.action).toBe('held');
     expect(held.find((l) => l.step === 'algotest-login')?.action).toBe('wait');
   });

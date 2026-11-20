@@ -188,26 +188,30 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
   `retries: 0` like the `morning-open` activation: a second attempt could act on a half-finished first. `quantiply-disable`
   is the safety net and runs whatever `QUANTIPLY_DEPLOY` and the deploy switch say.
 - `morning-open` (BL-234 Phase 4, trading days 08:00) is the morning as one chain, replacing the four clock-chained jobs
-  `angel-login-check` (08:00), `broker-login` (08:02), `quantiply-deploy` (08:10) and `algotest-activate` (08:11);
+  the former `angel-login-check` (08:00), `broker-login` (08:02), `quantiply-deploy` (08:10) and `algotest-activate` (08:11) jobs;
   `options-rotation-pick` (08:45) and `morning-summary` (09:00) stay fixed-time jobs (owner, 2026-11-18). Owner's
   order: **Quantiply is switched on first (about 08:06), before AlgoTest's 08:16 window**, and its one Telegram message
   goes once at the end (about 08:20; 2026-11-19). Steps (`jobs.ts` is the one place that lists times, timeouts and
   fixes): `angel-check` (`obt angel test --scheduled`: never stops the rest, no retry (the old 5-minute retry only
   helped a blip and would hold Quantiply back), not after 09:10) → `quantiply-login` (`local-login.ts --part
-  quantiply`: Quantiply · Angel One and Kite; not after 09:05) → `quantiply-deploy` (both accounts, REAL MONEY;
-  `requires` the login; held as `quantiply-deploy`; not after 09:05, the 09:19 `morning-topup` chain is the net) →
+  quantiply`: Quantiply · Angel One and Kite; not after 15:00, the old `broker-login` window) → `quantiply-deploy`
+  (Quantiply · Angel One's account, REAL MONEY; `requires` that login; held as `quantiply-deploy`; not after 09:05, the
+  09:19 `morning-topup` chain is the net) → `quantiply-deploy-shoonya` (the same for Shoonya's account; no `requires`,
+  so one failed Angel One login does not leave it off; the same `holdId`) →
   `algotest-login` (`--part algotest`: the AlgoTest brokers, then Quantiply · Shoonya; `notBefore` 08:16, not after
-  12:40) → `algotest-catch-up` (a list switched in after 16:40 is exported, uploaded and set up first; never fails;
-  held as `algotest-activate`) → `algotest-activate` (REAL MONEY; `requires` the AlgoTest login; not after 12:40) →
+  15:00) → `algotest-catch-up` (a list switched in after 16:40 is exported, uploaded and set up first; never fails;
+  held as `algotest-activate`; not after 12:40) → `algotest-activate` (REAL MONEY; no `requires`: the old 08:11 job did
+  not depend on the login, `--part algotest` exits 1 when only one broker, or only Quantiply · Shoonya, failed, and
+  `strategy-deploy --morning` reports each broker not logged in; not after 12:40) →
   `morning-message` (`morning-report.ts --chain`: the login line and each Quantiply account's report, or "switch-on
-  not run"). Failure policy: a failed check stops nothing; a failed Quantiply login skips only Quantiply's switch-on; a
-  failed AlgoTest login skips only the activation. Every login and activation step has NO retries (a refused PIN sent
+  not run"). Failure policy: a failed check stops nothing; a failed Quantiply · Angel One login skips only that
+  account's switch-on; a failed AlgoTest login skips nothing. Every login and activation step has NO retries (a refused PIN sent
   again locks an account; a second activation double-activates) and a step cut off mid-run is `unknown`, so a resume
   refuses (exit 4) and the owner decides with `--from`. A step past its `notAfter` is `late` and, with `alertLate`, the
   run counts it as a problem and the one alert names it (it is never waited for); the chain's `catchUpHours` is the
   old login window (7 h), each step has its own limit. The `quantiply` group is taken at the first Quantiply step and
   let go after the last step that needs it (`algotest-activate`), the span the old jobs held it (other chains still use it). The stop hold and the pause hold the
-  `quantiply-deploy`, `algotest-catch-up` and `algotest-activate` steps under their old job ids (`holdId`); the logins
+  `quantiply-deploy` and `quantiply-deploy-shoonya` (as `quantiply-deploy`), `algotest-catch-up` and `algotest-activate` steps under their old job ids (`holdId`); the logins
   and the message are never held. Each login part records its own body under `parts` in `<state>/broker-login/<day>.json`
   (the file's top level is them combined, which the 09:00 summary and the message read), hands only its own failures
   to GitHub, and the last asked part sets `LOCAL_LOGIN_DONE` (a part that failed sets it at once, so a refused PIN is

@@ -185,13 +185,23 @@ export async function runChain(
       continue;
     }
 
-    // started too late to be worth running (a laptop that slept through it): not a failure
-    if (step.notAfter && now().getTime() > istAt(istDay(now()), step.notAfter).getTime()) {
-      const reason = `too late: ${step.notAfter} IST has passed`;
-      history.recordStep(runId, step.id, 'late', now(), reason);
+    // started too late to be worth running (a laptop that slept through it): not a failure. Checked
+    // again after the `notBefore` wait and after the group wait, which can take a long time (a Mac
+    // that sleeps through the 08:16 wait must not start a login hours late).
+    const tooLate = () =>
+      step.notAfter && now().getTime() > istAt(istDay(now()), step.notAfter).getTime()
+        ? `too late: ${step.notAfter} IST has passed`
+        : null;
+    const lateNow = (reason: string, rowId: number | null) => {
+      if (rowId === null) history.recordStep(runId, step.id, 'late', now(), reason);
+      else history.finishStep(rowId, 'late', 0, 0, now(), reason);
       state.set(step.id, 'held');
       note(step, 'late', 0, 0, reason);
       log(`· ${step.id}: ${reason}`);
+    };
+    const lateBefore = tooLate();
+    if (lateBefore) {
+      lateNow(lateBefore, null);
       continue;
     }
 
@@ -200,6 +210,11 @@ export async function runChain(
       if (wait > 0) {
         log(`· ${step.id}: waiting for ${step.notBefore} IST`);
         await sleep(wait);
+        const lateAfterWait = tooLate();
+        if (lateAfterWait) {
+          lateNow(lateAfterWait, null);
+          continue;
+        }
       }
     }
 
@@ -212,6 +227,11 @@ export async function runChain(
       note(step, 'failed', 1, 0, blocked);
       log(`· ${step.id}: failed (${blocked})`);
       if ((step.onFail ?? 'stop') === 'stop') endedBy = step.id;
+      continue;
+    }
+    const lateAfterGroup = tooLate();
+    if (lateAfterGroup) {
+      lateNow(lateAfterGroup, rowId);
       continue;
     }
     const retries = step.retries ?? 0;

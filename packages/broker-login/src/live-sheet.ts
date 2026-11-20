@@ -17,7 +17,7 @@ export type SheetOutcome = 'saved' | 'kept';
  * checks at each minute's close, as the backtest does; leg stops stay on LTP) and saves it.
  *
  * A sheet set up before ("Update Execution Settings", 2026-11-05: last evening's setup, reopened
- * by the 08:11 activation) shows the multiplier and the execution time empty, so only what the
+ * by the morning activation) shows the multiplier and the execution time empty, so only what the
  * setup decided is checked, Candle Close and no execution day ticked, and the sheet is closed with
  * Cancel, never saved again.
  */

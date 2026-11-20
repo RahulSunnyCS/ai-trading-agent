@@ -146,7 +146,8 @@ export interface PartBody {
   ok: boolean;
   nothing?: boolean;
   github?: string;
-  fallback?: { parts: string[]; url: string | null } | null;
+  /** `at`: when we dispatched (ISO), so the run can be told apart when its URL was not found */
+  fallback?: { parts: string[]; url: string | null; at?: string } | null;
   result?: LoginResult | null;
   note?: string | undefined;
 }
@@ -186,6 +187,38 @@ export function combineParts(parts: Record<string, PartBody>): PartBody {
       : null,
     ...(note ? { note } : {}),
   };
+}
+
+/** One run of GitHub's "Daily broker login" as `gh run list --json` gives it. */
+export interface GithubRun {
+  conclusion: string;
+  createdAt: string;
+  url: string;
+}
+
+/**
+ * The GitHub run that already logged in today, if any: a successful run that is not one of OUR
+ * dispatches. The Quantiply part can dispatch a Quantiply-only run (`only=none`) before the AlgoTest
+ * part starts; counting it would make the AlgoTest part exit 0 with nobody logged in on AlgoTest
+ * or Quantiply · Shoonya. Ours are the URLs the status file recorded under `parts.*.fallback`; when
+ * a dispatch's URL was not found, every run created from its start counts as ours.
+ */
+export function githubLoggedInToday(
+  runs: GithubRun[],
+  status: { parts?: Record<string, PartBody> } | null,
+): GithubRun | undefined {
+  const ours = Object.values(status?.parts ?? {})
+    .map((b) => b.fallback)
+    .filter((f): f is NonNullable<PartBody['fallback']> => !!f);
+  const isOurs = (r: GithubRun) =>
+    ours.some(
+      (f) =>
+        f.url === r.url ||
+        (!(f.url ?? '').startsWith('http') &&
+          f.at !== undefined &&
+          Date.parse(r.createdAt) >= Date.parse(f.at) - 5_000),
+    );
+  return runs.find((r) => r.conclusion === 'success' && !isOurs(r));
 }
 
 /** The `.env` broker credentials GitHub's backup keeps its own copies of (repository secrets). */

@@ -453,7 +453,7 @@ export function morningSummary(sink?: AlertSink, system: SystemChecks = systemCh
     const { text } = formatSummary(istDay(ctx.now()), checks);
     ctx.log(text);
     // BL-173 (owner, 2026-10-28): only when something needs a look (a failed check, or a pause
-    // that makes the day quiet on purpose); on a clean day the 08:10 message is the confirmation.
+    // that makes the day quiet on purpose); on a clean day the `morning-open` message is the confirmation.
     const worth = checks.some((c) => !c.ok) || pauseChecks(ctx).length > 0;
     if (!worth) {
       ctx.log('every check passed: no message (BL-173)');
