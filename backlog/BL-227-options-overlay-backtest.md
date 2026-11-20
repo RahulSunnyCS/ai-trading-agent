@@ -119,4 +119,6 @@ itself is falling (owner, 2026-11-15: "if it is downward momentum, we can buy PE
 - 2026-11-15 — owner: add downward momentum (buy the puts of falling stocks). Added to Phase 1 as direction
   modes (calls only, puts only, market switch, both sides). Untested: BL-226's Phase 4 never ran (its gate
   needed a passing call book), so these runs are descriptive until a pre-registered item tests one.
-
+- 2026-11-15 — [BL-228](BL-228-fno-falling-stock-puts.md) tested the put side on its own and killed it at
+  learning: every put book lost in 2020-24, and the stock-and-inverse mirror pool earned only from its calls.
+  The put modes stay in the plan as descriptive settings; the page should show that result beside them.

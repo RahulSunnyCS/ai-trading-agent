@@ -36,7 +36,7 @@ Pages tested on one strategy only live in that strategy's folder.
 | Page | Applies to | Status | Default | Verdict in one line |
 |---|---|---|---|---|
 | [Universe, dates, weekly data](common/universe.md) | all | Tested | 2017-01-01 start; 21 core ETFs; Broad `turnover_rank` (new runs) | Today's list for every year inflates Broad by 22-25 points for the best configs; point in time is now the default |
-| [Holding the picks as options](common/options-overlay.md) | Broad (F&O stocks) | Tested | not used | Killed (BL-226): calls on the picks fail every confirmation book; the 2020-24 gains were leverage |
+| [Holding the picks as options](common/options-overlay.md) | Broad (F&O stocks) | Tested | not used | Killed (BL-226): calls on the picks fail every confirmation book; the 2020-24 gains were leverage. Killed (BL-228): puts on falling F&O stocks lose in every form; the stock-and-inverse pool fails on drawdown |
 | [Benchmarks](common/benchmarks.md) | all | Descriptive | Nifty 50; Nifty 50 TRI and Nifty200 Momentum 30 TRI lines | ETF +13.2 / +8.7 a year over them, Broad +19.1 / +14.6; ETF mode is not inflated by dividends |
 | [Lookbacks, weights, tie-break](common/lookbacks.md) | all | Tested | 1 / 4 / 13 / 26 / 52 weeks, equal weights | Keep equal weights: the 1-week window helps on ETFs |
 | [Skip-month](common/skip-month.md) | all | Tested | no skip (ranksum); `voladj` "skip" on | Skipping loses on ETFs; the `voladj` skip does not actually skip, and fixing it loses on Broad |
