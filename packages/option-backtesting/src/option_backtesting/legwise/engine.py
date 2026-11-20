@@ -82,6 +82,10 @@ backtest (TODO.md 3.10.7):
   price), is judged from the next bar, and its time stop counts from that fill.
   With `resell_after_reverse` the stopped leg also arms RE COST, which waits until the long has
   closed.
+  BL-240 (`close_on_reentry`): the long is a cover. RE COST does not wait for it; when the leg is
+  re-sold the long is closed at the close of that bar (`price_at(m + 1)`, reason COVER), the leg may
+  reverse again at a later stop, and a cover still open is held to the exit time or the overall
+  stop. `opposite` buys the other option type (the placebo).
 """
 
 from __future__ import annotations
@@ -118,6 +122,7 @@ from .market import (
 from .schema import Amount, Leg, LegwiseStrategy, ReEntry, Strike
 
 _EPS = 1e-9
+_OTHER = {"CE": "PE", "PE": "CE"}  # BL-240: the opposite option type
 #: NSE/BSE option tick. Stop and target levels are rounded to the nearest one, as AlgoTest
 #: does (BL-009 Phase 1: 512 of 515 untrailed stop exits across four exports equal the level
 #: rounded to the nearest 0.05; 88 equal it unrounded).
@@ -500,6 +505,22 @@ class _DaySim:
         engine; research subclasses filter here (reading only bars before `minute`)."""
         return True
 
+    def _close_cover(self, run: _LegRun, minute: int) -> None:
+        """BL-240: the leg was just re-sold; close its cover (still open) at the close of this bar
+        and let the leg reverse again at a later stop."""
+        rev = run.spec.reverse_on_sl
+        cover = run.child
+        if rev is None or not rev.close_on_reentry or cover is None:
+            return
+        if cover.state == "open" and cover.series is not None:
+            price = cover.series.price_at(minute + 1) if minute + 1 < self.n else None
+            if price is None:
+                price = cover.series.price_at(minute)
+            if price is not None:
+                self._exit(cover, minute, price, "COVER")
+        run.child = None
+        run.reversed = False
+
     def _maybe_reverse(self, run: _LegRun, minute: int) -> bool:
         """BL-186: buy the stopped sold leg's contract at its stop fill. True if it reversed."""
         rev = run.spec.reverse_on_sl
@@ -515,7 +536,7 @@ class _DaySim:
         spec = run.spec
         contract, series, raw, fill_at = run.contract, run.series, run.exit_raw, minute
         if rev.strike_premium is not None:
-            picked = self._pick_premium(run, minute, rev.strike_premium)
+            picked = self._pick_premium(run, minute, rev.strike_premium, rev.opposite)
             if picked is None:
                 return False
             contract, series = picked
@@ -530,7 +551,7 @@ class _DaySim:
             id=f"{spec.id}_rev",
             lots=spec.lots,
             position="buy",
-            option_type=spec.option_type,
+            option_type=_OTHER[spec.option_type] if rev.opposite else spec.option_type,
             expiry=spec.expiry,
             strike=spec.strike,
             stop_loss=(
@@ -556,7 +577,9 @@ class _DaySim:
             self._arm_reentry(run, minute, "sl")  # waits in _step_reentry until the long is closed
         return True
 
-    def _pick_premium(self, run: _LegRun, minute: int, target: float) -> tuple | None:
+    def _pick_premium(
+        self, run: _LegRun, minute: int, target: float, opposite: bool = False
+    ) -> tuple | None:
         """Amendment 1: the long's contract, the strike priced closest to `target` before `minute`
         among the stopped leg's expiry and option type, within 0.7x-1.4x of it; None (with a
         note) when there is none or it is the stopped contract itself."""
@@ -564,11 +587,12 @@ class _DaySim:
         assert run.contract is not None
         expiry = run.contract[0]
         low, high = 0.7 * target, 1.4 * target
+        option_type = _OTHER[spec.option_type] if opposite else spec.option_type
         priced = [
             (abs(p - target), p, k)
             for k, series in self.data.chain.items()
             if k[0] == expiry
-            and k[2] == spec.option_type
+            and k[2] == option_type
             and (p := series.price_at(minute)) is not None
             and low - _EPS <= p <= high + _EPS
         ]
@@ -608,11 +632,14 @@ class _DaySim:
         if minute > self.last_reentry_min:
             run.state = "done"
             return
-        if run.child is not None and run.child.state != "done":
+        rev = run.spec.reverse_on_sl
+        covering = rev is not None and rev.close_on_reentry
+        if run.child is not None and run.child.state != "done" and not covering:
             return  # BL-186 Amendment 1: re-sell only after the long has closed
         if run.reentry_mode == "asap":
             if self._select(run, minute):
                 self._enter(run, minute, run.series.open[minute], intrabar=False)  # type: ignore[union-attr,arg-type]
+                self._close_cover(run, minute)
             else:
                 run.state = "done"
             return
@@ -627,6 +654,7 @@ class _DaySim:
             fill = o if o >= p else (p if h >= p else None)
         if fill is not None:
             self._enter(run, minute, fill, intrabar=fill != o)
+            self._close_cover(run, minute)
 
     def _roll_exhausted_legs(self, minute: int) -> None:
         """BL-105: a sold leg whose premium has decayed to roll.decay x its entry is closed at this

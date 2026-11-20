@@ -711,3 +711,87 @@ def test_amendment_fields_validate_and_stay_out_of_the_dump_at_their_defaults():
     assert (rev["strike_premium"], rev["resell_after_reverse"]) == (50, True)
     with pytest.raises(ValidationError):
         strategy([sar_leg(strike_premium=0)])
+
+
+# --- BL-240: the cover — close the long when the stopped leg is re-sold -----------------------
+
+BACK = {
+    "10:00": (100, 125, 100, 124),
+    "10:03": (110, 110, 95, 97),  # back through the 100 entry: RE COST re-sells at 100
+}
+
+
+def cover_leg(**rev) -> dict:
+    return sar_leg(strike_premium=50, resell_after_reverse=True, close_on_reentry=True, **rev)
+
+
+def cover_chain(**extra) -> dict:
+    ce = rising(110, BACK, "10:03", 97)
+    ce.close[minute_index("09:19")] = 100  # entry at 100
+    return {
+        (22000.0, "CE"): ce,
+        (22100.0, "CE"): rising(48, {"10:00": (48, 70, 48, 66)}, "10:00", 90),
+        (22050.0, "CE"): bars(60),
+        (22200.0, "CE"): bars(30),
+        **extra,
+    }
+
+
+def test_cover_is_closed_at_the_close_of_the_bar_the_leg_is_re_sold():
+    result = simulate_day(strategy([cover_leg()]), day(cover_chain()))
+    short, cover, resold = result.trades
+    assert (short.exit_reason, cover.leg_id, cover.entry_price) == ("SL", "ce_rev", 66)
+    assert cover.contract == (EXP, 22100.0, "CE")
+    # the re-sale fills at 100 in the 10:03 bar; the cover leaves at the price at 10:04 (its 90)
+    assert (resold.position, resold.entry_price, resold.entry_min) == (
+        "sell",
+        100,
+        minute_index("10:03"),
+    )
+    assert (cover.exit_reason, cover.exit_min, cover.exit_price) == (
+        "COVER",
+        minute_index("10:03"),
+        90,
+    )
+    assert result.gross == pytest.approx((100 - 121) * LOT + (90 - 66) * LOT + (100 - 97) * LOT)
+
+
+def test_cover_never_re_sold_is_held_to_the_exit():
+    chain = cover_chain()
+    chain[(22000.0, "CE")] = rising(100, {"10:00": (100, 125, 100, 124)}, "10:00", 124)
+    short, cover = simulate_day(strategy([cover_leg()]), day(chain)).trades
+    assert (short.exit_reason, cover.exit_reason, cover.exit_price) == ("SL", "EXIT_TIME", 90)
+
+
+def test_a_second_stop_of_the_re_sold_leg_buys_a_second_cover():
+    spike = {**BACK, "10:10": (97, 125, 97, 124)}  # the re-sold leg (entry 100, SL 121) stops again
+    ce = rising(110, spike, "10:10", 124)
+    ce.close[minute_index("09:19")] = 100
+    chain = cover_chain()
+    chain[(22000.0, "CE")] = ce
+    result = simulate_day(strategy([cover_leg()]), day(chain))
+    assert [t.leg_id for t in result.trades] == ["ce", "ce_rev", "ce", "ce_rev"]
+    first, second = result.trades[1], result.trades[3]
+    assert first.exit_reason == "COVER"
+    assert (second.contract, second.exit_reason) == ((EXP, 22050.0, "CE"), "EXIT_TIME")
+
+
+def test_opposite_cover_buys_the_other_option_type_for_the_placebo():
+    chain = cover_chain()
+    chain[(22000.0, "PE")] = bars(48)
+    result = simulate_day(strategy([cover_leg(opposite=True)]), day(chain))
+    cover = result.trades[1]
+    assert (cover.leg_id, cover.contract) == ("ce_rev", (EXP, 22000.0, "PE"))
+    assert cover.exit_reason == "COVER"
+
+
+def test_cover_options_validate_and_stay_out_of_the_dump_at_their_defaults():
+    plain = strategy([sar_leg(strike_premium=50, resell_after_reverse=True)]).model_dump()
+    rev = plain["legs"][0]["reverse_on_sl"]
+    assert "close_on_reentry" not in rev and "opposite" not in rev
+    on = strategy([cover_leg(opposite=True)]).model_dump()["legs"][0]["reverse_on_sl"]
+    assert (on["close_on_reentry"], on["opposite"]) == (True, True)
+    with pytest.raises(ValidationError):
+        strategy([sar_leg(strike_premium=50, close_on_reentry=True)])
+    with pytest.raises(ValidationError):
+        strategy([sar_leg(opposite=True)])

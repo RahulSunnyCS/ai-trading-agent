@@ -128,3 +128,4 @@ Answered 2026-11-20: cover strike nearest ₹50, hold to 15:28 if no re-sale; th
 
 - 2026-11-20 — created and pre-registered before any run, from the owner's idea.
 - 2026-11-20 — scope narrowed by the owner to the 21% leg-stop Dir picks (Core's rotation Dir files and the base); first drafted on T1's Dir picks (40 / 20 / 15% stops), now out of scope.
+- 2026-11-20 — **Phase 1 built, before any arm was run.** Engine: `reverse_on_sl.close_on_reentry` (RE COST does not wait for the long; it closes at the close of the re-sale bar, `price_at(m + 1)`, reason COVER, and the leg can reverse again) and `opposite` (the placebo); both off by default and out of the spec dump, 5 unit tests, goldens and exports unchanged. Pick-days fixed: **344** (Core list C Dir picks, one per day on 344 days, 2025-01-10 → 2026-10-08; NIFTY 176, SENSEX 168); `research/bl240/run.py --count`.

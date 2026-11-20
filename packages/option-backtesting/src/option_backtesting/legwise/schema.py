@@ -145,7 +145,12 @@ class ReverseOnSL(_Model):
     option type instead: the collected strike whose price before the stop minute is closest to it
     (within 0.7x-1.4x of it; none, or the stopped contract itself = no reversal), filled at the
     close of the stop bar. `resell_after_reverse` lets RE COST re-sell the stopped leg once the long
-    has closed (else a reversed leg is not re-sold)."""
+    has closed (else a reversed leg is not re-sold).
+
+    BL-240: `close_on_reentry` (with `resell_after_reverse`) turns the long into a cover for the
+    stopped leg: RE COST does not wait for it, and when the leg is re-sold the long is closed at the
+    close of that bar; the leg can then reverse again at a later stop. `opposite` (with
+    `strike_premium`) buys the other option type instead (the placebo arm)."""
 
     lots_ratio: float = Field(default=1.0, allow_inf_nan=False)
     stop_loss_percent: float | None = Field(default=30.0, gt=0, lt=100, allow_inf_nan=False)
@@ -153,6 +158,8 @@ class ReverseOnSL(_Model):
     trail_peak: TrailPeak | None = None
     strike_premium: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     resell_after_reverse: bool = False
+    close_on_reentry: bool = False
+    opposite: bool = False
 
     @model_serializer(mode="wrap")
     def _omit_amendment_fields_at_default(self, handler):
@@ -163,7 +170,18 @@ class ReverseOnSL(_Model):
             data.pop("strike_premium", None)
         if data.get("resell_after_reverse") is False:
             data.pop("resell_after_reverse", None)
+        for key in ("close_on_reentry", "opposite"):  # BL-240
+            if data.get(key) is False:
+                data.pop(key, None)
         return data
+
+    @model_validator(mode="after")
+    def _cover_options(self):
+        if self.close_on_reentry and not self.resell_after_reverse:
+            raise ValueError("reverse_on_sl.close_on_reentry needs resell_after_reverse")
+        if self.opposite and self.strike_premium is None:
+            raise ValueError("reverse_on_sl.opposite needs strike_premium")
+        return self
 
     @field_validator("lots_ratio")
     @classmethod
