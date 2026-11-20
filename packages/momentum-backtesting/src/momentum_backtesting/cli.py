@@ -2147,9 +2147,9 @@ def kite_auto_login_cmd(
 ) -> None:
     """Log in to Kite unattended (owner, 2026-10-28; off until KITE_AUTO_LOGIN=on): Kite's own
     login page with KITE_USER_ID, KITE_PASSWORD and a code from KITE_TOTP_SECRET. Run by the
-    08:02 morning login on every trading day. A refused password is never retried and
-    holds later runs until the credentials change. Exit 0 = logged in, already logged in or
-    off; 1 = failed."""
+    morning login (the `morning-open` chain) on every trading day. A refused password is never
+    retried and holds later runs until the credentials change. Exit 0 = logged in, already logged
+    in or off; 1 = failed."""
     from . import kite_login
 
     load_repo_env()

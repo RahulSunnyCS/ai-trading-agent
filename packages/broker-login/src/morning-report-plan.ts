@@ -1,5 +1,5 @@
 /**
- * BL-172: the 08:10 switch-on's accounts as ONE Telegram message (owner, 2026-10-28). Each
+ * BL-172: the morning switch-on's accounts as ONE Telegram message (owner, 2026-10-28). Each
  * account's run adds its report as a JSON line `{text}` to `MORNING_REPORT_FILE`
  * (`quantiply-deploy.ts`'s `deliver`); `morning-report.ts` sends this.
  */
@@ -54,7 +54,7 @@ export function combineReports(
   return [head, '', body.join('\n\n')].join('\n');
 }
 
-/** The Mac's 08:02 login outcome (`<state>/broker-login/<day>.json`), as `local-login.ts` writes it. */
+/** The Mac's morning login outcome (`<state>/broker-login/<day>.json`), as `local-login.ts` writes it. */
 export interface LoginStatus {
   ok: boolean;
   nothing?: boolean;
@@ -69,7 +69,7 @@ export interface LoginStatus {
 }
 
 /**
- * BL-173: the 08:10 message's first line, the morning login (whose own report is sent only on a
+ * BL-173: the morning message's first line, the morning login (whose own report is sent only on a
  * failure). Null when the Mac did not run it today, or there was nothing to log in.
  */
 export function loginLine(status: LoginStatus | null): string | null {
@@ -95,7 +95,19 @@ export function loginLine(status: LoginStatus | null): string | null {
   ].filter((x): x is { name: string; status: string } => !!x);
   const failed = lines.filter((x) => x.status === 'FAIL').map((x) => x.name);
   if (!status.ok || failed.length) {
-    return `⚠️ Login failed: ${failed.join(', ') || 'see the 08:02 login report'}`;
+    return `⚠️ Login failed: ${failed.join(', ') || 'see the login report'}`;
   }
   return `✅ Logged in: ${lines.map((x) => x.name).join(' · ') || 'nothing asked'}`;
+}
+
+/**
+ * BL-234 Phase 4 (the `morning-open` chain's last step): the switch-on step wrote no report file
+ * because it did not run (its login failed, the stop button or a pause held it, or it was too
+ * late). The message still goes, with the login line and why there is no switch-on to report.
+ */
+export function switchOnNotRun(day: string, login: string | null): string {
+  return [
+    `⚠️ Quantiply morning switch-on ${day}: not run (the Quantiply login failed, the stop hold or a pause held it, or it was too late): check Quantiply before 09:17; the 09:19 top-up chain enables what is left`,
+    ...(login ? ['', login] : []),
+  ].join('\n');
 }

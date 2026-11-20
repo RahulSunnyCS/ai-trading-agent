@@ -1,12 +1,12 @@
 """BL-172 Phase 4: the 09:16 pick changes only what starts after 09:17 (owner, 2026-10-28).
 
-The evening uploads tomorrow's expected picks and the 08:10 job switches them on. At 09:16 the real
-pick is recorded. A strategy that enters at 09:17 cannot be changed by then: the evening's 09:17
-strategy keeps running, and a new 09:17 pick is not added. For the rest, the day's list is chosen
-again with the 09:16 pick's own rule (`score.select`: the top `N_CORE` Widesl / Dir variants by the
-09:16 composite, at least `MIN_WIDE_N` Widesl), with the evening's 09:17 strategy kept in and no
-other 09:17 variant allowed; the highest scorers stay. The Buy add-on follows the 09:16 pick unless
-it enters at 09:17 (then the evening's add-on, if any, stays).
+The evening uploads tomorrow's expected picks and the morning chain switches them on. At 09:16 the
+real pick is recorded. A strategy that enters at 09:17 cannot be changed by then: the evening's
+09:17 strategy keeps running, and a new 09:17 pick is not added. For the rest, the day's list is
+chosen again with the 09:16 pick's own rule (`score.select`: the top `N_CORE` Widesl / Dir
+variants by the 09:16 composite, at least `MIN_WIDE_N` Widesl), with the evening's 09:17 strategy
+kept in and no other 09:17 variant allowed; the highest scorers stay. The Buy add-on follows the
+09:16 pick unless it enters at 09:17 (then the evening's add-on, if any, stays).
 
 The result is written as the day's export, so the 09:19 upload creates only what is new and the
 09:21 switch-on turns it on and the replaced strategies off; nothing else in the pipeline changes.

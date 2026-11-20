@@ -329,9 +329,9 @@ describe('Jobs', () => {
   });
 
   it("reads the morning login's latest run", () => {
-    expect(brokerLoginLine(job('broker-login', run({})), NOW).tone).toBe('ok');
+    expect(brokerLoginLine(job('morning-open', run({})), NOW).tone).toBe('ok');
     expect(
-      brokerLoginLine(job('broker-login', run({ exit_code: -1, error: 'missed' })), NOW),
+      brokerLoginLine(job('morning-open', run({ exit_code: -1, error: 'missed' })), NOW),
     ).toMatchObject({ tone: 'bad', detail: 'missed' });
     expect(brokerLoginLine(null, NOW).text).toBe('job not found');
   });

@@ -559,7 +559,7 @@ def algotest_export(
         "--only-missing",
         help=(
             "Skip a list whose latest export already holds that session's expected picks (the "
-            "16:40 run made it); exit 3 when nothing was missing. The 08:11 catch-up for a row "
+            "16:40 run made it); exit 3 when nothing was missing. The morning catch-up for a row "
             "switched to another list after 16:40 (2026-11-05)."
         ),
     ),

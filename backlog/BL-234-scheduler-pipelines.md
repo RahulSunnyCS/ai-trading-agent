@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — fewer things to watch and no more jobs started on a guess of how long the one before takes; the morning chain touches real money, so it is last and careful |
-| **Status** | In progress — Phases 1, 2 and 3 built, not merged; Phase 2b and Phase 4 next |
+| **Status** | In progress — Phases 1, 2, 3 and 4 built, not merged (PR #459 carries 1-3); Phase 2b next |
 | **Type** | improvement |
 | **Area** | scheduler / infra |
 | **Created** | 2026-11-18 |
@@ -37,7 +37,7 @@ Last list of jobs and the groups they sit in: the scheduler's `jobs status` and 
 
 ## Goal
 
-Roughly 18–20 jobs instead of 53 (33 after Phase 3), with these true:
+Roughly 18–20 jobs instead of 53 (33 after Phase 3, 30 after Phase 4), with these true:
 
 - A chain starts its next step when the one before it **ends**, not at a guessed clock time; a step
   that must not run early declares `notBefore`.
@@ -184,21 +184,71 @@ per-step failure policy. The rest moved to Phase 2 (below).
   - A group held by a lazily taking chain can in principle deadlock with a job that needs both groups; none does.
 
 ### Phase 4 — `morning-open` chain (real money; last)
-- **Tasks:**
-  - Order: `angel-login-check` → Quantiply login and `quantiply-deploy` → AlgoTest login (waits for
-    08:16) → `algotest-activate` → `options-rotation-pick`. Start 08:00. Quantiply first, since it has
-    no 08:16 window and can switch on around 08:05 instead of about 08:20.
-  - Failure policy: a failed Angel One check does not stop the logins; a failed Quantiply login skips
-    only Quantiply's deploy; a failed AlgoTest login skips only the activation; the pick always runs.
-  - `broker-login` is split so Quantiply and AlgoTest logins are separate steps; the hand-off to
-    GitHub's "Daily broker login" and `LOCAL_LOGIN_DONE` keep their behaviour.
-  - A step past its latest useful time (the 09:15 entries) is skipped and alerted, not waited on.
-  - Retire the 08:00, 08:02, 08:10, 08:11 and 08:45 jobs and the `quantiply` group.
-- **Deliverables:** the chain and its tests, a dry-run mode that prints the order and waits without
-  logging in, the Guide and Settings text changed.
-- **Done when:** a dry run over a week of recorded timings matches the old order; then two live
-  mornings with the old jobs switched off by `jobs settings` one at a time, no refused PIN, no
-  double activation, the 08:10 Telegram message and the 09:00 summary unchanged.
+- **Owner answers, 2026-11-19 (asked before any code):**
+  - **The Telegram message:** ONE message, at the end of the chain (about 08:20), with the logins and each Quantiply
+    account's switch-on report, as today's 08:10 message; Quantiply is switched on at about 08:06 but is reported then.
+  - **GitHub's backup:** handed over after each part (Quantiply's failure right away), and `LOCAL_LOGIN_DONE` set when the
+    last asked part ends. (I also set it at once after a part that failed, so a refused PIN is never sent again by the
+    backstop between the two parts; recorded here because it is a small step beyond the literal answer.)
+  - **Quantiply · Shoonya's verification login** stays after AlgoTest's login, in the AlgoTest part (same process as
+    AlgoTest's Finvasia login, so the in-process TOTP rule applies).
+  - **Latest useful times** keep the old catch-up windows: Angel One check 09:10, Quantiply switch-on 09:05 (the 09:19
+    `morning-topup` chain is the net), AlgoTest catch-up and activation 12:40. *(Corrected in the PR #462 review: the first
+    build also cut the two LOGINS down to 09:05 and 12:40; the old `broker-login` job caught up for 7 h, so the Quantiply
+    · Angel One + Kite login and the AlgoTest login are `notAfter: 15:00` again.)*
+- **Built (2026-11-19, on top of the Phase 3 branch, not merged or restarted):** one chain `morning-open` (08:00, trading
+  days, catch-up 7 h, a restart before 12:40 resumes it) replaces `angel-login-check`, `broker-login`,
+  `quantiply-deploy` and `algotest-activate`: 33 → 30 jobs. Steps: `angel-check` → `quantiply-login` →
+  `quantiply-deploy` (Angel One's account) → `quantiply-deploy-shoonya` → `algotest-login` (`notBefore` 08:16) →
+  `algotest-catch-up` → `algotest-activate` → `morning-message`. `options-rotation-pick` (08:45) and `morning-summary` (09:00) stay fixed-time jobs.
+  - **Failure policy:** a failed check stops nothing; a failed Quantiply · Angel One login skips only that account's
+    switch-on (Shoonya's own switch-on has no `requires`: it logs in by itself, as the old 08:10 job did for both
+    accounts); a failed AlgoTest login skips nothing. **Corrected in the PR #462 review:** the first build had
+    `algotest-activate` `requires` the AlgoTest login, but `--part algotest` exits 1 when only one broker, or only
+    Quantiply · Shoonya, fails, so one failure cost every AlgoTest account its day; the old 08:11 job did not depend on
+    the login and the activation reports each broker not logged in, so the dependency is removed (the order stays). The
+    message says "switch-on not run" when that step did not run.
+  - **No retries** on any login, catch-up or activation step (a refused PIN sent again locks an account, a second
+    activation double-activates real money). The old 5-minute retry of the Angel One check is gone too: it only helped a
+    network blip and would have held Quantiply's switch-on back. A step cut off mid-run is `unknown` and a resume refuses.
+  - **A step past its time** is recorded `late` (checked before the `notBefore` wait, again after it and again after the
+    group wait, so a Mac that sleeps through a wait starts nothing late), never waited for, and (new `alertLate` on a chain step, `chain.ts`,
+    `alerts.ts`) counted as a problem so the one alert names it; its dependents are held.
+  - **GitHub's "already logged in today" check** (`local-login.ts`, `githubLoggedInToday`) no longer counts a run this
+    machine dispatched itself: the Quantiply part's Quantiply-only fallback (`only=none`) would otherwise make the
+    AlgoTest part exit 0 with nobody logged in on AlgoTest or Quantiply · Shoonya (PR #462 review; unit-tested).
+  - **`broker-login` split:** `local-login.ts --part quantiply|algotest` (no flag = the whole login, as before); each part
+    records its own body under `parts` in `<state>/broker-login/<day>.json`, the top level is them combined, so the 09:00
+    summary and the message read it unchanged. `main.ts` is untouched: the parts narrow its environment. The Quantiply part
+    waits for the next TOTP window before its first Angel One code (the check ran on the same seed seconds before; the old
+    jobs were two minutes apart) and after its login (the switch-on logs in next).
+  - **Holds:** the stop hold and the pause keep their old ids as step `holdId`s (`quantiply-deploy`, `algotest-activate`
+    for the catch-up and the activation); the held lists in `stop-hold.ts` are unchanged and a test pins them. The logins and the
+    message are never held.
+  - **The `quantiply` group** is taken at the first Quantiply step (`quantiply-login`) and let go after the last step that needs it (`algotest-activate`), so the message step holds nothing; the old jobs held it for the same span. It is NOT
+    retired: `close-out`, `morning-topup` and `evening` still use it.
+  - **Dry run:** `jobs run morning-open --dry-run [--at HH:MM]` (`chain-plan.ts`): the order, the 08:16 wait and any hold or
+    late skip, with no process, login, row or log; steps are taken as instant.
+  - **Other readers moved:** the trade monitor's platform-job list (`morning-open`), the Overview Logins card (reads the
+    chain's latest run), the Guide's Jobs, Broker logins, Overview and Settings pages, the scheduler and broker-login
+    `CLAUDE.md`, `technical.md` and `overview.md` (name the chain, not its steps), the launchd README.
+- **Tested:** `morning-open.test.ts` (the real chain with its commands replaced: order, the 08:16 wait, each failure
+  policy, one alert, the stop hold, a late start at 09:30 and 13:00, a cut-off login refused on resume, the dry run), the
+  registry and monitor-plan tests, `local-login-plan` (the parts, their combined body), the morning report's "not run".
+  None of it logs in anywhere, and no test depends on resume across a refused or `only` run (PR #459's review finding).
+- **Not done / open:**
+  - Not run live: nothing in this phase has logged in, switched on or activated anything.
+  - `maxRunMinutes` ignores a chain's waits and a step's group wait (the 08:16 wait, one timeout per group); the monitor
+    only uses it for rows nothing closed.
+  - The Overview card shows the whole chain's result as "Morning login": a failed Angel One check makes it read failed.
+  - Open from the PR #462 review: a hand run of `local-login.ts` with no `--part` writes an `all` entry beside any failed
+    `quantiply` / `algotest` entries, and `combineParts` still reads the failed ones (the status file, hence the message and
+    the 09:00 summary, keeps saying failed until the next day); and whether switching on Quantiply · Shoonya's algos
+    before its own morning login (about 08:06 vs about 08:20) matters to Quantiply is not verified.
+  - If PR #459's fixes to resume (`previousForSlot` / `lastSince`) land differently, rebase and re-run `morning-open.test.ts`.
+- **Done when:** a dry run over a week of recorded timings matches the old order; then two live mornings with the old
+  jobs switched off by `jobs settings` one at a time, no refused PIN, no double activation, one morning message and the
+  09:00 summary unchanged.
 
 ## Risks
 
@@ -258,3 +308,9 @@ Found when reading the code on 2026-11-18, to settle in the phase that meets eac
   and `only` runs for Apply now. Nothing committed; scheduler not restarted.
 - 2026-11-19 — Fixed the four main findings of the PR #459 review (resume across refused and Apply now runs,
   group release after the last use, AlgoTest in the `quantiply` group, Apply now 409 for held steps).
+- 2026-11-19 — Phase 4 built: the `morning-open` chain replaces the four morning jobs (33 → 30). Owner answered the
+  four design questions first (one message at the end, GitHub hand-off after each part, Shoonya's check after AlgoTest,
+  the old catch-up windows). Nothing run live; scheduler not restarted.
+- 2026-11-20 — Fixed the PR #462 review's findings: the AlgoTest part no longer counts its own Quantiply-only GitHub
+  run, `algotest-activate` no longer `requires` the AlgoTest login, Shoonya's switch-on is its own step, the logins have
+  the old 7 h window back, the chain checks `notAfter` again after each wait, stale job names and times in the docs.

@@ -94,7 +94,9 @@ export async function alertResult(
  */
 async function alertChain(sink: AlertSink, job: Job, result: RunResult): Promise<void> {
   const steps = result.steps ?? [];
-  const problems = steps.filter((s) => s.status === 'failed' || s.status === 'skipped');
+  const problems = steps.filter(
+    (s) => s.status === 'failed' || s.status === 'skipped' || (s.status === 'late' && s.alertLate),
+  );
   const loud = problems.filter(
     (s) =>
       !(

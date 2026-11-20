@@ -2,7 +2,7 @@ name: Daily broker login
 
 on:
   # PRIMARY TRIGGER IS NOT HERE. Since 2026-10-28 (BL-172) the login runs on the owner's Mac
-  # (apps/scheduler's broker-login job, packages/broker-login/src/local-login.ts), which dispatches
+  # (apps/scheduler's morning-open chain, packages/broker-login/src/local-login.ts), which dispatches
   # this workflow only for the parts that failed there for a reason another machine could fix, and
   # sets LOCAL_LOGIN_DONE so the crons below skip. From 2026-10-05 to then the laptop dispatched it
   # at 08:00 IST trading days (packages/broker-login/src/dispatch.ts),
@@ -74,7 +74,7 @@ jobs:
   # workflow was created today, whatever its result. Quantiply's failure fails the run,
   # so without this every backstop would send Angel One another login - with a wrong
   # PIN, refused attempts that GitHub repeats until Angel locks the account (the
-  # laptop's angel-login-check hold can't see these).
+  # laptop's Angel One refusal hold can't see these).
   backstop-check:
     runs-on: ubuntu-latest
     outputs:

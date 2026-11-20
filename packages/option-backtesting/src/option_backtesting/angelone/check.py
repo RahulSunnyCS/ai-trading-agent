@@ -5,7 +5,8 @@ session dropped) and the collector's own login.
 Callers, by `source`:
 - "manual": the dashboard's Test connection (`POST /legwise/angel/test`, which starts the check
   in a background thread once `begin` has the lock, and `obt angel test`);
-- "scheduled": the 08:00 job `angel-login-check` (`obt angel test --scheduled`);
+- "scheduled": the `angel-check` step of the scheduler's 08:00 `morning-open` chain
+  (`obt angel test --scheduled`);
 - "collector": `obt angel fetch` and the `obt daily` fallback (`evening.collect_detailed`), through
   `session()`, which holds the lock for the whole collection so no test logs in under it;
 - "margin": `obt angel funds` (BL-143, the 09:05 margin check), through `session(source="margin")`:

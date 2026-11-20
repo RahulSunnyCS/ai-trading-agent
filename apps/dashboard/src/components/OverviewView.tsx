@@ -545,7 +545,7 @@ function LoginsCard({ now }: { now: number }) {
 
   const loading =
     fyers.loading && angel.loading && kite.loading && jobs.loading && !angel.data && !kite.data;
-  const job = jobs.data?.find((j) => j.id === 'broker-login') ?? null;
+  const job = jobs.data?.find((j) => j.id === 'morning-open') ?? null;
 
   return (
     <OverviewCard

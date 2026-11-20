@@ -150,6 +150,44 @@ describe('a chain', () => {
     expect(waits).toEqual([]);
   });
 
+  it('checks notAfter again after the notBefore wait: a Mac that slept through the wait starts nothing late', async () => {
+    let clock = istAt('2026-11-18', '08:00');
+    ctx.now = () => clock;
+    // the wait takes the clock past the step's latest time (the laptop slept, then woke at 13:00)
+    ctx.sleep = async (ms) => {
+      waits.push(ms);
+      clock = istAt('2026-11-18', '13:00');
+    };
+    const result = await runJob(
+      chainJob('c', [step('login', { notBefore: '08:16', notAfter: '12:40', alertLate: true })]),
+      ctx,
+      'manual',
+    );
+    expect(waits).toEqual([16 * 60_000]);
+    expect(marks()).toEqual([]); // never started
+    expect(result.steps?.[0]).toMatchObject({ id: 'login', status: 'late' });
+    expect(result.ok).toBe(false); // alertLate: named in the alert
+  });
+
+  it('checks notAfter again after waiting for the group', async () => {
+    let clock = istAt('2026-11-18', '12:30');
+    ctx.now = () => clock;
+    // another job holds `quantiply`; it lets go after the clock has passed the step's latest time
+    const other = chainJob('close-out', [step('x')], { group: 'quantiply' });
+    const holderRow = ctx.history.start('close-out', 'schedule', null, join(dir, 'o.log'), clock);
+    const job = chainJob('c', [step('act', { notAfter: '12:40', group: 'quantiply' })], {
+      timeoutMinutes: 60,
+    });
+    ctx.jobs = [other, job];
+    const run = runJob(job, ctx, 'manual');
+    await new Promise((r) => setTimeout(r, 60));
+    clock = istAt('2026-11-18', '13:00');
+    ctx.history.finish(holderRow, 0, 1, clock);
+    const result = await run;
+    expect(marks()).toEqual([]); // never started: its time passed while it waited
+    expect(result.steps?.[0]).toMatchObject({ id: 'act', status: 'late' });
+  });
+
   it('writes a step to its own log file when it names one', async () => {
     const result = await runJob(
       chainJob('c', [sh('s', 'echo only-here', { logFile: 'logs/own.log' }), step('t')]),

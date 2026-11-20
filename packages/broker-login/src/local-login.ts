@@ -12,21 +12,30 @@ import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
 import {
   BACKUP_SECRETS,
+  type GithubRun,
   type LoginEnv,
+  type LoginPart,
   type LoginResult,
+  type PartBody,
   allLoggedIn,
   changedSecrets,
+  combineParts,
   fallback,
+  githubLoggedInToday,
   kiteDue,
   kiteResult,
   loginEnv,
+  parsePart,
+  partEnv,
   secretsReminder,
 } from './local-login-plan.js';
 import { registerSecret } from './secrets.js';
 import { istToday } from './strategy-plan.js';
+import { waitForNextWindow } from './totp.js';
 
 /**
- * BL-172 Phases 1-2: the 08:00 broker login runs on the Mac (the scheduler's `broker-login` job),
+ * BL-172 Phases 1-2: the morning broker login runs on the Mac (the scheduler's `morning-open` chain, which was the
+ * 08:02 `broker-login` job before BL-234 Phase 4),
  * GitHub's "Daily broker login" only as the backup.
  *
  * 1. Reads Settings › Automation (the scheduler's snapshot) for what to log in: the same rule as
@@ -41,10 +50,17 @@ import { istToday } from './strategy-plan.js';
  *    the workflow's cron backstops skip: the Mac ran, and anything left is the backup run's.
  * 5. Writes `<scheduler state>/broker-login/<IST day>.json`, which the 09:00 summary reads.
  * 6. With `KITE_AUTO_LOGIN=on` (owner, 2026-10-28; every trading day from 2026-11-06), logs in to Kite at the
- *    same time (`mbt kite auto-login`), its line in the same file and the 08:10 message. A failure
+ *    same time (`mbt kite auto-login`), its line in the same file and the chain's morning message. A failure
  *    is alerted at once; Kite is never handed to GitHub (no Kite secrets there).
  *
- *   tsx src/local-login.ts [--dry-run]
+ * BL-234 Phase 4: the scheduler's `morning-open` chain runs it in two parts, so Quantiply is switched on
+ * before AlgoTest's 08:16 window opens (`--part quantiply`: Quantiply · Angel One, and Kite;
+ * `--part algotest`: the AlgoTest broker logins, then Quantiply · Shoonya). Each part records its own
+ * body in the status file (the top level is the parts combined), hands only its own failures to
+ * GitHub, and the last asked part sets `LOCAL_LOGIN_DONE`. No `--part` is the whole login in one
+ * run, as before.
+ *
+ *   tsx src/local-login.ts [--part quantiply|algotest|all] [--dry-run]
  */
 
 const execFileP = promisify(execFile);
@@ -68,7 +84,7 @@ async function runMain(env: LoginEnv, resultFile: string): Promise<number> {
         ...process.env,
         ...env,
         LOGIN_RESULT_FILE: resultFile,
-        // BL-173: a clean login is said in the 08:10 switch-on message, not on its own
+        // BL-173: a clean login is said in the chain's morning message, not on its own
         LOGIN_QUIET_SUCCESS: '1',
         // never the Actions outputs: Quantiply's result then counts in the exit code
         GITHUB_OUTPUT: '',
@@ -209,32 +225,52 @@ async function remindChangedSecrets(telegram: ReturnType<typeof readTelegramConf
 
 async function main(): Promise<number> {
   const dryRun = process.argv.includes('--dry-run');
+  const at = process.argv.indexOf('--part');
+  const part = parsePart(at >= 0 ? process.argv[at + 1] : undefined);
   const day = istToday();
-  const kite = startKite(day, dryRun);
-  const code = await loginBrokers(dryRun, day, kite);
+  // Kite is the first part's (it ran beside Quantiply's login before the split)
+  const kite = part === 'algotest' ? Promise.resolve(null) : startKite(day, dryRun);
+  const code = await loginBrokers(dryRun, day, kite, part);
   await kite; // never exit under a running Kite login
   return code;
+}
+
+async function readStatus(file: string): Promise<Record<string, unknown> | null> {
+  try {
+    return JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 async function loginBrokers(
   dryRun: boolean,
   day: string,
   kitePending: Promise<BrokerResult | null>,
+  part: LoginPart,
 ): Promise<number> {
   const telegram = readTelegramConfig();
-  if (!dryRun) {
+  if (!dryRun && part !== 'algotest') {
     await remindChangedSecrets(telegram).catch((error) =>
       console.warn(`credential digests not checked: ${describe(error)}`),
     );
   }
   const statusFile = join(dirname(settingsPath()), 'broker-login', `${day}.json`);
-  const status = async (body: Record<string, unknown>) => {
+  // The file holds each part's own body under `parts` and the parts combined at the top level (what
+  // the 09:00 summary and the morning message read); a part run again replaces only its own.
+  const status = async (body: PartBody) => {
     if (dryRun) return;
     const kite = await kitePending;
+    const before = await readStatus(statusFile);
+    const parts = {
+      ...((before?.parts as Record<string, PartBody> | undefined) ?? {}),
+      [part]: body,
+    };
+    const keptKite = kite ?? (before?.kite as BrokerResult | undefined);
     await mkdir(dirname(statusFile), { recursive: true });
     await writeFile(
       statusFile,
-      `${JSON.stringify({ day, at: new Date().toISOString(), ...body, ...(kite ? { kite } : {}) })}\n`,
+      `${JSON.stringify({ day, at: new Date().toISOString(), parts, ...combineParts(parts), ...(keptKite ? { kite: keptKite } : {}) })}\n`,
     );
   };
 
@@ -249,10 +285,22 @@ async function loginBrokers(
     const text = `⚠️ Automation settings unreadable (${describe(error)}): the broker login goes to GitHub. Re-save Settings › Automation.`;
     console.warn(text);
     if (dryRun) return 0;
+    // the first part already handed the whole login to GitHub
+    if (part === 'algotest') {
+      const earlier = (await readStatus(statusFile))?.fallback as { parts?: string[] } | undefined;
+      if (earlier?.parts?.includes('all')) {
+        console.log(
+          'the whole login was handed to GitHub by the Quantiply part: nothing to do here',
+        );
+        await status({ ok: false, note: 'handed to GitHub with the Quantiply part' });
+        return 1;
+      }
+    }
     try {
+      const at = new Date().toISOString();
       const url = await dispatch({});
       await sendText(telegram, `${text}\n🔗 ${url}`, 'broker.algotest').catch(() => undefined);
-      await status({ ok: false, fallback: { parts: ['all'], url } });
+      await status({ ok: false, fallback: { parts: ['all'], url, at } });
       return 1;
     } catch (dispatchError) {
       await sendText(
@@ -263,7 +311,7 @@ async function loginBrokers(
       return 1;
     }
   }
-  // A catch-up after the Mac slept through 08:02: GitHub's 08:15 / 08:45 backstop may already
+  // A catch-up after the Mac slept through the morning: GitHub's 08:15 / 08:45 backstop may already
   // have logged in (LOCAL_LOGIN_DONE was not set). Logging in again would resend every password.
   if (!dryRun && env !== null) {
     try {
@@ -278,8 +326,9 @@ async function loginBrokers(
           '--json',
           'conclusion,createdAt,url',
         ]),
-      ) as { conclusion: string; createdAt: string; url: string }[];
-      const done = runs.find((r) => r.conclusion === 'success');
+      ) as GithubRun[];
+      // not a run this machine dispatched itself (the Quantiply part's Quantiply-only fallback)
+      const done = githubLoggedInToday(runs, await readStatus(statusFile));
       if (done) {
         console.log(`GitHub already logged in today (${done.url}): nothing to do on the Mac`);
         await status({ ok: true, github: done.url });
@@ -289,21 +338,36 @@ async function loginBrokers(
       console.warn(`could not ask GitHub for today's runs (${describe(error)}): logging in here`);
     }
   }
-  if (env === null) {
-    console.log(`no broker login in the settings (${source}): nothing to do`);
+  // The last part the settings ask for sets LOCAL_LOGIN_DONE when it ends well. A part that failed
+  // sets it at once: the Mac tried, and the backstop must not send a refused PIN again.
+  const lastAsked = part !== 'quantiply' || (env !== null && partEnv(env, 'algotest') === null);
+  const asked = env === null ? null : partEnv(env, part);
+  if (asked === null) {
+    console.log(
+      env === null
+        ? `no broker login in the settings (${source}): nothing to do`
+        : `the settings ask nothing of the ${part} part (${source}): nothing to do`,
+    );
     if (!dryRun) {
-      await markDone();
+      if (lastAsked) await markDone();
       await status({ ok: true, nothing: true });
     }
     return 0;
   }
   console.log(
-    `[${istTimestamp()} IST] broker login on the Mac (${source}): ONLY=${env.ONLY || 'both'} QUANTIPLY_LOGIN=${env.QUANTIPLY_LOGIN} QUANTIPLY_BROKERS=${env.QUANTIPLY_BROKERS || '(none)'}`,
+    `[${istTimestamp()} IST] broker login on the Mac, ${part} part (${source}): ONLY=${asked.ONLY || 'both'} QUANTIPLY_LOGIN=${asked.QUANTIPLY_LOGIN} QUANTIPLY_BROKERS=${asked.QUANTIPLY_BROKERS || '(none)'}`,
   );
   if (dryRun) return 0;
 
+  // The Angel One check ran seconds ago on the same seed (the chain's first step): Angel may refuse
+  // a code already used in its 30-second window, so Quantiply's first code comes from the next one.
+  if (part === 'quantiply') await waitForNextWindow();
+
   const resultFile = join(tmpdir(), `broker-login-${process.pid}.json`);
-  const code = await runMain(env, resultFile);
+  const code = await runMain(asked, resultFile);
+  // The Quantiply switch-on logs in again a moment after this step (its own session, the account's
+  // TOTP stamp): its first code must come from a later window than the one typed here.
+  if (part === 'quantiply' && asked.QUANTIPLY_LOGIN === 'on') await waitForNextWindow();
   let result: LoginResult | null = null;
   if (existsSync(resultFile)) {
     try {
@@ -315,7 +379,7 @@ async function loginBrokers(
   }
 
   if (result && allLoggedIn(result)) {
-    const note = await markDone();
+    const note = lastAsked ? await markDone() : '';
     if (note) {
       console.warn(note);
       await sendText(telegram, `⚠️ ${note}`, 'broker.algotest').catch(() => undefined);
@@ -324,7 +388,7 @@ async function loginBrokers(
     return 0;
   }
 
-  const fb = fallback(env, result);
+  const fb = fallback(asked, result);
   // the Mac ran: from here on the cron backstops never repeat it (a refusal must not be resent)
   const note = await markDone();
   if (!fb) {
@@ -333,6 +397,7 @@ async function loginBrokers(
     return code === 0 ? 1 : code;
   }
   try {
+    const at = new Date().toISOString();
     const url = await dispatch({
       only: fb.only || 'both',
       quantiply: fb.quantiply,
@@ -343,7 +408,7 @@ async function loginBrokers(
       `🔁 Mac broker login failed for ${fb.parts.join(', ')}: trying again on GitHub\n🔗 ${url}${note ? `\n⚠️ ${note}` : ''}`,
       'broker.algotest',
     ).catch(() => undefined);
-    await status({ ok: false, result, fallback: { parts: fb.parts, url } });
+    await status({ ok: false, result, fallback: { parts: fb.parts, url, at } });
   } catch (error) {
     await sendText(
       telegram,

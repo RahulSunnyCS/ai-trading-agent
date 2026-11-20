@@ -6,12 +6,13 @@ import { telegramSink } from './alerts.js';
 import { startApi } from './api.js';
 import { SettingsStore, syncGithub, validate } from './automation.js';
 import { allBuiltins } from './builtins.js';
+import { planChain, renderPlan } from './chain-plan.js';
 import { jobEnv } from './env.js';
 import { History, pidAlive } from './history.js';
 import { JOBS, findJob } from './jobs.js';
 import { skippedToday, startLoop } from './loop.js';
 import { type RunContext, type RunOptions, runJob } from './runner.js';
-import { formatIst, nextDue } from './schedule.js';
+import { formatIst, istAt, istDay, nextDue } from './schedule.js';
 import { startStopListener } from './stop-button.js';
 
 /**
@@ -133,16 +134,58 @@ export function parseRunFlags(args: string[]): RunOptions | string {
   return options;
 }
 
-async function runNow(id: string | undefined, flags: string[]): Promise<number> {
+/** `--dry-run` and `--at HH:MM` (BL-234 Phase 4); the rest of the flags are `parseRunFlags`'. */
+export function splitDryRun(flags: string[]): {
+  dryRun: boolean;
+  at: string | null;
+  rest: string[];
+} {
+  const rest: string[] = [];
+  let dryRun = false;
+  let at: string | null = null;
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i] as string;
+    if (flag === '--dry-run') dryRun = true;
+    else if (flag === '--at') at = flags[++i] ?? '';
+    else rest.push(flag);
+  }
+  return { dryRun, at, rest };
+}
+
+async function runNow(id: string | undefined, allFlags: string[]): Promise<number> {
   const job = id ? findJob(id) : undefined;
   if (!job) {
     console.error(`unknown job '${id ?? ''}'. Jobs: ${JOBS.map((j) => j.id).join(', ')}`);
     return 2;
   }
+  const { dryRun, at, rest: flags } = splitDryRun(allFlags);
+  if (dryRun) {
+    // BL-234 Phase 4: the order and the waits of a chain, with nothing started and nothing written
+    if (!job.chain) {
+      console.error(`${job.id} is not a chain: --dry-run is for chains`);
+      return 2;
+    }
+    if (flags.length > 0) {
+      console.error('--dry-run takes only --at HH:MM');
+      return 2;
+    }
+    if (at !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(at)) {
+      console.error('--at needs a time like 08:00 (IST, today)');
+      return 2;
+    }
+    const start = at ? istAt(istDay(new Date()), at) : new Date();
+    for (const line of renderPlan(job, planChain(job, { start, env: jobEnv(REPO_ROOT) })))
+      console.log(line);
+    return 0;
+  }
+  if (at !== null) {
+    console.error('--at goes with --dry-run');
+    return 2;
+  }
   const options = parseRunFlags(flags);
   if (typeof options === 'string') {
     console.error(
-      `${options}\nusage: bun run jobs run <job> [--resume | --from <step> | --fresh | --only <step,step>]`,
+      `${options}\nusage: bun run jobs run <job> [--resume | --from <step> | --fresh | --only <step,step> | --dry-run [--at HH:MM]]`,
     );
     return 2;
   }

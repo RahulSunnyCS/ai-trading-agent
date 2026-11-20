@@ -164,7 +164,7 @@ export function mergeLogins<K extends string>(
  * The two windows the scheduler's platform jobs log in in. Inside one, a job may be "due" or about
  * to run; after its end (the cap) only a run that is actually in progress still blocks.
  * Morning: the `morning-topup` chain (BL-234: the Quantiply top-up and enable, from 09:19, each step
- * with its own retries) ends by about 09:51; the 08:11 AlgoTest activation (BL-197 Phase 2) is long
+ * with its own retries) ends by about 09:51; the `morning-open` chain's AlgoTest activation (BL-197 Phase 2) is long
  * over, unless a catch-up after sleep runs it. Evening: the `close-out` chain from 15:30 (the deploy
  * check, the live-results capture of BL-141, the Quantiply switch-off, its retry, ending about
  * 16:30) and the `evening` chain from 15:45 (BL-234: the data, the 16:00 message, then the AlgoTest
@@ -194,11 +194,10 @@ export interface PlatformJob {
  */
 export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJob[]> = {
   algotest: [
-    // BL-172: the morning login runs on the Mac and logs in to both platforms
-    { id: 'broker-login', window: 'morning' },
-    // BL-197 Phase 2: the 08:11 activation of the evening list (the 09:16 deploy and the 09:18
-    // top-up were retired with it)
-    { id: 'algotest-activate', window: 'morning' },
+    // BL-234 Phase 4: the 08:00 morning chain: the Mac's logins to both platforms (BL-172), Quantiply's
+    // switch-on, and the activation of the evening list on AlgoTest (BL-197 Phase 2; the 09:16 deploy and
+    // the 09:18 top-up were retired with it). It ends about 08:25, long before the monitor's 09:10.
+    { id: 'morning-open', window: 'morning' },
     // BL-234: the 15:30 close-out chain: the deploy check, and the live capture and its retry (they
     // log in to both platforms)
     { id: 'close-out', window: 'evening' },
@@ -206,13 +205,12 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
     { id: 'evening', window: 'evening' },
   ],
   quantiply: [
-    { id: 'broker-login', window: 'morning' },
+    { id: 'morning-open', window: 'morning' },
     // BL-234: the 09:19 top-up and enable chain
     { id: 'morning-topup', window: 'morning' },
     // the 15:30 close-out chain: the capture and its retry, and the switch-off
     { id: 'close-out', window: 'evening' },
     { id: 'evening', window: 'evening' },
-    { id: 'quantiply-deploy', window: 'morning' },
   ],
 };
 

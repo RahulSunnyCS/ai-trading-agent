@@ -18,6 +18,8 @@ import { join } from 'node:path';
  *   (the stop still squares off; coordinator's decision 2026-10-20). Memory covers this process
  *   only (the loop, Apply now) and ends with it; `jobs run` in another process sees the files.
  */
+// A hold id: a job's id, or (BL-234) the id a chain step is held under (`ChainStep.holdId`): `quantiply-deploy` and
+// `algotest-activate` are steps of `morning-open`, `quantiply-topup` and `quantiply-deploy-topup` of `morning-topup`.
 export const STOP_HELD_JOBS: readonly string[] = [
   'algotest-evening',
   'algotest-activate',

@@ -112,6 +112,115 @@ export function allLoggedIn(r: LoginResult): boolean {
   return r.fatal === null && lines.every((x) => x.status !== 'FAIL');
 }
 
+/**
+ * BL-234 Phase 4: the morning login is two steps of the scheduler's `morning-open` chain, so
+ * Quantiply can be switched on before AlgoTest's 08:16 window. `quantiply` is Quantiply · Angel
+ * One (and Kite); `algotest` is the AlgoTest broker logins and, after them, Quantiply · Shoonya
+ * (one process with AlgoTest's Finvasia login, which shares its TOTP seed); `all` is the whole
+ * login in one run (a hand run, as before).
+ */
+export type LoginPart = 'quantiply' | 'algotest' | 'all';
+
+export function parsePart(value: string | undefined): LoginPart {
+  if (value === undefined) return 'all';
+  if (value === 'quantiply' || value === 'algotest' || value === 'all') return value;
+  throw new Error(`--part ${value}: expected quantiply, algotest or all`);
+}
+
+/** What `main.ts` gets for one part, or null when the settings ask nothing of that part. */
+export function partEnv(env: LoginEnv, part: LoginPart): LoginEnv | null {
+  if (part === 'all') return env;
+  if (part === 'quantiply') {
+    if (env.QUANTIPLY_LOGIN !== 'on') return null;
+    return { ONLY: 'none', QUANTIPLY_LOGIN: 'on', QUANTIPLY_BROKERS: 'angelone' };
+  }
+  const shoonya = env.QUANTIPLY_BROKERS.split(',')
+    .map((b) => b.trim())
+    .includes('finvasia');
+  if (env.ONLY === 'none' && !shoonya) return null;
+  return { ONLY: env.ONLY, QUANTIPLY_LOGIN: 'off', QUANTIPLY_BROKERS: shoonya ? 'finvasia' : '' };
+}
+
+/** One part's outcome, as `local-login.ts` records it. */
+export interface PartBody {
+  ok: boolean;
+  nothing?: boolean;
+  github?: string;
+  /** `at`: when we dispatched (ISO), so the run can be told apart when its URL was not found */
+  fallback?: { parts: string[]; url: string | null; at?: string } | null;
+  result?: LoginResult | null;
+  note?: string | undefined;
+}
+
+/**
+ * The status file's top level (what the 09:00 summary and the morning message read) from each
+ * part's own body. A part run again by hand replaces its own body, so an old failure never
+ * outlives the run that fixed it.
+ */
+export function combineParts(parts: Record<string, PartBody>): PartBody {
+  const bodies = Object.values(parts);
+  const results = bodies.map((b) => b.result).filter((r): r is LoginResult => !!r);
+  const fallbacks = bodies
+    .map((b) => b.fallback)
+    .filter((f): f is NonNullable<PartBody['fallback']> => !!f);
+  const github = bodies.find((b) => b.github)?.github;
+  const note = bodies.find((b) => b.note)?.note;
+  return {
+    ok: bodies.every((b) => b.ok),
+    ...(bodies.length > 0 && bodies.every((b) => b.nothing) ? { nothing: true } : {}),
+    ...(github ? { github } : {}),
+    ...(fallbacks.length
+      ? {
+          fallback: {
+            parts: fallbacks.flatMap((f) => f.parts),
+            url: fallbacks.find((f) => f.url)?.url ?? null,
+          },
+        }
+      : {}),
+    result: results.length
+      ? {
+          algotest: results.find((r) => r.algotest)?.algotest ?? null,
+          quantiply: results.find((r) => r.quantiply)?.quantiply ?? null,
+          quantiplyShoonya: results.find((r) => r.quantiplyShoonya)?.quantiplyShoonya ?? null,
+          fatal: results.find((r) => r.fatal)?.fatal ?? null,
+        }
+      : null,
+    ...(note ? { note } : {}),
+  };
+}
+
+/** One run of GitHub's "Daily broker login" as `gh run list --json` gives it. */
+export interface GithubRun {
+  conclusion: string;
+  createdAt: string;
+  url: string;
+}
+
+/**
+ * The GitHub run that already logged in today, if any: a successful run that is not one of OUR
+ * dispatches. The Quantiply part can dispatch a Quantiply-only run (`only=none`) before the AlgoTest
+ * part starts; counting it would make the AlgoTest part exit 0 with nobody logged in on AlgoTest
+ * or Quantiply · Shoonya. Ours are the URLs the status file recorded under `parts.*.fallback`; when
+ * a dispatch's URL was not found, every run created from its start counts as ours.
+ */
+export function githubLoggedInToday(
+  runs: GithubRun[],
+  status: { parts?: Record<string, PartBody> } | null,
+): GithubRun | undefined {
+  const ours = Object.values(status?.parts ?? {})
+    .map((b) => b.fallback)
+    .filter((f): f is NonNullable<PartBody['fallback']> => !!f);
+  const isOurs = (r: GithubRun) =>
+    ours.some(
+      (f) =>
+        f.url === r.url ||
+        (!(f.url ?? '').startsWith('http') &&
+          f.at !== undefined &&
+          Date.parse(r.createdAt) >= Date.parse(f.at) - 5_000),
+    );
+  return runs.find((r) => r.conclusion === 'success' && !isOurs(r));
+}
+
 /** The `.env` broker credentials GitHub's backup keeps its own copies of (repository secrets). */
 export const BACKUP_SECRETS = [
   'ALGOTEST_PHONE',
