@@ -1,6 +1,7 @@
 /** BL-227: Momentum › Options overlay — labels, defaults and the run bar's chips. */
 
 import type {
+  OverlayCallFilter,
   OverlayCustom,
   OverlayDirection,
   OverlayJob,
@@ -35,6 +36,7 @@ export const SIZING_LABEL: Record<OverlaySizing, string> = {
   one_lot: 'One lot per stock',
   premium: 'Premium per stock',
   capital_share: 'Share of capital a week',
+  exposure: 'Exposure (delta × stock value)',
 };
 
 export const MARKET_FILTER_LABEL: Record<OverlayMarketFilter, string> = {
@@ -43,10 +45,21 @@ export const MARKET_FILTER_LABEL: Record<OverlayMarketFilter, string> = {
   breadth: 'Under 40 % of F&O stocks above their 40-week average',
 };
 
-export const MONEYNESS: readonly OverlayMoneyness[] = ['ATM', 'OTM1', 'OTM2', 'OTM3'];
+export const MONEYNESS: readonly OverlayMoneyness[] = [
+  'ITM2',
+  'ITM1',
+  'ATM',
+  'OTM1',
+  'OTM2',
+  'OTM3',
+  'DELTA',
+];
 
 /** BL-226's slippage by moneyness, a share of premium each way. */
 export const DEFAULT_SLIPPAGE: Record<OverlayMoneyness, number> = {
+  ITM2: 0.01,
+  ITM1: 0.01,
+  DELTA: 0.01,
   ATM: 0.01,
   OTM1: 0.02,
   OTM2: 0.03,
@@ -97,6 +110,15 @@ export const DEFAULT_REQUEST: OverlayRequest = {
   profit_step: null,
   withdraw_share: 0.75,
   refill: true,
+  hold: false,
+  delta_target: 0.6,
+  expiry_skip: 0,
+  stop: null,
+  target: null,
+  call_filter: 'none',
+  max_positions: null,
+  max_weekly_premium: null,
+  split: null,
 };
 
 /** Why the request cannot run yet, or null. */
@@ -110,6 +132,8 @@ export function requestProblem(request: OverlayRequest): string | null {
   }
   if (request.sizing === 'capital_share' && !(request.sizing_value && request.sizing_value <= 1))
     return 'Set the share of capital spent on premium a week.';
+  if (request.sizing === 'exposure' && !(request.sizing_value && request.sizing_value <= 5))
+    return 'Set the exposure as a share of capital (e.g. 100 %).';
   return null;
 }
 
@@ -119,7 +143,23 @@ export function requestChips(request: OverlayRequest, strategyName: string | nul
   if (needsStrategy(request.direction)) chips.push(strategyName ?? 'No strategy');
   chips.push(DIRECTION_LABEL[request.direction]);
   if (usesPutList(request.direction)) chips.push(`N ${request.n}`);
-  chips.push(request.moneyness);
+  chips.push(
+    request.moneyness === 'DELTA'
+      ? `Delta ${formatNumber(request.delta_target, 2)}`
+      : request.moneyness,
+  );
+  if (request.expiry_skip) chips.push(`Expiry +${request.expiry_skip}`);
+  if (request.hold) chips.push('Hold while picked');
+  if (request.stop) chips.push(`Stop −${formatPct(request.stop, 0)}`);
+  if (request.target) chips.push(`Target +${formatPct(request.target, 0)}`);
+  if (
+    request.call_filter !== 'none' &&
+    (request.direction === 'calls' || request.direction === 'both')
+  )
+    chips.push(`Calls when ${CALL_FILTER_LABEL[request.call_filter]}`);
+  if (request.max_positions) chips.push(`Max ${request.max_positions} a week`);
+  if (request.max_weekly_premium)
+    chips.push(`Premium ≤ ${formatPct(request.max_weekly_premium, 0)} a week`);
   chips.push(
     request.sizing === 'one_lot'
       ? 'One lot'
@@ -127,7 +167,9 @@ export function requestChips(request: OverlayRequest, strategyName: string | nul
         ? request.sizing_value
           ? `${formatInr(request.sizing_value, { compact: true })} a stock`
           : 'Capital ÷ N a stock'
-        : `${formatPct(request.sizing_value ?? 0, 0)} of capital a week`,
+        : request.sizing === 'exposure'
+          ? `Exposure ${formatPct(request.sizing_value ?? 0, 0)}`
+          : `${formatPct(request.sizing_value ?? 0, 0)} of capital a week`,
   );
   chips.push(formatInr(request.capital, { compact: true }));
   if (request.direction === 'switch') chips.push(MARKET_FILTER_LABEL[request.market_filter]);
@@ -138,6 +180,8 @@ export function requestChips(request: OverlayRequest, strategyName: string | nul
     );
   chips.push(request.tax ? 'After tax' : 'Before tax');
   chips.push(`From ${request.start}`);
+  if (request.end) chips.push(`To ${request.end}`);
+  if (request.split) chips.push(`Split ${request.split}`);
   return chips;
 }
 
@@ -171,6 +215,18 @@ export const COUNT_LABEL: Record<string, string> = {
   restruck: 'Re-struck by a corporate action, followed',
   zero_booked: 'Contract gone on the exit day, booked at zero',
   no_capital: 'Skipped: the trading account could not pay for it',
+  capped: 'Skipped: over the positions or premium cap',
+  held: 'Weeks a contract was kept (no sale and re-buy)',
+  stopped: 'Closed at the stop on a daily close',
+  targeted: 'Closed at the target on a daily close',
+  no_delta: 'Skipped: no strike priced well enough for a delta',
+};
+
+/** "NIFTY is above its 200-day average", for the calls filter. */
+export const CALL_FILTER_LABEL: Record<Exclude<OverlayCallFilter, 'none'>, string> = {
+  nifty_200dma: 'NIFTY above its 200-day average',
+  nifty_26w: "NIFTY's 26-week return above zero",
+  breadth: '40 %+ of F&O stocks above their average',
 };
 
 export function countRows(counts: Record<string, number>): Array<{ label: string; value: number }> {
@@ -189,13 +245,16 @@ export function buyText(trade: OverlayTrade): string {
 /** "Sell at 52.00" (or how a re-struck or vanished contract was closed). */
 export function sellText(trade: OverlayTrade): string {
   if (trade.exit_how === 'zero') return 'Contract gone: booked at 0';
+  if (trade.exit_how === 'stop') return `Stopped at ${formatNumber(trade.p1, 2)}`;
+  if (trade.exit_how === 'target') return `Target hit at ${formatNumber(trade.p1, 2)}`;
   const restruck = trade.exit_how === 'restruck' ? ' (re-struck contract)' : '';
   return `Sell at ${formatNumber(trade.p1, 2)}${restruck}`;
 }
 
 /** The whole trade in one line: "Buy LAURUSLABS 2,000 CE at 34.50 → Sell at 52.00". */
 export function tradeText(trade: OverlayTrade): string {
-  return `${buyText(trade)} → ${sellText(trade)}`;
+  const held = trade.weeks && trade.weeks > 1 ? ` (held ${trade.weeks} weeks)` : '';
+  return `${buyText(trade)} → ${sellText(trade)}${held}`;
 }
 
 /** Lines a hover block shows before "+N more". */
@@ -217,7 +276,8 @@ export function tradesByDay(result: OverlayResult): string[] {
   const sells = new Map<string, OverlayTrade[]>();
   for (const trade of result.trades) {
     buys.set(trade.entry, [...(buys.get(trade.entry) ?? []), trade]);
-    sells.set(trade.exit, [...(sells.get(trade.exit) ?? []), trade]);
+    const soldOn = trade.week_end ?? trade.exit;
+    sells.set(soldOn, [...(sells.get(soldOn) ?? []), trade]);
   }
   const order = (a: OverlayTrade, b: OverlayTrade) =>
     a.right === b.right ? a.symbol.localeCompare(b.symbol) : a.right === 'PE' ? -1 : 1;

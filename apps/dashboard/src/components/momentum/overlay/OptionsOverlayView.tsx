@@ -23,6 +23,7 @@ import {
   formatPp,
 } from '../../../lib/format';
 import {
+  CALL_FILTER_LABEL,
   CUSTOM_LOOKBACKS,
   DEFAULT_CUSTOM,
   DEFAULT_REQUEST,
@@ -46,6 +47,7 @@ import {
   usesPutList,
 } from '../../../lib/optionsOverlay';
 import type {
+  OverlayCallFilter,
   OverlayCustom,
   OverlayDirection,
   OverlayMarketFilter,
@@ -55,6 +57,7 @@ import type {
   OverlaySizing,
   OverlayStrategies,
   OverlayTrade,
+  OverlayWindow,
 } from '../../../types/optionsOverlay';
 import { Button } from '../../ui/Button';
 import { Drawer } from '../../ui/Drawer';
@@ -64,6 +67,7 @@ import { StatCard } from '../../ui/StatCard';
 import { StateMessage } from '../../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 import { type ChartLine, MomentumLineChart } from '../MomentumLineChart';
+import { OverlaySweeps } from './OverlaySweeps';
 
 const STORAGE_KEY = 'ata.optionsOverlay.request';
 const CUSTOM_VALUE = '__custom__';
@@ -205,6 +209,17 @@ export function OptionsOverlayView() {
           description="Pick a strategy and the option settings, then Run."
         />
       )}
+
+      <OverlaySweeps
+        onOpen={(settings) => {
+          const next = { ...DEFAULT_REQUEST, ...settings } as OverlayRequest;
+          setRequest(next);
+          store(next);
+          setDrawerOpen(false);
+          void job.start(next);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
 
       <Drawer
         open={drawerOpen}
@@ -385,16 +400,143 @@ function OverlaySettings({
 
       <Field
         label="Moneyness"
-        help="ATM is the listed strike nearest the stock's close; OTM1-3 are one to three strikes further out (above for a call, below for a put)."
+        help="ATM is the listed strike nearest the stock's close; ITM1-2 are one or two strikes in the money, OTM1-3 out of it (for a call, below / above the price; the other way for a put). Delta picks the strike whose delta, read from its own price, is nearest the target."
       >
         <SegmentedControl
           ariaLabel="Moneyness"
           size="sm"
           value={request.moneyness}
-          options={MONEYNESS.map((m) => ({ value: m, label: m }))}
+          options={MONEYNESS.map((m) => ({ value: m, label: m === 'DELTA' ? 'Delta' : m }))}
           onChange={(m: OverlayMoneyness) => update({ moneyness: m })}
         />
+        {request.moneyness === 'DELTA' ? (
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+            <span>Target delta (%)</span>
+            <NumberField
+              aria-label="Target delta"
+              className="w-24"
+              min={5}
+              max={95}
+              value={Math.round(request.delta_target * 100)}
+              onChange={(v) => update({ delta_target: v / 100 })}
+            />
+          </div>
+        ) : null}
       </Field>
+
+      <Field
+        label="Expiry"
+        help="The nearest expiry with enough sessions left, or one or two after it."
+      >
+        <SegmentedControl
+          ariaLabel="Expiry"
+          size="sm"
+          value={String(request.expiry_skip)}
+          options={[
+            { value: '0', label: 'Nearest' },
+            { value: '1', label: 'Next one' },
+            { value: '2', label: 'Two out' },
+          ]}
+          onChange={(v) => update({ expiry_skip: Number(v) })}
+        />
+      </Field>
+
+      <Field
+        label="Hold while picked"
+        help="Keep a contract while its stock is still picked, instead of selling and buying it again every week (no costs or slippage on the weeks it is kept). It is rolled once it has fewer sessions left than the minimum."
+      >
+        <SegmentedControl
+          ariaLabel="Hold while picked"
+          size="sm"
+          value={request.hold ? 'on' : 'off'}
+          options={[
+            { value: 'off', label: 'Sell weekly' },
+            { value: 'on', label: 'Hold' },
+          ]}
+          onChange={(v) => update({ hold: v === 'on' })}
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field
+          label="Stop (% of premium)"
+          help="Sell on the first daily close this far below the buy price. Empty = off."
+        >
+          <Input
+            aria-label="Stop"
+            inputMode="decimal"
+            placeholder="off"
+            value={request.stop === null ? '' : String(Math.round(request.stop * 100))}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              update({ stop: e.target.value === '' || !(v > 0) ? null : v / 100 });
+            }}
+          />
+        </Field>
+        <Field
+          label="Target (% of premium)"
+          help="Sell on the first daily close this far above it. Empty = off."
+        >
+          <Input
+            aria-label="Target"
+            inputMode="decimal"
+            placeholder="off"
+            value={request.target === null ? '' : String(Math.round(request.target * 100))}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              update({ target: e.target.value === '' || !(v > 0) ? null : v / 100 });
+            }}
+          />
+        </Field>
+      </div>
+
+      {request.direction === 'calls' || request.direction === 'both' ? (
+        <Field label="Buy calls only when">
+          <Select
+            aria-label="Calls filter"
+            value={request.call_filter}
+            onChange={(e) => update({ call_filter: e.target.value as OverlayCallFilter })}
+          >
+            <option value="none">Always</option>
+            {(Object.keys(CALL_FILTER_LABEL) as Array<keyof typeof CALL_FILTER_LABEL>).map((f) => (
+              <option key={f} value={f}>
+                {CALL_FILTER_LABEL[f]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Positions a week (max)">
+          <Input
+            aria-label="Max positions"
+            inputMode="numeric"
+            placeholder="no cap"
+            value={request.max_positions === null ? '' : String(request.max_positions)}
+            onChange={(e) => {
+              const v = Math.round(Number(e.target.value));
+              update({ max_positions: e.target.value === '' || !(v >= 1) ? null : v });
+            }}
+          />
+        </Field>
+        <Field label="Premium a week (max % of capital)">
+          <Input
+            aria-label="Max weekly premium"
+            inputMode="decimal"
+            placeholder="no cap"
+            value={
+              request.max_weekly_premium === null
+                ? ''
+                : String(Math.round(request.max_weekly_premium * 100))
+            }
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              update({ max_weekly_premium: e.target.value === '' || !(v > 0) ? null : v / 100 });
+            }}
+          />
+        </Field>
+      </div>
 
       <Field label="Sizing">
         <SegmentedControl
@@ -406,9 +548,25 @@ function OverlaySettings({
             label: SIZING_LABEL[s],
           }))}
           onChange={(sizing: OverlaySizing) =>
-            update({ sizing, sizing_value: sizing === 'capital_share' ? 0.2 : null })
+            update({
+              sizing,
+              sizing_value: sizing === 'capital_share' ? 0.2 : sizing === 'exposure' ? 1 : null,
+            })
           }
         />
+        {request.sizing === 'exposure' ? (
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+            <span>Exposure a week, % of capital (delta × stock value, split over the picks)</span>
+            <NumberField
+              aria-label="Exposure"
+              className="w-24"
+              min={5}
+              max={500}
+              value={Math.round((request.sizing_value ?? 1) * 100)}
+              onChange={(v) => update({ sizing_value: v / 100 })}
+            />
+          </div>
+        ) : null}
         {request.sizing === 'premium' ? (
           <div className="mt-2 flex items-center gap-2 text-xs text-muted">
             <span>Premium a stock (₹, empty = capital ÷ sleeves ÷ N)</span>
@@ -456,6 +614,24 @@ function OverlaySettings({
             min="2020-01-01"
             value={request.start}
             onChange={(e) => update({ start: e.target.value || '2020-01-01' })}
+          />
+        </Field>
+        <Field label="Until (empty = the newest data)">
+          <Input
+            aria-label="End"
+            type="date"
+            min="2020-01-01"
+            value={request.end ?? ''}
+            onChange={(e) => update({ end: e.target.value || null })}
+          />
+        </Field>
+        <Field label="Train / test split (optional)">
+          <Input
+            aria-label="Split"
+            type="date"
+            min="2020-01-01"
+            value={request.split ?? ''}
+            onChange={(e) => update({ split: e.target.value || null })}
           />
         </Field>
         <Field label="Sessions left at entry (min)">
@@ -835,6 +1011,7 @@ function OverlayResultView({
           </dl>
         </Widget>
 
+        {result.windows ? <WindowsWidget result={result} /> : null}
         {result.booking ? <BookingWidget result={result} /> : null}
 
         <Widget title="Calls and puts" meta="What each side earned, before tax">
@@ -1284,5 +1461,84 @@ function CustomStrategyFields({
         itemised costs and 0.15 % slippage on the shares.
       </p>
     </div>
+  );
+}
+
+function WindowsWidget({ result }: { result: OverlayResult }) {
+  const w = result.windows;
+  if (!w) return null;
+  const rows: Array<[string, OverlayWindow]> = [
+    [`Train · to ${formatDay(w.split)}`, w.train],
+    [`Test · from ${formatDay(w.split)}`, w.test],
+  ];
+  return (
+    <Widget
+      title="Train and test"
+      meta="The same book on each side of the split day, after tax"
+      wide
+    >
+      <Table>
+        <THead>
+          <Th dense>Window</Th>
+          <Th align="right" dense>
+            Weeks
+          </Th>
+          <Th align="right" dense>
+            Total
+          </Th>
+          <Th align="right" dense>
+            CAGR
+          </Th>
+          <Th align="right" dense>
+            Drawdown
+          </Th>
+          <Th align="right" dense>
+            Weekly 90 % range
+          </Th>
+          <Th align="right" dense>
+            Trades
+          </Th>
+          <Th align="right" dense>
+            Won
+          </Th>
+          <Th align="right" dense>
+            Top 5 % share
+          </Th>
+        </THead>
+        <tbody>
+          {rows.map(([name, m]) => (
+            <TRow key={name}>
+              <Td dense>{name}</Td>
+              <Td numeric align="right" dense>
+                {formatInt(m.weeks)}
+              </Td>
+              <Td numeric align="right" dense>
+                <Money value={m.total_rs} />
+              </Td>
+              <Td numeric align="right" dense>
+                {formatPct(m.cagr, 1)}
+              </Td>
+              <Td numeric align="right" dense>
+                {formatPct(m.max_dd, 0)}
+              </Td>
+              <Td numeric align="right" dense>
+                {m.weekly_90
+                  ? `${formatPct(m.weekly_90[0], 2)} to ${formatPct(m.weekly_90[1], 2)}`
+                  : EMPTY}
+              </Td>
+              <Td numeric align="right" dense>
+                {formatInt(m.trades)}
+              </Td>
+              <Td numeric align="right" dense>
+                {formatPct(m.win_rate, 0)}
+              </Td>
+              <Td numeric align="right" dense>
+                {formatPct(m.top5pct_share, 0)}
+              </Td>
+            </TRow>
+          ))}
+        </tbody>
+      </Table>
+    </Widget>
   );
 }

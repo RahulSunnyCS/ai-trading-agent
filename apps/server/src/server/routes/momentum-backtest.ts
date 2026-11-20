@@ -674,6 +674,27 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/options-overlay/strategies');
   });
 
+  fastify.get('/api/momentum/options-overlay/sweeps', async (_request, reply) => {
+    await forward(reply, '/api/options-overlay/sweeps');
+  });
+
+  fastify.get(
+    '/api/momentum/options-overlay/sweeps/:name',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { name: { type: 'string', pattern: '^[A-Za-z0-9._-]{1,80}$' } },
+          required: ['name'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { name } = request.params as { name: string };
+      await forward(reply, `/api/options-overlay/sweeps/${encodeURIComponent(name)}`);
+    },
+  );
+
   fastify.post(
     '/api/momentum/options-overlay/jobs',
     { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },

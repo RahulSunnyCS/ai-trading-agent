@@ -1,8 +1,9 @@
 /** BL-227: Momentum › Options overlay. Mirrors `momentum_backtesting/options_overlay.py`. */
 
 export type OverlayDirection = 'calls' | 'puts' | 'mirror' | 'switch' | 'both';
-export type OverlaySizing = 'one_lot' | 'premium' | 'capital_share';
-export type OverlayMoneyness = 'ATM' | 'OTM1' | 'OTM2' | 'OTM3';
+export type OverlaySizing = 'one_lot' | 'premium' | 'capital_share' | 'exposure';
+export type OverlayMoneyness = 'ITM2' | 'ITM1' | 'ATM' | 'OTM1' | 'OTM2' | 'OTM3' | 'DELTA';
+export type OverlayCallFilter = 'none' | 'nifty_200dma' | 'nifty_26w' | 'breadth';
 export type OverlayMarketFilter = 'nifty_200dma' | 'nifty_26w' | 'breadth';
 
 /** A custom Broad strategy on F&O stocks (the research grid's settings plus these). */
@@ -37,6 +38,35 @@ export interface OverlayRequest {
   withdraw_share: number;
   /** With profit booking: move taken-out money back when the account cannot pay for a pick. */
   refill: boolean;
+  /** Keep a contract while its stock is still picked (rolled near expiry). */
+  hold: boolean;
+  /** Moneyness DELTA: the strike whose delta is nearest this. */
+  delta_target: number;
+  /** 0 = nearest expiry with enough sessions left, 1 = the one after, ... */
+  expiry_skip: number;
+  /** Exit on a daily close this share below / above the entry premium (null = off). */
+  stop: number | null;
+  target: number | null;
+  call_filter: OverlayCallFilter;
+  max_positions: number | null;
+  max_weekly_premium: number | null;
+  /** Train / test split day (null = none). */
+  split: string | null;
+}
+
+export interface OverlayWindow {
+  first?: string;
+  last?: string;
+  weeks: number;
+  total_rs?: number;
+  total?: number;
+  cagr?: number | null;
+  max_dd?: number;
+  weekly_90?: [number, number] | null;
+  trades?: number;
+  win_rate?: number | null;
+  top5pct_share?: number | null;
+  net_without_top5pct_rs?: number;
 }
 
 export interface OverlayStrategy {
@@ -67,7 +97,11 @@ export interface OverlayTrade {
   lots: number;
   p0: number;
   p1: number;
-  exit_how: 'same' | 'restruck' | 'zero';
+  exit_how: 'same' | 'restruck' | 'zero' | 'stop' | 'target';
+  /** Weeks the position was kept (1 = bought and sold within the week). */
+  weeks?: number;
+  /** The rebalance day whose week the sale belongs to (a stop can sell mid-week). */
+  week_end?: string;
   buy: number;
   sell: number;
   costs: number;
@@ -155,6 +189,7 @@ export interface OverlayResult {
   };
   counts: Record<string, number>;
   trades: OverlayTrade[];
+  windows: { split: string; train: OverlayWindow; test: OverlayWindow } | null;
   booking: {
     profit_step: number;
     withdraw_share: number;
@@ -178,4 +213,28 @@ export interface OverlayJob {
   result: OverlayResult | null;
   error: string | null;
   error_status: number | null;
+}
+
+export interface OverlaySweepStatus {
+  name: string;
+  total: number;
+  done: number;
+  todo: number;
+  workers: number;
+  started: string;
+  finished?: string;
+  running: boolean;
+}
+
+export interface OverlaySweepRow {
+  id: string;
+  label: string | null;
+  settings: Partial<OverlayRequest> & Record<string, unknown>;
+  book?: { total_rs: number; total: number; cagr: number | null; max_dd: number };
+  shares?: { total: number; max_dd: number } | null;
+  windows?: { split: string; train: OverlayWindow; test: OverlayWindow } | null;
+  stats?: { trades: number; win_rate: number | null; top5pct_share: number | null };
+  min_capital?: number | null;
+  error?: string;
+  secs?: number;
 }
