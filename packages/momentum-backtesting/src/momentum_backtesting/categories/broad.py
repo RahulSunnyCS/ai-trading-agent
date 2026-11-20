@@ -74,7 +74,14 @@ import pandas as pd
 
 from momentum_backtesting import engine, monday_fills
 from momentum_backtesting import tax as tax_mod
-from momentum_backtesting.categories import compose, daily_moves, residual, snapshots, sources
+from momentum_backtesting.categories import (
+    compose,
+    daily_moves,
+    extension,
+    residual,
+    snapshots,
+    sources,
+)
 from momentum_backtesting.categories import fno as fno_mod
 from momentum_backtesting.categories import liquidity as liquidity_mod
 from momentum_backtesting.categories import prices as cat_prices
@@ -1333,6 +1340,9 @@ def run_broad_backtest(
     # (its category is first in `held_by_week`) at this many times the share of the others.
     # 1.0 (default) changes nothing; category mode only.
     top_sector_weight: float = 1.0,
+    # BL-233 (research): engine.Config.extension_exit / extension_action. None changes nothing.
+    extension_exit: float | None = None,
+    extension_action: Literal["sell", "trim"] = "sell",
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1524,6 +1534,13 @@ def run_broad_backtest(
         stop_granularity=stop_granularity,
         weight_by=weight_by,
         vol_window=vol_window,
+        extension_exit=extension_exit,
+        extension_action=extension_action,
+    )
+    stretched = (
+        extension.extension_table(list(prices.columns), prices.index)
+        if extension_exit is not None
+        else None
     )
     if stop_granularity == "daily" and daily is None:
         daily = daily_moves.daily_moves(
@@ -1566,6 +1583,7 @@ def run_broad_backtest(
         lc_locked=lc_locked,
         daily=daily,
         tax_classes=_tax_classes(list(prices.columns)) if tax is not None else None,
+        extension=stretched,
     )
     return BroadBacktestResult(
         result=result,

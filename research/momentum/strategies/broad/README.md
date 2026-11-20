@@ -36,7 +36,7 @@ The search spaces and the frozen ensemble instead pin `signal_delay = 1`, itemis
 
 Broad-only pages (this folder):
 [simulate every week](min-ranked.md) · [funnel](funnel.md) · [category tags](category-tags.md) ·
-[stop-loss](stop.md) · [stock filters](filters.md) · [chart patterns](patterns.md)
+[stop-loss](stop.md) · [extension exit](extension-exit.md) · [stock filters](filters.md) · [chart patterns](patterns.md)
 
 Shared pages: [universe](../../common/universe.md) · [benchmarks](../../common/benchmarks.md) ·
 [lookbacks](../../common/lookbacks.md) · [skip-month](../../common/skip-month.md) ·
