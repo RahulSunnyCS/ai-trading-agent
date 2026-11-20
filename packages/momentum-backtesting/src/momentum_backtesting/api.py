@@ -4945,6 +4945,54 @@ TENTATIVE_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
 
 
+def _run_options_overlay(body: dict) -> dict:
+    from . import overlay_runs
+
+    try:
+        return overlay_runs.run_request(body)
+    except (ValueError, LookupError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error)) from error
+
+
+# BL-227: the Options overlay page's runs (a favourite re-run on F&O stocks takes minutes cold).
+OVERLAY_JOBS = _PreviewJobs(_run_options_overlay)
+
+
+class OverlayCustomStrategy(BaseModel):
+    """BL-227: a custom Broad strategy on F&O stocks (`overlay_runs.CUSTOM_BASE` plus these)."""
+
+    lookbacks: list[int] = Field([1, 4, 13, 26, 52], min_length=1, max_length=5)
+    top_n: int = Field(10, ge=1, le=30)
+    exit_rank: int = Field(20, ge=1, le=100)
+    rebalance: Literal["weekly", "fortnightly", "monthly"] = "weekly"
+    score: Literal["ranksum", "voladj"] = "ranksum"
+
+
+class OptionsOverlayRequest(BaseModel):
+    """BL-227: one Options overlay run (`options_overlay.Settings` plus the strategy)."""
+
+    favourite_id: str | None = None
+    custom: OverlayCustomStrategy | None = None  # instead of a favourite
+    direction: Literal["calls", "puts", "mirror", "switch", "both"] = "calls"
+    moneyness: Literal["ATM", "OTM1", "OTM2", "OTM3"] = "ATM"
+    sizing: Literal["one_lot", "premium", "capital_share"] = "one_lot"
+    sizing_value: float | None = Field(None, gt=0)
+    capital: float = Field(1_000_000.0, gt=0, le=1e9)
+    n: int = Field(5, ge=1, le=30)
+    min_sessions_left: int = Field(10, ge=1, le=60)
+    min_oi_lots: int = Field(10, ge=0, le=1000)
+    slippage: float | None = Field(None, ge=0, lt=0.5)
+    tax: bool = True
+    market_filter: Literal["nifty_200dma", "nifty_26w", "breadth"] = "nifty_200dma"
+    put_share: float = Field(0.5, ge=0, le=1)
+    start: str = "2020-01-01"
+    end: str | None = None
+    # profit booking: each `profit_step` rupees made, `withdraw_share` of it taken out
+    profit_step: float | None = Field(None, gt=0)
+    withdraw_share: float = Field(0.75, ge=0, le=1)
+    refill: bool = True  # move taken-out money back when the account cannot pay for a pick
+
+
 class _BacktestJobs:
     """Backtest runs executed off the request thread, several at once, so the browser can leave
     the page (or start a second run) while one is still computing. Unlike `_SingleFlightJob` this
@@ -6465,6 +6513,29 @@ def create_app() -> FastAPI:
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:
         return rebalance_preview(req)
+
+    @app.get("/api/options-overlay/strategies")
+    def options_overlay_strategies() -> dict:
+        """BL-227: the Broad favourites the Options overlay can re-run on F&O stocks, and the F&O
+        lake's newest day (None when the lake has no F&O files)."""
+        from . import options_overlay, overlay_runs
+
+        try:
+            newest = options_overlay.LAKE.newest
+        except FileNotFoundError:
+            newest = None
+        return {"strategies": overlay_runs.strategies(), "data_through": newest}
+
+    @app.post("/api/options-overlay/jobs", status_code=202)
+    def start_options_overlay(req: OptionsOverlayRequest) -> dict:
+        return OVERLAY_JOBS.start(req.model_dump())
+
+    @app.get("/api/options-overlay/jobs/{job_id}")
+    def options_overlay_job(job_id: str) -> dict:
+        job = OVERLAY_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown overlay run (the service may have restarted).")
+        return job
 
     @app.post("/api/rebalance-preview/jobs", status_code=202)
     def start_preview_job(req: RebalanceRequest) -> dict:
