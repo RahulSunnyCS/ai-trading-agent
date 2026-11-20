@@ -12,6 +12,7 @@ API marks its job failed). Neither sends the failure message from here.
 from __future__ import annotations
 
 import contextlib
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
@@ -76,11 +77,14 @@ def collect_detailed(
     with contextlib.ExitStack() as stack:
         if source == "angelone":
             from ..angelone import check
-            from ..angelone.client import AngelClient
+            from ..angelone.client import MIN_INTERVAL_S, AngelClient
 
             # The login and the whole collection under the Angel One guard's lock, so a
             # connection test cannot log in on the same account while this session is in use.
-            client = AngelClient(stack.enter_context(check.session()))
+            client = AngelClient(
+                stack.enter_context(check.session()),
+                min_interval_s=_min_interval(MIN_INTERVAL_S, log),
+            )
         elif source == "fyers":
             from ..fyers.auth import resolve_credentials
             from ..fyers.client import FyersClient
@@ -102,7 +106,38 @@ def collect_detailed(
         )
     errors = sum(len(v.get("errors", [])) for v in manifest.values() if isinstance(v, dict))
     log(f"done: {client.calls} requests, {errors} errors -> {root}")
+    if source == "angelone":
+        log(rate_line(client.stats()))
     return errors, manifest
+
+
+def _min_interval(default: float, log: Log) -> float:
+    """ANGELONE_MIN_INTERVAL_S: the gap between candle requests. A blank, non-numeric or
+    non-positive value would crash the run or remove the pacing, so it falls back to the default."""
+    raw = os.environ.get("ANGELONE_MIN_INTERVAL_S", "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        value = 0.0
+    if not value > 0:
+        log(f"ANGELONE_MIN_INTERVAL_S={raw!r} is not a positive number; using {default:g} s")
+        return default
+    return value
+
+
+def rate_line(stats: dict) -> str:
+    """One log line of what a run asked of Angel One, for reading its real limits off the logs."""
+    line = f"Angel One: {stats['requests']} requests, {stats['rate_limited_answers']} refused"
+    if stats["rate_limited_answers"]:
+        first = stats["first_limit"] or {}
+        line += (
+            f", {stats['rate_wait_s']:g} s waited; the first refusal came at request "
+            f"{first.get('call')} ({first.get('last_60s')} in the last minute, "
+            f"{first.get('last_hour')} in the last hour)"
+        )
+    return line
 
 
 def collect(day: date, underlyings: list[str], **kwargs) -> int:
@@ -141,6 +176,7 @@ def collect_with_fallback(
     except FyersCredentialsError as error:
         reason = str(error)[:160]
         log(f"Fyers is not available ({reason}); collecting from Angel One instead")
+        _alert_fallback(day, reason, log)
         try:
             errors, details = collect_detailed(
                 day, underlyings, force=force, source="angelone", **common
@@ -175,6 +211,35 @@ def collect_with_fallback(
         else []
     )
     return Collection(errors, "fyers", None, details, repaired, notes)
+
+
+def _alert_fallback(day: date, reason: str, log: Log) -> None:
+    """Say so at once: a missing Fyers login is the fix the owner can make, and the Angel One
+    fallback is the slow, rate-limited path (2026-11-16: found out at 16:35, from a failed
+    result)."""
+    from ..notify import Notification, send
+
+    # once a day: the evening job retries and the owner reruns by hand, each finding Fyers still out
+    marker = data_dir() / "angelone" / f"fallback-alert-{day.isoformat()}.sent"
+    if marker.exists():
+        return
+    try:
+        delivered, _ = send(
+            Notification(
+                source="obt daily",
+                severity="warn",
+                title=f"Fyers is not logged in: collecting {day:%a %d %b} from Angel One",
+                body=(
+                    f"{reason}\nLog in to Fyers from the dashboard's Broker logins; the next run "
+                    "repairs still-listed contracts from it."
+                ),
+            )
+        )
+        if delivered:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.touch()
+    except Exception as error:  # noqa: BLE001 - an alert that cannot be sent must not stop the day
+        log(f"fallback alert not sent: {error}")
 
 
 def repair_from_fyers(

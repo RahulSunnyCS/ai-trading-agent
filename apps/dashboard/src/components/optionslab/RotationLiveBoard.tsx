@@ -35,6 +35,7 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { RotationLiveMatrix } from './RotationLiveMatrix';
 import { pnlClass } from './shared';
 
 const VIEW_OPTIONS = [
@@ -308,6 +309,7 @@ export function RotationLiveBoard() {
               <IntradayLines lines={lines} />
             </div>
           ) : null}
+          <RotationLiveMatrix snap={snap} view={view} />
           {snap.notes.length > 0 ? (
             <ul className="space-y-0.5 text-[11px] text-faint">
               {snap.notes.map((n) => (

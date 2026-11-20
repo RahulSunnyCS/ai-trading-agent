@@ -950,3 +950,17 @@ is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupport
 | 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Done 2026-10-26** (#327): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
 | 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | **Done 2026-10-26**: preview passed (#328); #329 promoted, deploy run 40268605293 green, `dashboard.codifie.dev` on Next 16.4.3 behind Access |
 | 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | claude | **Done 2026-10-28**: React 19 (#363); Turbopack for dev, `start:prod` and the Worker, `next build` ~31 s → ~17 s, cf-build's dev-server guard dropped (#364); `middleware.ts` kept, OpenNext runs a Node `proxy.ts` only experimentally (BL-157 Log) |
+
+### 3.49 Intraday collection, no evening job — [BL-231](backlog/BL-231-intraday-collection-no-evening-job.md)
+
+Owner (2026-11-16): fetch during the session what the evening job fetches, so no evening job is needed;
+a live picks × time matrix on the Live board.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.49.1 | Phase 1: a rate limit is waited out, not fatal; request counters; fallback alert | claude | **Built 2026-11-16**, tests pass; not yet merged, so the evening run still has the old client |
+| 3.49.2 | Phase 2: measure the Angel One / Fyers limits, write the tier table | claude | Waits on 3.49.1's counters |
+| 3.49.3 | Phase 3: the intraday collector in shadow, 10 trading days compared | claude | Waits on 3.49.2 |
+| 3.49.4 | Phase 4: promote the staged day, chain the rest by itself | claude | Waits on 3.49.3 |
+| 3.49.5 | Phase 5: retire the 15:45 evening collection | claude | Waits on 3.49.4 |
+| 3.49.6 | Phase 6: live matrix (picks × time) on the Live board | claude | **Built 2026-11-16**, checked in the browser on 16 Nov's snapshot; not yet merged |
