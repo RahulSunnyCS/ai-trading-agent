@@ -16,7 +16,10 @@ shows one combined holding per stock, so this module keeps which shares belong t
   differ from the model on purpose (a swap for a name a gate blocked, whole shares).
   A lot that holds nothing yet is a *new lot*: it is funded with the weekly lot size (or all the
   free cash when that is more) and the plan says what to add to Kite. A rebalancing lot gets its
-  own shares plus the free cash left over.
+  own shares plus the free cash left over, and (BL-236, owner 2026-11-19) trades what its sleeve's
+  backtest trades that week, not the difference to the sleeve's end weights: it sells the names
+  the sleeve's book no longer holds, splits the proceeds and its cash equally over what the sleeve
+  buys (`orders.plan_equal_split`); `Lot.slices` / `Lot.keep` carry that, None = the older rule.
 
 Pure arithmetic and storage; no network. Callers pass a connection from `db_read` and keep it
 short (the package's catalog rule).
@@ -317,6 +320,14 @@ class Lot:
     #: a new lot bought from fresh cash: its leftover cash buys one share of the names an equal
     #: split could not afford, in the order of `target` (the model's rank, best first)
     use_leftover: bool = False
+    #: BL-236: a due lot with shares trades what the backtest trades instead of aiming at
+    #: `target`. `slices` = the names the sleeve buys this week -> its own equal-split weights
+    #: (best rank first), `keep` = the names its book holds after the week (and any ranked within
+    #: its exit rank): a held name outside it is sold. None = the older rule, toward `target`.
+    slices: dict[str, float] | None = None
+    keep: frozenset[str] | None = None
+    max_position: float | None = None
+    cap_band: float = 0.0
 
 
 def plan_lots(
@@ -381,8 +392,24 @@ def plan_lots(
         blocked_names = {n for n in set(mapped) | set(lot.target) if n in blocked}
         plan: OrderPlan | None = None
         status = "not due"
-        if lot.due:
+        rule: str | None = None
+        if lot.due and lot not in new and lot.slices is not None and lot.keep is not None:
+            status, rule = "rebalance", "equal"
+            plan = orders.plan_equal_split(
+                mapped,
+                prices,
+                lot.slices,
+                keep=lot.keep,
+                cash=budget[lot.id],
+                min_trade_rs=min_trade_rs,
+                blocked=blocked_names,
+                max_position=lot.max_position,
+                cap_band=lot.cap_band,
+            )
+            orders.use_leftover(plan, list(lot.slices))
+        elif lot.due:
             status = "new" if lot in new else "rebalance"
+            rule = "fresh" if lot in new else "target"
             plan = orders.plan(
                 mapped,
                 prices,
@@ -406,6 +433,7 @@ def plan_lots(
                 "label": lot.label,
                 "name": lot.name,
                 "status": status,
+                "rule": rule,
                 "next": lot.next_due,
                 "budget": round(budget.get(lot.id, 0.0), 2) if lot.due else None,
                 "holds": {n: s for n, s in sorted(mapped.items())},

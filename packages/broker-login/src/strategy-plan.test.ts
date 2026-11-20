@@ -15,6 +15,7 @@ import {
   parseLedger,
   plan,
   savedId,
+  summary,
 } from './strategy-plan.js';
 
 const row = (action: 'upload' | 'delete', name: string, sha = 'a', ok = true): LedgerRow => ({
@@ -35,6 +36,8 @@ const want = (name: string, sha = 'a'): Wanted => ({
 });
 
 const P = 'T1 · ';
+/** the session row() uploads for */
+const DAY = '2026-10-20';
 
 test('the name prefixes are append-only: the old ones stay recognised after any rename', () => {
   // ownership, the 15:40 disable and the stop button all match on these (BL-143 review, item 8)
@@ -52,7 +55,7 @@ test('owned follows the last successful action and ignores names without the pre
   assert.deepEqual([...owned(ledger).keys()], [`${P}A`]);
 });
 
-test('evening: keeps the unchanged, deletes the dropped, uploads the missing', () => {
+test('evening: keeps what this session already has, deletes the dropped, uploads the missing', () => {
   const ledger = [row('upload', `${P}A`), row('upload', `${P}B`)];
   const p = plan(
     'evening',
@@ -60,6 +63,7 @@ test('evening: keeps the unchanged, deletes the dropped, uploads the missing', (
     ledger,
     new Set([`${P}A`, `${P}B`]),
     new Set(),
+    DAY,
   );
   assert.deepEqual(p.keep, [`${P}A`]);
   assert.deepEqual(p.delete, [`${P}B`]);
@@ -72,10 +76,75 @@ test('evening: keeps the unchanged, deletes the dropped, uploads the missing', (
 test("evening never deletes the owner's strategies or a deployed one", () => {
   const ledger = [row('upload', `${P}B`)];
   const existing = new Set([`${P}B`, 'Nifty_Widesl_917_OTM1', `${P}X`]);
-  const p = plan('evening', [want(`${P}X`)], ledger, existing, new Set([`${P}B`]));
+  const p = plan('evening', [want(`${P}X`)], ledger, existing, new Set([`${P}B`]), DAY);
   assert.deepEqual(p.delete, []);
   assert.deepEqual(p.deployedKept, [`${P}B`]);
   assert.deepEqual(p.conflicts, [`${P}X`]);
+  assert.deepEqual(p.upload, []);
+});
+
+test('evening replaces an unchanged pick uploaded for an earlier session, keeps a same-evening one', () => {
+  // the owner may have edited yesterday's copy on AlgoTest: tomorrow always gets a fresh one
+  const ledger = [row('upload', `${P}A`), row('upload', `${P}B`)];
+  const p = plan(
+    'evening',
+    [want(`${P}A`), want(`${P}B`)],
+    ledger,
+    new Set([`${P}A`, `${P}B`]),
+    new Set(),
+    '2026-10-21',
+  );
+  assert.deepEqual(p.delete, [`${P}A`, `${P}B`]);
+  assert.deepEqual(
+    p.upload.map((w) => w.name),
+    [`${P}A`, `${P}B`],
+  );
+  assert.deepEqual(p.refreshed, [`${P}A`, `${P}B`]);
+  assert.deepEqual(p.keep, []);
+  assert.ok(
+    summary(p, 'evening').includes(
+      `fresh copy (unchanged, uploaded for an earlier day): ${P}A, ${P}B`,
+    ),
+  );
+  // a retry the same evening (uploads already for 2026-10-21) keeps them
+  const retry = [...ledger, { ...row('upload', `${P}A`), day: '2026-10-21' }];
+  const again = plan(
+    'evening',
+    [want(`${P}A`)],
+    retry,
+    new Set([`${P}A`, `${P}B`]),
+    new Set(),
+    '2026-10-21',
+  );
+  assert.deepEqual(again.keep, [`${P}A`]);
+  assert.deepEqual(again.delete, [`${P}B`]);
+  assert.deepEqual(again.refreshed, []);
+});
+
+test('evening leaves a deployed pick in place rather than refresh it, and says so', () => {
+  const p = plan(
+    'evening',
+    [want(`${P}A`)],
+    [row('upload', `${P}A`)],
+    new Set([`${P}A`]),
+    new Set([`${P}A`]),
+    '2026-10-21',
+  );
+  assert.deepEqual(p.deployedKept, [`${P}A`]);
+  assert.deepEqual(p.delete, []);
+  assert.deepEqual(p.upload, []);
+});
+
+test('top-up keeps an unchanged pick whatever session it was uploaded for', () => {
+  const p = plan(
+    'topup',
+    [want(`${P}A`)],
+    [row('upload', `${P}A`)],
+    new Set([`${P}A`]),
+    new Set(),
+    '2026-10-21',
+  );
+  assert.deepEqual(p.keep, [`${P}A`]);
   assert.deepEqual(p.upload, []);
 });
 
@@ -86,6 +155,7 @@ test('evening replaces an owned strategy whose content changed', () => {
     [row('upload', `${P}A`, 'old')],
     new Set([`${P}A`]),
     new Set(),
+    DAY,
   );
   assert.deepEqual(p.delete, [`${P}A`]);
   assert.deepEqual(
@@ -103,6 +173,7 @@ test('top-up uploads only what is missing, deletes nothing, reports not-today', 
     ledger,
     existing,
     new Set(),
+    DAY,
   );
   assert.deepEqual(
     p.upload.map((w) => w.name),
@@ -115,7 +186,7 @@ test('top-up uploads only what is missing, deletes nothing, reports not-today', 
 });
 
 test('a missing owned strategy is neither deleted nor reported', () => {
-  const p = plan('evening', [], [row('upload', `${P}A`)], new Set(), new Set());
+  const p = plan('evening', [], [row('upload', `${P}A`)], new Set(), new Set(), DAY);
   assert.deepEqual(p.delete, []);
   assert.deepEqual(p.notToday, []);
 });

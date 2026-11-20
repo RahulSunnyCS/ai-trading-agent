@@ -830,6 +830,8 @@ export interface MomentumOrderPlan {
   missing_prices: string[];
 }
 
+export type MomentumLotRule = 'equal' | 'target' | 'fresh';
+
 /** One lot of a group followed lot by lot, as the Friday run plans it. */
 export interface MomentumLotOrders {
   id: string;
@@ -837,6 +839,11 @@ export interface MomentumLotOrders {
   name: string;
   /** new: funded this week; rebalance: due; exit: only a forced exit; not due. */
   status: 'new' | 'rebalance' | 'exit' | 'not due';
+  /** How the orders were made (BL-236): equal = what the strategy trades this week, split
+   * equally; target = to the sleeve's end weights (the older rule, `MOMENTUM_LOT_RULE=target`);
+   * fresh = a new lot's picks in equal weights; null = nothing planned. Absent on orders saved
+   * before BL-236. */
+  rule?: MomentumLotRule | null;
   next: string | null;
   budget: number | null;
   holds: Record<string, number>;
@@ -877,6 +884,7 @@ export interface MomentumLot {
   /** What the last stored orders said for this lot (the Friday Telegram's line). */
   last_orders: {
     status: MomentumLotOrders['status'];
+    rule?: MomentumLotRule | null;
     budget: number | null;
     next: string | null;
   } | null;

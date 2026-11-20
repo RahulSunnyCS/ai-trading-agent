@@ -609,7 +609,7 @@ contract, not a shared service).
   message say *fresh picks, equal weights*; `orders.use_leftover`: the cash an equal split leaves buys one
   share of each skipped name in the target's order, best model rank first, stopping at the first it cannot
   afford; the target dict is ordered by the engine's final rank in `_fresh_sleeve_target`),
-  a due lot with shares rebalances with the free cash left, a lot not due sells only names its
+  a due lot with shares rebalances with the free cash left (BL-236, owner 2026-11-19: it trades what its sleeve's backtest trades that week, `orders.plan_equal_split` over `Lot.slices` / `keep` from `api._equal_split_recipe`, not the difference to the sleeve's end weights; `MOMENTUM_LOT_RULE=target` restores the BL-142 rule), a lot not due sells only names its
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
   group path of `_compute_orders` (the group's per-sleeve signals ride in `signal["_sleeves"]`,
