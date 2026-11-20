@@ -213,6 +213,15 @@ class Config:
     # stop sells at the NEXT session's open (a lower-circuit lock delays it). Needs `daily` moves
     # passed to run_backtest and stop_delay 0. "weekly" is the BL-084 behaviour.
     stop_granularity: Literal["weekly", "daily"] = "weekly"
+    # Buffer rule only (BL-233, research; off by default). A holding whose extension (the
+    # `extension` table run_backtest is given: a stock's close over its 200-day EMA, minus 1,
+    # seen with the ranks' `signal_delay`) is above `extension_exit` is sold whole ("sell") or
+    # halved ("trim", once per crossing: again only after it has been at or below the level)
+    # that week, every week. A name above the level is not bought or topped up that week (it
+    # keeps its slot, like a stock locked at the upper circuit). Proceeds wait as cash until the
+    # next rebalance week. None = off; the engine is exactly as before.
+    extension_exit: float | None = None
+    extension_action: Literal["sell", "trim"] = "sell"
     # Buffer rule only (BL-085 L5). How a buy week's money is split across the names that get
     # it: "equal" (default) or "inverse_vol", in proportion to 1 / the standard deviation of each
     # name's last `vol_window` weekly returns up to the signal week (a name without that history
@@ -285,6 +294,12 @@ class Config:
             raise ValueError("weight_by='inverse_vol' needs portfolio='buffer'")
         if self.vol_window < 4:
             raise ValueError("vol_window must be at least 4 weeks")
+        if self.extension_exit is not None and not self.extension_exit > 0:
+            raise ValueError("extension_exit must be above 0 (e.g. 0.70 for 70% above the EMA)")
+        if self.extension_action not in ("sell", "trim"):
+            raise ValueError(f"unknown extension_action {self.extension_action!r}")
+        if self.extension_exit is not None and self.portfolio != "buffer":
+            raise ValueError("an extension exit needs portfolio='buffer'")
         if self.stop_granularity not in ("weekly", "daily"):
             raise ValueError(f"unknown stop_granularity {self.stop_granularity!r}")
         if self.stop_granularity == "daily" and (not self.has_stop or self.stop_delay != 0):
@@ -339,6 +354,8 @@ class Config:
             rebalance += "_daily" if self.stop_granularity == "daily" else ""
         if self.weight_by == "inverse_vol":
             rebalance += f"_ivol{self.vol_window}"
+        if self.extension_exit is not None:
+            rebalance += f"_ext{round(self.extension_exit * 100)}{self.extension_action}"
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -654,6 +671,8 @@ class _Sim:
     daily: "DailyMoves | None" = None
     # inverse_vol only: week x name, 1 / trailing weekly-return std at the signal week.
     inv_vol: pd.DataFrame | None = None
+    # BL-233 extension exit only: week x instrument, close / 200-day EMA - 1, signal-week shifted.
+    extension: pd.DataFrame | None = None
     # The tables above, read by position (see `_Grid`). Built once, here: nothing replaces a table
     # on a sim after it is made.
     _prices: _Grid | _FrameGrid = field(init=False, repr=False)
@@ -664,6 +683,7 @@ class _Sim:
     _no_buy: _Grid | _FrameGrid | None = field(init=False, repr=False)
     _uc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
     _lc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _extension: _Grid | _FrameGrid | None = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._prices = _grid(self.prices)
@@ -674,6 +694,15 @@ class _Sim:
         self._no_buy = _grid(self.no_buy)
         self._uc_locked = _grid(self.uc_locked)
         self._lc_locked = _grid(self.lc_locked)
+        self._extension = _grid(self.extension)
+
+    def extension_at(self, asset: str, week: pd.Timestamp) -> float | None:
+        """BL-233: the holding's extension seen at `week`, or None when there is no value."""
+        table = self._extension
+        if table is None or not table.has(asset):
+            return None
+        value = table.at(week, asset)
+        return float(value) if np.isfinite(value) else None
 
     def sell_blocked(self, asset: str, week: pd.Timestamp) -> bool:
         return (
@@ -925,6 +954,7 @@ def run_backtest(
     lc_locked: pd.DataFrame | None = None,
     daily: "DailyMoves | None" = None,
     buy_weights: pd.DataFrame | None = None,
+    extension: pd.DataFrame | None = None,
 ) -> Result:
     """`buy_weights` (BL-116 Phase 2; signal week x instrument, None = off) sets how a buy week's
     money is shared between the names bought: in proportion to these numbers instead of equally
@@ -1044,6 +1074,24 @@ def run_backtest(
         groups = groups.reindex(ranks.index)
     if uc_locked is not None:
         uc_locked = uc_locked.reindex(ranks.index).fillna(False).astype(bool)
+    if config.extension_exit is not None:
+        # BL-233: seen with the ranks (shifted by signal_delay); a name above the level is
+        # treated as unbuyable that week, the upper-circuit lock's rule (keeps its slot, gets no
+        # money), so a name sold on extension is not bought straight back.
+        if extension is None:
+            raise ValueError("extension_exit needs the extension table (categories.extension)")
+        # Shifted on the ranks' own rows (as the ranks were above), so a ranks index that
+        # differs from prices.index (a skipped or later week) still pairs each week correctly.
+        extension = extension.reindex(index=ranks.index, columns=prices.columns)
+        extension = extension.shift(config.signal_delay)
+        above = extension.gt(config.extension_exit)
+        if uc_locked is not None:
+            columns = uc_locked.columns.union(above.columns)
+            above = above.reindex(columns=columns, fill_value=False)
+            above |= uc_locked.reindex(columns=columns, fill_value=False)
+        uc_locked = above.astype(bool)
+    else:
+        extension = None
     if lc_locked is not None:
         lc_locked = lc_locked.reindex(ranks.index).fillna(False).astype(bool)
 
@@ -1084,6 +1132,7 @@ def run_backtest(
         lc_locked=lc_locked,
         daily=daily,
         inv_vol=inv_vol,
+        extension=extension,
     )
     outcome = _run_slots(sim, weeks) if config.portfolio == "slots" else _run_buffer(sim, weeks)
 
@@ -1516,6 +1565,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                 run_price[a] = weekly
         return raised
 
+    trimmed: set[str] = set()  # BL-233 "trim": halved and not yet back at or below the level
+
     for i, week in enumerate(weeks[:-1]):
         proceeds, uninvested = uninvested, 0.0
 
@@ -1551,6 +1602,35 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                         rank = int(sim.rank(week, name))
                         sim.record(week, "BUY", name, f"rank {rank} (after a stop)", amount, **fill)
                         proceeds -= amount
+        if config.extension_exit is not None:
+            # 0b. BL-233: sell (or halve) a holding stretched above its 200-day EMA, every week.
+            trimmed &= set(lots)
+            for asset in [a for a in lots if a != _POOL and a not in stopped]:
+                ext = sim.extension_at(asset, week)
+                if ext is None:
+                    continue  # no value this week: no action, and a trim stays spent
+                if ext <= config.extension_exit:
+                    trimmed.discard(asset)
+                    continue
+                if sim.sell_blocked(asset, week) or asset in trimmed:
+                    continue
+                reason = f"extension: {ext:.0%} above the 200-day EMA"
+                if config.extension_action == "trim":
+                    gross, net, tax, fill = sell(asset, 0.5, week)
+                    sim.record(week, "TRIM", asset, reason, gross, tax=tax, **fill)
+                    trimmed.add(asset)
+                else:
+                    position = lots[asset]
+                    since = min(lot["since"] for lot in position)
+                    basis = sum(lot["basis"] for lot in position)
+                    value_before = value(asset, week)
+                    details = sim.exit_details(asset, week, since, basis, value_before)
+                    _, net, tax, fill = sell(asset, 1.0, week)
+                    # Not re-bought this week: the extension mask above makes it unbuyable.
+                    sim.record(
+                        week, "SELL", asset, reason, value_before, tax=tax, **details, **fill
+                    )
+                proceeds += net
         if is_buy_week or config.sell_every_week:
             # 1. Sell whatever has dropped out. Gated on `is_buy_week` alone when
             #    `sell_every_week` is off (the original, unchanged behaviour); with it on, this
