@@ -251,6 +251,12 @@ describe('chains over the API (BL-234)', () => {
     ],
   });
 
+  /** A run the API started carries on in the background: a test that ends first would close the history under it. */
+  const settled = async (jobId: string) => {
+    for (let i = 0; i < 300 && ctx.history.last(jobId)?.ended_at == null; i++)
+      await new Promise((r) => setTimeout(r, 10));
+  };
+
   beforeEach(() => {
     jobs = [...jobs, chain()];
     handle = createApi({ ctx, jobs, prefsFile });
@@ -332,10 +338,12 @@ describe('chains over the API (BL-234)', () => {
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toContain('held');
     expect((await send('POST', '/jobs/ev/run', { only: ['up', 'read'] })).status).toBe(202);
+    await settled('ev');
   });
 
   it('accepts resume and from for a chain', async () => {
     const res = await send('POST', '/jobs/close/run', { resume: true, from: 'two' });
     expect(res.status).toBe(202);
+    await settled('close');
   });
 });
