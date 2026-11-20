@@ -2692,6 +2692,7 @@ def _broad_engine_signal(
     run: tuple[broad.BroadBacktestResult, pd.Timestamp] | None = None,
     *,
     ahead: bool = False,
+    with_slices: bool = False,
 ) -> dict:
     """This week's Broad signal as the engine itself would trade it (BL-010 Phase 6): same shape
     as `analysis.latest_signal` (`week`, `rows`, `explain`), plus `target_weights`, the model's
@@ -2753,8 +2754,12 @@ def _broad_engine_signal(
     if req.signal_delay:
         explain += f" With a {req.signal_delay}-week signal delay, the ranks shown are that old."
     equity = result.equity.loc[:week]
+    extra: dict = {}
+    if with_slices:  # BL-236: what a rebalancing lot copies (never stored or journalled)
+        extra = _equal_split_recipe(req, result, acted, ranks, week)
     return analysis._clean(
         {
+            **extra,
             "week": week,
             "rows": rows,
             "explain": explain,
@@ -2779,6 +2784,38 @@ def _broad_engine_signal(
             },
         }
     )
+
+
+def _equal_split_recipe(
+    req: BacktestRequest, result: Result, acted: pd.DataFrame, ranks: pd.Series, week: pd.Timestamp
+) -> dict:
+    """The week's equal split as the engine made it (BL-236): `slices` = each name it BUYs or ADDs
+    to -> the value it put in (the top category's pick at its extra weight is already in it), best
+    rank first; `keep` = the names its book holds after the week plus any name ranked inside the
+    exit rank (a held name the model never bought, like one bought by hand, stays only inside
+    it)."""
+    bought = acted[acted["action"].isin(["BUY", "ADD"])] if len(acted) else acted
+    slices = {
+        str(t.asset): float(t.value)
+        for t in sorted(
+            bought.itertuples(), key=lambda t: (pd.isna(t.rank), 0.0 if pd.isna(t.rank) else t.rank)
+        )
+        if float(t.value) > 0
+    }
+    book = {n for n in _model_holdings_or_idle(result, week) if n not in (IDLE, CASH)}
+    # what the engine sold this week is gone, whatever rank the stock still has
+    sold = (
+        {str(t.asset) for t in acted.itertuples() if str(t.action) == "SELL"}
+        if len(acted)
+        else set()
+    )
+    inside = {str(n) for n, r in ranks.items() if pd.notna(r) and r <= req.broad_category_exit_rank}
+    return {
+        "slices": slices,
+        "keep": sorted((book | inside) - sold),
+        "max_position": req.max_position,
+        "cap_band": req.cap_band,
+    }
 
 
 def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> dict:
@@ -3461,9 +3498,9 @@ def _orders_signal(
             rankings.append(ranking)
         last = ranking.prices.index[-1].normalize()
         if last >= target_week.normalize():
-            signal, kind = _broad_engine_signal(req), "final"
+            signal, kind = _broad_engine_signal(req, with_slices=True), "final"
         elif last == (target_week - pd.Timedelta(days=7)).normalize() and req.signal_delay >= 1:
-            signal, kind = _broad_engine_signal(req, ahead=True), "exact"
+            signal, kind = _broad_engine_signal(req, ahead=True, with_slices=True), "exact"
         elif req.signal_delay < 1:
             return (
                 None,
@@ -3860,6 +3897,18 @@ def _lot_label(name: str, week: str, start: str | None, rebalance: dict | None) 
     return f"Lot {found.group(1)}" if found else name
 
 
+def lot_rule() -> str:
+    """How a due lot that holds shares is rebalanced (BL-236, owner 2026-11-19): `equal` (the
+    default) trades what the sleeve's backtest trades that week; `target` is the BL-142 rule, an
+    order to the sleeve's end weights. `MOMENTUM_LOT_RULE=target` switches it back (read on each
+    call; the launchd Momentum API keeps the environment it started with, so restart it)."""
+    return (
+        "target"
+        if os.environ.get("MOMENTUM_LOT_RULE", "equal").strip().lower() == "target"
+        else "equal"
+    )
+
+
 def _compute_lot_orders(
     payload: dict,
     *,
@@ -3921,6 +3970,11 @@ def _compute_lot_orders(
                 for k, v in sig.get("target_weights", {}).items()
                 if v > 0 and k not in cash_names
             },
+            # BL-236: what its backtest trades this week, for a due lot that holds shares.
+            "slices": sig.get("slices"),
+            "keep": sig.get("keep"),
+            "max_position": sig.get("max_position"),
+            "cap_band": sig.get("cap_band") or 0.0,
             # What the sleeve itself says to sell this week (a forced exit off its calendar).
             "exits": frozenset(
                 str(row["asset"])
@@ -3991,7 +4045,15 @@ def _compute_lot_orders(
         if info.get("fresh") and total > 0:
             kept = {k: v / total for k, v in kept.items()}
         info["target"] = kept
+        if info.get("slices"):  # the equal split spreads a gated name's slice over the rest
+            info["slices"] = {k: v for k, v in info["slices"].items() if k not in gated}
         premium_skipped.update({n: skips[n] for n in gated})
+
+    def equal_split(info: dict) -> dict[str, float] | None:
+        """The sleeve's slices when a rebalancing lot should copy its backtest (BL-236)."""
+        if lot_rule() != "equal" or info.get("fresh") or info.get("slices") is None:
+            return None
+        return info["slices"] if info.get("keep") is not None else None
 
     lot_inputs = [
         lots.Lot(
@@ -4005,6 +4067,10 @@ def _compute_lot_orders(
             info["exits"],
             sid in has_history,
             use_leftover=bool(info.get("fresh")),
+            slices=equal_split(info),
+            keep=frozenset(info["keep"]) if equal_split(info) is not None else None,
+            max_position=info.get("max_position"),
+            cap_band=float(info.get("cap_band") or 0.0),
         )
         for sid, info in sleeves.items()
     ]
@@ -4117,6 +4183,8 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
             head += f" · ₹{lot['budget']:,.0f}"
         if lot.get("fresh"):
             head += " · fresh picks, equal weights"
+        elif lot.get("rule") == "equal":
+            head += " · what the strategy trades this week, split equally"
         if lot["status"] == "not due" and lot["next"]:
             head += f" · next {pd.Timestamp(lot['next']):%a %d %b}"
         lines.append(head)
@@ -4480,6 +4548,7 @@ def lots_view() -> dict:
                 "last_orders": (
                     {
                         "status": ordered["status"],
+                        "rule": ordered.get("rule"),
                         "budget": ordered.get("budget"),
                         "next": ordered.get("next"),
                     }

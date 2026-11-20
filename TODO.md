@@ -950,3 +950,16 @@ is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupport
 | 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Done 2026-10-26** (#327): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
 | 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | **Done 2026-10-26**: preview passed (#328); #329 promoted, deploy run 40268605293 green, `dashboard.codifie.dev` on Next 16.4.3 behind Access |
 | 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | claude | **Done 2026-10-28**: React 19 (#363); Turbopack for dev, `start:prod` and the Worker, `next build` ~31 s → ~17 s, cf-build's dev-server guard dropped (#364); `middleware.ts` kept, OpenNext runs a Node `proxy.ts` only experimentally (BL-157 Log) |
+
+### 3.50 Momentum lots: rebalance by the backtest's equal split — [BL-236](backlog/BL-236-lot-rebalance-equal-split.md)
+
+Owner (2026-11-19): a due lot should trade as the backtest does (sell what falls past the exit rank, split the
+proceeds and free cash equally across the top N), not rebalance to the sleeve's drifted end weights.
+Rebalancing lots only. Owner chose equal split for 20 Nov too (2026-11-19).
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.50.1 | Phase 1: measure the gap; 20 Nov orders both ways (`scripts/bl236_equal_split.py`); the past-rebalance table is still open | claude | Done 2026-11-19 (table open) |
+| 3.50.2 | Phase 2: the equal-split planner design | claude→owner | Done 2026-11-19 (in the BL log) |
+| 3.50.3 | Phase 3: build (`MOMENTUM_LOT_RULE`, default `equal`), tests, UI, Guide | claude | Built 2026-11-19, not committed |
+| 3.50.4 | Phase 4: switch on, watch two Fridays | claude→owner | Planned |
