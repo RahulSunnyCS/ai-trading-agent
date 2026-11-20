@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's idea (2026-11-20); cheap on the engine's existing stop-and-reverse code, no live change until it passes |
-| **Status** | Planned — pre-registered (Phase 0), nothing run |
+| **Status** | Done, killed (2026-11-20): fails all 5 rules; confirmation never opened |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-20 |
@@ -129,3 +129,4 @@ Answered 2026-11-20: cover strike nearest ₹50, hold to 15:28 if no re-sale; th
 - 2026-11-20 — created and pre-registered before any run, from the owner's idea.
 - 2026-11-20 — scope narrowed by the owner to the 21% leg-stop Dir picks (Core's rotation Dir files and the base); first drafted on T1's Dir picks (40 / 20 / 15% stops), now out of scope.
 - 2026-11-20 — **Phase 1 built, before any arm was run.** Engine: `reverse_on_sl.close_on_reentry` (RE COST does not wait for the long; it closes at the close of the re-sale bar, `price_at(m + 1)`, reason COVER, and the leg can reverse again) and `opposite` (the placebo); both off by default and out of the spec dump, 5 unit tests, goldens and exports unchanged. Pick-days fixed: **344** (Core list C Dir picks, one per day on 344 days, 2025-01-10 → 2026-10-08; NIFTY 176, SENSEX 168); `research/bl240/run.py --count`.
+- 2026-11-20 — **Result** (344 Core Dir pick-days, 2025-01-10 → 2026-10-08; control at 0% slippage and no charges equals the stored Core result on all 344). ₹ per pick-day after ₹23.6 an order and 0.5% slippage, plain A(M) → cover H(M): ₹3k 231 → 2, ₹4k 278 → 94, **₹5k (primary) 270 → 128**, ₹6k 257 → 115, ₹7k 251 → 46; H(M) minus A(M) −229 / −184 / −142 / −143 / −205. Primary: H5 − A5 −142 [−366, +88], H5 − A3 −103 [−320, +132], H5 − placebo W5 +155 [−111, +431]; blocks H5 − A5 −267 / −176 / +188 / −314; max drawdown 44,703 against A3's 27,957, worst 5 days −19,467 against −13,256. All five rules fail (i, ii, iii, iv, v): **killed**. Covers: 533 bought at ₹5k (1.55 a pick-day), 263 closed by a re-sale (49%), the rest held to the exit; the covers alone lost ₹24,878 gross, about ₹47 each, so the bridge costs more than it earns whether or not the leg comes back. The placebo (opposite side) is the worst arm (−27 a day), so the side matters, but the right side still loses. Slippage: H5 − A5 is −80 at 0% and −248 at 1%. The plain overall stop alone peaks at ₹4,000 (278) and is flat to ₹7,000 (251), the same shape as BL-096. Descriptive, not tested: SENSEX picks H5 654 against A5 534 (168 days), NIFTY picks −374 against +19 (176 days); up-trend days H5 403 against A5 493, down-trend days −117 against +72. The SENSEX half is a lead found after the fact (its lot is 20, rupee stops bind less; BL-056): it needs its own registration and the 2022–24 confirmation.

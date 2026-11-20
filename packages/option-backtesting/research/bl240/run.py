@@ -76,9 +76,7 @@ def arms(spec: dict) -> dict[str, tuple[dict, float]]:
 
 def pick_days():
     picks = picks_for("core", ROOT, FIT_FROM, FIT_TO)
-    return [
-        (d, n) for d in sorted(picks) for n in picks[d] if DIR_RE.match(n)
-    ]
+    return [(d, n) for d in sorted(picks) for n in picks[d] if DIR_RE.match(n)]
 
 
 def main():
@@ -91,7 +89,9 @@ def main():
         for _, n in items:
             by_name[n] = by_name.get(n, 0) + 1
         days = {d for d, _ in items}
-        print(f"{len(items)} pick-days on {len(days)} days; first {items[0][0]}, last {items[-1][0]}")
+        print(
+            f"{len(items)} pick-days on {len(days)} days; first {items[0][0]}, last {items[-1][0]}"
+        )
         print("by index:", {k: sum(v for n, v in by_name.items() if n[0] == k) for k in "NS"})
         return
 
@@ -150,7 +150,9 @@ def main():
     out = HERE / "out"
     out.mkdir(exist_ok=True)
     (out / "table.json").write_text(
-        json.dumps({"keys": list(table), "table": table, "control_mismatch": bad, "skipped": skipped})
+        json.dumps(
+            {"keys": list(table), "table": table, "control_mismatch": bad, "skipped": skipped}
+        )
     )
     print(
         f"{len(table)} pick-days ({len(skipped)} skipped) in {time.time() - t0:.0f}s; "

@@ -1,6 +1,6 @@
 # Directional: stop-and-reverse (buy the stopped option)
 
-**Status:** Tested · **Last updated:** 2026-10-29 (Amendment 1)
+**Status:** Tested · **Last updated:** 2026-11-20 (BL-240)
 
 ## What it is
 
@@ -23,6 +23,8 @@ cost, count: 1 }`, [re-entry](re-entry.md)); T1's own Dir settings re-sell it tw
 |---|---|---|---|---|
 | BL-186 | Blanket reverse (B); filtered at the stop minute by the opening-range break (C1), the VWAP side (C2) or rising ATM IV (C3); half size (D); × a 20 / 30 / 45-minute time stop, a 150% / 80% peak trail, or hold; all at a ₹5,000 overall stop against the plain exit at ₹5,000 (A5) and at each file's own stop (A3) | T1's Adaptive picks (Dir picks changed, Widesl and Buy carried), 2025-01-10 → 2026-07-22 (375 days, 321 Dir pick-days), hold-out 2026-07-23 → 2026-10-22; 1 lot, after ₹20 + GST an order | **Killed.** Primary (C1 / C2 / C3 with a 30-minute stop − A5): +₹45 [−123, +226], −₹153 [−393, +88], −₹45 [−206, +118] a day, none significant under Holm, all with a deeper max drawdown (−₹41.2k / −₹46.0k / −₹32.8k against −₹26.2k). Hold-out: +₹85, +₹294, −₹297, none significant, all deeper | [BL-186][bl186] |
 | BL-186 Amendment 1 | A cheaper long: the strike priced closest to ₹50 (₹35–₹70) instead of the same contract; its stop 30% / 50%; a 30-minute stop or held to 15:28; all with the C1 filter; plus RE COST allowed to re-sell after the long closes (on the best cell and on the same-contract C1_T30) | The same T1 Dir picks, **full period** 2025-01-10 → 2026-10-22 (main to 2026-07-22 plus the hold-out; 431 days, 363 Dir pick-days; the hold-out had already been read, so it is exploratory and the full period judges) | **Killed, all six cells.** − A5 per day: +39 [−60, +135], +111 [−25, +249], +42, +133 [−24, +289], +112 (best + re-sale), +94 (same contract + re-sale); none significant under Holm over nine (smallest p 0.16); every max drawdown deeper than A5's −₹26.2k (−₹31.7k to −₹39.0k); `R-C1_T30` flips sign in the hold-out. 14 of 168 stops had no ₹50 strike | [BL-186][bl186] |
+
+| BL-240 | A ~₹50 same-side **cover** bought at each 21% leg stop and closed when that leg is re-sold (RE COST kept, no stop on the cover); overall stop ₹3k / 4k / 5k / 6k / 7k, each against the plain stop at the same M; placebo = cover on the opposite option type | Core's Dir picks (21% leg stop, RE COST ×1), 344 pick-days 2025-01-10 → 2026-10-08, ₹23.6 an order + 0.5% slippage | **Killed**: fails 5 of 5 rules | [BL-240][bl240] |
 
 ## What we know
 
@@ -47,8 +49,16 @@ cost, count: 1 }`, [re-entry](re-entry.md)); T1's own Dir settings re-sell it tw
   +₹10 / −₹239 / −₹84; expiry days left out +₹43 / −₹236 / −₹23 (C1 / C2 / C3, main period). C2's VWAP uses
   the chain's option volume as weights (the index has none); a plain TWAP gives the same answer.
 
+- **The cover (BL-240) does not fix it.** Closing the long at the re-sale keeps the RE COST re-sale, and it still loses: per
+  pick-day the book earns +2 / +94 / +128 / +115 / +46 at an overall stop of ₹3k / 4k / 5k / 6k / 7k against +231 / +278 / +270 /
+  +257 / +251 for the plain stop (−₹229 to −₹142 a day; at the primary ₹5k −142 [−366, +88]), with a max drawdown of ₹44.7k against
+  ₹28.0k. At ₹5k 533 covers were bought (1.55 a pick-day), 49% closed by a re-sale, the rest held to 15:28; the covers alone lost
+  ₹24.9k gross (about ₹47 each). The opposite-side placebo is worse (−27 a day). Descriptive, found afterwards: SENSEX picks gain
+  from the cover (+654 vs +534 a day, 168 days), NIFTY picks lose (−374 vs +19, 176 days).
+
 ## Not yet tested
 
+- The cover on SENSEX Dir picks alone (a lead after the fact; its lot is 20, so the rupee stops bind less): needs its own registration and the 2022–24 confirmation.
 - C1 held to the exit as a registered rule (the descriptive lead above); its drawdown is the problem, and a cheaper long
   (Amendment 1) shrinks it only from −₹50.0k to −₹39.0k.
 - Live: a conditional buy on the stop fill in Quantiply or AlgoTest. Not worth building on this result.
@@ -62,3 +72,4 @@ cost, count: 1 }`, [re-entry](re-entry.md)); T1's own Dir settings re-sell it tw
   minutes, one worker); Amendment 1: `amend1.py simulate|best|report` (about 4 minutes after that).
 
 [bl186]: ../../../../backlog/BL-186-dir-stop-and-reverse.md
+[bl240]: ../../../../backlog/BL-240-dir-cover-bridge.md
