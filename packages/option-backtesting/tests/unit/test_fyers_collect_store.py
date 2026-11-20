@@ -90,6 +90,40 @@ def test_collect_day_writes_lake_catalog_and_raw(root):
     assert len(lines) == len(opt.column("vendor_symbol").unique()) + 2  # + index + future
 
 
+def test_a_forced_rerun_that_stops_keeps_the_complete_raw_file_and_closes_the_run(root):
+    daily.collect_day(FakeClient(), DAY, ["NIFTY"], root, premium_floor=30, log=lambda _: None)
+    raw_file = lake.raw_path(root, "fyers", DAY, "NIFTY")
+    complete = raw_file.read_bytes()
+
+    class Dies(FakeClient):
+        def minute_candles(self, symbol, day):
+            candles = super().minute_candles(symbol, day)
+            if symbol.endswith("-INDEX") and "VIX" not in symbol:
+                raise RuntimeError("stopped part way")
+            return candles
+
+    class Sink(lake.RawSink):
+        def flush_partial(self, name):  # the flush itself fails too
+            super().flush_partial(name)
+            raise OSError("disk full")
+
+    messages: list[str] = []
+    real = lake.RawSink
+    lake.RawSink = Sink
+    try:
+        with pytest.raises(RuntimeError, match="stopped part way"):
+            daily.collect_day(Dies(), DAY, ["NIFTY"], root, force=True, log=messages.append)
+    finally:
+        lake.RawSink = real
+    assert raw_file.read_bytes() == complete  # not replaced by the partial
+    assert any("not saved" in m for m in messages)
+    with connect(root, read_only=True) as con:
+        statuses = [
+            r[0] for r in con.execute("SELECT status FROM ingest_runs ORDER BY 1").fetchall()
+        ]
+    assert statuses == ["failed", "ok"]  # the stopped run is closed, not left open
+
+
 def test_rerun_skips_collected_day_and_registers_nothing_twice(root):
     daily.collect_day(FakeClient(), DAY, ["NIFTY"], root, log=lambda _: None)
     client = FakeClient()

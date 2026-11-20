@@ -74,6 +74,11 @@ EVERY_S = 300
 UNTIL = "15:31"
 #: a loop whose heartbeat is older than this is not running (it beats every few seconds)
 STALE_S = 30
+#: how long one refresh waits out an Angel One rate limit before it gives up and keeps its last
+#: snapshot (the 5-minute loop asks again). The client's default (20 minutes, for the evening
+#: collection) would hold the Angel One guard's lock far past what any other user waits for it
+#: (`check.LOCK_WAIT_S`).
+RATE_BUDGET_S = 15.0
 #: the Adaptive list in a journal entry
 LIST_KEY = "C"
 #: (book, track, display name) — the names the dashboard's cards use
@@ -860,7 +865,9 @@ def refresh(
         if client_factory is None:
             from ..angelone.client import AngelClient
 
-            client_factory = AngelClient
+            def client_factory(session):
+                return AngelClient(session, rate_budget_s=RATE_BUDGET_S)
+
         client = client_factory(session)
         master = scrip_master(day, master_loader)
         previous = _read_json(snapshot_path(day, root))

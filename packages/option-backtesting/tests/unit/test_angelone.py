@@ -397,6 +397,23 @@ def test_fallback_failure_keeps_the_fyers_login_hint(monkeypatch):
     assert "Fyers login" in str(err.value) and "token expired" in str(err.value)
 
 
+def test_a_rate_limited_fallback_keeps_the_fyers_login_hint(monkeypatch):
+    from option_backtesting.angelone.client import AngelRateLimited
+    from option_backtesting.fyers.auth import FyersCredentialsError
+    from option_backtesting.legwise import evening
+
+    def collect(day, underlyings, *, source, **kwargs):
+        if source == "fyers":
+            raise FyersCredentialsError("Fyers token expired")
+        raise AngelRateLimited("Angel One kept refusing for 1200 s")
+
+    monkeypatch.setattr(evening, "collect_detailed", collect)
+    with pytest.raises(AngelRateLimited) as err:
+        evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None)
+    assert "Fyers login" in str(err.value) and "token expired" in str(err.value)
+    assert err.value.rate_limited  # the collector's stop-on-rate-limit flag survives
+
+
 def test_a_plain_text_rate_limit_keeps_its_words(monkeypatch):
     """SmartAPI's rate limit is a plain-text 403: its words reach the back-off (2026-10-23)."""
     import io

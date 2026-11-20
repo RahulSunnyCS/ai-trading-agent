@@ -232,6 +232,33 @@ def test_the_second_refresh_reads_only_the_held_contracts(monkeypatch):
     assert again["books"][0]["picks"][0]["net"] == pick["net"]
 
 
+def test_a_rate_limited_refresh_gives_up_fast_not_after_the_evening_budget(tmp_path, monkeypatch):
+    """The refresh holds the Angel One guard's lock: it must not wait out a rate limit for the
+    client's 20-minute default (every other lock user gives up after 3 minutes)."""
+    from types import SimpleNamespace
+
+    from option_backtesting.angelone.client import RATE_BUDGET_S as EVENING_BUDGET_S
+    from option_backtesting.angelone.client import AngelRateLimited
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(lb.time, "sleep", sleeps.append)
+    monkeypatch.setattr(lb, "scrip_master", lambda day, loader=None: [])
+    monkeypatch.setattr(lb, "read_for_session", lambda day: ({"rows": {}}, None))
+
+    def fetch_and_build(client, *args, **kwargs):
+        client._min_interval_s = 0.0
+        client._post = lambda path, body, headers: (200, {"message": "exceeding access rate"})
+        client._call("/rest/secure/angelbroking/historical/v1/getCandleData", {})
+
+    monkeypatch.setattr(lb, "fetch_and_build", fetch_and_build)
+    session = SimpleNamespace(api_key="k", public_ip=None, jwt="j")
+    with pytest.raises(AngelRateLimited):
+        lb.refresh(session, DAY, tmp_path, by="test", log=lambda m: None, books=books())
+    assert lb.RATE_BUDGET_S < EVENING_BUDGET_S and lb.RATE_BUDGET_S <= 15.0
+    assert sum(sleeps) <= lb.RATE_BUDGET_S
+    assert "AngelRateLimited" in lb.read_state(tmp_path)["last_error"]
+
+
 def test_a_waiting_pick_reads_no_options(monkeypatch):
     client = FakeClient(20)
     snap = lb.fetch_and_build(

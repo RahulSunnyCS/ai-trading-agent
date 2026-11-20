@@ -397,6 +397,28 @@ def test_raw_sink_replaces_rather_than_appends(root):
         assert len(fh.read().splitlines()) == 1
 
 
+def test_a_partial_flush_never_replaces_a_complete_raw_file(root):
+    complete = lake.RawSink(root, "fyers", DAY)
+    for i in range(3):
+        complete.add("NIFTY", f"NSE:X{i}", {"a": i}, {"s": "ok"})
+    path = complete.flush("NIFTY")
+    before = path.read_bytes()
+
+    stopped = lake.RawSink(root, "fyers", DAY)
+    stopped.add("NIFTY", "NSE:X0", {"a": 0}, {"s": "ok"})
+    beside = stopped.flush_partial("NIFTY")
+    assert beside != path and ".partial-" in beside.name
+    assert path.read_bytes() == before  # the complete copy is untouched
+    with gzip.open(beside, "rt") as fh:
+        assert len(fh.read().splitlines()) == 1
+
+    # with no earlier file the partial is the file, as flush writes it
+    fresh = lake.RawSink(root, "fyers", DAY)
+    fresh.add("SENSEX", "BSE:Y", {"a": 1}, {"s": "ok"})
+    assert fresh.flush_partial("SENSEX") == lake.raw_path(root, "fyers", DAY, "SENSEX")
+    assert fresh.flush_partial("SENSEX") is None  # nothing buffered
+
+
 def test_backup_copies_new_files_only_and_always_the_catalog(root, tmp_path):
     with connect(root):
         pass

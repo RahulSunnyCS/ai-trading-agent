@@ -188,3 +188,22 @@ class RawSink:
             fh.write("\n".join(lines) + "\n")
         tmp.replace(path)
         return path
+
+    def flush_partial(self, name: str) -> Path | None:
+        """Write what was read of an aborted run. Raw copies cannot be fetched again once a
+        contract expires, so an earlier complete file for the same day and name is never replaced
+        by this partial one: with a file already there the partial goes beside it, as
+        `<name>.partial-<UTC time>.jsonl.gz`. Without one it is the file, as `flush` writes it."""
+        path = raw_path(self.root, self.vendor, self.day, name)
+        if not path.exists():
+            return self.flush(name)
+        lines = self._lines.pop(name, None)
+        if not lines:
+            return None
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+        beside = path.with_name(f"{name}.partial-{stamp}.jsonl.gz")
+        tmp = beside.with_suffix(".tmp")
+        with gzip.open(tmp, "wt", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+        tmp.replace(beside)
+        return beside

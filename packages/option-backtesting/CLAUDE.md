@@ -94,7 +94,7 @@ Otherwise:
   lots->quantity, no-trade minutes carried forward, OI from `getOIData` for NFO only, the index
   gap 15:15-15:28 flagged not filled; what was missing lands in `ingest_runs.details.flags`). BL-231 Phase 1: a
   rate limit (HTTP 429, or SmartAPI's plain-text 403 "exceeding access rate") is waited out with growing
-  cool-downs (5, 15, 30, 60 s, then 60 s) for up to `RATE_BUDGET_S` (20 minutes) per request, then raises
+  cool-downs (5, 15, 30, 60 s, then 60 s) for up to `RATE_BUDGET_S` (20 minutes) in all for the whole run (the client's lifetime, not each request; the live board's refresh builds its client with `live_board.RATE_BUDGET_S`, 15 s, because it holds the Angel One guard's lock), then raises
   `AngelRateLimited`, which `fyers/daily.py`'s contract fetcher does not swallow (a bad symbol is recorded and
   skipped; a refusing vendor stops the underlying with no partial chain written, the raw answers kept, and a
   rerun redoes that underlying; finished underlyings are skipped). `client.stats()` (requests, refusals, seconds

@@ -508,7 +508,13 @@ def collect_day(
             entry["requests"] = client.calls - calls_before
             log(f"{spec.name}: {table.num_rows} option bars, {entry['requests']} requests")
     except Exception:
-        raw.flush(current["name"])  # keep the responses already read, whatever stopped the run
+        # Keep the responses already read, whatever stopped the run, but never over a complete
+        # raw file of an earlier run (a --force rerun), and never let a failed write keep the run
+        # open: the ingest run is closed below and the original error is what is raised.
+        try:
+            raw.flush_partial(current["name"])
+        except Exception as flush_error:  # noqa: BLE001
+            log(f"warning: the raw responses of the stopped run were not saved: {flush_error}")
         if getattr(client, "flags", None):
             details["flags"] = {k: dict(v) for k, v in client.flags.items()}
         if hasattr(client, "stats"):

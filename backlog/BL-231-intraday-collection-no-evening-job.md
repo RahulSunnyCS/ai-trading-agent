@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — protects the data that cannot be re-downloaded (expiring contracts vanish the same evening) and removes the evening's dependence on a Fyers login |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | improvement |
 | **Area** | options / infra |
 | **Created** | 2026-11-16 |
 | **Depends on** | none (BL-203's live board and BL-079's Angel One collector already exist) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.49 |
 
 ## Context
 
@@ -72,7 +72,7 @@ what is read when.
   - In `AngelClient._call`, treat the rate limit as a cool-down, not a retry count: on a 429 or a
     message with `RATE_WORDS`, sleep a growing, capped delay (for example 5, 15, 30, 60 s, then
     60 s repeating) and keep the same request until it answers or a wall-clock budget (default 20
-    minutes per request) ends. Only then raise a typed `AngelRateLimited` error (not a bare
+    minutes in all for the run, not per request; the live board's refresh uses 15 s) ends. Only then raise a typed `AngelRateLimited` error (not a bare
     `RuntimeError`).
   - In `collect_day`, catch it per contract: record the contract as unread, carry on or stop
     cleanly, and keep every contract already read. A rerun reads only what is missing (the raw
@@ -214,4 +214,10 @@ a grid. It does not depend on the collector.
   for the intraday collection to replace the evening job. Corrected an earlier statement: the 403
   was retried (5 attempts over about 15 s), then aborted the whole run; it was not unretried.
 - 2026-11-16 — owner asked for a live matrix chart with live data; chosen as the Live board's
-  picks × time grid and added as Phase 6 (builds on data the board already has; not started).
+  picks × time grid and added as Phase 6 (builds on data the board already has).
+- 2026-11-16 — Phase 1 (Angel One rate limit waited out, request counters, fallback alert) and
+  Phase 6 (the Live matrix card) built; PR #457. Phases 2-5 wait on Phase 1's counters (TODO 3.49).
+- 2026-11-20 — PR #457 review fixes: the live board's Angel One client waits at most 15 s on a rate
+  limit (the 20-minute budget is the evening collection's; the board holds the guard's lock); a
+  stopped Fyers run no longer replaces a complete raw file (the partial goes beside it) and always
+  closes its ingest run; a rate-limited Angel One fallback keeps the Fyers-login hint in its alert.
