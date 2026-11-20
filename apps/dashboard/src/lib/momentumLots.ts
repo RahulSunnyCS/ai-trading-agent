@@ -3,7 +3,7 @@
  * (`GET /api/momentum/lots`). Every figure is the server's; this file only chooses the words and
  * the tone, so the panel says the same as `mbt lots show` and the Friday Telegram.
  */
-import type { MomentumLot, MomentumLotOrders } from '../types/momentum';
+import type { MomentumLot, MomentumLotOrders, MomentumLotRule } from '../types/momentum';
 import { formatDayShort, formatInr, formatInt } from './format';
 
 /** The Friday orders' word for a lot (the Telegram's "NEW lot", "rebalance", …). */
@@ -12,6 +12,13 @@ export const LOT_ORDER_STATUS: Record<MomentumLotOrders['status'], string> = {
   rebalance: 'Rebalance',
   exit: 'Sell only',
   'not due': 'Not due',
+};
+
+/** How a due lot's orders were made (BL-236), in the words the Friday Telegram uses. */
+export const LOT_RULE_TEXT: Record<MomentumLotRule, string> = {
+  equal: 'what the strategy trades this week, split equally',
+  target: "to the strategy's end weights",
+  fresh: 'fresh picks, equal weights',
 };
 
 export type LotTone = 'primary' | 'neutral' | 'warning';
@@ -45,6 +52,7 @@ export function lastOrdersText(lot: MomentumLot): string | null {
   if ((said.status === 'new' || said.status === 'rebalance') && said.budget != null) {
     parts.push(formatInr(said.budget));
   }
+  if (said.status === 'rebalance' && said.rule) parts.push(LOT_RULE_TEXT[said.rule]);
   return parts.join(' · ');
 }
 

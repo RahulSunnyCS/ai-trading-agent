@@ -1,0 +1,14 @@
+variants 124; sessions 618 (2022-04-05 -> 2024-10-08); excluded by quality 0; no label 1
+
+REGISTERED TEST: Friday 81 (125 sessions) vs other 192 (493); gap 111 (bar 100); one-sided p 0.012 (bar 0.05); 90% band of the gap 29 .. 190 -> PASS
+Fridays left out (within 1 weekday of expiry): none
+
+Descriptive (not part of the verdict): session mean ± SE (sessions)
+weekday: Mon 103 ± 38 (121) | Tue 236 ± 38 (123) | Wed 137 ± 44 (124) | Thu 289 ± 45 (125) | Fri 81 ± 44 (125)
+Widesl: Mon 170 ± 72 (121) | Tue 318 ± 72 (123) | Wed 60 ± 79 (124) | Thu 286 ± 80 (125) | Fri 46 ± 81 (125)
+Dir ATM: Mon 2 ± 68 (121) | Tue 265 ± 85 (123) | Wed 361 ± 79 (124) | Thu 469 ± 52 (125) | Fri 214 ± 76 (125)
+Buy: Mon -1 ± 47 (121) | Tue -52 ± 44 (123) | Wed 142 ± 61 (124) | Thu 112 ± 61 (125) | Fri 53 ± 56 (125)
+weekday x NIFTY calendar days to expiry: Fri dte 5 -83 ± 210 (5) | Fri dte 6 88 ± 45 (120) | Mon dte 2 325 ± 169 (5) | Mon dte 3 93 ± 39 (116) | Thu dte 0 289 ± 45 (125) | Tue dte 1 394 ± 211 (5) | Tue dte 2 229 ± 39 (118) | Wed dte 0 573 ± 137 (6) | Wed dte 1 114 ± 45 (118)
+2022: Friday 116 ± 66 (38) | other 226 ± 37 (146)
+2023: Friday -3 ± 61 (50) | other 154 ± 24 (195)
+2024: Friday 160 ± 103 (37) | other 209 ± 49 (152)

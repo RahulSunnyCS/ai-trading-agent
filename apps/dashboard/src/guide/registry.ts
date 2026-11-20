@@ -21,6 +21,7 @@ import momentumBacktestResults from './content/momentum/backtest-results.md?raw'
 import momentumBacktestSettings from './content/momentum/backtest-settings.md?raw';
 import momentumHowItWorks from './content/momentum/how-it-works.md?raw';
 import momentumJournal from './content/momentum/journal.md?raw';
+import momentumOptionsOverlay from './content/momentum/options-overlay.md?raw';
 import momentumSavedRuns from './content/momentum/saved-runs.md?raw';
 import momentumScores from './content/momentum/scores.md?raw';
 import momentumThisWeek from './content/momentum/this-week.md?raw';
@@ -169,6 +170,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: momentumScores,
     screen: { tab: 'momentum', rest: ['scores'] },
+  },
+  {
+    chapter: 'momentum',
+    slug: 'options-overlay',
+    title: 'Options overlay',
+    summary:
+      "A strategy's picks held as bought stock options: calls, puts on falling stocks, the mirror pool or a market switch.",
+    kind: 'Screen',
+    body: momentumOptionsOverlay,
+    screen: { tab: 'momentum', rest: ['options'] },
   },
   {
     chapter: 'momentum',

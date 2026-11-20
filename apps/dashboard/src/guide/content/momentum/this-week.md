@@ -81,7 +81,18 @@ time. Nothing here places an order: you place them in your broker yourself.
     says how much to **add to Kite** before you buy. It buys the sleeve's **current picks in equal
     weights**, what the model would buy starting from cash this week (the row says *fresh picks,
     equal weights*), never the weights a model running for years has drifted to. A lot that
-    **rebalances** uses its own shares plus the free cash, to the sleeve's running target.
+    **rebalances** trades what the strategy's backtest trades that week (the row says *what the
+    strategy trades this week, split equally*), not the difference to the strategy's end
+    weights: it **sells** every name it holds that the strategy's book no longer keeps (a name
+    ranked inside the exit rank stays), **trims** a name past the position cap, and splits the
+    proceeds plus its share of the free cash **equally** over the names the strategy buys or
+    tops up that week (the top category's pick at its extra weight), in whole shares and with no
+    minimum on a slice. A slice worth less than one share is skipped, and the cash left buys one
+    share of those names in rank order. A name you already hold is topped up, never trimmed
+    toward a drifted weight, so a lot that began off the model stays off it until the
+    strategy's own exits sell what it holds. (Since 20 Nov 2026; set `MOMENTUM_LOT_RULE=target`
+    in `.env` and restart the Momentum API for the older rule, an order to the strategy's running
+    target weights.)
   - A lot that is **not due** trades nothing, even if what you hold differs from the model (a swap
     for a name blocked by the premium rule, whole shares). It sells only a name its sleeve marks
     SELL that week.

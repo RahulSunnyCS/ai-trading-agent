@@ -48,6 +48,10 @@ from .realised.cli import realised_app  # noqa: E402  (BL-168: the contract note
 
 app.add_typer(realised_app, name="realised")
 
+from .nse.cli import nse_app  # noqa: E402  (BL-226: NSE's daily F&O bhavcopy and ban list)
+
+app.add_typer(nse_app, name="nse")
+
 
 @app.callback()
 def _load_env() -> None:

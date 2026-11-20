@@ -233,6 +233,11 @@ const nextConfig: NextConfig = {
               source: '/api/momentum/rebalance-preview/jobs/:id',
               destination: `${momentumDirectOrigin}/api/rebalance-preview/jobs/:id`,
             },
+            {
+              // BL-227: Options overlay (strategies, jobs, jobs/:id)
+              source: '/api/momentum/options-overlay/:path*',
+              destination: `${momentumDirectOrigin}/api/options-overlay/:path*`,
+            },
           ]
         : []),
       // The scheduler's loopback API (apps/scheduler, BL-012): Jobs and Notifications pages.

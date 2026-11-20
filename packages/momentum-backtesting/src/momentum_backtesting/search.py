@@ -79,7 +79,7 @@ FILLS = {
 #: arm's universe (BL-176 searches the point-in-time `turnover_rank` list directly; earlier rounds
 #: searched today's list and were re-scored point in time afterwards, `pit_rerun.py`).
 SPACE_KEYS = {"universe_kind"}
-UNIVERSE_KINDS = ("total_market", "all_liquid", "turnover_rank")
+UNIVERSE_KINDS = ("total_market", "all_liquid", "turnover_rank", "fno")
 ARMS = {
     "A": ("total_market", "on"),
     "B": ("total_market", "off"),
@@ -379,7 +379,13 @@ def data_snapshot(root: Path | None = None, through: str | None = None) -> dict[
             [cap],
         ).fetchall()
     digest = hashlib.sha1(json.dumps(factors, default=str).encode()).hexdigest()[:12]
-    return {"last_bar": str(last_bar), "last_week": str(last_week), "factors": digest}
+    snapshot = {"last_bar": str(last_bar), "last_week": str(last_week), "factors": digest}
+    from .categories import fno
+
+    members = fno.members_digest(through, root)
+    if members is not None:  # only once the F&O list is built: older snapshots keep their keys
+        snapshot["fno"] = members
+    return snapshot
 
 
 def tilt_possible(lookbacks) -> bool:

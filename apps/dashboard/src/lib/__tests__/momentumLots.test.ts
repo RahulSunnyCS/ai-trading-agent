@@ -67,6 +67,16 @@ describe('lastOrdersText', () => {
     ).toBe('Not due');
     expect(lastOrdersText(lot())).toBeNull();
   });
+  it('says how a rebalancing lot was planned (BL-236)', () => {
+    expect(
+      lastOrdersText(
+        lot({ last_orders: { status: 'rebalance', rule: 'equal', budget: 29604, next: null } }),
+      ),
+    ).toBe('Rebalance · ₹29,604 · what the strategy trades this week, split equally');
+    expect(
+      lastOrdersText(lot({ last_orders: { status: 'rebalance', budget: 100, next: null } })),
+    ).toBe('Rebalance · ₹100');
+  });
 });
 
 describe('planned', () => {

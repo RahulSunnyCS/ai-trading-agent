@@ -26,6 +26,8 @@ EXEMPT_CHOICES = {
     ("execution", "mon_10am"): "needs intraday prices, which are not collected yet",
     ("broad_universe", "all_liquid"): EXEMPT["broad_universe"],
     ("broad_category_tags", "extended"): EXEMPT["broad_category_tags"],
+    ("broad_universe", "fno"): "BL-226, research only: the F&O list comes from NSE's F&O "
+    "bhavcopy in the lake (obt nse fno-build), which the fixture does not hold",
     ("broad_universe", "turnover_rank"): "the top 750 by turnover needs the whole lake; the "
     "fixture holds 170, so the Broad scenarios pin total_market although turnover_rank is the "
     "dashboard default since BL-036 Phase 1. tests/test_broad_parity.py checks the plumbing",
