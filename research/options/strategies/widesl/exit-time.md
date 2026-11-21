@@ -17,6 +17,7 @@ The minute any leg still open is bought back. Set by `exit_time` (HH:MM); it mus
 |---|---|---|---|---|
 | BL-098 Phase 2 | 14:50, 15:00, 15:10, 15:20, 15:28 (baseline) | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive; no earlier exit reached any top-four list | [BL-098][bl098], [report][bl098q] |
 | [BL-182][bl182] | A 12:00 exit, as the morning half of a two-set day (a fresh set 13:00–15:28 follows) | 2024-10-09 → 2026-10-27, 501 days, after charges, seen data | A 09:17–12:00 set alone earns +141 (NIFTY) / +266 (SENSEX) net a day against +239 / +260 for the whole day; with the afternoon set added the pair beats the whole day on point but not on the registered interval. Killed | [Session split](session-split.md) |
+| BL-218 (MCX minis) | 22:00 / 15 min before the close | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass | [MCX page](mcx-commodities.md) |
 
 ## What we know
 

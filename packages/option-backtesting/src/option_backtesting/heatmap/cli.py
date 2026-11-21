@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 
 import typer
+from trading_data.lake import MCX_ROOTS
 
 from . import grid, store, view
 
@@ -18,7 +19,9 @@ def _day(raw: str | None) -> date | None:
 
 def lake_underlyings(root: Path) -> list[str]:
     base = root / "lake" / "bars_1m" / "asset=option"
-    return sorted(p.name.split("=", 1)[1] for p in base.glob("underlying=*"))
+    # MCX commodity roots (BL-148) share the folder but are neither indexes nor stocks
+    names = (p.name.split("=", 1)[1] for p in base.glob("underlying=*"))
+    return sorted(n for n in names if n not in MCX_ROOTS)
 
 
 @heatmap_app.command("build")

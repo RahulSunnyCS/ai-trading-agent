@@ -37,6 +37,7 @@ import numpy as np
 from ..data.reference.loader import default_reference_data
 from . import expiry, journal, store
 from .dte import LEGACY_BASIS, entry_basis, recorded_labels
+from .entries import read as read_entries
 from .lists import BUY_TOP, LISTS, LOTS_PER, MIN_WIDE_N, N_BUY, N_CORE, WARMUP, RotationList
 from .score import (
     VIX_LABELS,
@@ -158,7 +159,7 @@ def load_snapshot(root: Path, names: Sequence[str] | None = None) -> Snapshot:
     error = None
     path = store.journal_path(root)
     try:
-        entries = {e["day"]: e for e in journal.read(path)}
+        entries = {e["day"]: e for e in read_entries(root, None, path)}
     except journal.JournalCorrupt as exc:
         error = str(exc)
     problems = tuple(journal.verify(path))

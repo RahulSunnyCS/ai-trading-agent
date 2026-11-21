@@ -241,10 +241,12 @@ def symbols_table(contracts: list[Contract]) -> pa.Table:
     )
 
 
-def write_symbol_master(root: Path, day: date, contracts: list[Contract]) -> None:
+def write_symbol_master(
+    root: Path, day: date, contracts: list[Contract], vendor: str = "fyers"
+) -> None:
     """Merge into the day's saved symbol master rather than overwrite it: a later run
     for fewer underlyings (e.g. a SENSEX-only backfill) must not drop the others'."""
-    path = lake.symbol_master_path(root, "fyers", day)
+    path = lake.symbol_master_path(root, vendor, day)
     table = symbols_table(contracts)
     if path.exists():
         new = set(table.column("vendor_symbol").to_pylist())

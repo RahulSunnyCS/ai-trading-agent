@@ -1,6 +1,6 @@
 # Overnight short straddle into expiry morning
 
-**Status:** Tested (killed) · **Last updated:** 2026-10-24
+**Status:** Tested (killed) · **Last updated:** 2026-11-20
 
 ## What it is
 
@@ -26,6 +26,7 @@ Not live; not in the rotation universe. Nothing here changes any list, file or t
 | BL-160 (supporting) | Same cell on SENSEX | SENSEX, 2023-07-26 → 2024-10-08 | **Not usable**: the vendor SENSEX option files cover about 8 nights | [BL-160][bl160] |
 | BL-160 (learning period) | Index × DTE × hedge × exit, descriptive | NIFTY and SENSEX, 2024-10-09 → 2026-10-08, after charges | Descriptive, no verdict (below) | [BL-160][bl160] |
 | BL-160 (VIX band, post-hoc) | The 09:17 cells split by India VIX at 15:25: < 13, 13–15, 15–18, 18+ (48 cells) | all three sets above | **Post-hoc and descriptive**; ran after the verdict; owner override recorded after the run (2026-10-24). See What we know | [BL-160][bl160] |
+| BL-237 (registered test) | The expiry-eve PAIR: sell the expiring index's ATM straddle and buy the other index's ATM straddle at 15:30 the day before each weekly expiry, close both at 09:17 on expiry day; one lot each, no stops; after charges and 0.5% slippage | NIFTY and SENSEX, 2024-10-09 → 2026-11-18, 89 trades fit year and 105 test year | **Killed**: −₹455 a trade fit [−650, −263], −₹541 test [−780, −325]; both streams negative in both windows. About zero before costs (−₹16 gross) | [BL-237][bl237] |
 
 BL-160 learning period, ₹ net per night, one lot, after charges, exit at 09:17 unless stated (the item's
 table):
@@ -55,6 +56,13 @@ table):
   the unhedged DTE 0 night was 15–18 (NIFTY 2024–26 +₹846, 16 nights; NIFTY 2022–24 +₹577, 28 nights;
   SENSEX 2024–26 +₹923, 17 nights). It was found by looking at 48 cells after the verdict, every other band
   flips sign between sets, and the code that cut it is not committed. Only a forward record could confirm it (about 13 qualifying nights a year per index).
+- **Selling one index's expiring straddle and buying the other's does not help** (BL-237, registered). The pair is about
+  zero before costs and loses −₹455 (fit) and −₹541 (test) a trade after them; the sold leg alone is +₹121 a trade (NIFTY
+  +₹349, SENSEX −₹149, consistent with BL-160's unhedged NIFTY DTE 0), but the bought straddle on the other index loses
+  −₹622 a trade and is no cushion on gaps above 0.5% (−₹1,707 a trade). The same pair on non-eve nights loses as much, so
+  there is no eve effect. 21 of 221 eve trades attempted could not be built because the bought index's own weekly expired that day
+  (skipped and listed, not run with the next weekly). Its windows overlap BL-160's learning period, so the sold-leg figure
+  is not new evidence.
 - **NIFTY 2022-01 → 2024-10 is now used up for overnight-straddle questions.** BL-160's registered test used
   it, and the VIX-band split looked at it afterwards. Any new overnight-straddle item needs a period neither
   has read (a forward record).
@@ -72,8 +80,9 @@ table):
 
 - [Long straddle hedge](../long-straddle-hedge/README.md) (another hedge test, killed);
   [Widesl entry time](../widesl/entry-time.md); [charges](../../common/charges.md).
-- Scripts: `research/bl159/overnight.py`, `research/bl160/overnight_hedged.py`; outputs git-ignored,
+- Scripts: `research/bl159/overnight.py`, `research/bl160/overnight_hedged.py`, `research/bl237/sim.py` + `analyse.py`; outputs git-ignored,
   regenerate with them (they need the lake on `TRADING_DATA_ROOT`).
 
 [bl159]: ../../../../backlog/BL-159-eight-poc-reads.md
 [bl160]: ../../../../backlog/BL-160-overnight-straddle-into-expiry.md
+[bl237]: ../../../../backlog/BL-237-expiry-eve-straddle-pair.md

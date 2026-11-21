@@ -18,6 +18,7 @@ bar to beat and a later earliest entry.
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-097 | entry + 5, + 15, + 20, + 30 minutes (`range_plus_N`; base + 10) | 48 files, fit 2024-10 → 2025-10, holdout 2025-10 → 2026-10, after charges | Screen only; + 30 leads NIFTY 09:15–11:00 and SENSEX 11:00–13:00; + 20 and + 30 fill SENSEX's morning top three | [BL-097][bl097], [report][bl097q] |
+| BL-218 (MCX minis) | 10 / 15 / 30 min | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass | [MCX page](mcx-commodities.md) |
 
 Change against the baseline on the same file, ₹, mean over files ([how to read](README.md#how-to-read-the-bl-097-tables-on-these-pages)):
 

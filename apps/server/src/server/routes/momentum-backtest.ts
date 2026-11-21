@@ -667,4 +667,90 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
       await forward(reply, `/api/rebalance-preview/jobs/${id}`);
     },
   );
+
+  // BL-227: Momentum › Options overlay. A run re-runs a favourite on F&O stocks first (minutes
+  // cold), so it is a job like the preview: start it, then poll it.
+  fastify.get('/api/momentum/options-overlay/strategies', async (_request, reply) => {
+    await forward(reply, '/api/options-overlay/strategies');
+  });
+
+  fastify.get('/api/momentum/options-overlay/sweeps', async (_request, reply) => {
+    await forward(reply, '/api/options-overlay/sweeps');
+  });
+
+  fastify.get(
+    '/api/momentum/options-overlay/sweeps/:name',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { name: { type: 'string', pattern: '^[A-Za-z0-9._-]{1,80}$' } },
+          required: ['name'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { name } = request.params as { name: string };
+      await forward(reply, `/api/options-overlay/sweeps/${encodeURIComponent(name)}`);
+    },
+  );
+
+  fastify.post(
+    '/api/momentum/options-overlay/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/options-overlay/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.get(
+    '/api/momentum/options-overlay/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/options-overlay/jobs/${id}`);
+    },
+  );
+
+  // Fresh starts: the page's settings started afresh with the capital on many days
+  fastify.post(
+    '/api/momentum/options-overlay/starts/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/options-overlay/starts/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.get(
+    '/api/momentum/options-overlay/starts/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/options-overlay/starts/jobs/${id}`);
+    },
+  );
 });

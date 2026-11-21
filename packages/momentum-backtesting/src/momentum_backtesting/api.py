@@ -425,7 +425,9 @@ class _Data:
         liquidity: liquidity_mod.LiquidityConfig | None = None,
         voladj_lookbacks: bool = False,
         voladj_skip: Literal["long", "all", "none"] = "long",
-        universe_kind: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
+        universe_kind: Literal[
+            "total_market", "all_liquid", "turnover_rank", "fno"
+        ] = "total_market",
         series_breaks: Literal["legacy", "verified"] = "verified",
     ) -> broad.UniverseRanking:
         """Step 2 (categories/broad.py) for this exact parameter combination - cached the same
@@ -762,7 +764,7 @@ class BacktestRequest(BaseModel):
     # every NSE equity, narrowed week by week by the tradability gate (which is then mandatory);
     # "turnover_rank" = the top 750 by turnover as known each January (point in time, BL-010 F1;
     # what the Phase 3-6 searches ran on) - gated like all_liquid, because the search always gates.
-    broad_universe: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market"
+    broad_universe: Literal["total_market", "all_liquid", "turnover_rank", "fno"] = "total_market"
     broad_liquidity_filter: bool = False
     # Fill as a live account would around circuit locks: no buying a stock locked at the upper
     # circuit, no selling one locked at the lower circuit. Off = fills ignore locks (the original
@@ -1979,9 +1981,12 @@ def _run_broad(
     *,
     top_sector_weight: float | None = None,
     tax: TaxRules | None = None,
+    extension_exit: float | None = None,
+    extension_action: Literal["sell", "trim"] = "sell",
 ) -> broad.BroadBacktestResult:
-    """`top_sector_weight` (None = the request's `broad_top_sector_weight`) and `tax` are for
-    research scripts (BL-116, after-tax runs); the API's own Broad requests leave both unset."""
+    """`top_sector_weight` (None = the request's `broad_top_sector_weight`), `tax` and the BL-233
+    extension exit are for research scripts (BL-116, after-tax runs, BL-233); the API's own Broad
+    requests leave them unset."""
     if top_sector_weight is None:
         top_sector_weight = req.broad_top_sector_weight
     if top_sector_weight != 1.0 and req.broad_category_mode != "on":
@@ -2053,6 +2058,8 @@ def _run_broad(
         lc_locked=lc_locked,
         top_sector_weight=top_sector_weight,
         tax=tax,
+        extension_exit=extension_exit,
+        extension_action=extension_action,
     )
 
 
@@ -2213,8 +2220,14 @@ def _fill_companion(
 #: what narrows it) and the point-in-time turnover rank (every search that used it gated).
 GATED_BROAD_UNIVERSES = ("all_liquid", "turnover_rank")
 #: Universes the live rebalance preview does not quote. The whole market is ~1,800 stocks; the
-#: turnover rank is the top 750, the same size as the Total Market pool, so it is quoted.
-LIVE_REFUSED_BROAD_UNIVERSES = ("all_liquid",)
+#: turnover rank is the top 750, the same size as the Total Market pool, so it is quoted. The F&O
+#: universe (BL-226) is research only: it reads NSE's F&O list from the lake, which no live path
+#: keeps current.
+LIVE_REFUSED_BROAD_UNIVERSES = ("all_liquid", "fno")
+_LIVE_REFUSED_WHY = {
+    "all_liquid": "The whole-market universe is not quoted live (about 1,800 stocks)",
+    "fno": "The F&O universe is research only (BL-226) and is not quoted live",
+}
 
 #: Exceptions a live preview reports instead of raising: a missing token, a Fyers error, a
 #: network failure (urllib's URLError and timeouts are OSError), stale history or a missing quote.
@@ -2630,8 +2643,7 @@ def _broad_live_ranking(
     stored history is stale or a quote is missing; the caller falls back or reports it."""
     if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
         raise ValueError(
-            "The whole-market universe is not quoted live (about 1,800 stocks); "
-            "it previews from the latest stored close."
+            f"{_LIVE_REFUSED_WHY[req.broad_universe]}; it previews from the latest stored close."
         )
     ranking = _broad_ranking(req)
     config = Config(
@@ -2685,6 +2697,7 @@ def _broad_engine_signal(
     run: tuple[broad.BroadBacktestResult, pd.Timestamp] | None = None,
     *,
     ahead: bool = False,
+    with_slices: bool = False,
 ) -> dict:
     """This week's Broad signal as the engine itself would trade it (BL-010 Phase 6): same shape
     as `analysis.latest_signal` (`week`, `rows`, `explain`), plus `target_weights`, the model's
@@ -2746,8 +2759,12 @@ def _broad_engine_signal(
     if req.signal_delay:
         explain += f" With a {req.signal_delay}-week signal delay, the ranks shown are that old."
     equity = result.equity.loc[:week]
+    extra: dict = {}
+    if with_slices:  # BL-236: what a rebalancing lot copies (never stored or journalled)
+        extra = _equal_split_recipe(req, result, acted, ranks, week)
     return analysis._clean(
         {
+            **extra,
             "week": week,
             "rows": rows,
             "explain": explain,
@@ -2772,6 +2789,38 @@ def _broad_engine_signal(
             },
         }
     )
+
+
+def _equal_split_recipe(
+    req: BacktestRequest, result: Result, acted: pd.DataFrame, ranks: pd.Series, week: pd.Timestamp
+) -> dict:
+    """The week's equal split as the engine made it (BL-236): `slices` = each name it BUYs or ADDs
+    to -> the value it put in (the top category's pick at its extra weight is already in it), best
+    rank first; `keep` = the names its book holds after the week plus any name ranked inside the
+    exit rank (a held name the model never bought, like one bought by hand, stays only inside
+    it)."""
+    bought = acted[acted["action"].isin(["BUY", "ADD"])] if len(acted) else acted
+    slices = {
+        str(t.asset): float(t.value)
+        for t in sorted(
+            bought.itertuples(), key=lambda t: (pd.isna(t.rank), 0.0 if pd.isna(t.rank) else t.rank)
+        )
+        if float(t.value) > 0
+    }
+    book = {n for n in _model_holdings_or_idle(result, week) if n not in (IDLE, CASH)}
+    # what the engine sold this week is gone, whatever rank the stock still has
+    sold = (
+        {str(t.asset) for t in acted.itertuples() if str(t.action) == "SELL"}
+        if len(acted)
+        else set()
+    )
+    inside = {str(n) for n, r in ranks.items() if pd.notna(r) and r <= req.broad_category_exit_rank}
+    return {
+        "slices": slices,
+        "keep": sorted((book | inside) - sold),
+        "max_position": req.max_position,
+        "cap_band": req.cap_band,
+    }
 
 
 def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> dict:
@@ -3454,9 +3503,9 @@ def _orders_signal(
             rankings.append(ranking)
         last = ranking.prices.index[-1].normalize()
         if last >= target_week.normalize():
-            signal, kind = _broad_engine_signal(req), "final"
+            signal, kind = _broad_engine_signal(req, with_slices=True), "final"
         elif last == (target_week - pd.Timedelta(days=7)).normalize() and req.signal_delay >= 1:
-            signal, kind = _broad_engine_signal(req, ahead=True), "exact"
+            signal, kind = _broad_engine_signal(req, ahead=True, with_slices=True), "exact"
         elif req.signal_delay < 1:
             return (
                 None,
@@ -3853,6 +3902,18 @@ def _lot_label(name: str, week: str, start: str | None, rebalance: dict | None) 
     return f"Lot {found.group(1)}" if found else name
 
 
+def lot_rule() -> str:
+    """How a due lot that holds shares is rebalanced (BL-236, owner 2026-11-19): `equal` (the
+    default) trades what the sleeve's backtest trades that week; `target` is the BL-142 rule, an
+    order to the sleeve's end weights. `MOMENTUM_LOT_RULE=target` switches it back (read on each
+    call; the launchd Momentum API keeps the environment it started with, so restart it)."""
+    return (
+        "target"
+        if os.environ.get("MOMENTUM_LOT_RULE", "equal").strip().lower() == "target"
+        else "equal"
+    )
+
+
 def _compute_lot_orders(
     payload: dict,
     *,
@@ -3914,6 +3975,11 @@ def _compute_lot_orders(
                 for k, v in sig.get("target_weights", {}).items()
                 if v > 0 and k not in cash_names
             },
+            # BL-236: what its backtest trades this week, for a due lot that holds shares.
+            "slices": sig.get("slices"),
+            "keep": sig.get("keep"),
+            "max_position": sig.get("max_position"),
+            "cap_band": sig.get("cap_band") or 0.0,
             # What the sleeve itself says to sell this week (a forced exit off its calendar).
             "exits": frozenset(
                 str(row["asset"])
@@ -3984,7 +4050,15 @@ def _compute_lot_orders(
         if info.get("fresh") and total > 0:
             kept = {k: v / total for k, v in kept.items()}
         info["target"] = kept
+        if info.get("slices"):  # the equal split spreads a gated name's slice over the rest
+            info["slices"] = {k: v for k, v in info["slices"].items() if k not in gated}
         premium_skipped.update({n: skips[n] for n in gated})
+
+    def equal_split(info: dict) -> dict[str, float] | None:
+        """The sleeve's slices when a rebalancing lot should copy its backtest (BL-236)."""
+        if lot_rule() != "equal" or info.get("fresh") or info.get("slices") is None:
+            return None
+        return info["slices"] if info.get("keep") is not None else None
 
     lot_inputs = [
         lots.Lot(
@@ -3998,6 +4072,10 @@ def _compute_lot_orders(
             info["exits"],
             sid in has_history,
             use_leftover=bool(info.get("fresh")),
+            slices=equal_split(info),
+            keep=frozenset(info["keep"]) if equal_split(info) is not None else None,
+            max_position=info.get("max_position"),
+            cap_band=float(info.get("cap_band") or 0.0),
         )
         for sid, info in sleeves.items()
     ]
@@ -4110,6 +4188,8 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
             head += f" · ₹{lot['budget']:,.0f}"
         if lot.get("fresh"):
             head += " · fresh picks, equal weights"
+        elif lot.get("rule") == "equal":
+            head += " · what the strategy trades this week, split equally"
         if lot["status"] == "not due" and lot["next"]:
             head += f" · next {pd.Timestamp(lot['next']):%a %d %b}"
         lines.append(head)
@@ -4473,6 +4553,7 @@ def lots_view() -> dict:
                 "last_orders": (
                     {
                         "status": ordered["status"],
+                        "rule": ordered.get("rule"),
                         "budget": ordered.get("budget"),
                         "next": ordered.get("next"),
                     }
@@ -4936,6 +5017,85 @@ ORDERS_JOBS = _SingleFlightJob()
 # Friday's orders planned early (tentative): `tentative_orders`, from the page's button.
 TENTATIVE_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
+
+
+def _run_options_overlay(body: dict) -> dict:
+    from . import overlay_runs
+
+    try:
+        return overlay_runs.run_request(body)
+    except (ValueError, LookupError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error)) from error
+
+
+# BL-227: the Options overlay page's runs (a favourite re-run on F&O stocks takes minutes cold).
+OVERLAY_JOBS = _PreviewJobs(_run_options_overlay)
+
+
+def _run_overlay_starts(body: dict) -> dict:
+    from . import overlay_runs
+
+    try:
+        return overlay_runs.starts_request(body)
+    except (ValueError, LookupError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error)) from error
+
+
+# The same settings started afresh on many days (the "Fresh starts" card; a run per start).
+OVERLAY_STARTS_JOBS = _PreviewJobs(_run_overlay_starts)
+
+
+class OverlayCustomStrategy(BaseModel):
+    """BL-227: a custom Broad strategy on F&O stocks (`overlay_runs.CUSTOM_BASE` plus these)."""
+
+    lookbacks: list[int] = Field([1, 4, 13, 26, 52], min_length=1, max_length=5)
+    top_n: int = Field(10, ge=1, le=30)
+    exit_rank: int = Field(20, ge=1, le=100)
+    rebalance: Literal["weekly", "fortnightly", "monthly"] = "weekly"
+    score: Literal["ranksum", "voladj"] = "ranksum"
+
+
+class OptionsOverlayRequest(BaseModel):
+    """BL-227: one Options overlay run (`options_overlay.Settings` plus the strategy)."""
+
+    favourite_id: str | None = None
+    custom: OverlayCustomStrategy | None = None  # instead of a favourite
+    direction: Literal["calls", "puts", "mirror", "switch", "both"] = "calls"
+    moneyness: Literal["ITM2", "ITM1", "ATM", "OTM1", "OTM2", "OTM3", "DELTA"] = "ATM"
+    sizing: Literal["one_lot", "premium", "capital_share", "exposure"] = "one_lot"
+    sizing_value: float | None = Field(None, gt=0)
+    capital: float = Field(1_000_000.0, gt=0, le=1e9)
+    n: int = Field(5, ge=1, le=30)
+    min_sessions_left: int = Field(10, ge=1, le=60)
+    min_oi_lots: int = Field(10, ge=0, le=1000)
+    slippage: float | None = Field(None, ge=0, lt=0.5)
+    tax: bool = True
+    market_filter: Literal["nifty_200dma", "nifty_26w", "breadth"] = "nifty_200dma"
+    put_share: float = Field(0.5, ge=0, le=1)
+    start: str = "2020-01-01"
+    end: str | None = None
+    # profit booking: each `profit_step` rupees made, `withdraw_share` of it taken out
+    profit_step: float | None = Field(None, gt=0)
+    withdraw_share: float = Field(0.75, ge=0, le=1)
+    refill: bool = True  # move taken-out money back when the account cannot pay for a pick
+    hold: bool = False  # keep a contract while its stock is still picked
+    delta_target: float = Field(0.6, ge=0.05, le=0.95)  # moneyness DELTA
+    expiry_skip: int = Field(0, ge=0, le=2)
+    stop: float | None = Field(None, gt=0, le=10)  # exit on a daily close this far down
+    target: float | None = Field(None, gt=0, le=10)  # ... or this far up
+    call_filter: Literal["none", "nifty_200dma", "nifty_26w", "breadth"] = "none"
+    max_positions: int | None = Field(None, ge=1, le=50)
+    max_weekly_premium: float | None = Field(None, gt=0, le=5)
+    split: str | None = None  # train / test split day
+
+
+class OverlayStartsRequest(OptionsOverlayRequest):
+    """The page's settings started afresh with `capital` every `every_months` months, each run
+    for `years` (`options_overlay.starts`)."""
+
+    every_months: Literal[1, 3, 6] = 3
+    years: int = Field(1, ge=1, le=3)
+    washout: float = Field(0.2, gt=0, lt=1)  # a start washed out below this share of capital
 
 
 class _BacktestJobs:
@@ -5422,7 +5582,7 @@ def _broad_live_weekly_result(
     config = dict(favorite["config"])
     req = BacktestRequest.model_validate(config)
     if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
-        raise ValueError("the whole-market universe is not quoted live")
+        raise ValueError(_LIVE_REFUSED_WHY[req.broad_universe])
     if split_every(req) > 1:  # All Fridays: no one portfolio for the engine to decide
         raise ValueError(analysis.SPLIT_SIGNAL_NOTE)
     symbols = tuple(sorted(set(rebalance.broad_quote_symbols(_broad_ranking(req)).values())))
@@ -6458,6 +6618,56 @@ def create_app() -> FastAPI:
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:
         return rebalance_preview(req)
+
+    @app.get("/api/options-overlay/strategies")
+    def options_overlay_strategies() -> dict:
+        """BL-227: the Broad favourites the Options overlay can re-run on F&O stocks, and the F&O
+        lake's newest day (None when the lake has no F&O files)."""
+        from . import options_overlay, overlay_runs
+
+        try:
+            newest = options_overlay.LAKE.newest
+        except FileNotFoundError:
+            newest = None
+        return {"strategies": overlay_runs.strategies(), "data_through": newest}
+
+    @app.get("/api/options-overlay/sweeps")
+    def options_overlay_sweeps() -> dict:
+        """BL-229: the overlay sweeps on disk, with how far each has got."""
+        from . import overlay_sweep
+
+        return {"sweeps": overlay_sweep.list_sweeps()}
+
+    @app.get("/api/options-overlay/sweeps/{name}")
+    def options_overlay_sweep(name: str) -> dict:
+        from . import overlay_sweep
+
+        try:
+            return {"name": name, "rows": overlay_sweep.read_sweep(name)}
+        except LookupError as error:
+            raise HTTPException(404, str(error)) from error
+
+    @app.post("/api/options-overlay/jobs", status_code=202)
+    def start_options_overlay(req: OptionsOverlayRequest) -> dict:
+        return OVERLAY_JOBS.start(req.model_dump())
+
+    @app.get("/api/options-overlay/jobs/{job_id}")
+    def options_overlay_job(job_id: str) -> dict:
+        job = OVERLAY_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown overlay run (the service may have restarted).")
+        return job
+
+    @app.post("/api/options-overlay/starts/jobs", status_code=202)
+    def start_overlay_starts(req: OverlayStartsRequest) -> dict:
+        return OVERLAY_STARTS_JOBS.start(req.model_dump())
+
+    @app.get("/api/options-overlay/starts/jobs/{job_id}")
+    def overlay_starts_job(job_id: str) -> dict:
+        job = OVERLAY_STARTS_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown starts run (the service may have restarted).")
+        return job
 
     @app.post("/api/rebalance-preview/jobs", status_code=202)
     def start_preview_job(req: RebalanceRequest) -> dict:

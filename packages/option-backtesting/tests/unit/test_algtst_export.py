@@ -232,7 +232,9 @@ def test_recorded_picks_read_the_tracks_journal(tmp_path, monkeypatch):
         seen["path"] = path
         return [entry]
 
-    monkeypatch.setattr(ax.journal, "read", fake_read)
+    from option_backtesting.rotation import entries
+
+    monkeypatch.setattr(entries.journal, "read", fake_read)  # every reader goes through entries
     picks = ax.recorded_picks(date(2026, 10, 19), "t1", tmp_path)
     assert picks.core == ["N_wide_0917"] and picks.source == "recorded"
     assert seen["path"] == tmp_path / "rotation" / "track_t1" / "journal.jsonl"

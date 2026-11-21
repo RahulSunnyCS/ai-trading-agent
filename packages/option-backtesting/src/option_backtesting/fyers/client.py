@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import collections
 import json
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -101,6 +102,10 @@ class FyersClient:
         self._per_minute = per_minute
         self._max_rate_limit_hits = max_rate_limit_hits
         self._recent: collections.deque[float] = collections.deque()
+        #: Guards pacing and counters so one client can serve several threads (BL-148's
+        #: parallel MCX pull: a request takes ~1.3 s, so a serial loop cannot reach the limit).
+        #: The HTTP call itself runs outside it.
+        self._lock = threading.Lock()
         self.rate_limit_hits = 0
         self.calls = 0
         #: Optional hook given (symbol, params, raw response body) for every history
@@ -108,18 +113,20 @@ class FyersClient:
         self.on_response: Callable[[str, dict, dict], None] | None = None
 
     def _throttle(self) -> None:
-        wait = self._last_call + self._min_interval_s - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-        if self._per_minute is not None:
-            now = time.monotonic()
-            while self._recent and now - self._recent[0] >= 60:
-                self._recent.popleft()
-            if len(self._recent) >= self._per_minute:
-                time.sleep(max(0.0, 60 - (now - self._recent[0])))
-                self._recent.popleft()
-            self._recent.append(time.monotonic())
-        self._last_call = time.monotonic()
+        with self._lock:  # sleeping inside it is the pacing: the next thread waits its turn
+            wait = self._last_call + self._min_interval_s - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            if self._per_minute is not None:
+                now = time.monotonic()
+                while self._recent and now - self._recent[0] >= 60:
+                    self._recent.popleft()
+                if len(self._recent) >= self._per_minute:
+                    time.sleep(max(0.0, 60 - (now - self._recent[0])))
+                    self._recent.popleft()
+                self._recent.append(time.monotonic())
+            self._last_call = time.monotonic()
+            self.calls += 1
 
     def _get(self, params: dict[str, str | int], *, endpoint: str = HISTORY_URL) -> dict:
         url = f"{endpoint}?{urllib.parse.urlencode(params)}"
@@ -132,16 +139,16 @@ class FyersClient:
         )
         for attempt in range(5):
             self._throttle()
-            self.calls += 1
             try:
                 return json.load(urllib.request.urlopen(request, timeout=30))
             except urllib.error.HTTPError as error:
                 if error.code == 429 and self._max_rate_limit_hits is not None:
-                    self.rate_limit_hits += 1
-                    if self.rate_limit_hits >= self._max_rate_limit_hits:
+                    with self._lock:
+                        self.rate_limit_hits += 1
+                        hits = self.rate_limit_hits
+                    if hits >= self._max_rate_limit_hits:
                         raise RateLimitedError(
-                            f"Fyers rate-limited {self.rate_limit_hits} times; stopping to avoid "
-                            "the day-long block"
+                            f"Fyers rate-limited {hits} times; stopping to avoid the day-long block"
                         ) from None
                     time.sleep(65)  # let the per-minute window clear, then retry once
                     continue
@@ -173,6 +180,13 @@ class FyersClient:
 
     def expired_expiries(self, symbol: str, start: date, end: date) -> list[date]:
         """Expired option expiry dates in the requested window."""
+        return self._expired_expiry_dates(symbol, start, end, "options")
+
+    def expired_futures_expiries(self, symbol: str, start: date, end: date) -> list[date]:
+        """Expired futures expiry dates in the requested window (the same call's other list)."""
+        return self._expired_expiry_dates(symbol, start, end, "futures")
+
+    def _expired_expiry_dates(self, symbol: str, start: date, end: date, kind: str) -> list[date]:
         body = self._get(
             {
                 "symbol": symbol,
@@ -183,7 +197,7 @@ class FyersClient:
             endpoint=EXPIRED_EXPIRIES_URL,
         )
         self._raise_for_error(body, f"{symbol} expiries {start}..{end}")
-        values = body.get("data", {}).get("expiry_dates", {}).get("options", [])
+        values = body.get("data", {}).get("expiry_dates", {}).get(kind, [])
         return [date.fromisoformat(value) for value in values]
 
     def expired_contracts(self, symbol: str, expiry: date) -> list[str]:

@@ -22,6 +22,7 @@ ITM1 in the live `nifty_dir_924_itm1_sl21_recost.yaml`. ATM in the fixed base
 | BL-080 blocks 3–4 | Leave each family out; the 100-weighting map on the 298 list | P1 / P2 / P3 | Both Dir ITM1 families and Dir ATM **carry weight**; the map is far less fragile (58% of weightings above chance everywhere, against 19%) | [BL-080][bl080] |
 | BL-096 | ATM and ITM1 across the stop / MTM / exit grid | holdout 2025-10-09 → 2026-10-09, before and **after charges** | Descriptive ranking | [pre-charge][bl096q], [post-charge][bl096pc] |
 | BL-099 | One winner per index × band across Dir, Buy, Widesl | same holdout, after charges | Every Dir winner is ATM | [BL-099][bl099] |
+| BL-218 (MCX minis) | ITM1 / ATM | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | Only GOLDM expiry week passed (ITM1) | [MCX page](mcx-commodities.md) |
 
 ITM1 minus ATM, mean per variant, 1 lot, before charges ([BL-080][bl080]): NIFTY +₹13k, +₹16k, +₹4k,
 +₹7k, +₹12k (2022 → 2026); SENSEX +₹3k, +₹14k, +₹9k (2024 → 2026); both at about 60% winning days.

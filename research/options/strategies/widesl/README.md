@@ -68,6 +68,7 @@ rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cu
 | [Days to expiry](days-to-expiry.md) | Descriptive | NIFTY falls steadily away from expiry (₹616 → −₹52 a day); SENSEX has no gradient; at the edge of noise, one year |
 | [India VIX](vix.md) | Tested | Weak at VIX 18+ in one year; VIX-based rules and intraday VIX states failed |
 | [Weekday](weekday.md) | Descriptive | Same split as days to expiry within one expiry regime |
+| [MCX commodity options (evening)](mcx-commodities.md) | Tested | No pass on any of the four minis; gold's fit-year winners failed the test year (BL-218) |
 
 ## Across strategies
 

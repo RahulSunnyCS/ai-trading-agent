@@ -18,6 +18,7 @@ corrected to percent against the owner's AlgoTest PDF (BL-009 Phase 1, noted in 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-098 Phase 2 | none, [5,5]%, [10,5]%, [15,10]% (baseline), [20,10]%, [20,15]% | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive; one trail row reached a top-four list | [BL-098][bl098], [report][bl098q] |
+| BL-218 (MCX minis) | none / [15,10]% | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass | [MCX page](mcx-commodities.md) |
 
 The one trail row in the post-charge top four: NIFTY ₹80, [5,5]%, 09:15–11:00: ₹23,989 net (₹52,147
 before charges), ₹99 a day, 60.4% positive days, drawdown −₹28,430, the shallowest of that band's four

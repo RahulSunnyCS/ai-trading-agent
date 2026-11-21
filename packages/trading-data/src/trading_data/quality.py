@@ -10,6 +10,10 @@ A day is described by the instrument with the most bars in the regular session
 (09:15 up to 15:30, bar start, IST): 375 on a full day. Fyers files also keep the 15:30-15:39
 closing bars and some vendor days have rows after hours (Muhurat evenings); those count as
 `off_session_rows`, never as bars.
+
+MCX commodity options (`lake.MCX_ROOTS`, BL-148) trade 09:00 to 23:30 or 23:55 IST (the close
+moves with US daylight saving), so their bars are counted over 09:00 up to 23:55: at most 895 on
+a day, fewer in the 23:30-close months and on an evening-only holiday session.
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ from .db import connect
 #: Same meaning as `fyers/history.py` always had.
 MIN_BARS = 300
 FULL_DAY_BARS = 375
+MCX_FULL_DAY_BARS = 895
 #: An option day with fewer contracts than this is not a chain.
 MIN_CONTRACTS = 10
 
@@ -40,6 +45,8 @@ MIN_CONTRACTS = 10
 #: Half-open on purpose — a bar stamped 15:29:30 belongs to minute 15:29, as in legwise's grid.
 _IST_TIME = "CAST(ts AT TIME ZONE 'Asia/Kolkata' AS TIME)"
 IN_SESSION_SQL = f"({_IST_TIME} >= TIME '09:15' AND {_IST_TIME} < TIME '15:30')"
+
+MCX_IN_SESSION_SQL = f"({_IST_TIME} >= TIME '09:00' AND {_IST_TIME} < TIME '23:55')"
 
 IST = ZoneInfo("Asia/Kolkata")
 ASSETS = ("option", "future", "index")
@@ -60,6 +67,10 @@ class DayStats:
     source: str = "vendor"
 
 
+def is_mcx(stats: DayStats) -> bool:
+    return stats.asset == "option" and stats.name in lake.MCX_ROOTS
+
+
 def verdict(stats: DayStats) -> tuple[str, str | None]:
     """(verdict, reason) for one partition. The first failing rule names the reason."""
     if stats.max_bars == 0:
@@ -68,7 +79,7 @@ def verdict(stats: DayStats) -> tuple[str, str | None]:
         return "excluded", f"short_session:{stats.max_bars}"
     if stats.asset == "option" and stats.contracts < MIN_CONTRACTS:
         return "excluded", f"thin_chain:{stats.contracts}"
-    if stats.max_bars > FULL_DAY_BARS:
+    if stats.max_bars > (MCX_FULL_DAY_BARS if is_mcx(stats) else FULL_DAY_BARS):
         return "excluded", f"duplicate_bars:{stats.max_bars}"
     return "usable", None
 
@@ -86,7 +97,11 @@ def session_kind(stats: DayStats, holidays: set[date]) -> str:
 def infer_source(vendor_symbol: str | None) -> str:
     """Fyers symbols look like `NSE:NIFTY26OCT22700CE`; the vendor's are bare contract
     names (`NIFTY_22700_CE_06_OCT_26`) or csv stems."""
-    return "fyers" if vendor_symbol and vendor_symbol.startswith(("NSE:", "BSE:")) else "vendor"
+    return (
+        "fyers"
+        if vendor_symbol and vendor_symbol.startswith(("NSE:", "BSE:", "MCX:"))
+        else "vendor"
+    )
 
 
 def parse_days(spec: str) -> tuple[date, date]:
@@ -104,13 +119,13 @@ _DAY_FROM_PATH = re.compile(r"date=(\d{4}-\d{2}-\d{2})/data\.parquet$")
 
 # One scan per (asset, name): aggregate each (file, instrument) once — an instrument has one
 # expiry, so any_value is exact — then roll that small intermediate up per file.
-_STATS_SQL = f"""
+_STATS_SQL = """
 WITH per AS (
     SELECT filename, instrument_id,
            count(*) AS n,
-           count(*) FILTER (WHERE {IN_SESSION_SQL}) AS bars,
+           count(*) FILTER (WHERE {in_session}) AS bars,
            min(ts) AS first_ts, max(ts) AS last_ts,
-           any_value({{expiry}}) AS expiry, any_value(vendor_symbol) AS vendor_symbol
+           any_value({expiry}) AS expiry, any_value(vendor_symbol) AS vendor_symbol
     FROM read_parquet(?, filename = true)
     GROUP BY 1, 2
 )
@@ -137,7 +152,10 @@ def file_stats(asset: str, name: str, files: list[Path]) -> list[DayStats]:
     if not files:
         return []
     expiry = "expiry" if asset == "option" else "CAST(NULL AS DATE)"
-    sql = _STATS_SQL.format(expiry=expiry)
+    in_session = (
+        MCX_IN_SESSION_SQL if asset == "option" and name in lake.MCX_ROOTS else IN_SESSION_SQL
+    )
+    sql = _STATS_SQL.format(expiry=expiry, in_session=in_session)
     con = duckdb.connect()
     try:
         rows = con.execute(sql, [[str(f) for f in files]]).fetchall()

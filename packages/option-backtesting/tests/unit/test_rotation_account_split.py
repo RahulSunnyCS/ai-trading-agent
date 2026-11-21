@@ -77,7 +77,9 @@ def test_a_split_that_would_move_a_lot_between_accounts_is_left_alone():
     core = [DIR, W1, DIR2]
     lots = _lots(core, NORMAL, boost_shoonya=True, boost_angel=True)
     got = s.split(core, lots, reentry=_never)
-    assert {b: sum(v.values()) for b, v in got.items()} == {b: sum(v.values()) for b, v in lots.items()}
+    assert {b: sum(v.values()) for b, v in got.items()} == {
+        b: sum(v.values()) for b, v in lots.items()
+    }
     assert got == lots
 
 

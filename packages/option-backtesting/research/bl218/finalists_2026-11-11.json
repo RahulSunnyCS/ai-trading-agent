@@ -1,0 +1,26 @@
+{
+ "NATGASMINI/dir/expiry": [
+  "dir|entry=18:00|strike=ATM|sl=30|reentry=none|exit=close"
+ ],
+ "GOLDM/dir/expiry": [
+  "dir|entry=18:00|strike=ITM1|sl=21|reentry=cost1|exit=close"
+ ],
+ "GOLDM/dir/before": [
+  "dir|entry=19:00|strike=ATM|sl=21|reentry=none|exit=close"
+ ],
+ "GOLDM/widesl/expiry": [
+  "widesl|entry=17:05|strike=OTM1|sl=115|trail=15/10|exit=close"
+ ],
+ "GOLDM/widesl/before": [
+  "widesl|entry=17:05|strike=OTM1|sl=115|trail=none|exit=22:00"
+ ],
+ "GOLDM/rb_e/expiry": [
+  "rb_e|strike=OTM1|start=18:30|range=15|source=instrument|sl=25|target=100|trail=20/10"
+ ],
+ "SILVERM/dir/expiry": [
+  "dir|entry=17:05|strike=ITM1|sl=30|reentry=cost1|exit=close"
+ ],
+ "SILVERM/dir/before": [
+  "dir|entry=17:05|strike=ATM|sl=21|reentry=none|exit=close"
+ ]
+}

@@ -40,6 +40,7 @@ import yaml
 
 from . import journal, store
 from .dte import entry_labels
+from .entries import read as read_entries
 from .lists import LISTS
 from .score import VIX_LABELS
 from .variants import CLOSEST, STRATEGIES_DIR, strategy_path
@@ -383,7 +384,7 @@ def load_journal(root: Path | None = None) -> Journal:
 
     root = root or data_dir()
     try:
-        entries = journal.read(store.journal_path(root))
+        entries = read_entries(root)
     except journal.JournalCorrupt as error:
         return Journal(False, f"the journal cannot be read: {error}")
     if not entries:

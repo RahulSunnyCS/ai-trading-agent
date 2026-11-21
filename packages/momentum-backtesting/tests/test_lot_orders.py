@@ -595,10 +595,15 @@ def test_the_lots_panel_shows_the_ledger_its_calendars_and_kite_beyond_it_withou
         sum(PRICES[r["symbol"]] * r["quantity"] for r in LOT1), 2
     )
     assert (lot1["last"], lot1["next"], lot1["due"]) == ("2026-10-16", "2026-11-13", False)
-    assert lot1["last_orders"] == {"status": "not due", "budget": None, "next": "2026-11-13"}
+    assert lot1["last_orders"] == {
+        "status": "not due",
+        "rule": None,
+        "budget": None,
+        "next": "2026-11-13",
+    }
     assert lot2["holds"] == [] and lot2["pending"] is True and lot2["funded"] is False
     assert (lot2["last"], lot2["next"], lot2["due"]) == ("2026-10-23", "2026-11-20", False)
-    assert lot2["last_orders"]["status"] == "new"
+    assert lot2["last_orders"]["status"] == "new" and lot2["last_orders"]["rule"] == "fresh"
     assert view["pending"] == "Lot 2" and view["snapshot"]["cash"] == 500.0
     assert view["snapshot"]["today"] is True
     assert view["last_orders"]["week"] == "2026-10-23"

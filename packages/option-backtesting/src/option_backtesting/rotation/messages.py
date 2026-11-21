@@ -3,9 +3,10 @@ results and expected picks to a string. Nothing here reads or writes the store, 
 a hash, so the picks, the journal and the scoring are exactly what they were; only the wording
 changes.
 
-Morning (09:16): Adaptive, then the T1 track, in one vertical message. Evening (16:00): the day's
-result for both, then tomorrow's strategies in full. The owner and the friends' group get the same
-text, except the owner's evening live-vs-paper lines. Strategy names come from `labels.label`, so
+Evening (16:00): the day's result for both lists, then tomorrow's strategies in full: the list
+that session trades (since 2026-11-09 there is no 09:16 message; `render_entry` is the text the
+morning record prints, never sent). The owner and the friends' group get the same text, except the
+owner's live-vs-paper lines. Strategy names come from `labels.label`, so
 every line says what the strategy does (`N_widesl_OTM1` and its stop loss, trail, re-entry and
 overall stop) instead of an id.
 """
@@ -13,7 +14,7 @@ overall stop) instead of an id.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import date
 
 from . import labels, live_lots
 from .lists import DISPLAY_NAMES
@@ -25,9 +26,6 @@ SEPARATOR = "━━━━━━━━━━━━━━━"
 T1_NAME = "Tuned Adaptive (In Testing phase)"
 T1_HEAD = f"🧪 {T1_NAME}"
 T1_NOT_RECORDED = f"{T1_HEAD} · not recorded today"
-#: the morning note when T1 is still being recorded (slow, or its results being caught up): it
-#: follows as a message of its own, or an alert says it failed
-T1_FOLLOWS = f"{T1_HEAD} · follows in a separate message"
 #: the evening message's T1 notes
 T1_RESULT_NOT_READY = f"{T1_HEAD} · result not ready"
 T1_RESULT_NOT_RECORDED = T1_NOT_RECORDED
@@ -78,33 +76,6 @@ def _with_dte(head: str, dte: dict | None, source: str | None = None) -> str:
     text = dte_text(dte)
     head = f"{head} · {text}" if text else head
     return f"{head} · {CALENDAR_DTE}" if source == "calendar" else head
-
-
-def change_line(day: date | str, previous: dict | None, core, buy) -> str:
-    """How the 09:16 picks compare with the list the evening message sent (`previous`:
-    `{'day', 'sent_on', 'core', 'buy'}`): `✅ No change from yesterday's list` or `🔄 Changed from
-    yesterday's list: ➖ 12:17 N_widesl_p100 · ➕ 09:32 S_dir_ATM`; '' with no evening list, or
-    one it cannot read (never raises: the 09:16 message is sent after the entry is recorded)."""
-    try:
-        return _change_line(day, previous, core, buy)
-    except Exception:  # noqa: BLE001
-        return ""
-
-
-def _change_line(day: date | str, previous: dict | None, core, buy) -> str:
-    if not isinstance(previous, dict) or str(previous.get("day")) != str(day):
-        return ""
-    sent_on = str(previous.get("sent_on") or "")
-    d = date.fromisoformat(day) if isinstance(day, str) else day
-    yesterday = sent_on == (d - timedelta(days=1)).isoformat()
-    when = "yesterday's" if yesterday or not sent_on else f"{day_text(sent_on)[:3]}'s"
-    before = {*previous.get("core", []), *previous.get("buy", [])}
-    now = {*core, *buy}
-    if before == now:
-        return f"✅ No change from {when} list"
-    gone = [f"➖ {_at(n, labels.label(n).head)}" for n in _by_time(sorted(before - now))]
-    new = [f"➕ {_at(n, labels.label(n).head)}" for n in _by_time(sorted(now - before))]
-    return f"🔄 Changed from {when} list: " + " · ".join([*gone, *new])
 
 
 def _at(name: str, head: str) -> str:
@@ -194,7 +165,6 @@ def _entry_lots(
 def _adaptive_block(
     entry: dict,
     options: dict[str, str | None] | None,
-    previous: dict | None = None,
     boost: bool = False,
 ) -> list[str]:
     head = f"🎯 {DISPLAY_NAMES.get(ADAPTIVE_KEY, 'Adaptive').upper()} · {day_text(entry['day'])}"
@@ -204,9 +174,6 @@ def _adaptive_block(
     core, buy = _entry_picks(entry)
     sized, lots = _entry_lots(entry, core, boost)
     lines += sized
-    change = change_line(entry["day"], previous, core, buy)
-    if change:
-        lines.append(change)
     return [*lines, "", *pick_lines(core, buy, options, lots)]
 
 
@@ -215,7 +182,6 @@ def _t1_block(
     options: dict[str, str | None] | None,
     *,
     dated: bool = False,
-    previous: dict | None = None,
     boost: bool = False,
 ) -> list[str]:
     head = f"{T1_HEAD} · {day_text(entry['day'])}" if dated else T1_HEAD
@@ -230,9 +196,6 @@ def _t1_block(
     core, buy = _entry_picks(entry)
     sized, lots = _entry_lots(entry, core, boost)
     lines += sized
-    change = change_line(entry["day"], previous, core, buy)
-    if change:
-        lines.append(change)
     return [*lines, "", *pick_lines(core, buy, options, lots)]
 
 
@@ -257,40 +220,6 @@ def render_entry(
     )
     lines = [*_late_prefix(entry), *body, "", footer(entry)]
     return "\n".join(lines)
-
-
-def render_morning(
-    live: dict,
-    live_options: dict[str, dict[str, str | None]] | None,
-    t1: dict | None,
-    t1_options: dict[str, dict[str, str | None]] | None = None,
-    t1_note: str = T1_NOT_RECORDED,
-    previous: dict | None = None,
-    boost: dict[str, bool] | None = None,
-) -> str:
-    """The 09:16 message, the same for the owner and the friends' group: Adaptive, then the T1
-    track (or, with no T1 entry, `t1_note`: not recorded, or follows separately), ending with the
-    Adaptive entry's chain hash. `previous` is the list the evening message sent for this session
-    (`result.read_tentative`): each list then says whether it changed."""
-    previous = previous or {}
-    boost = boost or {}
-    adaptive = _adaptive_block(
-        live,
-        (live_options or {}).get(ADAPTIVE_KEY),
-        previous.get("adaptive"),
-        boost.get("adaptive", False),
-    )
-    t1_lines = (
-        [t1_note]
-        if t1 is None
-        else _t1_block(
-            t1,
-            (t1_options or {}).get(ADAPTIVE_KEY),
-            previous=previous.get("t1"),
-            boost=boost.get("t1", False),
-        )
-    )
-    return "\n".join([*_late_prefix(live), *adaptive, "", SEPARATOR, *t1_lines, "", footer(live)])
 
 
 # -- evening ------------------------------------------------------------------------------------
@@ -480,7 +409,7 @@ def render_result(
         lines += ["", *month]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)
     if first is not None:
-        lines += ["", f"➡️ {day_text(first.day)} (Tentative)"]
+        lines += ["", f"➡️ {day_text(first.day)}"]
         if first.expiry_only:
             lines.append(f"⚡ {first.expiry_only} only")
         lines.append("")
@@ -495,7 +424,7 @@ def render_result(
                 boost.get("adaptive", False),
             )
             if tomorrow_t1 is not None:
-                lines += ["", SEPARATOR]  # the two lists apart, as in the morning message
+                lines += ["", SEPARATOR]  # the two lists apart
         if isinstance(tomorrow_t1, str):
             lines.append(tomorrow_t1)
         elif tomorrow_t1 is not None:

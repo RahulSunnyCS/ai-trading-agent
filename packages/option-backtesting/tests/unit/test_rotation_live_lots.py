@@ -213,22 +213,17 @@ def _entry(dte, core=None, track=None):
     return e
 
 
-def test_the_0916_message_says_the_lots_only_for_a_list_that_trades_them():
+def test_the_entry_text_says_the_lots_only_for_a_list_that_trades_them():
     from option_backtesting.rotation import messages
 
     entry = _entry(NORMAL)
-    plain = messages.render_morning(entry, None, _entry(NORMAL, track="t1"), None)
-    assert "lots" not in plain
-    text = messages.render_morning(
-        entry, None, _entry(NORMAL, track="t1"), None, boost={"adaptive": True, "t1": False}
-    )
-    adaptive, t1 = text.split(messages.SEPARATOR)
-    assert "🔢 4 lots · Dir ×2" in adaptive
-    assert "09:17  N_dir_ITM1 · 2 lots" in adaptive
+    assert "lots" not in messages.render_entry(entry)
+    text = messages.render_entry(entry, None, {"adaptive": True, "t1": False})
+    assert "🔢 4 lots · Dir ×2" in text
+    assert "09:17  N_dir_ITM1 · 2 lots" in text
+    t1 = messages.render_entry(_entry(NORMAL, track="t1"), None, {"adaptive": True, "t1": False})
     assert "lots" not in t1
-    expiry = messages.render_morning(
-        _entry(NIFTY_EXPIRY), None, None, None, boost={"adaptive": True}
-    )
+    expiry = messages.render_entry(_entry(NIFTY_EXPIRY), None, {"adaptive": True})
     assert "🔢 3 lots · expiry day" in expiry and "· 2 lots" not in expiry
     no_dir = _entry(NORMAL, core=["N_p100_1202", "N_wide_1117", "S_wide_0947"])
     assert "🔢 3 lots · no Dir picked" in messages.render_entry(no_dir, None, {"adaptive": True})

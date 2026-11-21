@@ -70,6 +70,7 @@ rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cu
 | [Profit target, lock and trail](profit-lock.md) | Tested | Killed (BL-105): targets lose money, locks change nothing after charges |
 | [Restart after a cut](restart.md) | Tested | Killed (BL-105); a SENSEX morning lead is unregistered |
 | [Roll the decayed leg](roll.md) | Tested | Killed (BL-105): 0 of 336 settings pass; bounded risk, no edge |
+| [MCX commodity options (evening)](mcx-commodities.md) | Tested | One pass: gold mini, expiry week, 18:00 ITM1 SL21 cost×1 to close (₹1,606 a session on the test year, after charges); crude, gas and silver failed (BL-218) |
 
 ## Across strategies
 

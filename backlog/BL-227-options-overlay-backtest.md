@@ -1,0 +1,176 @@
+# BL-227 — Options overlay backtest: run a Momentum strategy's picks as bought stock options, from the dashboard
+
+| | |
+|---|---|
+| **Priority** | P2 — the owner asked for it as a tool of its own (2026-11-15); the options and momentum workbench is the next 2–3 months' goal; nothing live depends on it |
+| **Status** | In progress (Phases 1-3 built; Phase 4 open) |
+| **Type** | feature |
+| **Area** | momentum / options / dashboard |
+| **Created** | 2026-11-15 |
+| **Depends on** | [BL-226](BL-226-fno-momentum-stock-options.md) (the NSE F&O history, the point-in-time F&O list, the `fno` Broad universe and the research scripts this builds on); [BL-107](BL-107-nse-fo-bhavcopy-daily.md) for keeping the F&O files current |
+| **TODO.md row** | 3.10.77 |
+
+## Context
+
+BL-226 tested one fixed form of the idea (three candidates, ₹10 lakh ÷ N of premium per stock, calls
+swapped weekly) and killed it: every call book failed on the confirmation weeks. The owner, 2026-11-15,
+after reading the trades: add it to the backtesting as a separate item, so other settings (one lot per
+stock, a smaller premium budget, other strategies, other moneyness) can be tried and their trades read.
+
+Today the engine is two research scripts (`packages/momentum-backtesting/scripts/bl226_fno_sweep.py`,
+`bl226_options_book.py`) run by hand over a scratch copy of the data; their output is files, not a page.
+The PR #450 review left ten findings on them (re-struck contracts booked at zero, a NaN premium passing
+the entry guard, the trade across a period boundary dropped, a no-op filter in the put list, a slow CDF,
+the API accepting `fno` on live paths); the first, second and sixth matter for a tool people will read.
+
+**What this is not:** a way round BL-226's verdict. A run here is descriptive; a finding still needs a
+pre-registered item (`research/README.md`), and the page says so.
+
+## Goal
+
+From the dashboard, the owner picks a Momentum strategy (a saved favourite, or Broad settings on the F&O
+universe), the option settings and the capital, and gets within a minute: the options book against the
+same picks held as shares (equity, drawdown, after tax), the minimum capital it needed, win rate and
+payoff, the winners and losers by stock, every trade, and the year-by-year split. The same page covers
+**downward momentum**: buying the puts of the stocks falling hardest, on their own or when the market
+itself is falling (owner, 2026-11-15: "if it is downward momentum, we can buy PE also").
+
+## Out of scope
+
+- Selling options, intraday entries and stops, index options (the Options Lab covers those).
+- Placing or suggesting live orders.
+- Re-opening BL-226's verdict.
+
+## Plan
+
+### Phase 1 — Engine in the package, with the review's fixes
+- **Tasks:** move the options book from the script into `momentum_backtesting/options_overlay.py` (pure
+  functions over the F&O lake and a strategy's weekly holdings); fix the review findings: follow a contract
+  re-struck by a corporate action (match the adjusted strike and lot on the exit day; booked at zero only
+  when no successor exists, counted), refuse a NaN or zero premium, score trades by one rule for any window,
+  vectorised normal CDF and one session array; settings: right (calls, puts, the two put forms), moneyness
+  (ATM, OTM1–OTM3), expiry rule (minimum sessions left), sizing (premium per stock, a fixed number of lots,
+  or a share of capital a week), minimum OI in lots, slippage, capital, tax on or off.
+- **Downward momentum (puts):** the same score read from the bottom. A stock is a put candidate when it
+  is among the N worst-ranked F&O stocks that week **and** its own trend is down (its 26-week return below
+  zero and its close below its 200-day average), so a stock that is merely lagging a rising market is not
+  shorted. Only F&O stocks count (the review's finding: Broad's Gold, Silver, Nasdaq 100, Hang Seng, idle
+  cash and split segments are dropped from the bottom list). Direction modes:
+  - **Calls only:** BL-226's book.
+  - **Puts only:** the falling stocks' puts every week.
+  - **Market switch:** calls on the top N while the market is rising, puts on the bottom N while it is
+    falling. "Falling" is a setting: NIFTY below its 200-day average (the default), NIFTY's own 26-week
+    return below zero, or breadth (under 40 % of F&O stocks above their 200-day average). The switch is
+    read at the rebalance close, from closes up to that day.
+  - **Both sides:** calls on the top N and puts on the bottom N every week, the budget split between them
+    (a setting, 50 / 50 by default).
+  The page shows, for each run, how many weeks were in each state and what each side earned on its own.
+- **Deliverables:** the module, unit tests on synthetic chains (strike choice, expiry rule, re-strike,
+  sizing modes, tax carry), and a parity test: with BL-226's settings it reproduces BL-226's registered
+  numbers, except where a fix changes them (each change listed in this item).
+- **Done when:** the tests pass and BL-226's Trio ATM learning book is reproduced, its differences
+  explained.
+
+### Phase 2 — API
+- **Tasks:** `POST /api/options-overlay` on `mbt serve` as a job (like the other Momentum jobs: start, poll,
+  cached by settings and the F&O lake's newest day); the request names a saved favourite or a Broad request
+  with `broad_universe="fno"`; the response: weekly equity of both books, drawdowns, the minimum-capital
+  table (one lot of every holding a week: median, 90th percentile, largest; worst fall at one lot each),
+  trade statistics, by stock, by year, and the trades. Keep `fno` out of the live signal, preview and order
+  paths (`LIVE_REFUSED_BROAD_UNIVERSES`), as the review asked.
+- **Done when:** an API test runs a small fixture end to end and a live request returns within a minute.
+
+### Phase 3 — Dashboard page and Guide
+- **Tasks:** an "Options overlay" page under Momentum, on the Analytics page pattern
+  (`apps/dashboard/CLAUDE.md`): run bar and settings drawer, a headline strip (options vs shares: total,
+  CAGR, drawdown, minimum capital), the hero chart (both books' equity), then widgets: drawdown, win rate and
+  payoff, winners and losers by stock, best and worst trades, by year, the trades table. A "descriptive,
+  not a finding" note with a link to BL-226. Its Guide page and `guide/registry.ts` entry in the same
+  change.
+- **Done when:** the e2e smoke opens the page, runs BL-226's Trio ATM settings and shows its numbers.
+
+### Phase 4 — Keep the data current
+- **Tasks:** the daily `obt nse fo-fetch` and `fno-build` after NSE publishes (about 18:30), through
+  BL-107's scheduler job if it lands first, else its own; the page shows the newest stored day.
+- **Done when:** a weekday's file and list are in the lake by 19:15 without a hand step.
+
+## Risks
+
+- **Read as a finding:** a page of good-looking runs invites picking the best one; the note on the page and
+  the Guide say it is descriptive, and the minimum-capital and concentration figures sit beside every total.
+- **Speed:** a favourite with four sleeves over seven years took minutes in the script; the job, the cache
+  and the Phase 1 speed-ups are the guard.
+- **Data:** daily closes, not tradable quotes; thin strikes; corporate actions. The page shows the counts
+  of each skip and fill rule.
+
+## Open questions
+
+Answered 2026-11-15 (owner, on starting the item):
+1. **Where:** under Momentum, a page of its own.
+2. **Picks:** the chosen favourite is re-run on the F&O universe (`broad_universe="fno"`, as BL-226), so every
+   pick has options.
+3. **Sizing:** all three in the first version: one lot per stock, premium per stock (capital ÷ N), a share of
+   capital a week.
+4. **Direction:** all modes: calls only, puts only (BL-228 Phase 0's weak list), the mirror pool (BL-228
+   Phase 0b, the owner's idea), the market switch and both sides.
+
+Still open: the data refresh (Phase 4) waits for BL-107's job or has its own; the own-trend test stays
+BL-228's (26-week return and the 40-week average) unless the owner says otherwise.
+
+## Log
+
+- 2026-11-15 — created at the owner's request after BL-226 was killed ("add this as a separate item in
+  backtesting"); planned in four phases, not started.
+- 2026-11-15 — owner: add downward momentum (buy the puts of falling stocks). Added to Phase 1 as direction
+  modes (calls only, puts only, market switch, both sides). Untested: BL-226's Phase 4 never ran (its gate
+  needed a passing call book), so these runs are descriptive until a pre-registered item tests one.
+- 2026-11-15 — [BL-228](BL-228-fno-falling-stock-puts.md) tested the put side on its own and killed it at
+  learning: every put book lost in 2020-24, and the stock-and-inverse mirror pool earned only from its calls.
+  The put modes stay in the plan as descriptive settings; the page should show that result beside them.
+- 2026-11-15 — started (owner: "create the UI for this to test"); questions answered (above). Built on PR #450
+  and #451's branches; the mirror pool added as a direction mode.
+- 2026-11-15 — Phases 1-3 built (`options_overlay.py`, `overlay_runs.py`, the job API, Momentum › Options
+  overlay and its Guide page). Parity: BL-228's N5 ATM puts book reproduced exactly (614 trades,
+  −₹11,51,443 before tax, learning window); the mirror pool differs by two contracts re-struck by bonuses
+  (BEL Sep 2022, PFC Sep 2023), now followed instead of booked at zero (+₹2.06 lakh); BL-226's Trio ATM
+  calls (premium sizing) 1,779 trades +₹1,29,47,277 against 1,789 +₹1,29,04,944 (bans now skipped, three
+  re-strikes followed). Two other vanished contracts (PFC Jun 2023, RECLTD Jul 2023: same lot, strike gone,
+  likely a dividend adjustment) are still booked at zero and counted. A week's same contract bought by two
+  sleeves is one position (lots added). Phase 4 (daily data refresh) not started: the F&O lake ends
+  2026-11-13 until `obt nse fo-fetch` is run again.
+- 2026-11-15 — PR #452 review: fixed the spinner after a lost job, the weekly-share budget split over
+  skipped picks, the chain cache (only traded (day, stock) pairs, bounded), concurrent cold runs (a lock per
+  key) and the favourite cache (newest four). Not done: a benchmark picker on the headline strip and widgets
+  loaded after the chart's first paint (Analytics page pattern); the comparison is fixed (shares, else NIFTY).
+- 2026-11-15 — owner: profit booking ("start with ₹1 lakh; for each ₹50,000 of profit keep 25 % to trade
+  and take 75 % out") and clearer trades ("Buy LAURUSLABS 2,000 CE at 34 → Sell at …") in the chart
+  tooltip and the trade tables. Built: `profit_step` / `withdraw_share` (week-by-week account sized on
+  itself; a one-lot book buys only what the account can pay for; a loss is made back before the next
+  booking); the tooltip lists each day's sales (price, P&L) and buys.
+- 2026-11-15 — owner: refill from money taken out (option 1 of three, after a booked Trio book stopped
+  trading in 2022 once its account fell below one lot). `refill` (on by default with booking): a week the
+  account cannot pay for a pick and is below the starting capital, taken-out money goes back in, up to
+  it. Trio, one lot, ₹1 lakh, 75 % of each ₹50,000: +₹44.4 lakh after tax and trading to Oct 2026 with
+  refill (₹53.6 lakh out, ₹7.1 lakh back) against +₹1.6 lakh and no trade after Jun 2022 without.
+- 2026-11-15 — owner: a custom strategy from the picker, not only saved favourites. "Custom strategy…"
+  sets the look-backs (1-52 weeks), top N, exit rank, rebalance (weekly / every 2 weeks / monthly) and
+  score (rank-sum / volatility-adjusted); the rest is BL-226's grid base (`overlay_runs.CUSTOM_BASE`).
+- 2026-11-16 — owner: a small options sleeve (₹1 lakh, about 3 % of the portfolio) may wash out now and
+  then, so judge it by what a start usually returns and how often it is lost, not by one start's
+  drawdown; asked for the "₹1 lakh starts" view. Built the **Fresh starts** card
+  (`options_overlay.starts`, POST /api/options-overlay/starts/jobs): the run bar's settings started
+  afresh with the capital every month / quarter / half-year, each held 1–3 years, each its own account
+  (a one-lot book buys only what it can pay for); tiles for the median end, ended above start, washed
+  out (account below 10–50 % of capital at a week's close), average, best and worst; one log-scale bar
+  per start. Descriptive, like the page. BL-229's nearest miss (Trio, calls while NIFTY is above its
+  200-day average, hold, stop −50 %, one lot) at ATM, ₹1 lakh, quarterly from 2020, one year: median
+  end ₹19,230, 10 of 24 above ₹1 lakh, 13 of 24 washed out, average ₹4.30 lakh (best ₹24.0 lakh);
+  five of the six starts from July 2024 washed out.
+- 2026-11-16 — PR #452 review (7 bugs). Fixed: a saved favourite is re-run with `signal_delay >= 1` and
+  Friday-close execution (it kept its own, so a delay-0 favourite's calls were bought on the close that
+  ranked them); **this moves the BL-226 parity figure for such a favourite**, to be re-read in BL-230. Also:
+  the last weeks of a default run were all "no contract" (sessions to an expiry are counted in weekdays past
+  the lake's last day); the chosen expiry is never before the exit day (a short `min_sessions_left` booked a
+  lapsed contract at zero); the Run button no longer waits for ever on a forgotten job; a stored favourite is
+  not replaced by the headline; the slippage field keeps what is typed; every cache is keyed on
+  `db_read.data_version()` (stock bars, F&O list) and a favourite's re-run on a hash of its saved settings.

@@ -23,6 +23,7 @@ times per index (`N_buy_*`, `S_buy_*`); there is no 09:35 rotation file.
 | BL-059 | NIFTY and SENSEX, 24 times 09:17–15:02 | 2025-09-01 → 2026-10-08, before charges | Descriptive (table below); shape does not repeat between halves | [BL-059][bl059] |
 | BL-083 | Entry at the minute an RSI-exhaustion or pivot trigger fires | explore 2024-10 → 2026-10; confirm NIFTY 2022-01 → 2024-10 | No lead under the registered bar | [BL-083][bl083] |
 | BL-097 | Baseline at all 24 times, by band | holdout 2025-10-09 → 2026-10-09, **after charges** | Every band negative (below) | [BL-097 report][bl097q] |
+| BL-218 (MCX minis) | range start 09:15/10:30/12:00, 17:00/18:30/20:00; timed buys every 30 min | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | No pass | [MCX page](mcx-commodities.md) |
 
 Average ₹ per day per lot, mean of the start-time means, before charges ([BL-059][bl059]):
 

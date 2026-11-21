@@ -149,6 +149,7 @@ export const NAV_GROUPS: NavGroup[] = [
         children: [
           { segment: 'backtest', label: 'Backtest' },
           { segment: 'scores', label: 'Scores' },
+          { segment: 'options', label: 'Options overlay' },
           { segment: 'saved', label: 'Saved runs' },
           { segment: 'week', label: 'This week' },
           { segment: 'journal', label: 'Journal' },

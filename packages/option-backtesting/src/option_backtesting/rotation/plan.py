@@ -27,7 +27,8 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import automation_settings, day_type, journal, labels, result, store
+from . import automation_settings, day_type, labels, result, store
+from .entries import read as read_entries
 
 BOOKS = ("core", "t1")
 #: the name prefix each uploader gives a book's strategies
@@ -63,7 +64,7 @@ def _picks(core: list[str], buy: list[str]) -> list[dict]:
 
 
 def _latest_entry(root: Path, track: str | None) -> dict | None:
-    entries = journal.read(store.journal_path(root, track))
+    entries = read_entries(root, track)
     return entries[-1] if entries else None
 
 

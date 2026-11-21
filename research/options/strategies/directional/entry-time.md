@@ -22,7 +22,8 @@ from 09:17 to 15:17, exit 15:28. BL-083 also tested entry at the minute an intra
 | BL-083 | Entry at the minute a trigger fires (10:30–14:00) | explore 2024-10 → 2026-10 both indices; confirm NIFTY 2022-01 → 2024-10 | **No lead** under the registered bar; two leads under the owner's rule (below) that fail in 2022–24 | [BL-083][bl083] |
 | BL-096 | Best configuration per band and per start time, ATM and ITM1 | holdout 2025-10-09 → 2026-10-09, before and **after charges** | Descriptive ranking | [post-charge list][bl096pc], [pre-charge list][bl096q] |
 | [BL-184][bl184] | A 13:02–15:02 entry (exit 15:28) as the afternoon half of a two-set day, Adaptive's top one, beside its whole-day pick | 434 pick days 2025-01-10 → 2026-10-27, after charges, seen data | The afternoon Dir alone earns +276 net a day (DD −16,944) against the whole-day pick's +326 (DD −26,486); as part of the split not adopted (interval through zero, drawdown deeper) | [Session split](session-split.md) |
-| [BL-207][bl207] | The second of two Dir lots entered 30 / 60 min after the first (same setting), or the best-ranked Dir at least 30 / 60 min later, against both lots at the pick's minute | T1 normal days with a Dir pick, 219 days 2025-01-10 → 2026-11-03, after brokerage, book stop, seen data | **No evidence**: −₹259 to −₹564 a day against Dir ×2 (last year −₹440 to −₹785), no reliably smaller drawdown or worst day | [BL-207][bl207] |
+| [BL-207][bl207] | The second of two Dir lots entered 30 / 60 min after the first (same setting), the best-ranked Dir at least 30 / 60 min later, away (earlier or later) or at a different slot, against both lots at the pick's minute | T1 normal days with a Dir pick, 219 days 2025-01-10 → 2026-11-03, after brokerage, book stop, seen data | **No evidence**: −₹259 to −₹593 a day against Dir ×2 over nine second-lot arms (last year −₹440 to −₹821), no reliably smaller drawdown or worst day | [BL-207][bl207] |
+| BL-218 (MCX minis) | 17:05 / 18:00 / 19:00 / 20:00 (evening) | CRUDEOILM, NATGASMINI, GOLDM, SILVERM; fit Nov 2024–Oct 2025, test Nov 2025–Oct 2026; **after charges, 1% slippage** | Only GOLDM expiry week passed (18:00) | [MCX page](mcx-commodities.md) |
 
 Average ₹ per day per lot, mean of the start-time means, before charges ([BL-059][bl059]):
 
@@ -51,7 +52,9 @@ On the charged shortlist, entries from 13:00 net ₹1–76 a day ([BL-096][bl096
 - B4 in BL-055 used Dir ATM at 11:17 and 11:32, picked with hindsight from BL-054's results.
 - Spacing a second lot: on T1's Dir ×2 days, the second lot entered 30 or 60 minutes later earns less than both at
   the pick's minute, and a later best-ranked Dir earns less again; neither gives a reliably smaller drawdown or
-  worst day (BL-207, in-sample).
+  worst day (BL-207, in-sample). Two different Dirs at different slots (the best-ranked other Dir whose slot differs,
+  or is at least 30 / 60 minutes away on either side) earn −₹529 to −₹593 a day against Dir ×2; the 60-minute-away
+  arm's drawdown is 16 % shallower, short of the registered 20 % (BL-207 amendments, 2026-11-06).
 
 ## Not yet tested
 

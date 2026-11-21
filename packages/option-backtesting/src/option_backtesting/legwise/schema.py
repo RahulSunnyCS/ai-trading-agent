@@ -54,10 +54,19 @@ class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+#: NSE/BSE session; MCX commodity strategies (BL-218) may name 09:00-23:54. A field accepts
+#: the widest grid; `LegwiseStrategy` then holds every time to its underlying's own session.
+NSE_FIRST, NSE_LAST = "09:15", "15:29"
+MCX_UNDERLYINGS = ("CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM")
+MCX_FIRST, MCX_LAST = "09:00", "23:54"
+
+
 def _hhmm(value: str) -> str:
     time.fromisoformat(value)  # raises on a malformed time
-    if not "09:15" <= value <= "15:29":
-        raise ValueError(f"{value!r} is outside the 09:15-15:29 session")
+    if len(value) != 5:
+        raise ValueError(f"{value!r} is not HH:MM")
+    if not MCX_FIRST <= value <= MCX_LAST:
+        raise ValueError(f"{value!r} is outside the {MCX_FIRST}-{MCX_LAST} session")
     return value
 
 
@@ -310,7 +319,10 @@ class Execution(_Model):
 
 class LegwiseStrategy(_Model):
     id: str
-    underlying: Literal["NIFTY", "BANKNIFTY", "MIDCPNIFTY", "FINNIFTY", "SENSEX"]
+    underlying: Literal[
+        "NIFTY", "BANKNIFTY", "MIDCPNIFTY", "FINNIFTY", "SENSEX",
+        "CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM",
+    ]  # fmt: skip
     entry_time: str
     exit_time: str
     no_reentry_after: str | None = None
@@ -325,6 +337,18 @@ class LegwiseStrategy(_Model):
 
     @model_validator(mode="after")
     def _consistent(self) -> LegwiseStrategy:
+        first, last = (
+            (MCX_FIRST, MCX_LAST) if self.underlying in MCX_UNDERLYINGS else (NSE_FIRST, NSE_LAST)
+        )
+        times = [self.entry_time, self.exit_time, self.no_reentry_after]
+        for leg in self.legs:
+            if leg.range_breakout is not None:
+                times += [leg.range_breakout.until, leg.range_breakout.valid_until]
+            if leg.roll is not None:
+                times.append(leg.roll.not_after)
+        for t in times:
+            if t is not None and not first <= t <= last:
+                raise ValueError(f"{t!r} is outside the {first}-{last} session")
         if self.exit_time <= self.entry_time:
             raise ValueError("exit_time must be after entry_time")
         ids = [leg.id for leg in self.legs]

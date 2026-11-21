@@ -112,19 +112,42 @@ class TestAggregateAgainstGoldenFixture:
         [
             (
                 "A_flat.yaml",
-                {"net_inr": 7568, "win_days": 7, "worst_day": -6577, "sum_peak_loss": -58136, "lot_days": 60, "inr_per_lot_day": 126},
+                {
+                    "net_inr": 7568,
+                    "win_days": 7,
+                    "worst_day": -6577,
+                    "sum_peak_loss": -58136,
+                    "lot_days": 60,
+                    "inr_per_lot_day": 126,
+                },
             ),
             (
                 "B_pyramid.yaml",
-                {"net_inr": 6517, "win_days": 10, "worst_day": -5314, "sum_peak_loss": -41913, "lot_days": 39, "inr_per_lot_day": 169},
+                {
+                    "net_inr": 6517,
+                    "win_days": 10,
+                    "worst_day": -5314,
+                    "sum_peak_loss": -41913,
+                    "lot_days": 39,
+                    "inr_per_lot_day": 169,
+                },
             ),
             (
                 "C_pyramid_fallback.yaml",
-                {"net_inr": 6003, "win_days": 9, "worst_day": -6740, "sum_peak_loss": -46390, "lot_days": 44, "inr_per_lot_day": 138},
+                {
+                    "net_inr": 6003,
+                    "win_days": 9,
+                    "worst_day": -6740,
+                    "sum_peak_loss": -46390,
+                    "lot_days": 44,
+                    "inr_per_lot_day": 138,
+                },
             ),
         ],
     )
-    def test_15_day_aggregate_matches_golden_expected_txt(self, strategy_file: str, expected: dict) -> None:
+    def test_15_day_aggregate_matches_golden_expected_txt(
+        self, strategy_file: str, expected: dict
+    ) -> None:
         loaded = load_strategy(STRATEGIES_DIR / strategy_file)
         cache = FixtureCache()
         reference = ReferenceData()

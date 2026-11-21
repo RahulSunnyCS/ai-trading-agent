@@ -244,60 +244,99 @@ def test_a_late_entry_is_flagged_not_forward_and_a_past_day_is_refused(seeded):
     record(target + timedelta(days=1), root, vix_open=14.2, now_fn=_at(target, 9, 16), dry_run=True)
 
 
-def test_nothing_is_recorded_when_the_vix_open_cannot_be_read(seeded, monkeypatch):
+def test_nothing_is_recorded_when_no_evening_vix_is_stored(seeded, monkeypatch):
     root, days = seeded
     target = days[-1] + timedelta(days=1)
     while target.weekday() >= 5:
         target += timedelta(days=1)
-    monkeypatch.setattr(pick, "vix_open_with_source", lambda d: (None, ""))
-    with pytest.raises(PickError, match="could not be read"):
+    monkeypatch.setattr(pick, "evening_vix", lambda r, d: (None, "none"))
+    with pytest.raises(PickError, match="no India VIX close or open"):
         record(target, root, now_fn=_at(target, 9, 16))
     assert journal.read(store.journal_path(root)) == []
 
 
-def _fake_clock():
-    state = {"t": 0.0, "sleeps": 0}
-
-    def sleep(s):
-        state["t"] += s
-        state["sleeps"] += 1
-
-    return state, sleep, lambda: state["t"]
-
-
-def test_vix_open_polls_fyers_then_succeeds_without_calling_angel_one(monkeypatch):
-    answers = iter([None, None, 15.28])
-    monkeypatch.setattr(live, "_fyers_attempt", lambda d, client=None: next(answers))
+def test_the_entry_ranks_with_the_evenings_vix_never_a_live_read(seeded, monkeypatch):
+    """Owner, 2026-11-09: the evening is the source of truth. The entry ranks with the previous
+    session's VIX close (the evening message's stand-in), so it is the evening's list."""
+    root, days = seeded
+    target = _weekdays(days[-1] + timedelta(days=1), 1)[0]
+    asked = []
     monkeypatch.setattr(
-        live, "vix_open_angel", lambda d: pytest.fail("Angel One must not be called")
+        pick, "evening_vix", lambda r, d: asked.append(d) or (16.4, f"close {d.isoformat()}")
     )
-    state, sleep, monotonic = _fake_clock()
-    got = live.vix_open_with_source(date(2026, 10, 12), sleep=sleep, monotonic=monotonic)
-    assert got == (15.28, "fyers") and state["sleeps"] == 2
-
-
-def test_vix_open_goes_to_angel_one_at_once_without_a_fyers_token(monkeypatch):
-    def no_token(d, client=None):
-        raise live.FyersCredentialsError("no token")
-
-    monkeypatch.setattr(live, "_fyers_attempt", no_token)
-    monkeypatch.setattr(live, "vix_open_angel", lambda d: 15.3)
-    state, sleep, monotonic = _fake_clock()
-    got = live.vix_open_with_source(date(2026, 10, 12), sleep=sleep, monotonic=monotonic)
-    assert got == (15.3, "angelone") and state["sleeps"] == 0
-
-
-def test_vix_open_retries_through_fyers_errors_then_falls_back(monkeypatch):
-    def flaky(d, client=None):
-        raise ConnectionError("reset")
-
-    monkeypatch.setattr(live, "_fyers_attempt", flaky)
-    monkeypatch.setattr(live, "vix_open_angel", lambda d: None)
-    state, sleep, monotonic = _fake_clock()
-    got = live.vix_open_with_source(
-        date(2026, 10, 12), wait_s=20, poll_s=5, sleep=sleep, monotonic=monotonic
+    e = record(target, root, now_fn=_at(target, 8, 45)).entry
+    assert asked == [days[-1]]  # the last session the evening ranked from
+    assert (e["vix_open"], e["vix_source"], e["vix_band"]) == (
+        16.4,
+        f"close {days[-1].isoformat()}",
+        "15-18",
     )
-    assert got == (None, "") and state["sleeps"] == 4  # polled for the whole window, then gave up
+    assert e["picks_from"] == "evening" and e["before_first_entry"] is True
+    expected = pick.score_lists(target, 16.4, {"dte_n": "1", "dte_s": "2"}, root, NAMES)
+    assert e["lists"] == expected
+
+
+def test_evening_vix_is_the_lake_close_else_the_stored_open(seeded, monkeypatch):
+    root, days = seeded
+    monkeypatch.setattr(attrs, "vix_close_from_lake", lambda r, d: 13.9)
+    assert pick.evening_vix(root, days[-1]) == (13.9, f"close {days[-1].isoformat()}")
+    monkeypatch.setattr(attrs, "vix_close_from_lake", lambda r, d: None)
+    stored = float(store.read_days(root)[days[-1]]["vix_open"])
+    assert pick.evening_vix(root, days[-1]) == (stored, f"open {days[-1].isoformat()}")
+    assert pick.evening_vix(root, days[-1] + timedelta(days=30)) == (None, "none")
+
+
+def _evening_saved(root, target, core, buy, sent_on="2026-01-01", key="adaptive"):
+    from option_backtesting.rotation import result
+
+    path = result.tentative_path(target, root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc = json.loads(path.read_text()) if path.exists() else {}
+    doc[key] = {"day": target.isoformat(), "sent_on": sent_on, "core": core, "buy": buy}
+    path.write_text(json.dumps(doc))
+
+
+def test_the_evening_list_saved_for_the_day_is_what_the_entry_records(seeded):
+    root, days = seeded
+    target = _weekdays(days[-1] + timedelta(days=1), 1)[0]
+    ranked = record(target, root, vix_open=14.2, now_fn=_at(target, 8, 45), dry_run=True).entry
+    c = ranked["lists"]["C"]
+    assert ranked["evening_list"] == {"status": "not saved", "sent_on": None}
+    # the same list saved last evening: matched, recorded exactly as ranked
+    _evening_saved(root, target, c["core"], c["buy"], sent_on=days[-1].isoformat())
+    same = record(target, root, vix_open=14.2, now_fn=_at(target, 8, 45), dry_run=True).entry
+    assert same["evening_list"] == {"status": "matched", "sent_on": days[-1].isoformat()}
+    assert same["lists"] == ranked["lists"]
+    # a different saved list (the results changed overnight): the evening's wins, the re-score is
+    # kept beside it, the other lists are untouched
+    other = [n for n in NAMES if n not in c["core"] and "_buy_" not in n][:3]
+    _evening_saved(root, target, other, [], sent_on=days[-1].isoformat())
+    e = record(target, root, vix_open=14.2, now_fn=_at(target, 8, 45)).entry
+    assert e["evening_list"]["status"] == "replaced"
+    assert (e["lists"]["C"]["core"], e["lists"]["C"]["buy"]) == (other, [])
+    assert e["lists"]["C"]["rescored"] == {
+        "core": c["core"],
+        "buy": c["buy"],
+        "overridden": c["overridden"],
+    }
+    assert e["lists"]["C"]["overridden"] is False
+    assert sorted(e["lists"]["C"]["composite"]) == sorted(other)
+    assert {k: v for k, v in e["lists"].items() if k != "C"} == {
+        k: v for k, v in ranked["lists"].items() if k != "C"
+    }
+    assert journal.verify(store.journal_path(root)) == []
+
+
+def test_an_evening_list_saved_for_another_day_is_ignored(seeded):
+    root, days = seeded
+    target = _weekdays(days[-1] + timedelta(days=1), 1)[0]
+    from option_backtesting.rotation import result
+
+    path = result.tentative_path(target, root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"adaptive": {"day": "2020-01-01", "core": ["x"], "buy": []}}))
+    e = record(target, root, vix_open=14.2, now_fn=_at(target, 8, 45), dry_run=True).entry
+    assert e["evening_list"]["status"] == "not saved"
 
 
 def test_cli_exits_zero_on_a_retry_and_alerts_then_exits_two_on_a_crash(monkeypatch):
@@ -363,23 +402,6 @@ def test_an_entry_carries_a_digest_of_the_history_it_was_scored_on(seeded):
     path.write_text("\n".join(lines) + "\n")
     edited = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16), dry_run=True).entry
     assert edited["inputs_sha"] != first["inputs_sha"]
-
-
-def test_the_slow_reads_happen_before_the_vix_poll(seeded, monkeypatch):
-    root, days = seeded
-    target = _weekdays(days[-1] + timedelta(days=1), 1)[0]
-    order = []
-    monkeypatch.setattr(
-        pick,
-        "listed_dte_labels",
-        lambda d: (order.append("dte") or {"dte_n": "1", "dte_s": "2"}, "master"),
-    )
-    monkeypatch.setattr(pick, "code_commit", lambda: order.append("commit") or "test")
-    monkeypatch.setattr(
-        pick, "vix_open_with_source", lambda d: (order.append("vix") or 14.2, "fyers")
-    )
-    record(target, root, now_fn=_at(target, 9, 16), dry_run=True)
-    assert order == ["dte", "commit", "vix"]
 
 
 def test_two_writers_cannot_both_append_the_same_variant_day(tmp_path):
@@ -519,19 +541,6 @@ def test_update_day_skips_a_day_either_index_lacks(tmp_path):
     assert store.read_days(tmp_path) == {}
 
 
-def test_angel_vix_fallback_skips_during_a_refusal_hold(monkeypatch, capsys):
-    """A login Angel One refused is never repeated with the same settings (BL-122 / the Angel
-    check's hold): the 09:16 fallback skips instead of sending one more wrong attempt."""
-    from option_backtesting.angelone import auth as angel_auth
-    from option_backtesting.angelone import check as angel_check
-
-    monkeypatch.setattr(angel_check, "current_env", lambda: {"ANGELONE_CLIENT_CODE": "X"})
-    monkeypatch.setattr(angel_check, "refusal_hold", lambda env=None: "held until 08:15")
-    monkeypatch.setattr(angel_auth, "login", lambda *a, **k: pytest.fail("must not log in"))
-    assert live.vix_open_angel(date(2026, 10, 19)) is None
-    assert "skipped" in capsys.readouterr().err
-
-
 def test_angel_check_refusal_hold_follows_the_settings(tmp_path):
     from option_backtesting.angelone import check as angel_check
 
@@ -546,3 +555,20 @@ def test_angel_check_refusal_hold_follows_the_settings(tmp_path):
     changed = {**env, "ANGELONE_MPIN": "w"}
     assert angel_check.refusal_hold(tmp_path, changed, lambda: now) is None
     assert angel_check.refusal_hold(tmp_path, env, lambda: now + 16 * 60) is None
+
+
+def test_the_entry_is_the_list_the_evening_message_sent(seeded, monkeypatch):
+    """The evening ranks the next session with the last close (`tomorrow.expected_picks`); the
+    morning entry ranks with the same stand-in, so with no saved list it records the same picks."""
+    from option_backtesting.rotation import tomorrow, variants
+    from option_backtesting.rotation.lists import PUBLIC_KEYS
+
+    root, days = seeded
+    monkeypatch.setattr(variants, "variant_names", lambda: NAMES)
+    target = _weekdays(days[-1] + timedelta(days=1), 1)[0]
+    monkeypatch.setattr(attrs, "vix_close_from_lake", lambda r, d: 12.2)
+    evening = tomorrow.expected_picks(target, root, "1", "2", days[-1])
+    entry = record(target, root, now_fn=_at(target, 8, 45), dry_run=True).entry
+    for key in PUBLIC_KEYS:
+        block = entry["lists"][key]
+        assert (block["core"], block["buy"]) == tuple(evening.picks[key])

@@ -1,4 +1,5 @@
-"""The rotation Telegram messages (BL-125): exact text of the morning and evening layouts."""
+"""The rotation Telegram messages (BL-125): exact text of the evening layout, and of the morning
+entry's printed text (`render_entry`; since 2026-11-09 nothing is sent in the morning)."""
 
 from __future__ import annotations
 
@@ -50,17 +51,19 @@ T1_NORMAL = """🧪 Tuned Adaptive (In Testing phase)
    SL60% · TSL15%/10% · REnone · MTMSL4000"""
 
 
-def test_the_morning_message_on_a_normal_day_is_adaptive_then_t1_with_one_hash():
-    live = _entry()
+def test_the_entry_text_on_a_normal_day_is_its_list_with_its_hash():
+    assert messages.render_entry(_entry()) == f"{ADAPTIVE_NORMAL}\n\n🔒 f1a77247 · 09:16"
     t1 = _entry(core=T1_CORE, track="t1", hash="aaaaaaaa22222222")
-    text = messages.render_morning(live, None, t1)
-    assert text == (f"{ADAPTIVE_NORMAL}\n\n━━━━━━━━━━━━━━━\n{T1_NORMAL}\n\n🔒 f1a77247 · 09:16")
+    assert messages.render_entry(t1) == (
+        T1_NORMAL.replace("(In Testing phase)", "(In Testing phase) · Tue 20 Oct", 1)
+        + "\n\n🔒 aaaaaaaa · 09:16"
+    )
 
 
 def test_the_expiry_rule_has_one_line_and_the_optional_line_names_the_next_best():
     live = _entry(expiry_only="NIFTY")
     options = {"C": {"wide": "N_wide_1317", "dir": "N_ditm1_0947"}}
-    text = messages.render_morning(live, options, None)
+    text = messages.render_entry(live, options)
     assert text.splitlines()[:3] == [
         "🎯 ADAPTIVE · Tue 20 Oct",
         "⚡ Expiry day · NIFTY only",
@@ -68,49 +71,29 @@ def test_the_expiry_rule_has_one_line_and_the_optional_line_names_the_next_best(
     ]
     assert text.count("Expiry day") == 1
     assert "➕ Optional: Widesl 13:17 N_widesl_OTM1 · Dir 09:47 N_dir_ITM1" in text
-    # BL-122 restricts T1 too, so the combined T1 block carries the line as well
-    t1 = _entry(core=T1_CORE, track="t1", expiry_only="NIFTY")
-    both = messages.render_morning(live, options, t1)
-    assert both.count("⚡ Expiry day · NIFTY only") == 2
-    assert "🧪 Tuned Adaptive (In Testing phase)\n⚡ Expiry day · NIFTY only\n" in both
     # no rule, no line; no options, no optional line
-    plain = messages.render_morning(_entry(), None, None)
+    plain = messages.render_entry(_entry())
     assert "Expiry day" not in plain and "Optional" not in plain
 
 
 def test_a_buy_pick_is_listed_with_its_settings_and_when_it_buys():
-    live = _entry(buy=["N_buy_0917"])
-    group = messages.render_morning(live, None, None)
+    text = messages.render_entry(_entry(buy=["N_buy_0917"]))
     assert (
         "➕ Buy\n"
         "   09:17  N_buy_p50\n"
         f"   {BUY}\n"
         "   ⏳ buys only if the premium breaks the range high"
-    ) in group
+    ) in text
 
 
-def test_a_late_entry_says_so_first():
-    live = _entry(before_first_entry=False)
-    text = messages.render_morning(live, None, None)
-    assert text.splitlines()[0] == "⚠️ LATE · not a forward entry"
-    # a late T1 is flagged inside its own block
-    t1 = _entry(core=T1_CORE, track="t1", before_first_entry=False)
-    private = messages.render_morning(_entry(), None, t1)
-    assert "🧪 Tuned Adaptive (In Testing phase)\n   ⚠️ LATE · not a forward entry\n" in private
-    assert private.splitlines()[0] == "🎯 ADAPTIVE · Tue 20 Oct"
-    assert private.count("LATE") == 1
-    # a late T1 message of its own says so once, as its first line
-    own = messages.render_entry(t1)
-    assert own.splitlines()[0] == "⚠️ LATE · not a forward entry"
-    assert own.count("LATE") == 1
-
-
-def test_when_t1_was_not_recorded_the_message_says_so_and_adaptive_is_unchanged():
-    text = messages.render_morning(_entry(), None, None)
-    assert text == (
-        f"{ADAPTIVE_NORMAL}\n\n━━━━━━━━━━━━━━━\n"
-        "🧪 Tuned Adaptive (In Testing phase) · not recorded today\n\n🔒 f1a77247 · 09:16"
-    )
+def test_a_late_entry_says_so_first_and_once():
+    for entry in (
+        _entry(before_first_entry=False),
+        _entry(core=T1_CORE, track="t1", before_first_entry=False),
+    ):
+        text = messages.render_entry(entry)
+        assert text.splitlines()[0] == "⚠️ LATE · not a forward entry"
+        assert text.count("LATE") == 1
 
 
 def test_a_t1_entry_that_follows_on_its_own_uses_the_t1_layout_and_its_own_hash():
@@ -191,7 +174,7 @@ def test_the_evening_message_for_a_normal_day():
    09:17  N_widesl_p150   −₹30
    09:47  N_dir_ITM1     −₹280
 
-➡️ Wed 21 Oct (Tentative)
+➡️ Wed 21 Oct
 
 🎯 Adaptive
 1️⃣ 09:17  N_dir_ITM1
@@ -234,7 +217,7 @@ def test_tomorrow_being_a_rule_day_is_one_short_line():
     text = messages.render_result(
         date(2026, 10, 16), (10.0, A_ROWS[:1]), None, _next(date(2026, 10, 19), expiry_only="NIFTY")
     )
-    assert "➡️ Mon 19 Oct (Tentative)\n⚡ NIFTY only\n\n🎯 Adaptive\n1️⃣" in text
+    assert "➡️ Mon 19 Oct\n⚡ NIFTY only\n\n🎯 Adaptive\n1️⃣" in text
     assert "Expiry day" not in text
     plain = messages.render_result(date(2026, 10, 16), (10.0, A_ROWS[:1]), None, _next())
     assert "only" not in plain.replace("Adaptive", "")
@@ -266,20 +249,19 @@ def test_the_t1_followup_is_a_message_of_its_own():
         "📊 Tue 20 Oct · Tuned Adaptive result\n1 lot per strategy, after costs\n\n🧪 Tuned Adaptive (In Testing phase) "
     )
     assert "🎯" not in text
-    assert (
-        "➡️ Wed 21 Oct (Tentative)\n\n🧪 Tuned Adaptive (In Testing phase)\n1️⃣ 09:17  N_widesl_p150"
-        in text
-    )
+    assert "➡️ Wed 21 Oct\n\n🧪 Tuned Adaptive (In Testing phase)\n1️⃣ 09:17  N_widesl_p150" in text
 
 
-# -- DTE, (Tentative) and the morning's change line (2026-10-23) ------------------------------
+# -- DTE (2026-10-23) and the next day's list, no longer tentative (2026-11-09) ---------------
 
 DTE = {"NIFTY": "2", "SENSEX": "4"}
 
 
-def test_the_evening_next_day_is_tentative_and_adaptive_says_its_dte():
+def test_the_evening_next_day_is_not_tentative_and_adaptive_says_its_dte():
+    """Owner, 2026-11-09: the evening's list is what trades, so it is not called tentative."""
     text = messages.render_result(date(2026, 10, 20), (1240.0, A_ROWS), None, _next(dte=DTE))
-    assert "➡️ Wed 21 Oct (Tentative)\n\n🎯 Adaptive · NIFTY 2 DTE · SENSEX 4 DTE\n1️⃣" in text
+    assert "➡️ Wed 21 Oct\n\n🎯 Adaptive · NIFTY 2 DTE · SENSEX 4 DTE\n1️⃣" in text
+    assert "Tentative" not in text and "tentative" not in text
     assert messages.dte_text({"NIFTY": "7+", "SENSEX": "unknown"}) == "NIFTY 7+ DTE"
     assert messages.dte_text(None) == ""
 
@@ -297,44 +279,7 @@ def test_the_evening_heading_says_when_its_dte_is_the_calendars():
     assert "calendar" not in listed
 
 
-def _previous(core, day="2026-10-20", sent_on="2026-10-19", buy=()):
-    return {"day": day, "sent_on": sent_on, "core": list(core), "buy": list(buy)}
-
-
-def test_the_morning_says_no_change_when_the_picks_are_last_evenings():
-    live = _entry(dte=DTE)
-    t1 = _entry(core=T1_CORE, track="t1", hash="aaaaaaaa22222222", dte=DTE)
-    previous = {
-        "adaptive": _previous(["N_wide_1117", "N_p100_1202", "N_ditm1_0917"]),
-        "t1": _previous(T1_CORE),
-    }
-    private = messages.render_morning(live, None, t1, previous=previous)
-    head = "🎯 ADAPTIVE · Tue 20 Oct · NIFTY 2 DTE · SENSEX 4 DTE\n✅ No change from yesterday's list\n\n1️⃣"
-    assert private.startswith(head)
-    assert "🧪 Tuned Adaptive (In Testing phase)\n✅ No change from yesterday's list\n\n" in private
-
-
-def test_the_morning_names_what_changed():
-    previous = {"adaptive": _previous(["N_wide_1117", "N_p100_1202", "N_dir_0932"])}
-    group = messages.render_morning(_entry(), None, None, previous=previous)
-    assert (
-        "🎯 ADAPTIVE · Tue 20 Oct\n🔄 Changed from yesterday's list: ➖ 09:32  N_dir_ATM"
-        " · ➕ 09:17  N_dir_ITM1\n\n1️⃣"
-    ) in group
-
-
-def test_a_monday_names_the_friday_and_an_old_list_is_ignored():
-    monday = _entry(day="2026-10-26")
-    core = monday["lists"]["C"]["core"]
-    fri = {"adaptive": _previous(core, day="2026-10-26", sent_on="2026-10-23")}
-    group = messages.render_morning(monday, None, None, previous=fri)
-    assert "✅ No change from Fri's list" in group
-    stale = {"adaptive": _previous(core, day="2026-10-23", sent_on="2026-10-22")}
-    group = messages.render_morning(monday, None, None, previous=stale)
-    assert "change" not in group.split("━")[0].lower()
-
-
-def test_the_tentative_lists_are_kept_and_the_t1_followup_adds_to_them(tmp_path):
+def test_the_evening_lists_are_kept_and_the_t1_followup_adds_to_them(tmp_path):
     sent_on = date(2026, 10, 20)
     rotation_result.save_tentative(
         sent_on, _next(dte=DTE), "🧪 Tuned Adaptive (In Testing phase) · not ready", tmp_path
@@ -346,18 +291,10 @@ def test_the_tentative_lists_are_kept_and_the_t1_followup_adds_to_them(tmp_path)
             "sent_on": "2026-10-20",
             "core": ["N_wide_1117", "N_ditm1_0917", "N_p100_1202"],
             "buy": [],
+            "dte": DTE,  # for the live board before the entry is written (2026-11-09)
         }
     }
     rotation_result.save_tentative(sent_on, None, _next(core=T1_CORE), tmp_path)
     doc = rotation_result.read_tentative(date(2026, 10, 21), tmp_path)
     assert doc["t1"]["core"] == T1_CORE and doc["adaptive"]["core"][0] == "N_wide_1117"
     assert rotation_result.read_tentative("2026-10-22", tmp_path) == {}
-
-
-def test_a_malformed_evening_list_only_leaves_the_line_out():
-    for bad in (
-        {"adaptive": "oops"},
-        {"adaptive": {"day": "2026-10-20", "sent_on": "not-a-date", "core": 5}},
-    ):
-        group = messages.render_morning(_entry(), None, None, previous=bad)
-        assert group.startswith("🎯 ADAPTIVE · Tue 20 Oct\n\n1️⃣")

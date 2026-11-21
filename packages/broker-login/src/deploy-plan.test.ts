@@ -492,6 +492,13 @@ test('the broker count is read when split over lines or spaced', () => {
   }
 });
 
+// 2026-11-19: the page showed its "0/0" placeholder when the count was read.
+test('a "0/0" placeholder count is unread, not logged out', () => {
+  const live = parseLive(PAGE_NOV.replace('Broker Login 0/2', 'Broker Login 0/0'));
+  assert.match(brokerRefusal(live) ?? '', /could not read the broker count/);
+  assert.doesNotMatch(brokerRefusal(live) ?? '', /no broker logged in/);
+});
+
 test('a broker count missing from /live is unread: the deploy refuses as such, not as logged out', () => {
   const live = parseLive(PAGE_NOV.replace('Broker Login 0/2\n', ''));
   assert.equal(live.brokersLoggedIn, null);

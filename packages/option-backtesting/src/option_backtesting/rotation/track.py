@@ -18,6 +18,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import journal, store
+from .entries import read as read_entries
 from .readout import READOUT_DAYS, block_bootstrap_mean, max_drawdown
 
 LIST_KEY = "C"  # Adaptive
@@ -42,8 +43,8 @@ def build(track: str, root: Path | None = None) -> dict:
     before 09:17) whose picks are all scored. The verdict reads the first READOUT_DAYS such days
     only (registered); later days are reported as descriptive, never re-judged."""
     root = root or data_dir()
-    live_all = journal.read(store.journal_path(root))
-    track_all = journal.read(store.journal_path(root, track))
+    live_all = read_entries(root)
+    track_all = read_entries(root, track)
     live = {e["day"]: e for e in live_all if e.get("before_first_entry")}
     tracked = {e["day"]: e for e in track_all if e.get("before_first_entry")}
     cache: dict[str, dict[date, float]] = {}

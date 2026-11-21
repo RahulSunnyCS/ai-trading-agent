@@ -375,6 +375,12 @@ contract, not a shared service).
   `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
   sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
   `scripts/bl085_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
+- **Extension exit (BL-233, killed, off by default):** `Config.extension_exit` (close / 200-day EMA
+  − 1, e.g. 0.70) with `extension_action` `sell` or `trim` (half, once per crossing). Buffer rule only,
+  every week; a name above the level is not bought or topped up (merged into the upper-circuit
+  mask) and the proceeds wait as cash. The table is `categories/extension.py`, passed through
+  `run_broad_backtest` / `api._run_broad`; no API request sets it. Runner:
+  `scripts/bl233_extension_exit.py`; findings: `research/momentum/strategies/broad/extension-exit.md`.
 - **All Fridays (BL-087):** `BacktestRequest.split_fridays` (off by default; a no-op unless
   `rebalance="weekly"` and `rebalance_every > 1`) runs every `rebalance_offset` 0..K-1 with
   `capital / K` and returns one `Result` of the whole account (`tranches.blend_reset`: equal
@@ -603,7 +609,7 @@ contract, not a shared service).
   message say *fresh picks, equal weights*; `orders.use_leftover`: the cash an equal split leaves buys one
   share of each skipped name in the target's order, best model rank first, stopping at the first it cannot
   afford; the target dict is ordered by the engine's final rank in `_fresh_sleeve_target`),
-  a due lot with shares rebalances with the free cash left, a lot not due sells only names its
+  a due lot with shares rebalances with the free cash left (BL-236, owner 2026-11-19: it trades what its sleeve's backtest trades that week, `orders.plan_equal_split` over `Lot.slices` / `keep` from `api._equal_split_recipe`, not the difference to the sleeve's end weights; `MOMENTUM_LOT_RULE=target` restores the BL-142 rule), a lot not due sells only names its
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
   group path of `_compute_orders` (the group's per-sleeve signals ride in `signal["_sleeves"]`,

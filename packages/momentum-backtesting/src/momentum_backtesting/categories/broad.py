@@ -74,7 +74,15 @@ import pandas as pd
 
 from momentum_backtesting import engine, monday_fills
 from momentum_backtesting import tax as tax_mod
-from momentum_backtesting.categories import compose, daily_moves, residual, snapshots, sources
+from momentum_backtesting.categories import (
+    compose,
+    daily_moves,
+    extension,
+    residual,
+    snapshots,
+    sources,
+)
+from momentum_backtesting.categories import fno as fno_mod
 from momentum_backtesting.categories import liquidity as liquidity_mod
 from momentum_backtesting.categories import prices as cat_prices
 from momentum_backtesting.categories.liquidity import LiquidityConfig
@@ -381,7 +389,7 @@ def load_stock_universe_frame(
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
-    universe: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
+    universe: Literal["total_market", "all_liquid", "turnover_rank", "fno"] = "total_market",
     series_breaks: Literal["legacy", "verified"] = "verified",
 ) -> StockUniverseFrame:
     """The 755-name Total Market weekly price frame + point-in-time membership gate, computed
@@ -396,6 +404,9 @@ def load_stock_universe_frame(
     elif universe == "turnover_rank":
         # The index's membership as it could have been known each January (BL-010 F1).
         members_by_year = liquidity_mod.turnover_rank_members_by_year()
+    elif universe == "fno":
+        # BL-226: the stocks whose futures NSE listed that year (narrowed week by week below).
+        members_by_year = fno_mod.members_by_year()
     else:
         members_by_year = total_market_members_by_year(categories_data_dir)
     all_symbols = sorted(set().union(*members_by_year.values()))
@@ -423,6 +434,12 @@ def load_stock_universe_frame(
         events=events,
         stale_columns=stale_columns,
     )
+    if universe == "fno":
+        fno_gate = fno_mod.gate(frame.index, all_symbols)
+        stock_membership = stock_membership & pd.DataFrame(
+            {col: fno_gate[base] for col, base in column_to_base_symbol.items()},
+            index=frame.index,
+        ).reindex_like(stock_membership).fillna(False)
     gate = None
     if liquidity is not None:
         base_gate = liquidity_mod.eligibility(liquidity, all_symbols, frame.index)
@@ -622,7 +639,7 @@ def compute_universe_base(
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
-    universe_kind: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
+    universe_kind: Literal["total_market", "all_liquid", "turnover_rank", "fno"] = "total_market",
     series_breaks: Literal["legacy", "verified"] = "verified",
 ) -> UniverseBase:
     """The expensive half of Step 2 -- everything that does not depend on the pool size.
@@ -1323,6 +1340,9 @@ def run_broad_backtest(
     # (its category is first in `held_by_week`) at this many times the share of the others.
     # 1.0 (default) changes nothing; category mode only.
     top_sector_weight: float = 1.0,
+    # BL-233 (research): engine.Config.extension_exit / extension_action. None changes nothing.
+    extension_exit: float | None = None,
+    extension_action: Literal["sell", "trim"] = "sell",
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1514,6 +1534,13 @@ def run_broad_backtest(
         stop_granularity=stop_granularity,
         weight_by=weight_by,
         vol_window=vol_window,
+        extension_exit=extension_exit,
+        extension_action=extension_action,
+    )
+    stretched = (
+        extension.extension_table(list(prices.columns), prices.index)
+        if extension_exit is not None
+        else None
     )
     if stop_granularity == "daily" and daily is None:
         daily = daily_moves.daily_moves(
@@ -1556,6 +1583,7 @@ def run_broad_backtest(
         lc_locked=lc_locked,
         daily=daily,
         tax_classes=_tax_classes(list(prices.columns)) if tax is not None else None,
+        extension=stretched,
     )
     return BroadBacktestResult(
         result=result,

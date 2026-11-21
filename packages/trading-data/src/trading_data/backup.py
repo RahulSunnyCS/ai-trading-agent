@@ -1,10 +1,11 @@
 """
 Monthly copy of the whole data root to another disk (`tdata backup --to <dir>`).
 
-Incremental: lake/, raw/, contract-notes/ (BL-168) and rotation/ are walked, and a file
-the destination already has with the same size AND the same mtime is skipped. Most lake
-and raw files never change once written, but some are rewritten in place (the yearly
-`bars_1d` file grows, `lake/derived/` is rebuilt, a Fyers repair rewrites a day), and
+Incremental: lake/, raw/, contract-notes/ (BL-168), rotation/, mcx/ (the MCX contract calendar,
+BL-218) and mcx-forward/ (the gold Dir paper journal, BL-219: the only record of that test) are
+walked, and a file the destination already has with the same size AND the same mtime is
+skipped. Most lake and raw files never change once written, but some are rewritten in place
+(the yearly `bars_1d` file grows, `lake/derived/` is rebuilt, a Fyers repair rewrites a day), and
 contract-notes/ and rotation/ are rewritten often, at the same size as often as not, so
 size alone is not enough. The catalog is always re-copied, after a CHECKPOINT.
 
@@ -41,7 +42,7 @@ import duckdb
 
 from .db import catalog_path
 
-FOLDERS = ("lake", "raw", "contract-notes", "rotation")
+FOLDERS = ("lake", "raw", "contract-notes", "rotation", "mcx", "mcx-forward")
 MAX_TRIES = 3
 LOCK_WAIT_S = 600.0
 LOCK_POLL_S = 5.0

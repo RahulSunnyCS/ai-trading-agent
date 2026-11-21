@@ -257,8 +257,13 @@ def margin(settings: dict) -> dict[str, int]:
 
 def book_capital(settings: dict, book: str) -> int:
     """The capital behind a list (`core` or `t1`): the accounts with a row that uploads it, each
-    counted once (two platforms on one account share its money); the default when none does."""
+    counted once (two platforms on one account share its money); the default when none does.
+    With T1 split across the two AlgoTest accounts (`splitT1`, BL-209) the book is one set of
+    picks shared between them, not a copy on each: it is measured against one account's capital
+    (the larger), not both added up (owner, 2026-11-07)."""
     per = capital(settings)
+    if book == "t1" and (accounts := split_t1(settings)):
+        return max(per[b] for b in accounts)
     brokers = {
         b
         for p in PLATFORMS

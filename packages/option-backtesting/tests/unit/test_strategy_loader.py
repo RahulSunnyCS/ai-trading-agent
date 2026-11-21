@@ -91,10 +91,10 @@ class TestLoadStrategyFromSource:
             "  universe: { underlying: NIFTY }\n"
             "  legs:\n"
             "    - { id: ce, kind: OPT, strike: ATM, option: CE, side: SELL }\n"
-            "  entry: { time: \"09:17\", lots: 1 }\n"
+            '  entry: { time: "09:17", lots: 1 }\n'
             "  caps: { max_lots: 1 }\n"
             "  exits:\n"
-            "    - { type: time, at: \"15:15\" }\n"
+            '    - { type: time, at: "15:15" }\n'
             "  fills: { model: trigger_level }\n"
             "  costs: { per_leg_rt: 60 }\n"
         )
@@ -112,13 +112,15 @@ class TestLoadStrategyFromSource:
             "  universe: { underlying: NIFTY }\n"
             "  legs:\n"
             "    - { id: ce, kind: OPT, strike: BOGUS_RULE, option: CE, side: SELL }\n"
-            "  entry: { time: \"09:17\", lots: 1 }\n"
+            '  entry: { time: "09:17", lots: 1 }\n'
             "  caps: { max_lots: 1 }\n"
             "  exits:\n"
-            "    - { type: time, at: \"15:15\" }\n"
+            '    - { type: time, at: "15:15" }\n'
             "  fills: { model: trigger_level }\n"
             "  costs: { per_leg_rt: 60 }\n"
         )
         with pytest.raises(StrategyValidationError) as exc_info:
             load_strategy(p)
-        assert any("Unknown strike rule" in e and e.startswith("line ") for e in exc_info.value.errors)
+        assert any(
+            "Unknown strike rule" in e and e.startswith("line ") for e in exc_info.value.errors
+        )

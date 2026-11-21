@@ -492,3 +492,65 @@ def test_the_cached_master_keeps_only_the_rows_the_board_reads():
     kept = lb.scrip_master(DAY, loader=lambda: rows)
     assert len(kept) == len(master_rows())
     lb._MASTER = None
+
+
+# --- whose picks (owner, 2026-11-09: the evening's list is the source of truth) --------------
+
+
+def _journal_entry(root, day, core, track=None, **extra):
+    from option_backtesting.rotation import journal, store
+
+    journal.append(
+        store.journal_path(root, track),
+        {
+            "day": day.isoformat(),
+            "before_first_entry": True,
+            "dte": {"NIFTY": "0", "SENSEX": "2"},
+            "lists": {"C": {"core": core, "buy": []}},
+            **extra,
+        },
+    )
+
+
+def _evening_list(root, day, key, core, buy=(), **extra):
+    from option_backtesting.rotation import result
+
+    path = result.tentative_path(day, root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc = json.loads(path.read_text()) if path.exists() else {}
+    doc[key] = {"day": day.isoformat(), "sent_on": "2026-11-02", "core": core, "buy": list(buy)}
+    doc[key].update(extra)
+    path.write_text(json.dumps(doc))
+
+
+def test_the_board_tracks_last_evenings_list_not_the_0916_entry(tmp_path):
+    """2026-11-09: the day's entry was a 09:16 pick that changed the list; the board tracks what
+    the evening sent (and the platforms trade), taking the entry's days to expiry and rule."""
+    _journal_entry(tmp_path, DAY, ["N_dir_1117", "N_wide_0917", "N_wide_1017"], expiry_only="NIFTY")
+    _evening_list(tmp_path, DAY, "adaptive", ["N_dir_0947", "N_wide_0917", "N_wide_1017"])
+    (core,) = lb.todays_picks(DAY, tmp_path)
+    assert core.book == "core" and core.source == "evening" and core.late is False
+    assert core.core == ["N_dir_0947", "N_wide_0917", "N_wide_1017"]
+    assert core.dte == {"NIFTY": "0", "SENSEX": "2"} and core.expiry_only == "NIFTY"
+
+
+def test_the_board_takes_the_evening_lists_own_dte_before_the_entry_exists(tmp_path):
+    _evening_list(
+        tmp_path, DAY, "t1", ["N_wide_0947"], ["N_buy_0917"], dte={"NIFTY": "3", "SENSEX": "1"}
+    )
+    (t1,) = lb.todays_picks(DAY, tmp_path)
+    assert (t1.book, t1.source, t1.core, t1.buy) == (
+        "t1",
+        "evening",
+        ["N_wide_0947"],
+        ["N_buy_0917"],
+    )
+    assert t1.dte == {"NIFTY": "3", "SENSEX": "1"} and t1.expiry_only is None
+
+
+def test_without_an_evening_list_for_the_day_the_board_reads_the_entry(tmp_path):
+    _journal_entry(tmp_path, DAY, ["N_wide_0917"], before_first_entry=False)
+    _evening_list(tmp_path, DAY + timedelta(days=1), "adaptive", ["N_dir_0947"])  # another day
+    (core,) = lb.todays_picks(DAY, tmp_path)
+    assert (core.source, core.core, core.late) == ("journal", ["N_wide_0917"], True)
+    assert lb.todays_picks(DAY + timedelta(days=7), tmp_path) == []

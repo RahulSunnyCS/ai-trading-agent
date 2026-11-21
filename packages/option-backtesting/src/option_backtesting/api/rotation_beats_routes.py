@@ -25,7 +25,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import beats, journal, store, warm
+from ..rotation import beats, entries, journal, store, warm
 
 router = APIRouter(prefix="/legwise/rotation/beats")
 
@@ -48,7 +48,8 @@ def _stamp(root: Any) -> tuple:
             out.append(path.stat().st_mtime_ns)
         except OSError:
             out.append(0)
-    return tuple(out)
+    # the evening's lists are what the journals are read as (`entries.read`, 2026-11-09)
+    return (*out, entries.evening_stamp(root))
 
 
 def _error(status: int, message: str) -> JSONResponse:

@@ -17,6 +17,7 @@ from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import journal, store
 from .dte import entry_labels
+from .entries import read as read_entries
 from .lists import LISTS, LOTS_PER, WARMUP
 from .pick import FIRST_ENTRY
 from .variants import is_buy, is_dir, is_wide, parts, variant_names
@@ -101,7 +102,7 @@ def health(root: Path | None = None, now: datetime | None = None) -> dict:
     ref = default_reference_data()
     checks: list[dict] = []
     try:
-        entries = journal.read(store.journal_path(root))
+        entries = read_entries(root)
         unreadable = ""
     except journal.JournalCorrupt as error:
         entries, unreadable = [], str(error)
@@ -258,7 +259,7 @@ def baskets(root: Path | None = None, day: date | None = None, track: str | None
     root = root or data_dir()
     out: dict = {"entry": None, "lists": {}, "changed": {}, "readout_days": READOUT_DAYS}
     try:
-        entries = journal.read(store.journal_path(root, track))
+        entries = read_entries(root, track)
     except journal.JournalCorrupt as error:
         out["error"] = str(error)
         return out

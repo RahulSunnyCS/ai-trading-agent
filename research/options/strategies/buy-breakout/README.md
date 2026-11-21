@@ -80,6 +80,7 @@ rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cu
 | [30-minute consolidation](consolidation-30m.md) | Not tested | Owner's idea: require a tight band before the breakout |
 | [Candle position](candle-position.md) | Not tested | Owner's idea: require closes to cluster near the breakout level |
 | Square-off (no page) | Descriptive | `complete` instead of `partial`: holdout +₹1,123 net per file, gross lower; BL-097 |
+| [MCX commodity options (morning, evening)](mcx-commodities.md) | Tested | No pass; the buys lose before charges on most roots and sessions (BL-218) |
 
 ## How to read the BL-097 tables on these pages
 

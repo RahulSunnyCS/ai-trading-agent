@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 
 from ..fyers.daily import data_dir
 from . import journal, store
+from .entries import read as read_entries
 from .lists import LISTS
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -134,7 +135,7 @@ def validate(
     if status == "changed" and not note:
         raise PlacementError("say what was changed in the note")
     try:
-        entries = journal.read(store.journal_path(root))
+        entries = read_entries(root)
     except journal.JournalCorrupt as error:
         raise PlacementError(f"the journal cannot be read: {error}") from error
     entry = next((e for e in entries if e.get("day") == day), None)

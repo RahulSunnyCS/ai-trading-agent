@@ -63,7 +63,9 @@ class TestEvalRefPlusAndTimes:
     def test_plus_fixed_number(self) -> None:
         store = _store_with_per_bar("atm_straddle", 100.0, [])
         state = EngineState()
-        assert eval_ref(Ref(feature="atm_straddle", at="entry", plus=10.0), store, state, D) == 110.0
+        assert (
+            eval_ref(Ref(feature="atm_straddle", at="entry", plus=10.0), store, state, D) == 110.0
+        )
 
     def test_plus_feature_ref_resolves_a_scalar(self) -> None:
         store = _store_with_per_bar("atm_straddle", 100.0, [])
@@ -100,7 +102,9 @@ class TestEvalFeatureCondition:
         store = _store_with_per_bar("atm_straddle", 100.0, [105.0, 112.0, 120.0])
         state = EngineState()
         cond = FeatureCondition(
-            feature="atm_straddle", op="crosses_above", ref=Ref(feature="atm_straddle", at="entry", plus=10)
+            feature="atm_straddle",
+            op="crosses_above",
+            ref=Ref(feature="atm_straddle", at="entry", plus=10),
         )
         # threshold = 110. bar0=105 (no prior data, PRE_BAR->105, not > yet since prev(open)=100<=110 but 105<=110 too)
         assert eval_condition(cond, store, state, D, 0, BAR_TIMES) is False

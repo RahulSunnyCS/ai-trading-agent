@@ -198,17 +198,27 @@ def _period(
     }
 
 
-def _forward_rows(entries: list[dict]) -> dict[date, dict]:
+#: `vix_source` prefixes of an entry ranked with the evening's VIX stand-in (`pick.evening_vix`)
+EVENING_VIX_SOURCES = ("close ", "open ")
+
+
+def _forward_rows(entries: list[dict], attrs: dict[date, dict] | None = None) -> dict[date, dict]:
+    """The on-time entries' own attributes. An entry that ranked with the evening's VIX stand-in
+    (`pick.evening_vix`, 2026-11-09: `vix_source` `close <day>` / `open <day>`) recorded the
+    previous session's VIX, not the open: its opening VIX is the collected day's (`attrs`,
+    `days.csv`), unknown until collected."""
     out: dict[date, dict] = {}
     for e in entries:
         if not e.get("before_first_entry"):
             continue
         d = date.fromisoformat(e["day"])
         dte = entry_labels(e)
+        stand_in = str(e.get("vix_source") or "").startswith(EVENING_VIX_SOURCES)
+        opened = ((attrs or {}).get(d) or {}) if stand_in else e
         out[d] = {
             "weekday": e.get("weekday") or d.strftime("%a"),
-            "vix_open": e.get("vix_open"),
-            "vix_band": e.get("vix_band"),
+            "vix_open": opened.get("vix_open"),
+            "vix_band": opened.get("vix_band"),
             "dte_n": dte.get("NIFTY"),
             "dte_s": dte.get("SENSEX"),
         }
@@ -257,7 +267,7 @@ def build(root: Path | None = None) -> dict:
         pid: (lo, hi, label, {d: a for d, a in attrs.items() if lo <= d <= hi})
         for pid, (lo, hi, label) in NAMED.items()
     }
-    forward_rows = _forward_rows(entries)
+    forward_rows = _forward_rows(entries, attrs)
     # every period's days, read once per index
     wanted = {d for *_, rows in named.values() for d in rows} | set(forward_rows)
     ranges = {u: day_ranges(root, u, {d for d in wanted if d.weekday() < 5}) for u in UNDERLYINGS}

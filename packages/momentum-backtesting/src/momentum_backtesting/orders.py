@@ -71,28 +71,162 @@ LEFTOVER_NOTE = "one share from the leftover cash"
 def use_leftover(result: OrderPlan, order: list[str]) -> OrderPlan:
     """Spend what a fresh buy left over on the names it could not afford (owner, 2026-11-05).
 
-    The names a plan skipped for being under one share (`SKIP`, a name the portfolio does not hold
-    yet) are taken in `order` (the model's rank, best first); each gets ONE share while the cash
-    left covers it and its charges, and the first one that does not stops the rule: a lower-ranked
-    name is never bought ahead of a better one. Changes the plan in place (sells, buys, charges,
-    cash after, the row's action, quantity and note) and returns it."""
+    The names a plan skipped for being under one share (`SKIP`, a new name or a held one whose
+    equal-split slice was under a share) are taken in `order` (the model's rank, best first);
+    each gets ONE share while the cash left covers it and its charges, and the first one that
+    does not stops the rule: a lower-ranked name is never bought ahead of a better one. Changes
+    the plan in place (sells, buys, charges, cash after, the row's action, quantity and note)
+    and returns it."""
     rows = {r.symbol: r for r in result.rows}
     for name in order:
         row = rows.get(name)
-        if row is None or row.action != "SKIP" or row.held > 0 or not row.price:
+        if row is None or row.action != "SKIP" or not row.price:
             continue
         if not row.note.startswith("less than one share"):
             continue
         cost = row.price + buy_charges(row.price)
         if cost > result.cash_after:
             break
-        row.action, row.quantity, row.note = "BUY", 1, LEFTOVER_NOTE
+        row.action, row.quantity, row.note = ("ADD" if row.held > 0 else "BUY"), 1, LEFTOVER_NOTE
         row.order_value = row.price
+        if result.portfolio_value > 0:  # the row's share of the lot after the buy
+            row.target = max(row.target, row.price / result.portfolio_value)
         row.charges = buy_charges(row.price)
         result.buys += row.order_value
         result.charges += row.charges
         result.cash_after -= cost
     result.rows.sort(key=lambda r: (_ORDER[r.action], r.symbol))
+    result.not_traded = sum(1 for r in result.rows if r.action in ("SKIP", "HOLD"))
+    return result
+
+
+def plan_equal_split(
+    holdings: dict[str, float],
+    prices: dict[str, float],
+    slices: dict[str, float],
+    *,
+    keep: frozenset[str] | set[str],
+    cash: float = 0.0,
+    min_trade_rs: float = DEFAULT_MIN_TRADE_RS,
+    blocked: frozenset[str] | set[str] = frozenset(),
+    max_position: float | None = None,
+    cap_band: float = 0.0,
+) -> OrderPlan:
+    """A rebalancing lot trades what the backtest trades (BL-236, owner 2026-11-19): it does not
+    aim at the sleeve's end weights.
+
+    The backtest sells what leaves its book, splits what that frees equally across the names it
+    buys that week (the top category's pick at its extra weight) and lets everything else drift.
+    Here: a held name not in `keep` is sold in full; a held name above `max_position + cap_band`
+    of the lot is trimmed to `max_position` (the minimum trade applies to that trim only); the
+    proceeds, the trims and `cash` are split over `slices` (name -> relative weight, best rank
+    first; a name already held is topped up, never trimmed) in whole shares, with no minimum on a
+    slice and no name pushed past `max_position`. A slice under one share is skipped (the leftover
+    rule can buy it afterwards: `use_leftover`). A blocked name is held and its slice goes to the
+    others. Sells first; charges as `plan`."""
+    names = sorted(set(holdings) | set(slices))
+    value_of = {n: holdings.get(n, 0.0) * (prices.get(n) or 0.0) for n in names}
+    total = sum(value_of.values()) + cash
+    result = OrderPlan(
+        portfolio_value=total, cash=cash, missing_prices=[n for n in names if not prices.get(n)]
+    )
+    if total <= 0:
+        return result
+    rows = {
+        n: OrderRow(
+            n,
+            "",
+            holdings.get(n, 0.0),
+            prices.get(n),
+            value_of[n],
+            value_of[n] / total,
+            value_of[n] / total,
+            0,
+            0.0,
+            0.0,
+        )
+        for n in names
+    }
+    result.rows = list(rows.values())
+    after = dict(value_of)  # what each name is worth once the sells and trims are made
+    pool = cash
+
+    def sell(row: OrderRow, action: str, quantity: int) -> None:
+        nonlocal pool
+        row.action, row.quantity = action, quantity
+        row.order_value = quantity * row.price
+        row.charges = sell_charges(row.order_value)
+        result.sells += row.order_value
+        result.charges += row.charges
+        pool += row.order_value - row.charges
+        after[row.symbol] -= row.order_value
+
+    for name, row in rows.items():
+        if holdings.get(name, 0.0) <= 0:
+            continue
+        if name in blocked:
+            row.action, row.note = "HOLD", "held: a possible split is not classified yet"
+        elif not row.price:
+            row.action, row.note = "SKIP", "no price"
+        elif name not in keep:
+            sell(row, "SELL", int(row.held))
+        elif max_position and value_of[name] / total > max_position + cap_band:
+            quantity = math.floor((value_of[name] - max_position * total) / row.price)
+            if quantity <= 0:
+                continue
+            if quantity * row.price < min_trade_rs:
+                row.action = "SKIP"
+                row.note = f"over the cap, but under the ₹{min_trade_rs:,.0f} minimum"
+            else:
+                sell(row, "TRIM", quantity)
+
+    eligible = [n for n in slices if n not in blocked and prices.get(n) and slices[n] > 0]
+    budget = pool
+    alloc: dict[str, float] = {}
+    free = list(eligible)
+    remaining = budget
+    for _ in range(len(eligible) + 1):  # water-fill: a name at the cap stops taking money
+        weight = sum(slices[n] for n in free)
+        if not free or weight <= 0 or remaining <= 0:
+            break
+        capped = []
+        for n in free:
+            share = remaining * slices[n] / weight
+            room = (max_position * total - after[n]) if max_position else math.inf
+            if share > max(room, 0.0):
+                alloc[n] = max(room, 0.0)
+                capped.append(n)
+        if not capped:
+            for n in free:
+                alloc[n] = remaining * slices[n] / weight
+            break
+        remaining -= sum(alloc[n] for n in capped)
+        free = [n for n in free if n not in capped]
+
+    spent = 0.0
+    for name in eligible:
+        row = rows[name]
+        quantity = math.floor(alloc.get(name, 0.0) / row.price)
+        while quantity > 0:
+            cost = quantity * row.price
+            if spent + cost + buy_charges(cost) <= budget + 1e-9:
+                break
+            quantity -= 1
+        if quantity <= 0:
+            row.action, row.note = "SKIP", f"less than one share (₹{row.price:,.0f})"
+            continue
+        row.action = "ADD" if row.held > 0 else "BUY"
+        row.quantity = quantity
+        row.order_value = quantity * row.price
+        row.charges = buy_charges(row.order_value)
+        result.buys += row.order_value
+        result.charges += row.charges
+        spent += row.order_value + row.charges
+        after[name] += row.order_value
+    for name, row in rows.items():
+        row.target = after[name] / total
+    result.rows.sort(key=lambda r: (_ORDER[r.action], r.symbol))
+    result.cash_after = cash + result.sells - result.buys - result.charges
     result.not_traded = sum(1 for r in result.rows if r.action in ("SKIP", "HOLD"))
     return result
 

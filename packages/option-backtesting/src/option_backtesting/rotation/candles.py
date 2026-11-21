@@ -43,7 +43,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import base, journal, portfolio, store
+from . import base, portfolio, store
+from .entries import read as read_entries
 from .portfolio import PortfolioStopError
 
 BOOKS = ("t1", "core", "base")
@@ -89,7 +90,7 @@ def picks_by_day(root: Path, book: str, start: date, end: date) -> dict[date, Da
     track = "t1" if book == "t1" else None
     entries = {
         date.fromisoformat(e["day"]): e
-        for e in journal.read(store.journal_path(root, track))
+        for e in read_entries(root, track)
         if start.isoformat() <= str(e.get("day", "")) <= end.isoformat()
     }
     out: dict[date, DayPicks] = {}
