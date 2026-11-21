@@ -16,7 +16,7 @@ import {
   readAutomation,
   uploadBooks,
 } from './automation-settings.js';
-import { tickBrokers } from './broker-sheet.js';
+import { activateLabelIsFor, tickBrokers } from './broker-sheet.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { automationForSession, sessionFor } from './day-type.js';
 import {
@@ -164,7 +164,7 @@ async function deployOne(
   }
   const go = livePage.brokerSheetActivate(sheet);
   const label = (await go.innerText()).trim();
-  if (label !== `Activate on ${brokers.length} Broker${brokers.length === 1 ? '' : 's'}`)
+  if (!activateLabelIsFor(label, brokers.length))
     throw new Error(
       `the broker sheet's button reads "${label}", expected ${brokers.length} broker(s)`,
     );

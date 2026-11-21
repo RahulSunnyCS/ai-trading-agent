@@ -25,9 +25,23 @@ export async function tickBrokers(
     const brokerLabel = [...byLabel.keys()].find((w) => label.startsWith(`${w} - `));
     const want = brokerLabel !== undefined;
     const checked = () => box.evaluate((e) => (e as HTMLInputElement).checked);
-    if ((await checked()) !== want) await row.click();
-    if ((await checked()) !== want)
-      throw new Error(`could not ${want ? 'tick' : 'untick'} "${label}" on the broker sheet`);
+    // The page commits a click a moment later (as the quantity does below): look for the new state
+    // for a few seconds, and click once more only if the first click clearly did nothing.
+    const settled = async (): Promise<boolean> => {
+      for (let waited = 0; waited <= 3_000; waited += 100) {
+        if ((await checked()) === want) return true;
+        await box.page().waitForTimeout(100);
+      }
+      return false;
+    };
+    if ((await checked()) !== want) {
+      await row.click();
+      if (!(await settled())) {
+        await row.click();
+        if (!(await settled()))
+          throw new Error(`could not ${want ? 'tick' : 'untick'} "${label}" on the broker sheet`);
+      }
+    }
     if (brokerLabel !== undefined)
       await setQuantity(box, brokerLabel, byLabel.get(brokerLabel) ?? 1);
   }
@@ -36,6 +50,14 @@ export async function tickBrokers(
   );
   if (ticked !== byLabel.size)
     throw new Error(`${ticked} broker(s) ticked on the broker sheet, expected ${byLabel.size}`);
+}
+
+/**
+ * Does the sheet's Activate button read for `n` ticked brokers? AlgoTest writes "Activate on 1
+ * Brokers" (no singular, seen 2026-11-12 to 2026-11-20); "Activate on 1 Broker" is accepted too.
+ */
+export function activateLabelIsFor(label: string, n: number): boolean {
+  return new RegExp(`^Activate on ${n} Brokers?$`).test(label.trim());
 }
 
 /**
