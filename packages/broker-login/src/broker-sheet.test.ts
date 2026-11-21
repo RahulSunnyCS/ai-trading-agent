@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { type Browser, type Page, chromium } from 'playwright';
-import { tickBrokers } from './broker-sheet.js';
+import { activateLabelIsFor, tickBrokers } from './broker-sheet.js';
 
 /**
  * Real Chromium against a stand-in of AlgoTest's "Select Broker for <name>" sheet, shaped as the
@@ -38,11 +38,18 @@ const SHEET = `
 </div>
 <script>
   window.stuck = %STUCK%;
+  window.lag = %LAG%;   // ms before a click shows in the box (the page commits it later)
+  window.swallow = %SWALLOW%; // clicks on the first row that do nothing
   for (const card of document.querySelectorAll('.grid-cols-4')) {
     const row = card.querySelector('.row'); const box = card.querySelector('input[type=checkbox]');
+    const toggle = () => { box.checked = !box.checked; };
     row.addEventListener('click', (e) => {
       if (e.target.closest('.qty')) return;
-      box.checked = !box.checked;
+      if (window.swallow > 0 && card.dataset.b === 'Finvasia') { window.swallow--; return; }
+      if (window.lag) { setTimeout(() => { toggle(); render(); }, window.lag); return; }
+      toggle(); render();
+    });
+    const render = () => {
       let q = card.querySelector('.qty');
       if (box.checked && !q) {
         q = document.createElement('div'); q.className = 'order-last qty';
@@ -54,15 +61,19 @@ const SHEET = `
         q.querySelector('[aria-label=Decrease]').onclick = () => set(Number(i.value) - 1);
       }
       if (!box.checked && q) q.remove();
-    });
+    };
   }
 </script>`;
 
-async function open(stuck = false): Promise<Page> {
+async function open(stuck = false, lag = 0, swallow = 0): Promise<Page> {
   assert.ok(browser);
   const p = await (await browser.newContext()).newPage();
   p.setDefaultTimeout(3_000);
-  await p.setContent(SHEET.replace('%STUCK%', String(stuck)));
+  await p.setContent(
+    SHEET.replace('%STUCK%', String(stuck))
+      .replace('%LAG%', String(lag))
+      .replace('%SWALLOW%', String(swallow)),
+  );
   return p;
 }
 
@@ -102,5 +113,46 @@ describe('tickBrokers with quantities', () => {
       /did not move from 1/,
     );
     await p.context().close();
+  });
+});
+
+describe('tickBrokers when the page is slow', () => {
+  it('waits for a click the page commits late', async (t) => {
+    if (skip) return t.skip(skip);
+    const p = await open(false, 700);
+    await tickBrokers(p.locator('#sheet'), new Map([['finvasia', 1]]));
+    assert.equal(await quantity(p, 'Finvasia'), '1');
+    await p.context().close();
+  });
+
+  it('clicks again when the first click did nothing, and never toggles it back', async (t) => {
+    if (skip) return t.skip(skip);
+    const p = await open(false, 0, 1);
+    await tickBrokers(p.locator('#sheet'), new Map([['finvasia', 1]]));
+    assert.equal(await p.locator('[data-b="Finvasia"] input[type=checkbox]').isChecked(), true);
+    await p.context().close();
+  });
+
+  it('still stops when the box never ticks', async (t) => {
+    if (skip) return t.skip(skip);
+    const p = await open(false, 0, 5);
+    await assert.rejects(
+      tickBrokers(p.locator('#sheet'), new Map([['finvasia', 1]])),
+      /could not tick "Finvasia - Shiny/,
+    );
+    await p.context().close();
+  });
+});
+
+describe('activateLabelIsFor', () => {
+  it('takes the plural AlgoTest shows for one broker, and the singular', () => {
+    assert.ok(activateLabelIsFor('Activate on 1 Brokers', 1));
+    assert.ok(activateLabelIsFor('Activate on 1 Broker', 1));
+    assert.ok(activateLabelIsFor(' Activate on 2 Brokers ', 2));
+  });
+  it('refuses a count that is not the wanted one, or nothing ticked', () => {
+    assert.ok(!activateLabelIsFor('Activate on 2 Brokers', 1));
+    assert.ok(!activateLabelIsFor('Activate on 11 Brokers', 1));
+    assert.ok(!activateLabelIsFor('Activate', 1));
   });
 });

@@ -240,11 +240,12 @@ export function stillDeployed(name: string, live: LiveState, cards: DeployedCard
 
 /**
  * Why AlgoTest cannot trade now, from /live's broker count, or null when a broker is logged in.
- * A count the page did not show is its own refusal: deploying blind is not safe, and "0/0" in the
- * message would read as "logged out".
+ * A count the page did not show, or only its "0/0" placeholder, is its own refusal: deploying blind
+ * is not safe, and "0/0" in the message would read as "logged out".
  */
 export function brokerRefusal(live: LiveState): string | null {
-  if (live.brokersLoggedIn === null)
+  // "0/0" is the placeholder the page shows before its real count: also unread, never "logged out"
+  if (live.brokersLoggedIn === null || live.brokersTotal === 0)
     return 'could not read the broker count on AlgoTest /live (no "Broker Login n/m" on the page)';
   if (live.brokersLoggedIn < 1)
     return `no broker logged in on AlgoTest (Broker Login ${live.brokersLoggedIn}/${live.brokersTotal})`;

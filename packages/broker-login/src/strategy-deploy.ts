@@ -16,7 +16,7 @@ import {
   readAutomation,
   uploadBooks,
 } from './automation-settings.js';
-import { tickBrokers } from './broker-sheet.js';
+import { activateLabelIsFor, tickBrokers } from './broker-sheet.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { automationForSession, sessionFor } from './day-type.js';
 import {
@@ -104,11 +104,7 @@ async function readLive(page: Page, opts: { brokers?: boolean } = {}): Promise<L
   await livePage.header(page).waitFor({ timeout: 30_000 });
   await livePage.anyRowCount(page).waitFor({ timeout: 30_000 });
   // the broker count renders after the rows; not shown in time = unread (planDeploy refuses)
-  if (opts.brokers)
-    await livePage
-      .brokerCount(page)
-      .waitFor({ timeout: 20_000 })
-      .catch(() => undefined);
+  if (opts.brokers) await livePage.brokerCountLoaded(page, 20_000).catch(() => undefined);
   return parseLive(await page.evaluate(() => document.body.innerText));
 }
 
@@ -164,7 +160,7 @@ async function deployOne(
   }
   const go = livePage.brokerSheetActivate(sheet);
   const label = (await go.innerText()).trim();
-  if (label !== `Activate on ${brokers.length} Broker${brokers.length === 1 ? '' : 's'}`)
+  if (!activateLabelIsFor(label, brokers.length))
     throw new Error(
       `the broker sheet's button reads "${label}", expected ${brokers.length} broker(s)`,
     );
