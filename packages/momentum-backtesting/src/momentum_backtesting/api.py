@@ -4015,6 +4015,12 @@ def _compute_lot_orders(
         if reconciled.events:
             if not dry_run:  # a tentative plan reads Kite's changes but books nothing
                 lots.append(con, who, group_id, reconciled.events, at)
+                if reconciled.settled:  # booked from the plan: drop it so it is not booked twice
+                    left = {
+                        sid: {s: q for s, q in p.items() if s not in reconciled.settled}
+                        for sid, p in planned_before.items()
+                    }
+                    lots.set_pending(con, who, group_id, pending_id, at, left)
             ledger = lots.apply(ledger, reconciled.events)
         has_history = lots.funded(con, who, group_id)
 

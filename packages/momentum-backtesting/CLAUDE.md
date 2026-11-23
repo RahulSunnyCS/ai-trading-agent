@@ -597,7 +597,7 @@ contract, not a shared service).
   page's renumbered label. `reconcile` books each difference between Kite's holdings and the ledger
   first against what each lot was told to trade (`momentum_lot_state.planned`, stored by the last
   Friday run: a forced exit is booked to the lot told to sell it; the one net order a stock gets
-  is booked as planned), then the rest to the *pending* lot (the lot due on that Friday) when it
+  is booked as planned; when the lots' orders net to nothing, Kite never moves, so the move between lots is booked from the plan itself and dropped from it, `Reconciled.settled`), then the rest to the *pending* lot (the lot due on that Friday) when it
   may hold the name (its target or its current shares; noted "beyond the planned orders"); anything
   else is returned as unexplained, never guessed (`mbt lots assign`). The pending lot and the plan
   move only on a run on the Friday itself with a Kite snapshot read that day. Symbols Kite still
