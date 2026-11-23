@@ -228,7 +228,8 @@ describe('Angel One login check', () => {
     // owner 2026-11-05: + momentum-orders-tentative (Thu 18:30)
     // BL-148 Phase 4: + mcx-collect (weekdays 23:31)
     // BL-219: + mcx-forward-spread (weekdays 18:00), mcx-forward-score (Tue-Sat 01:30)
-    expect(JOBS).toHaveLength(53);
+    // BL-242: + mcx-forward-spread-silver (weekdays 17:05)
+    expect(JOBS).toHaveLength(54);
   });
 });
 
@@ -253,6 +254,33 @@ describe('gold Dir forward test (BL-219)', () => {
     expect(score?.schedule.on('2026-11-30')).toBe(false);
     expect(score?.group).toBe('catalog'); // queues behind the collector
     expect(score?.noRetryExitCodes).toEqual([2]);
+  });
+});
+
+describe('silver Dir forward test (BL-242)', () => {
+  it('reads its own spread at 17:05, the silver entry minute, never the gold 18:00 one', () => {
+    const spread = JOBS.find((job) => job.id === 'mcx-forward-spread-silver');
+    expect(spread?.schedule.at).toBe('17:05');
+    expect(spread?.steps).toEqual([
+      [
+        'uv',
+        'run',
+        '--directory',
+        'packages/option-backtesting',
+        'obt',
+        'mcx-forward',
+        'spread',
+        '--rule',
+        'silverm-dir-before',
+      ],
+    ]);
+    expect(spread?.schedule.on('2026-12-15')).toBe(true); // a Tuesday
+    expect(spread?.schedule.on('2026-12-19')).toBe(false); // a Saturday
+    // the gold job still has no --rule: a bare spread reads gold's only
+    const gold = JOBS.find((job) => job.id === 'mcx-forward-spread');
+    expect(gold?.steps[0]).not.toContain('--rule');
+    // the one nightly score covers every rule
+    expect(JOBS.find((job) => job.id === 'mcx-forward-score')?.steps[0]).not.toContain('--rule');
   });
 });
 

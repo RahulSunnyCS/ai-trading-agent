@@ -153,7 +153,7 @@ export const NAV_GROUPS: NavGroup[] = [
         defaultSegment: 'overview',
         children: [
           { segment: 'overview', label: 'Overview', group: 'Today' },
-          { segment: 'forward', label: 'Gold forward test', group: 'Today' },
+          { segment: 'forward', label: 'Forward tests', group: 'Today' },
           { segment: 'sweep', label: 'Sweep verdict', group: 'Research' },
           { segment: 'data', label: 'Contracts & data', group: 'Explore data' },
         ],

@@ -18,4 +18,4 @@ Dir and Widesl made money **before charges** on every root. A flat ₹20 an orde
 
 ## Read with care
 
-Both years were a gold bull run; the test year leans on January to March 2026. There are only about 60 sessions a year, the real bid-ask spread was not measured, and one pass among eight finalists from 48 cohorts is what luck alone could produce. It is a lead for the [forward test](guide:commodity/gold-forward-test), not for live money.
+Both years were a gold bull run; the test year leans on January to March 2026. There are only about 60 sessions a year, the real bid-ask spread was not measured, and one pass among eight finalists from 48 cohorts is what luck alone could produce. It is a lead for the [forward test](guide:commodity/forward-tests), not for live money.

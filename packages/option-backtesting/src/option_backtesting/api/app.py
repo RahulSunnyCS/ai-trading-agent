@@ -24,10 +24,10 @@ from .favourites_routes import router as favourites_router
 from .heatmap_routes import router as heatmap_router
 from .legwise_routes import router as legwise_router
 from .live_routes import router as live_router
+from .mcx_routes import router as mcx_router
 from .rotation_basket_routes import router as rotation_basket_router
 from .rotation_beats_routes import router as rotation_beats_router
 from .rotation_candles_routes import router as rotation_candles_router
-from .mcx_routes import router as mcx_router
 from .rotation_day_type_routes import router as rotation_day_type_router
 from .rotation_drawdowns_routes import router as rotation_drawdowns_router
 from .rotation_drift_routes import router as rotation_drift_router

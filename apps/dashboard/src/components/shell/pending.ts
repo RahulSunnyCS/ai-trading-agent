@@ -47,7 +47,7 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
   ],
   jobs: [],
   commoditylab: [
-    'First cut: Overview, Gold forward test, Sweep verdict, Contracts & data. Pending the owner’s direction on what to build next',
+    'First cut: Overview, Forward tests (gold and silver), Sweep verdict, Contracts & data. Pending the owner’s direction on what to build next',
     'A Builder for commodity strategies (the leg-wise engine already runs MCX on a 09:00-23:54 grid)',
     'A heatmap of entry time by stop for the four minis, like Options Lab’s Heatmap',
     'A Live board for gold and crude (spot future, ATM straddle) once an intraday MCX feed exists',

@@ -16,7 +16,7 @@
 import type { Tab } from '../components/shell/nav';
 import { buildPath } from '../lib/routes';
 
-import commodityForward from './content/commodity/gold-forward-test.md?raw';
+import commodityForward from './content/commodity/forward-tests.md?raw';
 import commodityOverview from './content/commodity/overview.md?raw';
 import commoditySweep from './content/commodity/sweep-verdict.md?raw';
 import glossaryIntro from './content/glossary/terms.md?raw';
@@ -436,10 +436,10 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'commodity',
-    slug: 'gold-forward-test',
-    title: 'Gold forward test',
+    slug: 'forward-tests',
+    title: 'Commodity forward tests',
     summary:
-      'The paper test of gold Dir in its expiry week: the rule, the pass rule and how to read the journal.',
+      'The paper tests of gold Dir (expiry week) and silver Dir (the week before): the rules, the pass rule and how to read the journal.',
     kind: 'Screen',
     body: commodityForward,
     screen: { tab: 'commoditylab', rest: ['forward'] },

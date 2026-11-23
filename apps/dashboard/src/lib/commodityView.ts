@@ -7,8 +7,8 @@
 
 import type { Tone } from '../components/ui/Badge';
 import type {
-  CommodityForward,
   CommodityRoot,
+  ForwardBlock,
   ForwardEntry,
   SpreadSnapshot,
   WindowState,
@@ -30,13 +30,13 @@ export const COMMODITY_SECTION_META: Readonly<Record<CommoditySection, Commodity
     workspace: 'Today',
     question: 'What is on the commodity desk today?',
     explanation:
-      'The four MCX mini contracts we have studied: when each next expires, how fresh the collected data is, and where the one setting that passed its test stands.',
+      'The four MCX mini contracts we have studied: when each next expires, how fresh the collected data is, and where the two forward paper tests stand.',
   },
   forward: {
     workspace: 'Today',
-    question: 'Is gold Dir still earning in its expiry week?',
+    question: 'Are the commodity paper tests earning?',
     explanation:
-      'A paper-only test of the one setting that passed the sweep: sell gold options at 18:00 in the last five sessions before each expiry. Scored every night; no order is ever sent.',
+      'Paper-only tests of two frozen settings: gold Dir in its expiry week (the one setting that passed the sweep) and silver Dir in the week before expiry (a setting the sweep did not clear, tested forward at the owner’s request). Scored every night; no order is ever sent.',
   },
   sweep: {
     workspace: 'Research',
@@ -241,15 +241,20 @@ export const WINDOW_TONE: Readonly<Record<WindowState, Tone>> = {
   'waiting for data': 'warning',
 };
 
+const ORDINAL: Record<number, string> = { 4: 'fourth', 5: 'fifth', 6: 'sixth', 8: 'eighth' };
+const ordinal = (n: number): string => ORDINAL[n] ?? `${n}th`;
+
 /** "2 of 6 expiries finished…" lines for the pass-rule card. */
-export function passRuleLines(d: CommodityForward): string[] {
+export function passRuleLines(d: ForwardBlock): string[] {
   const { summary, pass_rule: rule } = d;
   const lines = [
     `${summary.sessions} session${summary.sessions === 1 ? '' : 's'} scored across ${summary.expiries} of ${rule.expiries} expiries.`,
     `Pass = net above zero after charges and ${rule.slippage_pct}% slippage, with at least ${rule.expiries_up} of the ${rule.expiries} expiries up. ${summary.expiries_up} up so far.`,
   ];
   if (summary.expiries < rule.expiries) {
-    lines.push('Not decided yet: the rule is read only after the sixth expiry (April 2027).');
+    lines.push(
+      `Not decided yet: the rule is read only after the ${ordinal(rule.expiries)} expiry (${d.rule.key === 'goldm-dir' ? 'April 2027' : 'May 2027'}).`,
+    );
   } else {
     lines.push(
       summary.pass_rule_met ? 'The registered rule is met.' : 'The registered rule is not met.',
@@ -288,14 +293,17 @@ function median(values: number[]): number | null {
 }
 
 /**
- * The median half-spread of the two entry contracts (ITM1 CE and PE) across the snapshots, in
+ * The median half-spread of the two entry contracts (`keys`: the rule's strike, CE and PE) across the snapshots, in
  * percent of the mid price, to set beside the 1% a fill the backtest charged. Null before any
  * snapshot has a bid and an ask.
  */
-export function medianHalfSpreadPct(spreads: readonly SpreadSnapshot[]): number | null {
+export function medianHalfSpreadPct(
+  spreads: readonly SpreadSnapshot[],
+  keys: readonly string[] = ['ITM1_CE', 'ITM1_PE'],
+): number | null {
   const full: number[] = [];
   for (const s of spreads) {
-    for (const key of ['ITM1_CE', 'ITM1_PE']) {
+    for (const key of keys) {
       const v = s.contracts?.[key]?.spread_pct_of_mid;
       if (typeof v === 'number') full.push(v);
     }
@@ -334,4 +342,14 @@ export function staleWeekdays(root: CommodityRoot, asOf: string): number | null 
     if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) n += 1;
   }
   return n;
+}
+
+/** The rule in one plain sentence, from the API's own fields. */
+export function ruleSentence(d: ForwardBlock): string {
+  const r = d.rule;
+  const metal = r.root === 'GOLDM' ? 'gold' : r.root === 'SILVERM' ? 'silver' : r.root;
+  const exits = Object.entries(r.exits)
+    .map(([season, time]) => `${time} ${season}`)
+    .join(', ');
+  return `Sell the ${r.strike === 'ATM' ? 'at-the-money' : 'in-the-money'} ${metal} call and put at ${r.entry} · ${r.sl}% stop on each leg · ${r.reentry ? 're-enter once at cost' : 'no re-entry'} · hold to 15 minutes before the close (${exits}) · 1 lot · ${r.week} only`;
 }

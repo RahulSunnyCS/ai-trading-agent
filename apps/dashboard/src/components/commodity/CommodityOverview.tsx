@@ -6,8 +6,10 @@
 
 import { CalendarClock, Database } from 'lucide-react';
 
-import { useAppRoute } from '../../hooks/useAppRoute';
+import type { ReactNode } from 'react';
+
 import { useCommodityForward, useCommodityOverview } from '../../hooks/useCommodity';
+import { navigateToLink } from '../../hooks/useQueryState';
 import { cn } from '../../lib/cn';
 import {
   COMMODITY_SECTION_META,
@@ -16,7 +18,7 @@ import {
   staleWeekdays,
 } from '../../lib/commodityView';
 import { EMPTY, formatDay, formatInr } from '../../lib/format';
-import type { CommodityRoot } from '../../types/commodity';
+import type { CommodityRoot, ForwardBlock } from '../../types/commodity';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -70,76 +72,100 @@ function RootCard({ root, asOf }: { root: CommodityRoot; asOf: string }) {
   );
 }
 
+function ForwardCard({ block, refresh }: { block: ForwardBlock; refresh: ReactNode }) {
+  const { rule, summary, pass_rule: pass, window } = block;
+  const first = rule.key === 'goldm-dir';
+  return (
+    <Card>
+      <CardHeader
+        title={`${rule.label.replace(' paper', '')} forward test`}
+        description={`Paper-only: sell ${rule.root === 'GOLDM' ? 'gold' : 'silver'} options at ${rule.entry} in the ${rule.week === 'expiry week' ? 'last five sessions before each expiry' : 'five sessions before each expiry week'}, scored every night.`}
+        actions={
+          <span className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() =>
+                navigateToLink(`/commoditylab/forward${first ? '' : `?rule=${rule.key}`}`)
+              }
+            >
+              Open the test
+            </Button>
+            {refresh}
+          </span>
+        }
+      />
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard
+            label="Net so far"
+            value={summary.sessions ? formatInr(summary.net, { sign: true }) : EMPTY}
+            tone={summary.net > 0 ? 'positive' : summary.net < 0 ? 'negative' : 'muted'}
+            note={`After charges and ${pass.slippage_pct}% slippage`}
+          />
+          <StatCard label="Sessions" value={summary.sessions} note="Scored and journaled" />
+          <StatCard
+            label="Expiries up"
+            value={`${summary.expiries_up} of ${summary.expiries}`}
+            note={`Pass needs ${pass.expiries_up} of ${pass.expiries}`}
+          />
+          <StatCard
+            label="Journal"
+            value={block.chain.ok ? 'Intact' : 'Broken'}
+            tone={block.chain.ok ? 'positive' : 'negative'}
+            note="Hash chain checked on every read"
+          />
+        </div>
+        {window ? (
+          <div>
+            <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-faint">
+              Window for the {formatDay(window.expiry)} expiry
+            </div>
+            <WindowStrip window={window} />
+          </div>
+        ) : (
+          <p className="text-sm text-muted">No expiry window is open yet.</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export function CommodityOverview() {
-  const { navigate } = useAppRoute();
   const overview = useCommodityOverview();
   const forward = useCommodityForward();
   const f = forward.data;
   const o = overview.data;
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader
-          title="Gold Dir forward test"
-          description="Paper-only: sell gold options at 18:00 in the last five sessions before each expiry, scored every night."
-          actions={
-            <span className="flex items-center gap-2">
-              <Button size="sm" onClick={() => navigate('commoditylab', 'forward')}>
-                Open the test
-              </Button>
-              <RefreshButton
-                onClick={() => {
-                  overview.refetch();
-                  forward.refetch();
-                }}
-                loading={overview.loading || forward.loading}
-              />
-            </span>
-          }
+      {forward.error ? (
+        <StateMessage
+          variant="error"
+          title="Could not read the forward tests"
+          description={forward.error}
         />
-        {forward.error ? (
-          <StateMessage
-            variant="error"
-            title="Could not read the forward test"
-            description={forward.error}
-          />
-        ) : f === null ? (
+      ) : f === null ? (
+        <Card>
           <SkeletonRows rows={2} />
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatCard
-                label="Net so far"
-                value={f.summary.sessions ? formatInr(f.summary.net, { sign: true }) : EMPTY}
-                tone={f.summary.net > 0 ? 'positive' : f.summary.net < 0 ? 'negative' : 'muted'}
-                note={`After charges and ${f.pass_rule.slippage_pct}% slippage`}
-              />
-              <StatCard label="Sessions" value={f.summary.sessions} note="Scored and journaled" />
-              <StatCard
-                label="Expiries up"
-                value={`${f.summary.expiries_up} of ${f.summary.expiries}`}
-                note={`Pass needs ${f.pass_rule.expiries_up} of ${f.pass_rule.expiries}`}
-              />
-              <StatCard
-                label="Journal"
-                value={f.chain.ok ? 'Intact' : 'Broken'}
-                tone={f.chain.ok ? 'positive' : 'negative'}
-                note="Hash chain checked on every read"
-              />
-            </div>
-            {f.window ? (
-              <div>
-                <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-faint">
-                  Window for the {formatDay(f.window.expiry)} expiry
-                </div>
-                <WindowStrip window={f.window} />
-              </div>
-            ) : (
-              <p className="text-sm text-muted">No expiry window is open yet.</p>
-            )}
-          </div>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        f.rules.map((block, i) => (
+          <ForwardCard
+            key={block.rule.key}
+            block={block}
+            refresh={
+              i === 0 ? (
+                <RefreshButton
+                  onClick={() => {
+                    overview.refetch();
+                    forward.refetch();
+                  }}
+                  loading={overview.loading || forward.loading}
+                />
+              ) : null
+            }
+          />
+        ))
+      )}
 
       <Card>
         <CardHeader title="The four minis" description={COMMODITY_SECTION_META.data.explanation} />

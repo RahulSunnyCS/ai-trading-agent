@@ -1,6 +1,6 @@
 ## What it is for
 
-**Commodity Lab** is the workbench for options on MCX commodities: the gold, silver, crude oil and natural gas **mini** contracts. It is a research area like Options Lab. It places no orders, and the only experiment running in it is a paper test.
+**Commodity Lab** is the workbench for options on MCX commodities: the gold, silver, crude oil and natural gas **mini** contracts. It is a research area like Options Lab. It places no orders, and the only experiments running in it are paper tests.
 
 > [!NOTE]
 > The Lab is new and small on purpose: four screens that report what the earlier research found and what is running now. What to build on top of them (a builder, a heatmap, a live board) is the owner's call.
@@ -9,8 +9,8 @@
 
 | Screen | What it answers |
 |---|---|
-| [Overview](app:/commoditylab/overview) | What is on the desk today: each mini's next expiry, whether its data is up to date, and the headline of the gold test. |
-| [Gold forward test](app:/commoditylab/forward) | Is gold Dir still earning in its expiry week? [Guide](guide:commodity/gold-forward-test) |
+| [Overview](app:/commoditylab/overview) | What is on the desk today: each mini's next expiry, whether its data is up to date, and the headline of each forward test. |
+| [Forward tests](app:/commoditylab/forward) | Are the two paper tests earning: gold Dir in its expiry week, and silver Dir in the week before expiry? [Guide](guide:commodity/forward-tests) |
 | [Sweep verdict](app:/commoditylab/sweep) | Which commodity strategies worked in the two-year sweep, and which did not. [Guide](guide:commodity/sweep-verdict) |
 | [Contracts & data](app:/commoditylab/data) | The option bars collected so far, and the expiry calendar. |
 

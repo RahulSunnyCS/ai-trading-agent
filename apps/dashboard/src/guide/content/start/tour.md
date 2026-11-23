@@ -41,8 +41,8 @@ Options on MCX gold, silver, crude oil and natural gas minis. Read-only research
 
 | Workspace | Screen | What it is for |
 |---|---|---|
-| Today | [Overview](app:/commoditylab/overview) | Each mini's next expiry, how fresh its data is, and the gold test's headline. [Guide](guide:commodity/overview) |
-| Today | [Gold forward test](app:/commoditylab/forward) | The paper test of gold Dir in its expiry week, scored every night. [Guide](guide:commodity/gold-forward-test) |
+| Today | [Overview](app:/commoditylab/overview) | Each mini's next expiry, how fresh its data is, and each forward test's headline. [Guide](guide:commodity/overview) |
+| Today | [Forward tests](app:/commoditylab/forward) | The paper tests of gold Dir (expiry week) and silver Dir (the week before), scored every night. [Guide](guide:commodity/forward-tests) |
 | Research | [Sweep verdict](app:/commoditylab/sweep) | Which commodity strategies worked in the two-year sweep. [Guide](guide:commodity/sweep-verdict) |
 | Explore data | [Contracts & data](app:/commoditylab/data) | The collected option bars and the expiry calendar. [Guide](guide:commodity/overview) |
 

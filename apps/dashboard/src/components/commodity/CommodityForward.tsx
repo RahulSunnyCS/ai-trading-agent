@@ -9,23 +9,34 @@
 import { useMemo } from 'react';
 
 import { useCommodityForward } from '../../hooks/useCommodity';
+import { useQueryState } from '../../hooks/useQueryState';
 import {
   cumulativeLines,
   medianHalfSpreadPct,
   passRuleLines,
+  ruleSentence,
   tradeText,
 } from '../../lib/commodityView';
 import { EMPTY, formatDay, formatDayShort, formatInr, formatNumber } from '../../lib/format';
-import type { CommodityForward as Forward, SpreadSnapshot } from '../../types/commodity';
+import type { ForwardBlock as Forward, SpreadSnapshot } from '../../types/commodity';
 import { CumulativeLines, pnlClass } from '../optionslab/shared';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { WindowStrip } from './WindowStrip';
+
+const SPREAD_KEYS = ['ITM1_CE', 'ITM1_PE', 'ATM_CE', 'ATM_PE'] as const;
+const SPREAD_LABEL: Record<(typeof SPREAD_KEYS)[number], string> = {
+  ITM1_CE: 'ITM1 CE',
+  ITM1_PE: 'ITM1 PE',
+  ATM_CE: 'ATM CE',
+  ATM_PE: 'ATM PE',
+};
 
 function Headline({ d }: { d: Forward }) {
   const s = d.summary;
@@ -122,49 +133,44 @@ function Journal({ d }: { d: Forward }) {
   );
 }
 
-function Spreads({ spreads }: { spreads: SpreadSnapshot[] }) {
-  const half = medianHalfSpreadPct(spreads);
+function Spreads({ d }: { d: Forward }) {
+  const spreads: SpreadSnapshot[] = d.spreads;
+  const half = medianHalfSpreadPct(spreads, d.entry_contracts);
   return (
     <Card>
       <CardHeader
         title="Real bid-ask spread"
-        description="At 18:00 on each window weekday the entry contracts’ bid and ask are read (read-only) and kept. The backtest charged 1% a fill."
+        description={`At ${d.rule.entry} on each window weekday the entry contracts’ bid and ask are read (read-only) and kept. The backtest charged 1% a fill.`}
       />
       {spreads.length === 0 ? (
         <StateMessage
           variant="empty"
           title="No snapshot yet"
-          description="The first is read at 18:00 on the first window weekday."
+          description={`The first is read at ${d.rule.entry} on the first window weekday.`}
         />
       ) : (
         <div className="space-y-3">
           <StatCard
             label="Median half-spread"
             value={half === null ? EMPTY : `${formatNumber(half, 2)}%`}
-            note="Of the ITM1 call and put’s mid price, across snapshots. Compare with the 1% assumed."
+            note={`Of the ${d.rule.strike} call and put’s mid price, across snapshots. Compare with the 1% assumed.`}
             className="max-w-xs"
           />
           <Table>
             <THead>
               <Th dense>Day</Th>
-              <Th dense align="right">
-                ITM1 CE spread
-              </Th>
-              <Th dense align="right">
-                ITM1 PE spread
-              </Th>
-              <Th dense align="right">
-                ATM CE spread
-              </Th>
-              <Th dense align="right">
-                ATM PE spread
-              </Th>
+              {SPREAD_KEYS.map((k) => (
+                <Th key={k} dense align="right">
+                  {SPREAD_LABEL[k]}
+                  {d.entry_contracts.includes(k) ? ' (entry)' : ''}
+                </Th>
+              ))}
             </THead>
             <tbody>
               {[...spreads].reverse().map((s) => (
                 <TRow key={s.day}>
                   <Td dense>{formatDay(s.day)}</Td>
-                  {(['ITM1_CE', 'ITM1_PE', 'ATM_CE', 'ATM_PE'] as const).map((k) => {
+                  {SPREAD_KEYS.map((k) => {
                     const v = s.contracts?.[k]?.spread_pct_of_mid;
                     return (
                       <Td key={k} dense align="right" numeric>
@@ -184,10 +190,24 @@ function Spreads({ spreads }: { spreads: SpreadSnapshot[] }) {
 
 export function CommodityForward() {
   const res = useCommodityForward();
-  const d = res.data;
+  const [ruleParam, setRuleParam] = useQueryState('rule');
+  const rules = res.data?.rules ?? [];
+  const d = rules.find((r) => r.rule.key === ruleParam) ?? rules[0] ?? null;
   const lines = useMemo(() => (d ? cumulativeLines(d.entries) : []), [d]);
   return (
     <div className="space-y-5">
+      {rules.length > 1 ? (
+        <SegmentedControl
+          value={d?.rule.key ?? ''}
+          options={rules.map((r) => ({
+            value: r.rule.key,
+            label: r.rule.label.replace(' paper', ''),
+          }))}
+          onChange={(key) => setRuleParam(key === rules[0]?.rule.key ? null : key)}
+          ariaLabel="Forward test"
+          size="sm"
+        />
+      ) : null}
       <Card>
         <CardHeader
           title="The registered rule"
@@ -212,15 +232,8 @@ export function CommodityForward() {
               />
             ) : null}
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge tone="accent">GOLDM Dir</Badge>
-              <span className="text-muted">
-                Sell the in-the-money call and put at 18:00 · 21% stop on each leg · re-enter once
-                at cost · hold to 15 minutes before the close (
-                {Object.entries(d.rule.exits)
-                  .map(([season, time]) => `${time} ${season}`)
-                  .join(', ')}
-                ) · 1 lot · expiry week only
-              </span>
+              <Badge tone="accent">{d.rule.label.replace(' paper', '')}</Badge>
+              <span className="text-muted">{ruleSentence(d)}</span>
             </div>
             <Headline d={d} />
             <ul className="space-y-1 text-sm text-muted">
@@ -237,7 +250,7 @@ export function CommodityForward() {
           <Card>
             <CardHeader
               title={d.window ? `Window for the ${formatDay(d.window.expiry)} expiry` : 'Window'}
-              description={`The last ${d.rule.window_sessions} sessions up to and including expiry day. A session with no data is left waiting and alerted, never skipped.`}
+              description={`The ${d.rule.window_sessions} sessions of the ${d.rule.week} (${d.rule.week === 'expiry week' ? 'ending on expiry day' : 'the five before the expiry week'}). A session with no data is left waiting and alerted, never skipped.`}
             />
             {d.window ? (
               <WindowStrip window={d.window} />
@@ -278,7 +291,7 @@ export function CommodityForward() {
             </div>
           </Card>
 
-          <Spreads spreads={d.spreads} />
+          <Spreads d={d} />
         </>
       ) : null}
     </div>

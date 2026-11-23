@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CommodityForward, CommodityRoot, ForwardEntry } from '../../types/commodity';
+import type { CommodityRoot, ForwardBlock, ForwardEntry } from '../../types/commodity';
 import {
   COMMODITY_SECTIONS,
   COMMODITY_SECTION_META,
@@ -9,6 +9,7 @@ import {
   expiryText,
   medianHalfSpreadPct,
   passRuleLines,
+  ruleSentence,
   staleWeekdays,
 } from '../commodityView';
 
@@ -23,7 +24,7 @@ const entry = (day: string, net: number): ForwardEntry => ({
   'net_0.5pct': net + 5,
   net_0pct: net + 10,
   stopped_by: null,
-  future_at_18: 124487,
+  future_at_entry: 124487,
   recorded_at: '2026-11-24T01:30:27+05:30',
   trades: [],
   notes: [],
@@ -75,13 +76,50 @@ describe('cumulativeLines', () => {
 
 describe('passRuleLines', () => {
   const base = {
+    rule: { key: 'goldm-dir' },
     pass_rule: { expiries: 6, expiries_up: 4, slippage_pct: 1 },
     summary: { sessions: 1, expiries: 1, expiries_up: 1, net: 90, pass_rule_met: false },
-  } as unknown as CommodityForward;
+  } as unknown as ForwardBlock;
   it('says it is not decided before the sixth expiry', () => {
     const lines = passRuleLines(base);
     expect(lines[0]).toContain('1 session scored across 1 of 6');
     expect(lines.at(-1)).toContain('Not decided yet');
+  });
+});
+
+describe('ruleSentence', () => {
+  const block = (over: Record<string, unknown>) =>
+    ({
+      rule: {
+        key: 'x',
+        root: 'GOLDM',
+        entry: '18:00',
+        strike: 'ITM1',
+        sl: 21,
+        reentry: true,
+        week: 'expiry week',
+        exits: { summer: '23:15', winter: '23:40' },
+        ...over,
+      },
+    }) as unknown as ForwardBlock;
+  it('words gold from the rule fields', () => {
+    expect(ruleSentence(block({}))).toBe(
+      'Sell the in-the-money gold call and put at 18:00 · 21% stop on each leg · re-enter once at cost · hold to 15 minutes before the close (23:15 summer, 23:40 winter) · 1 lot · expiry week only',
+    );
+  });
+  it('words silver: at the money, no re-entry, the week before', () => {
+    const text = ruleSentence(
+      block({
+        root: 'SILVERM',
+        entry: '17:05',
+        strike: 'ATM',
+        reentry: false,
+        week: 'week before expiry',
+      }),
+    );
+    expect(text).toContain('at-the-money silver call and put at 17:05');
+    expect(text).toContain('no re-entry');
+    expect(text.endsWith('week before expiry only')).toBe(true);
   });
 });
 
@@ -96,6 +134,8 @@ describe('medianHalfSpreadPct', () => {
       },
     });
     expect(medianHalfSpreadPct([snap(2, 4), snap(6, 8)])).toBe(2.5);
+    // another rule's entry contracts are read by its own keys
+    expect(medianHalfSpreadPct([snap(2, 4)], ['ATM_CE', 'ATM_PE'])).toBeNull();
   });
 });
 

@@ -930,13 +930,44 @@ const BASE_JOBS: Job[] = [
       'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward spread (only meaningful at about 18:00 on a gold expiry-window weekday)',
   },
   {
+    // BL-242: the same read-only snapshot for the silver forward test (SILVERM Dir, the week before
+    // expiry, entered at 17:05). Reads the live bid/ask of the silver future and the ATM pair at
+    // 17:05 on a window weekday (the five sessions before an expiry week, from the 28 Dec 2026
+    // expiry); outside a window the command prints that and exits 0. Nothing is ordered.
+    id: 'mcx-forward-spread-silver',
+    description:
+      "Silver Dir forward test (BL-242): at 17:05 on a week-before-expiry window weekday, the live bid/ask of the silver future and the ATM call and put (`obt mcx-forward spread --rule silverm-dir-before`), kept to compare the real spread with the backtest's 1% slippage. Read-only; does nothing outside a window",
+    schedule: { at: '17:05', on: onWeekdays(1, 2, 3, 4, 5), label: 'weekdays 17:05' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        OPTIONS,
+        'obt',
+        'mcx-forward',
+        'spread',
+        '--rule',
+        'silverm-dir-before',
+      ],
+    ],
+    cwd: '.',
+    timeoutMinutes: 5,
+    retries: 1,
+    retryDelayMinutes: 2, // a retry past ~17:10 would read quotes after the entry minute
+    noRetryExitCodes: [2],
+    catchUpHours: 0.1,
+    fixHint:
+      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward spread --rule silverm-dir-before (only meaningful at about 17:05 on a silver week-before-expiry window weekday)',
+  },
+  {
     // BL-219: after the nightly collector. Scores the session just closed (and any window session
     // missed earlier whose bars are collected) into the hash-chained paper journal, one private
     // Telegram line each. The session is the evening just held (default_session): at 01:30 that
     // is yesterday's. Group `catalog`: it queues behind the 23:31 collector and the 21:00 T1 job.
     id: 'mcx-forward-score',
     description:
-      "Gold Dir forward test (BL-219): score the MCX session just closed (`obt mcx-forward score`): extend the gold contract calendar from the live master, fetch the settling future's day, simulate the frozen BL-218 rule on the collected option bars, append the session to the paper journal and send one private Telegram line. Nothing is ever ordered. Does nothing outside a gold expiry window",
+      "Gold and silver Dir forward tests (BL-219, BL-242): score the MCX session just closed (`obt mcx-forward score`, every rule): extend each root's contract calendar from the live master, fetch the settling future's day, simulate the frozen BL-218 rule on the collected option bars, append the session to that rule's paper journal and send one private Telegram line. Nothing is ever ordered. Does nothing outside a rule's expiry window",
     schedule: {
       at: '01:30',
       on: onWeekdays(2, 3, 4, 5, 6),

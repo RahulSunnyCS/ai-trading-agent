@@ -10,12 +10,12 @@
         and says where its calendar ends, never a guess.
 
     GET /legwise/mcx/forward
-        {"rule", "start_expiry", "pass_rule", "summary", "entries", "window", "spreads",
-         "chain": {"ok", "problems"}}
-        The BL-219 forward paper test of GOLDM Dir in the expiry week: the hash-chained journal as
-        written (never edited), the running totals against the registered pass rule, the sessions
-        of the coming expiry window (journaled / waiting for data / still to come) and the 18:00
-        spread snapshots.
+        {"as_of", "rules": [{"rule", "start_expiry", "pass_rule", "summary", "entries", "window",
+         "spreads", "entry_contracts", "chain": {"ok", "problems"}}]}
+        The forward paper tests, one block per frozen rule (BL-219 gold Dir in the expiry week,
+        BL-242 silver Dir in the week before): the hash-chained journal as written (never edited),
+        the running totals against the registered pass rule, the sessions of the coming window
+        (journaled / waiting for data / still to come) and the entry-minute spread snapshots.
 
 A root that cannot be read comes back with its reason in `errors`; the others still answer.
 """
@@ -44,9 +44,6 @@ ROOTS: tuple[tuple[str, str, float], ...] = (
     ("CRUDEOILM", "Crude oil mini", 10.0),
     ("NATGASMINI", "Natural gas mini", 250.0),
 )
-
-#: The registered pass rule (BL-219), shown beside the running totals.
-PASS_RULE = {"expiries": 6, "expiries_up": 4, "slippage_pct": mf.SLIPPAGE_PCT}
 
 
 def _weekdays_between(start: date, end: date) -> int:
@@ -91,7 +88,7 @@ def overview(root_dir: Path, today: date) -> dict:
     return {"as_of": today.isoformat(), "roots": rows, "errors": errors}
 
 
-def _entry_row(e: dict) -> dict:
+def _entry_row(e: dict, rule: mf.Rule) -> dict:
     keep = (
         "day",
         "expiry",
@@ -103,16 +100,15 @@ def _entry_row(e: dict) -> dict:
         "net_0.5pct",
         "net_0pct",
         "stopped_by",
-        "future_at_18",
         "recorded_at",
         "trades",
         "notes",
     )
-    return {k: e.get(k) for k in keep}
+    return {**{k: e.get(k) for k in keep}, "future_at_entry": e.get(rule.spot_key)}
 
 
-def _spreads(root_dir: Path) -> list[dict]:
-    folder = mf.forward_dir(root_dir) / "spread"
+def _spreads(root_dir: Path, rule: mf.Rule) -> list[dict]:
+    folder = mf.forward_dir(root_dir, rule) / "spread"
     out = []
     for path in sorted(folder.glob("*.json")) if folder.exists() else []:
         try:
@@ -122,18 +118,23 @@ def _spreads(root_dir: Path) -> list[dict]:
     return out
 
 
-def _window(root_dir: Path, today: date, done: set[str]) -> dict | None:
-    """The sessions of the nearest expiry's window from the first scored expiry on."""
-    cal = mcx_calendar(root_dir, mf.ROOT)["options"]
+def _window(root_dir: Path, today: date, done: set[str], rule: mf.Rule) -> dict | None:
+    """The sessions of the nearest expiry's window from the rule's first scored expiry on."""
+    cal = mcx_calendar(root_dir, rule.root)["options"]
     later = sorted(
-        date.fromisoformat(e) for e in cal if date.fromisoformat(e) >= max(today, mf.START_EXPIRY)
+        date.fromisoformat(e) for e in cal if date.fromisoformat(e) >= max(today, rule.start_expiry)
     )
-    if not later:
+    # the week-before window of an expiry ends before the expiry: once it has passed, the next
+    # expiry's window is the one to show
+    for expiry in later:
+        collected = mf.option_days(root_dir, rule)
+        days = mf.window(expiry, collected, today, rule)
+        if days and days[-1] >= today:
+            break
+    else:
         return None
-    expiry = later[0]
-    collected = mf.option_days(root_dir)
     sessions = []
-    for d in mf.window(expiry, collected, today):
+    for d in days:
         if d.isoformat() in done:
             state = "journaled"
         elif d > today:
@@ -148,26 +149,44 @@ def _window(root_dir: Path, today: date, done: set[str]) -> dict | None:
     return {"expiry": expiry.isoformat(), "sessions": sessions}
 
 
-def forward(root_dir: Path, today: date) -> dict:
-    path = mf.journal_path(root_dir)
+def forward_rule(root_dir: Path, today: date, rule: mf.Rule) -> dict:
+    path = mf.journal_path(root_dir, rule)
     entries = journal.read(path)
     problems = journal.verify(path)
     return {
-        "as_of": today.isoformat(),
         "rule": {
-            "root": mf.ROOT,
-            "cell": mf.CELL_ID,
+            "key": rule.key,
+            "root": rule.root,
+            "label": rule.label,
+            "cell": rule.cell_id,
             "grid_sha": mf.GRID_SHA,
+            "entry": rule.entry,
+            "strike": rule.strike,
+            "sl": rule.sl,
+            "reentry": rule.reentry,
+            "week": "week before expiry" if rule.week_offset else "expiry week",
             "window_sessions": mf.WINDOW,
             "exits": mf.EXITS,
         },
-        "start_expiry": mf.START_EXPIRY.isoformat(),
-        "pass_rule": PASS_RULE,
-        "summary": mf.summary(root_dir),
-        "entries": [_entry_row(e) for e in entries],
-        "window": _window(root_dir, today, {e["day"] for e in entries}),
-        "spreads": _spreads(root_dir),
+        "start_expiry": rule.start_expiry.isoformat(),
+        "pass_rule": {
+            "expiries": rule.expiries_needed,
+            "expiries_up": rule.expiries_up_needed,
+            "slippage_pct": mf.SLIPPAGE_PCT,
+        },
+        "summary": mf.summary(root_dir, rule),
+        "entries": [_entry_row(e, rule) for e in entries],
+        "window": _window(root_dir, today, {e["day"] for e in entries}, rule),
+        "spreads": _spreads(root_dir, rule),
+        "entry_contracts": [f"{rule.strike}_CE", f"{rule.strike}_PE"],
         "chain": {"ok": not problems, "problems": problems},
+    }
+
+
+def forward(root_dir: Path, today: date) -> dict:
+    return {
+        "as_of": today.isoformat(),
+        "rules": [forward_rule(root_dir, today, rule) for rule in mf.RULES.values()],
     }
 
 

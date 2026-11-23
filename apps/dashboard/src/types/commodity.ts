@@ -47,7 +47,8 @@ export interface ForwardEntry {
   'net_0.5pct': number | null;
   net_0pct: number | null;
   stopped_by: string | null;
-  future_at_18: number | null;
+  /** The settling future's price at the rule's entry minute. */
+  future_at_entry: number | null;
   recorded_at: string;
   trades: ForwardTrade[];
   notes: string[];
@@ -90,20 +91,37 @@ export interface SpreadSnapshot {
   error?: string;
 }
 
-export interface CommodityForward {
-  as_of: string;
-  rule: {
-    root: string;
-    cell: string;
-    grid_sha: string;
-    window_sessions: number;
-    exits: Record<string, string>;
-  };
+export interface ForwardRuleInfo {
+  key: string;
+  root: string;
+  label: string;
+  cell: string;
+  grid_sha: string;
+  /** HH:MM entry minute. */
+  entry: string;
+  strike: string;
+  sl: number;
+  reentry: boolean;
+  week: 'expiry week' | 'week before expiry';
+  window_sessions: number;
+  exits: Record<string, string>;
+}
+
+/** One frozen forward test: its rule, journal, totals, window and spread snapshots. */
+export interface ForwardBlock {
+  rule: ForwardRuleInfo;
   start_expiry: string;
   pass_rule: { expiries: number; expiries_up: number; slippage_pct: number };
   summary: ForwardSummary;
   entries: ForwardEntry[];
   window: ForwardWindow | null;
   spreads: SpreadSnapshot[];
+  /** The snapshot keys of the contracts the rule enters (ITM1_CE and ITM1_PE, or ATM_CE and ATM_PE). */
+  entry_contracts: string[];
   chain: { ok: boolean; problems: string[] };
+}
+
+export interface CommodityForward {
+  as_of: string;
+  rules: ForwardBlock[];
 }
