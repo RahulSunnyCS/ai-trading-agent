@@ -805,6 +805,9 @@ export interface MomentumOrderRow {
   symbol: string;
   /** The lot this order belongs to ("Lot 2"), when the strategy is followed lot by lot. */
   lot?: string;
+  /** What each lot did with this stock, when the strategy is followed lot by lot: the row is the
+   * net of them (one order per stock). */
+  parts?: { lot: string; action: string; quantity: number }[];
   /** SELL, TRIM, BUY, ADD, SKIP, HOLD (blocked), or '' (at the target). */
   action: string;
   held: number;

@@ -304,3 +304,52 @@ def test_net_by_symbol_adds_buys_and_takes_off_sells_across_lots():
         ]
     }
     assert lots.net_by_symbol(plan) == {"CUPID": 6}
+
+
+def _row(symbol, action, held, quantity, price=100.0, lot="Lot 1", note=""):
+    return {
+        "symbol": symbol,
+        "action": action,
+        "held": held,
+        "price": price,
+        "value": held * price,
+        "current": 0.1,
+        "target": 0.1,
+        "quantity": quantity,
+        "order_value": quantity * price,
+        "charges": 1.0 if quantity else 0.0,
+        "note": note,
+        "lot": lot,
+    }
+
+
+def test_merge_rows_makes_one_order_per_stock_for_the_difference():
+    rows = [
+        (_row("SOUTHBANK", "SELL", 105, 105, lot="Lot 2"), 1000.0),
+        (_row("SOUTHBANK", "BUY", 0, 51, lot="Lot 4"), 1000.0),
+        (_row("NAZARA", "ADD", 14, 15, lot="Lot 2"), 1000.0),
+        (_row("NAZARA", "ADD", 33, 1, lot="Lot 4"), 1000.0),
+    ]
+    merged = {r["symbol"]: r for r in lots.merge_rows(rows, 2000.0)}
+    south = merged["SOUTHBANK"]
+    # 105 sold, 51 bought: a net sale of 54 of the 105 held, so a TRIM
+    assert (south["action"], south["quantity"], south["held"]) == ("TRIM", 54, 105)
+    assert south["order_value"] == 5400.0
+    assert [(p["lot"], p["quantity"]) for p in south["parts"]] == [("Lot 2", 105), ("Lot 4", 51)]
+    nazara = merged["NAZARA"]
+    assert (nazara["action"], nazara["quantity"], nazara["held"]) == ("ADD", 16, 47)
+    assert len(merged) == 2
+
+
+def test_merge_rows_cancels_an_equal_sell_and_buy_and_keeps_one_skip_row():
+    rows = [
+        (_row("A", "SELL", 5, 5, lot="Lot 1"), 1000.0),
+        (_row("A", "BUY", 0, 5, lot="Lot 2"), 1000.0),
+        (_row("B", "SKIP", 0, 0, lot="Lot 1", note="less than one share"), 1000.0),
+        (_row("B", "", 3, 0, lot="Lot 2"), 1000.0),
+    ]
+    merged = {r["symbol"]: r for r in lots.merge_rows(rows, 2000.0)}
+    assert merged["A"]["action"] == "" and merged["A"]["quantity"] == 0
+    assert merged["A"]["charges"] == 0.0
+    assert merged["B"]["action"] == "SKIP" and merged["B"]["quantity"] == 0
+    assert lots.net_by_symbol({"rows": list(merged.values())}) == {}

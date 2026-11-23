@@ -96,7 +96,9 @@ time. Nothing here places an order: you place them in your broker yourself.
   - A lot that is **not due** trades nothing, even if what you hold differs from the model (a swap
     for a name blocked by the premium rule, whole shares). It sells only a name its sleeve marks
     SELL that week.
-  - **One order per stock** adds the lots together, so you place a single order per stock.
+  - **One order per stock**: the orders table, the Kite basket and the Telegram message add the lots
+    together, so a stock one lot sells and another buys is a single order for the difference (the
+    row lists what each lot did). The totals and charges are those of the netted orders.
   - Shares you buy or sell in Kite between Fridays are booked first to the lots the last orders
     named, then to the lot whose orders were made last (the message lists what was booked, and
     marks anything not in the last orders). If Kite was not read that day, the message says so:
