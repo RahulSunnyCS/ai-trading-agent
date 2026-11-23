@@ -4,6 +4,7 @@ import {
   BookOpen,
   Building2,
   CalendarClock,
+  Coins,
   CreditCard,
   Database,
   Layers,
@@ -30,6 +31,7 @@ export type Tab =
   | 'coverage'
   | 'jobs'
   | 'optionslab'
+  | 'commoditylab'
   | 'momentum'
   | 'tradebook'
   | 'brokerLogins'
@@ -70,6 +72,7 @@ export interface NavItem {
 export type NavGroupId =
   | 'overview'
   | 'optionslab'
+  | 'commoditylab'
   | 'momentum'
   | 'tradebook'
   | 'operations'
@@ -138,6 +141,26 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: 'commoditylab',
+    heading: 'Commodity Lab',
+    icon: Coins,
+    items: [
+      {
+        id: 'commoditylab',
+        label: 'Commodity Lab',
+        icon: Coins,
+        // MCX gold, silver, crude oil and natural gas minis (BL-148, BL-218, BL-219).
+        defaultSegment: 'overview',
+        children: [
+          { segment: 'overview', label: 'Overview', group: 'Today' },
+          { segment: 'forward', label: 'Gold forward test', group: 'Today' },
+          { segment: 'sweep', label: 'Sweep verdict', group: 'Research' },
+          { segment: 'data', label: 'Contracts & data', group: 'Explore data' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'momentum',
     heading: 'Momentum',
     icon: LineChart,
@@ -192,6 +215,7 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'start', label: 'Start here' },
           { segment: 'momentum', label: 'Momentum' },
           { segment: 'optionslab', label: 'Options Lab' },
+          { segment: 'commodity', label: 'Commodity Lab' },
           { segment: 'operations', label: 'Data & operations' },
           { segment: 'glossary', label: 'Glossary' },
         ],

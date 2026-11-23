@@ -16,6 +16,9 @@
 import type { Tab } from '../components/shell/nav';
 import { buildPath } from '../lib/routes';
 
+import commodityForward from './content/commodity/gold-forward-test.md?raw';
+import commodityOverview from './content/commodity/overview.md?raw';
+import commoditySweep from './content/commodity/sweep-verdict.md?raw';
 import glossaryIntro from './content/glossary/terms.md?raw';
 import momentumBacktestResults from './content/momentum/backtest-results.md?raw';
 import momentumBacktestSettings from './content/momentum/backtest-settings.md?raw';
@@ -65,6 +68,7 @@ export const GUIDE_CHAPTERS = [
   { id: 'start', title: 'Start here' },
   { id: 'momentum', title: 'Momentum' },
   { id: 'optionslab', title: 'Options Lab' },
+  { id: 'commodity', title: 'Commodity Lab' },
   { id: 'operations', title: 'Data & operations' },
   { id: 'glossary', title: 'Glossary' },
 ] as const;
@@ -418,6 +422,38 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'From the template to a saved strategy the evening run will track.',
     kind: 'Walkthrough',
     body: optionsShortStraddle,
+  },
+
+  // ---- Commodity Lab -------------------------------------------------------------------
+  {
+    chapter: 'commodity',
+    slug: 'overview',
+    title: 'Commodity Lab: the four minis',
+    summary: 'What the Commodity Lab holds: expiries, data freshness and the screens in it.',
+    kind: 'Screen',
+    body: commodityOverview,
+    screen: { tab: 'commoditylab' },
+  },
+  {
+    chapter: 'commodity',
+    slug: 'gold-forward-test',
+    title: 'Gold forward test',
+    summary:
+      'The paper test of gold Dir in its expiry week: the rule, the pass rule and how to read the journal.',
+    kind: 'Screen',
+    body: commodityForward,
+    screen: { tab: 'commoditylab', rest: ['forward'] },
+    disclaimer: true,
+  },
+  {
+    chapter: 'commodity',
+    slug: 'sweep-verdict',
+    title: 'Commodity sweep verdict',
+    summary: 'Which commodity strategies worked in the two-year sweep, and why most did not.',
+    kind: 'Screen',
+    body: commoditySweep,
+    screen: { tab: 'commoditylab', rest: ['sweep'] },
+    disclaimer: true,
   },
 
   // ---- Data & operations ---------------------------------------------------------------

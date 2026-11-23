@@ -34,10 +34,13 @@ serves its API;
 its research chart uses a lazy-loaded Plotly basic bundle with optional wheel/
 touchpad zoom and the shared CSS theme tokens.
 
+**Commodity Lab** (`CommodityLabView.tsx` + `components/commodity/`, `hooks/useCommodity.ts`, `lib/commodityView.ts`, `types/commodity.ts`): the MCX minis' sidebar section at `/commoditylab/<overview|forward|sweep|data>`, read through `/legwise/mcx/overview|forward` (`api/mcx_routes.py`, read-only). Overview and Contracts & data show each root's next expiry and the collected days; Gold forward test shows the GOLDM Dir paper journal (BL-219) against its registered pass rule; Sweep verdict is a typed copy of BL-218's recorded verdict (`SWEEP_*` in `lib/commodityView.ts`, not recomputed: update it from the item's Log). A missing figure is a dash, never a zero; a journal chain that does not verify is shown.
+
 **Routing:** the URL is the source of truth for tab and sub-tab (`app/[[...slug]]/page.tsx`
 renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts` reads/pushes
 it). Paths: `/<tab>`, `/optionslab/<rotation|heatmap|matrix|correlation|regimes|strategies|builder>` (three workspaces, BL-102: Today = `rotation`, which `/optionslab` opens; Explore data; Build and test; `regimes` is archived, routed but `hidden` in the sidebar; the retired `/optionslab/results` redirects to Today and `/optionslab/runs` to Strategies, whose History drawer (`?strategy=<id>`) holds a strategy's saved days, through `PATH_ALIASES`),
 `/optionslab/builder/yaml` (the YAML engine; `/backtest` redirects there),
+`/commoditylab/<overview|forward|sweep|data>` (the Commodity Lab; `/commoditylab` opens Overview),
 `/tradebook/<fno|trades|money|momentum>` (the Trade book; `/tradebook` opens F&O), `/coverage/<backfill|replay>` (old `/backfill`, `/replay` redirect), `/jobs` (the scheduler's Jobs page, read from `/api/scheduler/*` — needs `SCHEDULER_DIRECT=1`), `/billing` (`/pricing` redirects),
 `/momentum/<backtest|scores|saved|week|journal>` (`/momentum/weekly` and the retired `/momentum/rebalance` redirect to `week`; This week's state is in the query: `?week=`, `?fav=`, `?panel=run`, `?review=`, `?stock=`), `/momentum/backtest/<dataset>`,
 `/momentum/scores/<stocks|sectors>`, `/guide/<chapter>/<page>` (`/help` and `/docs` redirect). A new sub-tab = add its ids to `lib/routes.ts` and derive

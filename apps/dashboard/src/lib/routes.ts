@@ -6,13 +6,14 @@
  *   /live  /trades  /personalities  /pnl  /regime
  *   /optionslab/{rotation|heatmap|matrix|correlation|strategies|builder|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
+ *   /commoditylab/{overview|forward|sweep|data}
  *   /momentum/{backtest|scores|options|saved|week|journal} (old /momentum/weekly and /rebalance redirect)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
  *   /tradebook/{fno|trades|money|momentum}
  *   /coverage/{backfill|replay}
  *   /brokerLogins  /billing  /settings
- *   /guide/{start|momentum|optionslab|operations|glossary}/<page>
+ *   /guide/{start|momentum|optionslab|commodity|operations|glossary}/<page>
  *
  * A path's first segment is the tab id, except where TAB_SEGMENT says otherwise (the
  * `pricing` tab lives at /billing).

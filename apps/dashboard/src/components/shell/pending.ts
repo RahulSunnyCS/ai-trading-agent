@@ -46,6 +46,15 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Render replay results in the UI',
   ],
   jobs: [],
+  commoditylab: [
+    'First cut: Overview, Gold forward test, Sweep verdict, Contracts & data. Pending the owner’s direction on what to build next',
+    'A Builder for commodity strategies (the leg-wise engine already runs MCX on a 09:00-23:54 grid)',
+    'A heatmap of entry time by stop for the four minis, like Options Lab’s Heatmap',
+    'A Live board for gold and crude (spot future, ATM straddle) once an intraday MCX feed exists',
+    'Serve the BL-218 sweep results (the files are not in the API) so the Sweep verdict is computed, not copied',
+    'Extend the expiry calendar of silver, crude and natural gas past October 2026 (only gold is kept current)',
+    'Margin per lot and the real bid-ask spread: the sweep could not measure either',
+  ],
   optionslab: [
     'Run `obt fyers history` once (live Fyers token needed) to unlock the market-regime study',
     'Calibrate the anatomy thresholds (QUIET / TREND) against the backfilled history (TODO 3.10.16)',
