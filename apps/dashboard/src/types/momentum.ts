@@ -701,6 +701,12 @@ export interface MomentumWeekCard {
     added: Array<{ asset: string; action: string }>;
     dropped: Array<{ asset: string; action: string }>;
   } | null;
+  /** Return and worst fall of the favourite's lots put in the way yours were (Paper and Invested
+   * favourites only; stored by the Friday rules job); `error` when it could not be measured. */
+  since_start?:
+    | { start: string; return: number; max_drawdown: number; weeks: number; as_of: string }
+    | { error: string }
+    | null;
   trades: number;
   shared_with_headline: number | null;
   /** The paper start Friday: nothing is held going into it, so every held name is a buy. */
@@ -805,6 +811,9 @@ export interface MomentumOrderRow {
   symbol: string;
   /** The lot this order belongs to ("Lot 2"), when the strategy is followed lot by lot. */
   lot?: string;
+  /** What each lot did with this stock, when the strategy is followed lot by lot: the row is the
+   * net of them (one order per stock). */
+  parts?: { lot: string; action: string; quantity: number }[];
   /** SELL, TRIM, BUY, ADD, SKIP, HOLD (blocked), or '' (at the target). */
   action: string;
   held: number;
@@ -830,6 +839,8 @@ export interface MomentumOrderPlan {
   missing_prices: string[];
 }
 
+export type MomentumLotRule = 'equal' | 'target' | 'fresh';
+
 /** One lot of a group followed lot by lot, as the Friday run plans it. */
 export interface MomentumLotOrders {
   id: string;
@@ -837,6 +848,11 @@ export interface MomentumLotOrders {
   name: string;
   /** new: funded this week; rebalance: due; exit: only a forced exit; not due. */
   status: 'new' | 'rebalance' | 'exit' | 'not due';
+  /** How the orders were made (BL-236): equal = what the strategy trades this week, split
+   * equally; target = to the sleeve's end weights (the older rule, `MOMENTUM_LOT_RULE=target`);
+   * fresh = a new lot's picks in equal weights; null = nothing planned. Absent on orders saved
+   * before BL-236. */
+  rule?: MomentumLotRule | null;
   next: string | null;
   budget: number | null;
   holds: Record<string, number>;
@@ -877,6 +893,7 @@ export interface MomentumLot {
   /** What the last stored orders said for this lot (the Friday Telegram's line). */
   last_orders: {
     status: MomentumLotOrders['status'];
+    rule?: MomentumLotRule | null;
     budget: number | null;
     next: string | null;
   } | null;

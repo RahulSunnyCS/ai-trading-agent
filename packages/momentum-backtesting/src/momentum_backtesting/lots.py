@@ -16,7 +16,10 @@ shows one combined holding per stock, so this module keeps which shares belong t
   differ from the model on purpose (a swap for a name a gate blocked, whole shares).
   A lot that holds nothing yet is a *new lot*: it is funded with the weekly lot size (or all the
   free cash when that is more) and the plan says what to add to Kite. A rebalancing lot gets its
-  own shares plus the free cash left over.
+  own shares plus the free cash left over, and (BL-236, owner 2026-11-19) trades what its sleeve's
+  backtest trades that week, not the difference to the sleeve's end weights: it sells the names
+  the sleeve's book no longer holds, splits the proceeds and its cash equally over what the sleeve
+  buys (`orders.plan_equal_split`); `Lot.slices` / `Lot.keep` carry that, None = the older rule.
 
 Pure arithmetic and storage; no network. Callers pass a connection from `db_read` and keep it
 short (the package's catalog rule).
@@ -317,6 +320,14 @@ class Lot:
     #: a new lot bought from fresh cash: its leftover cash buys one share of the names an equal
     #: split could not afford, in the order of `target` (the model's rank, best first)
     use_leftover: bool = False
+    #: BL-236: a due lot with shares trades what the backtest trades instead of aiming at
+    #: `target`. `slices` = the names the sleeve buys this week -> its own equal-split weights
+    #: (best rank first), `keep` = the names its book holds after the week (and any ranked within
+    #: its exit rank): a held name outside it is sold. None = the older rule, toward `target`.
+    slices: dict[str, float] | None = None
+    keep: frozenset[str] | None = None
+    max_position: float | None = None
+    cap_band: float = 0.0
 
 
 def plan_lots(
@@ -381,8 +392,24 @@ def plan_lots(
         blocked_names = {n for n in set(mapped) | set(lot.target) if n in blocked}
         plan: OrderPlan | None = None
         status = "not due"
-        if lot.due:
+        rule: str | None = None
+        if lot.due and lot not in new and lot.slices is not None and lot.keep is not None:
+            status, rule = "rebalance", "equal"
+            plan = orders.plan_equal_split(
+                mapped,
+                prices,
+                lot.slices,
+                keep=lot.keep,
+                cash=budget[lot.id],
+                min_trade_rs=min_trade_rs,
+                blocked=blocked_names,
+                max_position=lot.max_position,
+                cap_band=lot.cap_band,
+            )
+            orders.use_leftover(plan, list(lot.slices))
+        elif lot.due:
             status = "new" if lot in new else "rebalance"
+            rule = "fresh" if lot in new else "target"
             plan = orders.plan(
                 mapped,
                 prices,
@@ -406,6 +433,7 @@ def plan_lots(
                 "label": lot.label,
                 "name": lot.name,
                 "status": status,
+                "rule": rule,
                 "next": lot.next_due,
                 "budget": round(budget.get(lot.id, 0.0), 2) if lot.due else None,
                 "holds": {n: s for n, s in sorted(mapped.items())},
@@ -414,33 +442,115 @@ def plan_lots(
             }
         )
 
-    rows: list[dict[str, Any]] = []
     # The cash the orders spend is the free cash plus what the owner adds for a new lot.
     total = OrderPlan(0.0, max(0.0, free_cash) + deposit_needed)
+    lot_rows: list[tuple[dict[str, Any], float]] = []
     for result in results:
         plan_dict = result["plan"]
         if not plan_dict:
             continue
-        rows += [{**row, "lot": result["label"]} for row in plan_dict["rows"]]
+        lot_rows += [
+            ({**row, "lot": result["label"]}, plan_dict["portfolio_value"])
+            for row in plan_dict["rows"]
+        ]
         total.portfolio_value += plan_dict["portfolio_value"]
-        total.sells += plan_dict["sells"]
-        total.buys += plan_dict["buys"]
-        total.charges += plan_dict["charges"]
-        total.not_traded += plan_dict["not_traded"]
         total.missing_prices += [
             m for m in plan_dict["missing_prices"] if m not in total.missing_prices
         ]
+    # One row per stock (owner, 2026-11-23): two lots that sell and buy the same name, or buy it
+    # twice, are one order. The totals follow the netted orders, so the charges are the ones the
+    # single order pays; each lot's own plan above is untouched.
+    merged = merge_rows(lot_rows, total.portfolio_value)
+    for row in merged:
+        if row["quantity"]:
+            if row["action"] in ("SELL", "TRIM"):
+                total.sells += row["order_value"]
+            else:
+                total.buys += row["order_value"]
+            total.charges += row["charges"]
+    total.not_traded = sum(1 for r in merged if r["action"] in ("SKIP", "HOLD"))
     total.cash_after = total.cash + total.sells - total.buys - total.charges
     aggregate = total.to_dict()
-    aggregate["rows"] = sorted(
-        rows, key=lambda r: (orders._ORDER[r["action"]], r["symbol"], r["lot"])
-    )
+    aggregate["rows"] = sorted(merged, key=lambda r: (orders._ORDER[r["action"]], r["symbol"]))
     return {
         "lots": results,
         "deposit_needed": round(deposit_needed, 2),
         "free_cash": round(max(0.0, free_cash), 2),
         "plan": aggregate,
     }
+
+
+def merge_rows(
+    lot_rows: list[tuple[dict[str, Any], float]], portfolio_value: float
+) -> list[dict[str, Any]]:
+    """One order row per stock from the lots' rows (each paired with its lot's portfolio value).
+
+    A stock several lots trade becomes one order for the net: sells and buys of it cancel, so a
+    lot that sells 105 and another that buys 51 is a SELL of 54, with the charges of that one
+    order. `parts` lists what each lot did, for the page and the message. Held and value add up,
+    and the shares of the portfolio (yours, the model's) are re-based on all the lots together. A
+    stock nothing trades keeps one row: HOLD over SKIP over already at target."""
+    by_symbol: dict[str, list[tuple[dict[str, Any], float]]] = {}
+    for item in lot_rows:
+        by_symbol.setdefault(item[0]["symbol"], []).append(item)
+
+    out: list[dict[str, Any]] = []
+    for symbol, items in by_symbol.items():
+        rows = [r for r, _ in items]
+        held = sum(r["held"] for r in rows)
+        value = sum(r["value"] for r in rows)
+        current = sum(r["current"] * pv for r, pv in items)
+        target = sum(r["target"] * pv for r, pv in items)
+        if portfolio_value > 0:
+            current /= portfolio_value
+            target /= portfolio_value
+        price = next((r["price"] for r in rows if r["price"]), None)
+        traded = [r for r in rows if r["quantity"]]
+        parts = [
+            {"lot": r["lot"], "action": r["action"], "quantity": r["quantity"]} for r in traded
+        ]
+        net = sum(
+            (-1 if r["action"] in ("SELL", "TRIM") else 1) * r["quantity"] for r in traded
+        )
+        notes = list(dict.fromkeys(r["note"] for r in rows if r["note"]))
+        action, quantity, order_value, charges = "", 0, 0.0, 0.0
+        if net:
+            quantity = abs(net)
+            order_value = quantity * price if price else sum(r["order_value"] for r in traded)
+            if net < 0:
+                action = "SELL" if quantity >= held else "TRIM"
+                charges = orders.sell_charges(order_value)
+            else:
+                action = "ADD" if held > 0 else "BUY"
+                charges = orders.buy_charges(order_value)
+            if len(traded) > 1:
+                notes = [f"{len(traded)} lots, netted"] + notes
+        elif traded:
+            notes = ["lots buy and sell the same shares: nothing to trade"] + notes
+        else:
+            for wanted in ("HOLD", "SKIP"):
+                if any(r["action"] == wanted for r in rows):
+                    action = wanted
+                    break
+        out.append(
+            {
+                "symbol": symbol,
+                "action": action,
+                "held": held,
+                "price": price,
+                "value": value,
+                "current": current,
+                "target": target,
+                "quantity": quantity,
+                "order_value": order_value,
+                "charges": charges,
+                "note": "; ".join(notes),
+                # the lot, when one lot alone has a row for the stock; `parts` has the rest
+                "lot": rows[0]["lot"] if len(rows) == 1 else "",
+                "parts": parts,
+            }
+        )
+    return out
 
 
 def net_by_symbol(plan: dict[str, Any]) -> dict[str, int]:
@@ -463,6 +573,7 @@ __all__ = [
     "clear",
     "has_ledger",
     "history",
+    "merge_rows",
     "net_by_symbol",
     "pending",
     "plan_lots",
