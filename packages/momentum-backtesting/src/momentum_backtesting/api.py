@@ -4193,16 +4193,18 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
         if lot["status"] == "not due" and lot["next"]:
             head += f" · next {pd.Timestamp(lot['next']):%a %d %b}"
         lines.append(head)
-        for row in (plan or {}).get("rows", []):
-            if row["quantity"]:
-                traded = True
-                extra = " · leftover cash" if row.get("note") == orders.LEFTOVER_NOTE else ""
-                lines.append(
-                    f"  • {row['action']} {row['symbol']} {row['quantity']} sh "
-                    f"(₹{row['order_value']:,.0f}){extra}"
-                )
-            elif row["action"] in ("SKIP", "HOLD"):
-                lines.append(f"  · not traded: {row['symbol']} ({row['note'] or row['action']})")
+    # One order per stock (owner, 2026-11-23): the rows of the combined plan are already netted
+    # across the lots, so a stock two lots trade is listed once, for the difference.
+    for row in payload["plan"]["rows"]:
+        if row["quantity"]:
+            traded = True
+            extra = " · leftover cash" if row.get("note") == orders.LEFTOVER_NOTE else ""
+            lines.append(
+                f"  • {row['action']} {row['symbol']} {row['quantity']} sh "
+                f"(₹{row['order_value']:,.0f}){extra}"
+            )
+        elif row["action"] in ("SKIP", "HOLD"):
+            lines.append(f"  · not traded: {row['symbol']} ({row['note'] or row['action']})")
     for skip in payload.get("premium_skips") or []:
         lines.append(_premium_skip_line(skip))
     if payload["deposit_needed"] > 0:
@@ -4211,12 +4213,6 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
             f"(free cash ₹{payload.get('free_cash', 0):,.0f}, the new lot needs "
             f"₹{payload['lot_size']:,.0f})."
         )
-    if payload["net"]:
-        net = ", ".join(
-            f"{'BUY' if q > 0 else 'SELL'} {name} {abs(q)}"
-            for name, q in sorted(payload["net"].items())
-        )
-        lines.append(f"One order per stock: {net}")
     labels = {lot["id"]: lot["label"] for lot in payload["lots"]}
     booked = payload["ledger"]["booked"]
     if booked:

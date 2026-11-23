@@ -602,7 +602,7 @@ contract, not a shared service).
   else is returned as unexplained, never guessed (`mbt lots assign`). The pending lot and the plan
   move only on a run on the Friday itself with a Kite snapshot read that day. Symbols Kite still
   holds that are not strategy names today are never booked as sold (`ignore`).
-  `plan_lots`: each lot planned alone with `orders.plan`: a due lot with no shares is a *new lot*
+  `plan_lots`: the combined `plan` has one row per stock (`merge_rows`, owner 2026-11-23: lots that sell and buy the same name are one order for the difference, `parts` listing each lot, totals and charges on the netted orders; the per-lot plans stay as planned); each lot planned alone with `orders.plan`: a due lot with no shares is a *new lot*
   (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite; its
   target is `api._fresh_sleeve_target`, the sleeve's picks split equally as the Rebalance preview's
   first allocation, never the running model's drifted weights: owner, 2026-11-05; the lot row and the

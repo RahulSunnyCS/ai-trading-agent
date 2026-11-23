@@ -76,6 +76,16 @@ function OrderRow({ row }: { row: MomentumOrderRow }) {
       <Td className="font-semibold text-foreground">
         {row.symbol}
         {row.lot ? <span className="ml-1.5 text-xs font-normal text-faint">{row.lot}</span> : null}
+        {row.parts && row.parts.length > 1 ? (
+          <span className="ml-1.5 text-xs font-normal text-faint">
+            {row.parts
+              .map(
+                (part) =>
+                  `${part.lot} ${part.action === 'SELL' || part.action === 'TRIM' ? '−' : '+'}${formatInt(part.quantity)}`,
+              )
+              .join(' · ')}
+          </span>
+        ) : null}
       </Td>
       <Td align="right" numeric>
         {row.held ? formatInt(row.held) : '0'}
@@ -579,14 +589,13 @@ function PlanBody({
 }
 
 /** BL-142: the strategy followed lot by lot: what each lot does this Friday, what to add to Kite,
- * the one order per stock, and any change in Kite no lot could take. */
+ * and any change in Kite no lot could take. */
 function LotOrders({
   orders,
 }: {
-  orders: Pick<MomentumOrders, 'lots' | 'net' | 'ledger' | 'deposit_needed' | 'lot_size'>;
+  orders: Pick<MomentumOrders, 'lots' | 'ledger' | 'deposit_needed' | 'lot_size'>;
 }) {
   const lots = orders.lots ?? [];
-  const net = Object.entries(orders.net ?? {});
   const unexplained = orders.ledger?.unexplained ?? [];
   return (
     <div className="space-y-2 border-b border-border px-4 py-3 text-sm">
@@ -618,14 +627,6 @@ function LotOrders({
         <p className="text-warning">
           Add <b>{formatInr(orders.deposit_needed)}</b> to Kite before you buy: the new lot needs{' '}
           {formatInr(orders.lot_size ?? 0)}.
-        </p>
-      ) : null}
-      {net.length ? (
-        <p className="text-muted">
-          One order per stock:{' '}
-          {net
-            .map(([name, q]) => `${q > 0 ? 'BUY' : 'SELL'} ${name} ${formatInt(Math.abs(q))}`)
-            .join(', ')}
         </p>
       ) : null}
       {unexplained.length ? (
