@@ -161,6 +161,9 @@ def history(con: duckdb.DuckDBPyConnection, who: str, group_id: str) -> list[dic
 class Reconciled:
     events: list[dict[str, Any]] = field(default_factory=list)
     unexplained: list[dict[str, Any]] = field(default_factory=list)
+    #: symbols whose planned orders netted to nothing and were booked as a move between lots; the
+    #: caller drops them from the saved plan so the next refresh does not book them again
+    settled: list[str] = field(default_factory=list)
 
 
 def _note_beyond(planned: dict[str, dict[str, float]] | None) -> str | None:
@@ -174,6 +177,7 @@ def reconcile(
     allowed: dict[str, set[str]],
     planned: dict[str, dict[str, float]] | None = None,
     ignore: set[str] | frozenset[str] = frozenset(),
+    book_transfers: bool = True,
 ) -> Reconciled:
     """Book what changed in Kite's holdings (`held`: base symbol -> shares, the strategy's names
     only) to the lots.
@@ -188,7 +192,11 @@ def reconcile(
 
     `ignore`: symbols Kite still holds that are not in `held` (outside the strategy today, or
     excluded). The ledger cannot tell a sale from a name dropping out of the data, so these are
-    never booked as sold."""
+    never booked as sold.
+
+    `book_transfers`: book a move between lots whose orders netted to nothing (kind `transfer`:
+    no trade stands behind it, so forward fills skip it). The caller turns it off on the day the
+    plan was made, when a replan that follows would otherwise see the lots already moved."""
     result = Reconciled()
     plan = planned or {}
     note = _note_beyond(plan)
@@ -198,9 +206,32 @@ def reconcile(
             continue
         booked = sum(lot.get(symbol, 0.0) for lot in ledger.values())
         delta = held.get(symbol, 0.0) - booked
-        if abs(delta) < EPS:
-            continue
         involved = [sid for sid, p in plan.items() if abs(p.get(symbol, 0.0)) > EPS]
+        if abs(delta) < EPS:
+            # One lot sells what another buys: the orders net to nothing, so Kite never moves and
+            # there is no change to read. The move between lots is booked from the plan itself
+            # (only when every selling lot holds what it was told to sell).
+            nets_to_nothing = (
+                len(involved) > 1 and abs(sum(plan[sid][symbol] for sid in involved)) < EPS
+            )
+            sellers_hold_it = all(
+                plan[sid][symbol] > 0
+                or ledger.get(sid, {}).get(symbol, 0.0) + plan[sid][symbol] > -EPS
+                for sid in involved
+            )
+            if book_transfers and nets_to_nothing and sellers_hold_it:
+                for sid in involved:
+                    result.events.append(
+                        {
+                            "sleeve_id": sid,
+                            "symbol": symbol,
+                            "delta": plan[sid][symbol],
+                            "kind": "transfer",
+                            "note": "moved between lots: the orders netted to nothing",
+                        }
+                    )
+                result.settled.append(symbol)
+            continue
         # One order a stock: the orders asked for the lots' trades netted (lot 2 buys 73 while lot
         # 1 sells 20: BUY 53). When Kite moved by exactly that, every lot did what it was told.
         if len(involved) > 1 and abs(delta - sum(plan[sid][symbol] for sid in involved)) < EPS:
