@@ -4195,10 +4195,12 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
         lines.append(head)
     # One order per stock (owner, 2026-11-23): the rows of the combined plan are already netted
     # across the lots, so a stock two lots trade is listed once, for the difference.
+    if any(r["quantity"] or r["action"] in ("SKIP", "HOLD") for r in payload["plan"]["rows"]):
+        lines.append("Orders, one per stock (all lots together)")
     for row in payload["plan"]["rows"]:
         if row["quantity"]:
             traded = True
-            extra = " · leftover cash" if row.get("note") == orders.LEFTOVER_NOTE else ""
+            extra = " · leftover cash" if orders.LEFTOVER_NOTE in row.get("note", "") else ""
             lines.append(
                 f"  • {row['action']} {row['symbol']} {row['quantity']} sh "
                 f"(₹{row['order_value']:,.0f}){extra}"
