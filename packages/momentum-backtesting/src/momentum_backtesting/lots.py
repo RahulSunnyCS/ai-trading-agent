@@ -177,6 +177,7 @@ def reconcile(
     allowed: dict[str, set[str]],
     planned: dict[str, dict[str, float]] | None = None,
     ignore: set[str] | frozenset[str] = frozenset(),
+    book_transfers: bool = True,
 ) -> Reconciled:
     """Book what changed in Kite's holdings (`held`: base symbol -> shares, the strategy's names
     only) to the lots.
@@ -191,7 +192,11 @@ def reconcile(
 
     `ignore`: symbols Kite still holds that are not in `held` (outside the strategy today, or
     excluded). The ledger cannot tell a sale from a name dropping out of the data, so these are
-    never booked as sold."""
+    never booked as sold.
+
+    `book_transfers`: book a move between lots whose orders netted to nothing (kind `transfer`:
+    no trade stands behind it, so forward fills skip it). The caller turns it off on the day the
+    plan was made, when a replan that follows would otherwise see the lots already moved."""
     result = Reconciled()
     plan = planned or {}
     note = _note_beyond(plan)
@@ -214,14 +219,14 @@ def reconcile(
                 or ledger.get(sid, {}).get(symbol, 0.0) + plan[sid][symbol] > -EPS
                 for sid in involved
             )
-            if nets_to_nothing and sellers_hold_it:
+            if book_transfers and nets_to_nothing and sellers_hold_it:
                 for sid in involved:
                     result.events.append(
                         {
                             "sleeve_id": sid,
                             "symbol": symbol,
                             "delta": plan[sid][symbol],
-                            "kind": "attributed",
+                            "kind": "transfer",
                             "note": "moved between lots: the orders netted to nothing",
                         }
                     )

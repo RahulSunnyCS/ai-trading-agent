@@ -97,10 +97,25 @@ def test_a_sale_and_a_buy_that_net_to_nothing_move_the_shares_between_lots():
     got = lots.reconcile({"SOUTHBANK": 105.0}, ledger, L2, _allowed(**{L2: {"SOUTHBANK"}}), planned)
     assert {(e["sleeve_id"], e["delta"]) for e in got.events} == {(L1, -105.0), (L2, 105.0)}
     assert got.settled == ["SOUTHBANK"] and got.unexplained == []
+    assert {e["kind"] for e in got.events} == {"transfer"}
     assert lots.apply(ledger, got.events) == {L2: {"SOUTHBANK": 105.0}}
     # the plan is spent: reconciling again with it dropped books nothing
     again = lots.reconcile({"SOUTHBANK": 105.0}, lots.apply(ledger, got.events), L2, {}, {})
     assert again.events == [] and again.settled == []
+
+
+def test_a_move_between_lots_waits_when_the_caller_says_the_plan_is_from_today():
+    ledger = {L1: {"SOUTHBANK": 105.0}}
+    planned = {L1: {"SOUTHBANK": -105.0}, L2: {"SOUTHBANK": 105.0}}
+    got = lots.reconcile(
+        {"SOUTHBANK": 105.0},
+        ledger,
+        L2,
+        _allowed(**{L2: {"SOUTHBANK"}}),
+        planned,
+        book_transfers=False,
+    )
+    assert got.events == [] and got.settled == []
 
 
 def test_a_move_between_lots_is_not_booked_when_the_selling_lot_lacks_the_shares():

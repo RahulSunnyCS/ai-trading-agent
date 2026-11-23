@@ -4001,6 +4001,11 @@ def _compute_lot_orders(
             for sid, info in sleeves.items()
         }
         pending_id, planned_before = lots.pending_state(con, who, group_id)
+        planned_row = con.execute(
+            "SELECT updated_at FROM momentum_lot_state WHERE owner = ? AND group_id = ?",
+            [who, group_id],
+        ).fetchone()
+        planned_at = str(planned_row[0]) if planned_row and planned_row[0] else ""
         # What Kite still holds that is not a strategy name today (outside, excluded, or a name
         # that dropped out of the data) is never booked as sold.
         reconciled = lots.reconcile(
@@ -4010,6 +4015,9 @@ def _compute_lot_orders(
             allowed,
             planned=planned_before,
             ignore=kite_symbols - set(held),
+            # A move between lots is booked from a later day than the plan's: a run on the same
+            # day replans from the ledger, and would see the lots already moved.
+            book_transfers=bool(planned_at) and planned_at[:10] < today.isoformat(),
         )
         at = (synced or {}).get("synced_at") or datetime.now(IST).isoformat(timespec="seconds")
         if reconciled.events:
@@ -4020,7 +4028,7 @@ def _compute_lot_orders(
                         sid: {s: q for s, q in p.items() if s not in reconciled.settled}
                         for sid, p in planned_before.items()
                     }
-                    lots.set_pending(con, who, group_id, pending_id, at, left)
+                    lots.set_pending(con, who, group_id, pending_id, planned_at, left)
             ledger = lots.apply(ledger, reconciled.events)
         has_history = lots.funded(con, who, group_id)
 
