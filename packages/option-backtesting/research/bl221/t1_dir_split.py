@@ -27,6 +27,7 @@ FROM, TO = date(2024, 10, 9), date(2026, 10, 8)
 DIR_RE = re.compile(r"^[NS]_(dir|ditm1)")
 
 from adaptive_picks import picks_for, strategy_path  # noqa: E402
+
 from option_backtesting.rotation import store  # noqa: E402
 
 TABLE = json.loads((HERE / "out" / "table.json").read_text())
@@ -59,8 +60,8 @@ def main(legs: bool):
         gp = sum(r[5] for r in rows)
         gl = sum(r[6] for r in rows)
         print(f"{'state':20}{'days':>6}{'total ₹':>11}{'₹/day':>8}{'win%':>6}{'profit on win days':>20}{'loss on lose days':>19}")
-        for n, k, t, m, w, p, l in rows:
-            print(f"{n:20}{k:>6}{t:>11.0f}{m:>8.0f}{w * 100:>5.0f}%{p:>12.0f} ({p / gp * 100:>3.0f}%){l:>12.0f} ({l / gl * 100:>3.0f}%)")
+        for n, k, t, m, w, p, loss in rows:
+            print(f"{n:20}{k:>6}{t:>11.0f}{m:>8.0f}{w * 100:>5.0f}%{p:>12.0f} ({p / gp * 100:>3.0f}%){loss:>12.0f} ({loss / gl * 100:>3.0f}%)")
         print(f"{'all Dir days':20}{len(has_dir):>6}{tot:>11.0f}{tot / len(has_dir):>8.0f}")
         # by market direction that day (open to close) as a second lens
     # the index's own direction on the day, from the frame
@@ -91,6 +92,7 @@ def main(legs: bool):
 
 def leg_lens(has_dir, dir_picks):
     import yaml
+
     from option_backtesting.data.reference.loader import default_reference_data
     from option_backtesting.legwise.engine import MissingReferenceData, simulate_day
     from option_backtesting.legwise.market import load_day

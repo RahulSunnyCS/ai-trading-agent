@@ -23,18 +23,32 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
 import score  # noqa: E402 - the registered scorer's helpers (stats, series, episodes)
+
 from option_backtesting.data.reference.loader import default_reference_data  # noqa: E402
 from option_backtesting.legwise.engine import simulate_day  # noqa: E402
 from option_backtesting.legwise.market import load_day  # noqa: E402
 from option_backtesting.legwise.schema import load_legwise  # noqa: E402
-from option_backtesting.rotation import base, daylog, expiry, pick, sl150_cap, slip_store, store  # noqa: E402
+from option_backtesting.rotation import (  # noqa: E402
+    base,
+    daylog,
+    expiry,
+    pick,
+    sl150_cap,
+    slip_store,
+    store,
+)
 from option_backtesting.rotation.lists import SIZING_DATE  # noqa: E402
 from option_backtesting.rotation.readout import (  # noqa: E402
     MIN_WIDE_N,
     block_bootstrap_mean,
     random_day,
 )
-from option_backtesting.rotation.variants import is_buy, is_wide, track_names, variant_names  # noqa: E402
+from option_backtesting.rotation.variants import (  # noqa: E402
+    is_buy,
+    is_wide,
+    track_names,
+    variant_names,
+)
 
 ROOT = Path(os.environ["TRADING_DATA_ROOT"])
 S_BASE_YAML = Path(__file__).parent / "sensex_base_dir_atm_0924.yaml"
@@ -199,7 +213,7 @@ def main() -> None:
         nx_ix = np.array([i for i in ix if not sflag[i]])
         wed_ix = np.array([i for i in sx_ix if rows[i]["wed"]])
         se_ix = np.array([i for i in sx_ix if not rows[i]["wed"]])
-        for tag, jx, dest in (("s", sx_ix, "on_s_days"), ("n", nx_ix, "on_n_days"), ("w", wed_ix, "on_wed"), ("e", se_ix, "on_sexpiry")):
+        for _tag, jx, dest in (("s", sx_ix, "on_s_days"), ("n", nx_ix, "on_n_days"), ("w", wed_ix, "on_wed"), ("e", se_ix, "on_sexpiry")):
             if not len(jx):
                 continue
             for kind in ("nifty", "sensex", "live"):

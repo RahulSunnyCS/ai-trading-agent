@@ -132,7 +132,7 @@ def boot_lb(diff, seed=SEED, block=5, draws=DRAWS):
 
 def blocks(net, base):
     edges = np.linspace(0, N, 5).astype(int)
-    return [(float(net[a:b].mean()), float(base[a:b].mean())) for a, b in zip(edges[:-1], edges[1:])]
+    return [(float(net[a:b].mean()), float(base[a:b].mean())) for a, b in zip(edges[:-1], edges[1:], strict=True)]
 
 
 def main():
@@ -140,7 +140,6 @@ def main():
     missing = [d for d in DAYS if T[d]["comp"]["base"][SLIP] is None]
     print(f"{N} sessions {DAYS[0]} -> {DAYS[-1]}; base Dir unrun on {len(missing)}; "
           f"left out of the fit by the engine: {len(TABLE['skipped'])}")
-    rows = []
     cells = [(r, k, c) for r in RANGE_ENDS for k in ("hourly", "daily") for c in CUTOFFS]
     ng_cache = {}
     print(f"\nC1 base Dir (as traded, 0.5%): {stats(base)}")
@@ -220,7 +219,7 @@ def main():
     print("VERDICT:", "ADVANCE to confirmation" if all(rule.values()) else "KILLED (no candidate)")
     if EXTRA_PATH.exists():
         print("\nEXTRAS (owner override, exploratory; primary range 10:00; 0.5% slippage; never a pass):")
-        c1s = stats(base)
+        stats(base)
         for cut in ("12:00", "14:00"):
             rows_ = {
                 "sell ATM (registered)": (series(r, k, cut)[0], series(r, k, cut)[1]),

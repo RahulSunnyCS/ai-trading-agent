@@ -152,7 +152,7 @@ def run_all(limit: int | None) -> dict:
             "comp": {},
         }
 
-        def sim(spec):
+        def sim(spec, data=data):
             try:
                 return simulate(spec, data, reference, sizing)
             except MissingReferenceData:

@@ -80,7 +80,7 @@ def main():
     pl = np.array([np.where(rng.random(N) < p_up, arm(f"WCE{x}"), arm(f"WPE{x}")).mean() for _ in range(DRAWS)])
     pct = float((pl < w.mean()).mean())
     edges = np.linspace(0, N, 5).astype(int)
-    blocks = [(float(w[a_:b].mean()), float(a[a_:b].mean())) for a_, b in zip(edges[:-1], edges[1:])]
+    blocks = [(float(w[a_:b].mean()), float(a[a_:b].mean())) for a_, b in zip(edges[:-1], edges[1:], strict=True)]
     q_ok = sum(1 for wv, av in blocks if wv > av)
     print(f"\nPRIMARY W({x}) vs S({x}): {(w - s).mean():.0f} [{lo_s:.0f}, {hi_s:.0f}]; placebo trend mean {pl.mean():.0f} "
           f"(5-95% {np.percentile(pl, 5):.0f}..{np.percentile(pl, 95):.0f}); W beats {pct * 100:.1f}% of draws")
@@ -95,7 +95,8 @@ def main():
     # splits by state, primary
     for nm, m in (("up-trend days (CE wide)", up), ("down-trend days (PE wide)", ~up)):
         print(f"  {nm}: {m.sum()} days, W(50) minus A0 {(w - a)[m].mean():.0f}/day, A0 {a[m].mean():.0f}/day, W {w[m].mean():.0f}/day")
-    json.dump({"rule": rule, "placebo_pct": pct}, open(HERE / "out" / "verdict.json", "w"), default=float)
+    with open(HERE / "out" / "verdict.json", "w") as fh:
+        json.dump({"rule": rule, "placebo_pct": pct}, fh, default=float)
 
 
 if __name__ == "__main__":
