@@ -1406,10 +1406,17 @@ def mcx_forward_score(
 def mcx_forward_spread(
     day: str | None = typer.Option(None, "--day", help="YYYY-MM-DD (default: today)."),
     rule_key: str | None = _RULE_OPTION,
+    angel: bool = typer.Option(
+        True,
+        "--angel/--no-angel",
+        help="When Fyers cannot be used (no token, or a refused one), read the quotes from Angel "
+        "One instead (one guarded login; the snapshot says which source it came from).",
+    ),
 ) -> None:
     """BL-219 / BL-242: the read-only quotes of the future and the entry contracts (bid, ask,
     spread %), written under mcx-forward/<rule>/spread/. Run at the rule's entry minute (gold
-    18:00, silver 17:05); without --rule it reads gold's. Does nothing outside the rule's window."""
+    18:00, silver 17:05); without --rule it reads gold's. Does nothing outside the rule's window
+    (and logs in nowhere). Exit 0 done or not due, 2 no source could be used."""
     from . import mcx_forward as mf
     from .fyers.auth import FyersCredentialsError
     from .fyers.daily import data_dir
@@ -1417,12 +1424,30 @@ def mcx_forward_spread(
 
     today = date.fromisoformat(day) if day else datetime.now(IST).date()
     rule = _forward_rules(rule_key, default_all=False)[0]
+    if mf.spread_due(data_dir(), today, rule) is None:
+        typer.echo(f"{today}: not in the {rule.key} window")
+        return
     try:
         out = mf.spread_snapshot(data_dir(), _mcx_client(), today, rule=rule)
     except FyersCredentialsError as error:
-        typer.echo(f"stopped: {error}")
-        raise typer.Exit(2) from None
-    typer.echo(json.dumps(out, indent=2) if out else f"{today}: not in the {rule.key} window")
+        fyers_error = str(error)[:200]
+        if not angel:
+            typer.echo(f"stopped: {fyers_error}")
+            raise typer.Exit(2) from None
+        typer.echo(f"Fyers cannot be used ({fyers_error}); reading the quotes from Angel One")
+        from .angelone import check
+        from .angelone.mcx import AngelMcxClient
+
+        try:
+            with check.session() as sess:
+                # SmartAPI's quote call allows about one a second
+                out = mf.spread_snapshot(
+                    data_dir(), AngelMcxClient(sess, min_interval_s=1.1), today, rule=rule
+                )
+        except FyersCredentialsError as angel_error:  # Angel One's errors subclass Fyers'
+            typer.echo(f"stopped: Fyers: {fyers_error}; Angel One: {angel_error}")
+            raise typer.Exit(2) from None
+    typer.echo(json.dumps(out, indent=2))
 
 
 @mcx_forward_app.command("status")

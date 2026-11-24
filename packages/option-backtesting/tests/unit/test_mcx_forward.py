@@ -440,3 +440,97 @@ def test_a_holiday_in_the_expiry_week_moves_the_silver_window_and_scoring_waits_
     assert mf.window(SILVER_EXPIRY, held, date(2026, 12, 29), mf.SILVER) == real
     # gold's expiry week keeps its old behaviour: the last five known sessions
     assert mf.window(SILVER_EXPIRY, held, SILVER_EXPIRY, mf.GOLD) == held[-5:]
+
+
+def test_the_snapshot_reads_through_angel_one_and_says_so(root, monkeypatch):
+    contracts = [
+        Contract(f"MCX:GOLDM26NOV{k}{s}", "GOLDM", EXPIRY, float(k), s, 0)
+        for k in (139500, 140000, 140500)
+        for s in ("CE", "PE")
+    ] + [Contract(FUT, "GOLDM", EXPIRY, None, "FUT", 0)]
+    monkeypatch.setattr(mf, "parse_master", lambda text, names: contracts)
+
+    class AngelLike:
+        source = "angelone"
+
+        def __init__(self):
+            self.bound, self.future = [], None
+
+        def bind_mcx(self, wanted):
+            self.bound = [c.symbol for c in wanted]
+
+        def bind_future(self, contract):
+            self.future = contract.symbol
+            return True
+
+        def quotes(self, symbols):
+            return {s: {"lp": 140100.0 if s == FUT else 1000.0, "bid": 990.0, "ask": 1010.0}
+                    for s in symbols}  # fmt: skip
+
+    client = AngelLike()
+    out = mf.spread_snapshot(root, client, DAY, master_text="x")
+    assert out["source"] == "angelone" and out["future"]["lp"] == 140100.0
+    assert client.future == FUT and "MCX:GOLDM26NOV140000CE" in client.bound
+    assert out["contracts"]["ITM1_CE"]["spread_pct_of_mid"] == 2.0
+
+    class NoFuture(AngelLike):
+        def bind_future(self, contract):
+            return False
+
+    with pytest.raises(RuntimeError, match="Angel One lists no MCX future"):
+        mf.spread_snapshot(root, NoFuture(), DAY, master_text="x")
+
+
+def test_spread_due_names_the_expiry_only_inside_the_window(root):
+    assert mf.spread_due(root, DAY) == EXPIRY
+    assert mf.spread_due(root, date(2026, 11, 18)) is None
+
+
+def test_the_spread_command_falls_back_to_angel_one_and_stops_when_neither_works(root, monkeypatch):
+    import contextlib
+
+    from typer.testing import CliRunner
+
+    from option_backtesting import cli
+    from option_backtesting.angelone import check
+    from option_backtesting.angelone.auth import AngelCredentialsError
+    from option_backtesting.fyers import daily
+    from option_backtesting.fyers.auth import FyersCredentialsError
+
+    def no_fyers():
+        raise FyersCredentialsError("Fyers token database is unavailable")
+
+    monkeypatch.setattr(cli, "_mcx_client", no_fyers)
+    monkeypatch.setattr(daily, "data_dir", lambda: root)
+    monkeypatch.setattr(mf, "spread_due", lambda *a, **k: EXPIRY)
+    seen = []
+
+    @contextlib.contextmanager
+    def session(**kwargs):
+        seen.append(kwargs)
+        yield object()
+
+    monkeypatch.setattr(check, "session", session)
+    monkeypatch.setattr(mf, "spread_snapshot", lambda root, client, today, rule: {"source": "x"})
+    runner = CliRunner()
+    result = runner.invoke(cli.app, ["mcx-forward", "spread", "--day", "2026-11-24"])
+    assert result.exit_code == 0 and "reading the quotes from Angel One" in result.output
+    assert len(seen) == 1
+
+    refused = runner.invoke(cli.app, ["mcx-forward", "spread", "--day", "2026-11-24", "--no-angel"])
+    assert refused.exit_code == 2 and len(seen) == 1  # Angel One never logged in
+
+    @contextlib.contextmanager
+    def held(**kwargs):
+        raise AngelCredentialsError("login held")
+        yield
+
+    monkeypatch.setattr(check, "session", held)
+    both = runner.invoke(cli.app, ["mcx-forward", "spread", "--day", "2026-11-24"])
+    assert both.exit_code == 2 and "Angel One: login held" in both.output
+
+    monkeypatch.setattr(mf, "spread_due", lambda *a, **k: None)  # outside a window: no login
+    monkeypatch.setattr(check, "session", session)
+    idle = runner.invoke(cli.app, ["mcx-forward", "spread", "--day", "2026-11-18"])
+    assert idle.exit_code == 0 and "not in the goldm-dir window" in idle.output
+    assert len(seen) == 1
