@@ -38,33 +38,6 @@
       ],
       "port": 5190,
       "autoPort": true
-    },
-    {
-      "name": "bl231-dashboard",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "export PATH=$HOME/.nvm/versions/node/v20.18.0/bin:$PATH; cd /Users/rahul/Projects/ata-bl231/apps/dashboard && OBT_DIRECT=1 MOMENTUM_DIRECT=1 SCHEDULER_DIRECT=1 bun run dev -- --port 5193"
-      ],
-      "port": 5193
-    },
-    {
-      "name": "bl227-momentum-api",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "cd /Users/rahul/Projects/ata-bl226/packages/momentum-backtesting && MOMENTUM_DATA_DIR=$PWD/data/bl226/mdata MOMENTUM_STATE_DIR=$PWD/data/bl226/mstate uv run mbt serve --port 8766"
-      ],
-      "port": 8766
-    },
-    {
-      "name": "bl227-dashboard",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "export PATH=$HOME/.nvm/versions/node/v23.11.1/bin:$PATH; cd /Users/rahul/Projects/ata-bl226/apps/dashboard && MOMENTUM_DIRECT=1 MOMENTUM_DIRECT_API_URL=http://127.0.0.1:8766 bun run dev -- --port 5192"
-      ],
-      "port": 5192
     }
   ]
 }

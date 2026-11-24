@@ -41,6 +41,14 @@ Angel One's minute prices can run a few minutes behind the clock.
 - **Slippage** follows the Rotation page's switch: on, every entry and exit is filled 0.5% against
   the trade, which is the figure the 16:00 message gives.
 
+## The picks × time matrix
+
+Under the board, a second view lays the same picks out as a grid: one row per pick, one column per
+time bucket from the open (5, 15 or 30 minutes, your choice), each cell the pick's running profit
+or loss at the end of that bucket. A cell before the pick enters is empty, never zero, and a pick
+that has ended keeps its last value in a muted face. It is read off the same refresh as the board,
+so it moves every 5 minutes and sends no request of its own. Figures are before slippage.
+
 ## When Angel One says no
 
 Angel One limits how often its prices can be read and sometimes refuses well within its published
