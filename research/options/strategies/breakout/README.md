@@ -38,6 +38,9 @@ their own levels makes a breakout better: it does not, in any of the four refere
 - [Gap-and-go band → Williams back-up](../gap-and-go/README.md) (BL-164): the opening range again, with the
   gap's direction and a filled-gap stand-down, buying 150 points ITM; killed too.
 
+- [Trend-aligned range break (09:17–10:00, one sold leg)](../directional/trend-range-break.md) (BL-221): the same
+  selling-the-opposite-side idea with an hourly EMA gate; killed.
+
 ## Reproduce
 
 The result files are git-ignored. `packages/option-backtesting/research/bl152/`: `specs.py` (the 192

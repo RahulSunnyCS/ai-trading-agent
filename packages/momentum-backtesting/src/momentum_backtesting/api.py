@@ -3365,6 +3365,18 @@ def _journal_view(week: str | None) -> dict:
     }
 
 
+def _with_since_start(cards: list[dict]) -> list[dict]:
+    """Each card's `since_start` (return and worst fall of the favourite's lots put in as yours
+    were, `since_start.py`), from the file the Friday rules job stores; None where there is none."""
+    from . import since_start
+
+    stored = since_start.load(this_week.state_dir())
+    items = (stored or {}).get("items", {})
+    for card in cards:
+        card["since_start"] = items.get(card["id"])
+    return cards
+
+
 def _week_view(week: str | None) -> dict:
     """GET /api/week (BL-051): every favourite's signal for one week, from the journal, and the
     headline's message. Defaults to the latest Friday on or before today."""
@@ -3399,8 +3411,8 @@ def _week_view(week: str | None) -> dict:
         "weeks": weeks,
         "paper_start": start,
         "first_week": start == selected,
-        "favourites": this_week.week_view(
-            selected, rows, prior, favourites, groups, start_week=start
+        "favourites": _with_since_start(
+            this_week.week_view(selected, rows, prior, favourites, groups, start_week=start)
         ),
         "message": this_week.message_for(this_week.load_messages(this_week.state_dir()), selected),
     }

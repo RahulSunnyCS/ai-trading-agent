@@ -24,6 +24,18 @@ export const STEP_LABEL: Record<ScheduledRun, string> = {
   'live-rules': 'Rules check',
 };
 
+/** The Friday steps that only an ETF favourite uses: the 14:40 preview and the 16:45 final. */
+const ETF_ONLY_RUNS: ReadonlySet<ScheduledRun> = new Set(['preview', 'final']);
+
+/**
+ * The steps worth drawing: the ETF-only ones go when no favourite is an ETF favourite (a Broad or
+ * Stock favourite's signal comes from the orders run and the 19:30 stock run). A failed one is
+ * still raised by `needsAttention`, which reads the full list.
+ */
+export function shownSteps(steps: readonly TimelineStep[], etfInUse: boolean): TimelineStep[] {
+  return etfInUse ? [...steps] : steps.filter((step) => !ETF_ONLY_RUNS.has(step.run));
+}
+
 export type StepState = 'done' | 'late' | 'failed' | 'waiting' | 'due' | 'missed';
 
 export interface TimelineStep {
@@ -201,60 +213,9 @@ export function needsAttention({
   return items;
 }
 
-export type RowSection = 'sell' | 'buy' | 'skip' | 'hold';
-
-const SECTION_OF: Record<string, RowSection> = {
-  SELL: 'sell',
-  TRIM: 'sell',
-  'TRIM TO CAP': 'sell',
-  BUY: 'buy',
-  ADD: 'buy',
-  'TOP UP': 'buy',
-};
-
 /** True for a gate's row: a name the strategy wanted and did not buy ("SKIP (premium)"). */
 export function isSkipAction(action: string): boolean {
   return action.trim().toUpperCase().startsWith('SKIP');
-}
-
-/**
- * A row's place on the card: what is sold or cut, what is bought or added, what a gate kept
- * out this week (BL-136), what is kept.
- */
-export function rowSection(row: MomentumWeekRow): RowSection {
-  if (isSkipAction(row.action)) return 'skip';
-  return SECTION_OF[row.action.toUpperCase()] ?? 'hold';
-}
-
-export const SECTION_LABEL: Record<RowSection, string> = {
-  sell: 'Sell',
-  buy: 'Buy',
-  skip: 'Not bought',
-  hold: 'Hold',
-};
-
-/** Rows split Sell / Buy / Not bought / Hold, each by rank (unranked last); empty sections left out. */
-export function groupRows(
-  rows: readonly MomentumWeekRow[],
-): Array<{ section: RowSection; rows: MomentumWeekRow[] }> {
-  const byRank = (a: MomentumWeekRow, b: MomentumWeekRow) =>
-    (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY);
-  return (['sell', 'buy', 'skip', 'hold'] as const)
-    .map((section) => ({
-      section,
-      rows: rows.filter((row) => rowSection(row) === section).sort(byRank),
-    }))
-    .filter((group) => group.rows.length > 0);
-}
-
-/** Places climbed since last week (positive) or lost; null without both ranks. */
-export function rankDelta(row: { rank: number | null; rank_prev?: number | null }): number | null {
-  return row.rank == null || row.rank_prev == null ? null : row.rank_prev - row.rank;
-}
-
-/** How many places a held name has left before its exit rank; null when the strategy has none. */
-export function roomToExit(row: MomentumWeekRow, exitRank: number | null): number | null {
-  return exitRank == null || row.rank == null ? null : exitRank - row.rank;
 }
 
 /** The card to show first: the one asked for, else the headline, else the first. */

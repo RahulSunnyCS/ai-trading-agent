@@ -56,7 +56,15 @@ def compute_score(*, only: set[str] | None = None, rerun: bool = True) -> dict:
     def request(settings: dict):
         return api.BacktestRequest.model_validate(settings)
 
+    prices_memo: dict[str, fs.PriceTables | None] = {}
+
     def prices_for(settings: dict) -> fs.PriceTables | None:
+        key = journal.canonical(settings)
+        if key not in prices_memo:
+            prices_memo[key] = _prices_for(settings)
+        return prices_memo[key]
+
+    def _prices_for(settings: dict) -> fs.PriceTables | None:
         if settings.get("dataset") != "broad":
             return None  # only Broad favourites are journalled today; others say so
         ranking = api._broad_ranking(request(settings))
@@ -80,14 +88,21 @@ def compute_score(*, only: set[str] | None = None, rerun: bool = True) -> dict:
             tables[key] = (ranking, fs.PriceTables(close=close, monday=monday))
         return tables[key][1]
 
-    def backtest_now(settings: dict, week: str, next_week: str) -> float | None:
+    def run_now(settings: dict) -> None:
         if not rerun or settings.get("dataset") != "broad":
-            return None
+            return
         key = journal.canonical(settings)
         if key not in results:
             req = request(settings)
             results[key] = api._run_broad(req, api._broad_ranking(req), api.DATA.get()).result
-        return fs.backtest_week(results[key], week, next_week)
+
+    def backtest_now(settings: dict, week: str, next_week: str) -> float | None:
+        if not rerun or settings.get("dataset") != "broad":
+            return None
+        run_now(settings)
+        return fs.backtest_week(results[journal.canonical(settings)], week, next_week)
+
+    _warm(rows, only, request, prices_for, run_now)
 
     is_ancestor = fs.git_is_ancestor(PACKAGE_ROOT)
     out = fs.score(
@@ -103,6 +118,52 @@ def compute_score(*, only: set[str] | None = None, rerun: bool = True) -> dict:
     out["ranking_now"] = fs.ranking_version(out["code_commit"], is_ancestor=is_ancestor)
     out["rerun"] = rerun
     return out
+
+
+def _ranking_group(req: Any) -> tuple:
+    """The ranking-side settings of a request, to sort by: favourites that share one ranking sit
+    together, so `DATA`'s small ranking cache serves each ranking's favourites from one
+    computation. Only an ordering: a key that differs from the cache's own costs time, not
+    correctness."""
+    return (
+        repr(tuple(req.lookbacks)),
+        repr(tuple(req.weights) if req.weights else None),
+        repr(req.score),
+        repr(req.voladj_skip_recent_month),
+        repr(req.broad_pool_top_n),
+        repr(req.broad_pool_exit_rank),
+        repr(req.broad_universe),
+        repr(req.broad_series_breaks),
+        repr(req.voladj_lookbacks),
+        repr(req.voladj_skip),
+        repr(req.broad_liq_circuit),
+        repr(req.broad_liq_circuit_run),
+        repr(req.broad_liq_max_circuit_days),
+    )
+
+
+def _warm(rows: list[dict], only: set[str] | None, request, prices_for, run_now) -> None:
+    """Fill the price and backtest memos one ranking at a time, before `fs.score` walks the weeks.
+
+    That walk goes week by week, and one week touches every favourite, hence every ranking; the
+    ranking cache keeps four of the eighteen-odd the journal needs, so a week-ordered walk
+    recomputed a ~45 s ranking on most of its 260-odd visits (the Friday job passed an hour and
+    kept growing by a week's worth each Friday). One visit per distinct settings, in ranking
+    order, computes each ranking once; the walk then reads the memos."""
+    selected = fs.select(rows)
+    todo: dict[str, dict] = {}
+    for (config_id, _kind, _week), slot in selected.items():
+        scored = slot["scored"]
+        if scored is None or (only is not None and config_id not in only):
+            continue
+        settings = scored["settings"]
+        settings = json.loads(settings) if isinstance(settings, str) else settings
+        if settings.get("dataset") == "broad":
+            todo.setdefault(journal.canonical(settings), settings)
+    ordered = sorted(todo.values(), key=lambda s: _ranking_group(request(s)))
+    for settings in ordered:
+        prices_for(settings)
+        run_now(settings)
 
 
 def headline_line() -> str | None:

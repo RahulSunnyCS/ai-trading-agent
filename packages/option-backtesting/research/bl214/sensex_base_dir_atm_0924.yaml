@@ -1,0 +1,28 @@
+# BL-214 follow-up: the fixed base Dir leg (N_dir_atm_0924) with the underlying changed to SENSEX and nothing else.
+# Research only (owner, 2026-11-07): never uploaded, never in strategies/legwise or strategies/rotation.
+# Never edited after the first journal entry: the base must not drift.
+strategy:
+  id: bl214_base_s_dir_atm_0924
+  underlying: SENSEX
+  entry_time: "09:24"
+  exit_time: "15:28"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: sell
+      option_type: CE
+      expiry: weekly
+      strike: { strike_type: ATM }
+      stop_loss: { percent: 21 }
+      reentry_on_sl: { mode: cost, count: 1 }
+    - id: pe
+      lots: 1
+      position: sell
+      option_type: PE
+      expiry: weekly
+      strike: { strike_type: ATM }
+      stop_loss: { percent: 21 }
+      reentry_on_sl: { mode: cost, count: 1 }
+  overall:
+    stop_loss_inr: 3000

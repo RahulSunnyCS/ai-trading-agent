@@ -701,6 +701,12 @@ export interface MomentumWeekCard {
     added: Array<{ asset: string; action: string }>;
     dropped: Array<{ asset: string; action: string }>;
   } | null;
+  /** Return and worst fall of the favourite's lots put in the way yours were (Paper and Invested
+   * favourites only; stored by the Friday rules job); `error` when it could not be measured. */
+  since_start?:
+    | { start: string; return: number; max_drawdown: number; weeks: number; as_of: string }
+    | { error: string }
+    | null;
   trades: number;
   shared_with_headline: number | null;
   /** The paper start Friday: nothing is held going into it, so every held name is a buy. */

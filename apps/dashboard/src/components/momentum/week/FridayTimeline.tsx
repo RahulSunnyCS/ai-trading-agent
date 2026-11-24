@@ -7,7 +7,13 @@ import { useNow } from '../../../hooks/useNow';
 
 import { cn } from '../../../lib/cn';
 import { formatDay, formatIstTime } from '../../../lib/format';
-import { type StepState, type TimelineStep, countdown, timeline } from '../../../lib/momentumWeek';
+import {
+  type StepState,
+  type TimelineStep,
+  countdown,
+  shownSteps,
+  timeline,
+} from '../../../lib/momentumWeek';
 import type { MomentumWeeklyStatus } from '../../../types/momentum';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
@@ -46,6 +52,7 @@ export function FridayTimeline({
   previousWeek,
   nextWeek,
   running,
+  etfInUse,
 }: {
   status: MomentumWeeklyStatus | null;
   week: string | null;
@@ -54,10 +61,15 @@ export function FridayTimeline({
   previousWeek: string | null;
   nextWeek: string | null;
   running: boolean;
+  /** Whether any favourite is an ETF favourite; without one the ETF preview and final steps are left out. */
+  etfInUse: boolean;
 }) {
   // The one ticking clock on the page lives here, so a tick redraws only the timeline.
   const now = useNow(60_000);
-  const steps = useMemo(() => (status && now ? timeline(status, now) : null), [status, now]);
+  const steps = useMemo(
+    () => (status && now ? shownSteps(timeline(status, now), etfInUse) : null),
+    [status, now, etfInUse],
+  );
   return (
     <Card flush>
       <div className="flex flex-wrap items-center gap-2 px-4 pt-3">

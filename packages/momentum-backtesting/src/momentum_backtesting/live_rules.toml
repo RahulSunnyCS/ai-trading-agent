@@ -6,15 +6,16 @@
 [stage]
 # "paper" until the money gate below passes and the owner says go; then "live".
 current = "paper"
-# The Friday the followed money counts from: Friday 1 of 4 of the Kite lots, whose first buy
-# was Monday 2026-10-19 (BL-142; 2026-10-09 was the forward journal's first clean Friday, for the
-# frozen ensemble this file tracked before).
-paper_start = "2026-10-16"
+# The Friday the followed money counts from: Friday 1 of 4 of the Kite lots under the Four-Strategy
+# Mix (BL-176), whose first lot traded on 2026-10-23 (lots 2-4 on 30 Oct, 6 Nov and 13 Nov). Until
+# 2026-11-20 this was 2026-10-16, the first Friday of the Four Sectors Monthly lots (BL-142: first
+# buy Monday 2026-10-19); the weeks and the 13-week money gate count from the new date (BL-025 Log).
+paper_start = "2026-10-23"
 
 [strategy]
 # What is tracked now, and what the money would follow if the gate passes.
-followed = "Four Sectors Monthly, No Tilt · all Fridays (run fbb7ab054238, four sleeves; BL-142, chosen by the owner 2026-10-20)"
-config_file = "search_spaces/bl142_followed.json"
+followed = "Four-Strategy Mix, BSE Tags (BL-176 extended-tags ensemble: sleeves d5ad8da622e7, d7b06967be4e, 00d4034e807e 4-weekly and 02ff9a531230 2-weekly; the headline the Kite lots follow)"
+config_file = "search_spaces/bl176_followed.json"
 compared_with = ["Nifty200 Momentum 30 TRI"]
 source = "the forward-signal journal (BL-024): signals as recorded each Friday, never rebuilt"
 

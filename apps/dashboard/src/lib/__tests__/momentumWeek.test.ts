@@ -1,20 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import type {
-  MomentumJournalCheck,
-  MomentumWeekRow,
-  MomentumWeeklyStatus,
-} from '../../types/momentum';
+import type { MomentumJournalCheck, MomentumWeeklyStatus } from '../../types/momentum';
 import {
   countdown,
   favouriteRow,
-  groupRows,
   isSkipAction,
   istDay,
   needsAttention,
-  rankDelta,
-  roomToExit,
   selectedCard,
+  shownSteps,
   sleeveLabel,
   timeline,
   tradingSleeves,
@@ -82,6 +76,16 @@ describe('the Friday timeline', () => {
     expect(steps[2]?.minutesToGo).toBe(140);
     expect(steps[1]?.lateBy).toBe(45);
     expect(steps[2]?.label).toBe('Stock data + final');
+  });
+
+  it('leaves the ETF preview and final out unless a favourite is an ETF favourite', () => {
+    const steps = timeline(status(), FRIDAY_AFTERNOON);
+    expect(shownSteps(steps, false).map((s) => s.run)).toEqual([
+      'stock-ingest',
+      'journal-check',
+      'live-rules',
+    ]);
+    expect(shownSteps(steps, true)).toHaveLength(steps.length);
   });
 
   it('calls a step missed once its time has passed on the Friday, or on any later day', () => {
@@ -199,53 +203,9 @@ describe('needs attention', () => {
 });
 
 describe('a favourite’s rows', () => {
-  const row = (
-    asset: string,
-    action: string,
-    rank: number | null,
-    rank_prev: number | null = null,
-  ): MomentumWeekRow => ({
-    asset,
-    action,
-    rank,
-    rank_prev,
-    held: action !== 'BUY',
-  });
-
-  it('groups Sell / Buy / Hold by rank and leaves empty sections out', () => {
-    const groups = groupRows([
-      row('C', 'HOLD', 3),
-      row('A', 'SELL', 30),
-      row('B', 'TRIM', 5),
-      row('D', 'HOLD', 1),
-    ]);
-    expect(groups.map((g) => [g.section, g.rows.map((r) => r.asset)])).toEqual([
-      ['sell', ['B', 'A']],
-      ['hold', ['D', 'C']],
-    ]);
-  });
-
-  it('puts a gate’s skip in its own Not bought section, after the buys (BL-136)', () => {
-    const skip: MomentumWeekRow = {
-      ...row('Nasdaq 100', 'SKIP (premium)', 1),
-      held: false,
-      reason: 'MON100 trades +16.9% above NAV, over the 5% limit.',
-    };
-    const groups = groupRows([row('C', 'HOLD', 3), skip, row('B', 'BUY', 2)]);
-    expect(groups.map((g) => [g.section, g.rows.map((r) => r.asset)])).toEqual([
-      ['buy', ['B']],
-      ['skip', ['Nasdaq 100']],
-      ['hold', ['C']],
-    ]);
+  it('tells a gate’s skip from a trade (BL-136)', () => {
     expect(isSkipAction('SKIP (premium)')).toBe(true);
     expect(isSkipAction('BUY')).toBe(false);
-  });
-
-  it('measures rank change and room to exit', () => {
-    expect(rankDelta(row('A', 'HOLD', 4, 9))).toBe(5);
-    expect(rankDelta(row('A', 'HOLD', 4))).toBeNull();
-    expect(roomToExit(row('A', 'HOLD', 17), 20)).toBe(3);
-    expect(roomToExit(row('A', 'HOLD', 17), null)).toBeNull();
   });
 
   it('picks the asked-for card, else the headline, and shortens sleeve names', () => {

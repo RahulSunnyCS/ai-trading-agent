@@ -9,8 +9,9 @@ What it measures, and what it cannot yet:
   While the stage is `paper` that is the followed strategy's model portfolio rebased at
   `stage.paper_start` (BL-010 Phase 6 step 3's definition: its holdings carry in, as a paper
   account opened that day would hold them). Which strategy that is, is `strategy.config_file`
-  in the TOML (BL-142: Four Sectors Monthly, No Tilt, all Fridays; without that key, the
-  frozen ensemble of BL-010 Phase 6).
+  in the TOML (the headline group the Kite lots follow: the BL-176 Four-Strategy Mix, BSE Tags;
+  before 2026-11-20 BL-142's Four Sectors Monthly, No Tilt; without that key, the frozen
+  ensemble of BL-010 Phase 6).
 - **Trailing** (live return minus the backtest's over the same weeks) needs the *journal-scored*
   live series, which BL-024 Phase 2 has not built. Until a `live` series is supplied the rule
   reports "not measurable" in every weekly message; it never passes silently, and a paper curve
@@ -22,6 +23,7 @@ What it measures, and what it cannot yet:
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import tomllib
 from dataclasses import dataclass, field
@@ -359,44 +361,88 @@ def twr_index(lots: list[pd.Series]) -> pd.Series:
     return (1 + r).cumprod()
 
 
+def lot_sleeves(starts: list[pd.Timestamp], configs: list[dict]) -> list[dict | None]:
+    """The config each lot is: the first config, in file order and not yet taken, whose own
+    calendar trades on the lot's first Friday (`rebalance_every` and `rebalance_offset`, calendar-
+    anchored). One cadence in the file (every sleeve 4-weekly) gives each lot the sleeve of its
+    Friday as before; a mix of cadences (a 2-weekly sleeve beside 4-weekly ones, BL-176) can have
+    two configs trading on one Friday, and file order says which lot is which, as the group's
+    sleeves are numbered. A Friday no free config trades on is a mistake in the file or in
+    `stage.paper_start`, never skipped."""
+    free = list(configs)
+    out: list[dict | None] = []
+    for start in starts:
+        for cfg in free:
+            every = cfg["rebalance_every"]
+            if lot_offset(start, every) == cfg["rebalance_offset"] % every:
+                free.remove(cfg)
+                out.append(cfg)
+                break
+        else:
+            raise RuntimeError(
+                f"no sleeve of the followed strategy trades on {start.date()}: check "
+                "stage.paper_start and the sleeves' rebalance_every / rebalance_offset"
+            )
+    return out
+
+
 def paper_curves(echo=print, rules: dict | None = None) -> tuple[pd.Series, pd.Series]:
     """The followed money's weekly equity through the latest week, and the Nifty200 Momentum 30
     TRI level (BL-010 Phase 6 step 3's model portfolio, not the journal).
 
     With `strategy.config_file` the money is the lots the owner actually puts in: lot k starts
-    from cash on `lot_starts()[k]` as the sleeve that trades that Friday (a run `start`ed there,
-    its first buy under the research engine's own fill convention), and the equity is the
-    time-weighted index of the lots (`twr_index`). Without it, the frozen ensemble at equal
-    capital, reset each April, carrying its holdings in at `paper_start`."""
+    from cash on `lot_starts()[k]` as its sleeve (`lot_sleeves`: a run `start`ed there, its first
+    buy under the research engine's own fill convention), and the equity is the time-weighted
+    index of the lots (`twr_index`). A config that names its own `space` (BL-176's sleeves: the
+    extended tags, the ₹10,000 price ceiling) runs on that space with its `fixed_settings`, as
+    `scripts/bl176_save_ensemble.py` does; one without runs on round7_A's curated tags, as before.
+    Without the key, the frozen ensemble at equal capital, reset each April, carrying its
+    holdings in at `paper_start`."""
     from . import bias, choose, reference_benchmarks, search, tracker
     from .phase5 import MOM30
 
     rules = rules or load()
     configs = followed_configs(rules)
-    runner = bias.Runner(
-        search.load_space(SPACE_PATH), universe_kind="turnover_rank", category_tags="curated"
-    )
-    bases = {}
+    runners: dict[str, object] = {}
+    bases: dict[tuple[str, str], object] = {}
+
+    def runner_for(cfg: dict):
+        key = json.dumps([cfg.get("space"), cfg.get("fixed_settings")], sort_keys=True)
+        if key not in runners:
+            if cfg.get("space"):
+                space = search.load_space(PACKAGE / cfg["space"])
+                space = dataclasses.replace(
+                    space, fixed={**space.fixed, **cfg.get("fixed_settings", {})}
+                )
+                runners[key] = bias.Runner(space)
+            else:
+                runners[key] = bias.Runner(
+                    search.load_space(SPACE_PATH),
+                    universe_kind="turnover_rank",
+                    category_tags="curated",
+                )
+        return key, runners[key]
 
     def base_for(cfg: dict):
-        key = json.dumps(cfg["heavy"], sort_keys=True)
+        rkey, runner = runner_for(cfg)
+        key = (rkey, json.dumps(cfg["heavy"], sort_keys=True))
         if key not in bases:  # the sleeves of one strategy share their heavy settings
             bases[key] = runner.base(cfg["heavy"])
         return bases[key]
 
     benchmark = reference_benchmarks.load_references()[MOM30].dropna()
     if rules["strategy"].get("config_file"):
-        every = configs[0]["rebalance_every"]
-        by_offset = {c["rebalance_offset"]: c for c in configs}
-        last = runner.common["outer_prices"].index[-1]
+        last = runner_for(configs[0])[1].common["outer_prices"].index[-1]
+        starts = lot_starts(rules["stage"]["paper_start"], len(configs))
         lots = []
-        for start in lot_starts(rules["stage"]["paper_start"], len(configs)):
+        for start, cfg in zip(starts, lot_sleeves(starts, configs), strict=True):
             if start > last:
                 break  # this lot is not in yet
-            cfg = by_offset[lot_offset(start, every)]
             echo(f"lot {len(lots) + 1} from {start.date()}: {cfg['id']} ...")
             try:
-                curve = tracker.run_config(runner, cfg, base_for(cfg), start=str(start.date()))
+                curve = tracker.run_config(
+                    runner_for(cfg)[1], cfg, base_for(cfg), start=str(start.date())
+                )
             except ValueError as exc:
                 if "not enough history" not in str(exc):
                     raise
@@ -407,6 +453,7 @@ def paper_curves(echo=print, rules: dict | None = None) -> tuple[pd.Series, pd.S
             raise RuntimeError("no lot has started yet: the data ends before stage.paper_start")
         return twr_index(lots), benchmark
 
+    runner = runner_for(configs[0])[1]
     curves = {}
     for cfg in configs:
         echo(f"{cfg['id']} ...")

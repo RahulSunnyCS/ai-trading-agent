@@ -1,23 +1,30 @@
 'use client';
 
+import { useState } from 'react';
+
 import { cn } from '../../../lib/cn';
 import { EMPTY, formatDay, formatInt, formatPct } from '../../../lib/format';
 import { STATUS_LABEL } from '../../../lib/momentumFavourites';
 import { favouriteRow } from '../../../lib/momentumWeek';
 import type { MomentumWeekCard } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
+import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { Skeleton } from '../../ui/Skeleton';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 
 const STATUS_TONE = { invested: 'positive', paper: 'info', watching: 'neutral' } as const;
 
-/** A favourite's backtest figures, when the page already has them (a single saved run's own;
- * a group's blend lives on Saved runs and is not fetched here). */
-export interface FavouriteKpis {
-  cagr: number | null;
-  max_drawdown: number | null;
+type SinceStart = NonNullable<MomentumWeekCard['since_start']>;
+type Measured = Exclude<SinceStart, { error: string }>;
+
+/** The figures when the favourite was measured; null for a Watching one, or one that could not be. */
+function measured(card: MomentumWeekCard): Measured | null {
+  const value = card.since_start;
+  return value && 'return' in value ? value : null;
 }
+
+const tone = (value: number) => (value < 0 ? 'text-negative' : 'text-positive');
 
 function HeadlineCard({
   card,
@@ -30,6 +37,7 @@ function HeadlineCard({
 }) {
   const row = favouriteRow(card);
   const edge = card.edge;
+  const since = measured(card);
   return (
     <button
       type="button"
@@ -58,11 +66,19 @@ function HeadlineCard({
           <span className="text-warning">{card.blocked}</span>
         ) : (
           <span className="text-foreground">
-            This week {row.sleeve ? <b>{row.sleeve}</b> : null}
-            {row.sleeve ? ' · ' : ''}
-            {row.noSleeve ?? row.trades}
+            This week {row.sleeve ? <b>{row.sleeve}</b> : (row.noSleeve ?? row.trades)}
           </span>
         )}
+        {since ? (
+          <span className="text-foreground">
+            Since {formatDay(since.start)}{' '}
+            <b className={cn('metric', tone(since.return))}>
+              {formatPct(since.return, 1, { sign: true })}
+            </b>{' '}
+            · worst fall <b className="metric text-negative">{formatPct(since.max_drawdown)}</b> ·{' '}
+            {formatInt(since.weeks)} week{since.weeks === 1 ? '' : 's'}
+          </span>
+        ) : null}
         <span className="text-muted">
           Holds {card.blocked || !card.run ? EMPTY : `${formatInt(card.held.length)} names`}
         </span>
@@ -104,25 +120,31 @@ function SharedBar({ shared, held }: { shared: number | null; held: number }) {
 
 /**
  * Every favourite (BL-051): the headline as its card, the rest as a dense table under it, one row
- * each. A click shows that favourite's signals below and its orders' table, as the cards did.
+ * each, with the return and worst fall since your start (the lots put in the way yours were, from
+ * the Friday rules job). A click picks the favourite Names at the edge follows.
  */
 export function Favourites({
   cards,
   selectedId,
   onSelect,
   followed,
-  kpis,
 }: {
   cards: readonly MomentumWeekCard[] | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
   followed: number | null;
-  kpis: ReadonlyMap<string, FavouriteKpis>;
 }) {
   const headline = cards?.find((card) => card.headline) ?? null;
   const others = (cards ?? []).filter((card) => card !== headline);
-  // CAGR and drawdown only when the page has them for at least one row (a group's are on Saved runs).
-  const showKpis = others.some((card) => kpis.has(card.id));
+  // Paper and Invested favourites are the ones that matter for money; the Watching ones sit behind
+  // a toggle (and show whenever one of them is the card picked below).
+  const [showWatching, setShowWatching] = useState(false);
+  const watching = others.filter((card) => card.status === 'watching');
+  const watchingPicked = watching.some((card) => card.id === selectedId);
+  const open = showWatching || watchingPicked;
+  const first = (cards ?? []).map(measured).find((value) => value !== null);
+  const sinceLabel = first ? formatDay(first.start) : 'start';
+  const listed = open ? others : others.filter((card) => card.status !== 'watching');
   return (
     <Card flush>
       <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3">
@@ -152,7 +174,7 @@ export function Favourites({
               onSelect={() => onSelect(headline.id)}
             />
           ) : null}
-          {others.length ? (
+          {listed.length ? (
             <div className="mt-2">
               <Table>
                 <THead>
@@ -161,38 +183,36 @@ export function Favourites({
                   </Th>
                   <Th dense>This week</Th>
                   <Th dense align="right">
-                    Sells
+                    Return since {sinceLabel}
                   </Th>
                   <Th dense align="right">
-                    Buys
+                    Worst fall
                   </Th>
                   <Th dense>Same names as headline</Th>
-                  {showKpis ? (
-                    <>
-                      <Th dense align="right">
-                        CAGR
-                      </Th>
-                      <Th dense align="right">
-                        Max DD
-                      </Th>
-                    </>
-                  ) : null}
                   <Th dense className="pr-4">
                     <span className="sr-only">Open</span>
                   </Th>
                 </THead>
                 <tbody>
-                  {others.map((card) => (
+                  {listed.map((card) => (
                     <FavouriteRow
                       key={card.id}
                       card={card}
                       selected={card.id === selectedId}
                       onSelect={() => onSelect(card.id)}
-                      kpis={showKpis ? (kpis.get(card.id) ?? null) : undefined}
                     />
                   ))}
                 </tbody>
               </Table>
+            </div>
+          ) : null}
+          {watching.length && !watchingPicked ? (
+            <div className="px-4 pt-2">
+              <Button size="sm" variant="ghost" onClick={() => setShowWatching((value) => !value)}>
+                {showWatching
+                  ? 'Hide the watching favourites'
+                  : `Show ${formatInt(watching.length)} watching favourite${watching.length === 1 ? '' : 's'}`}
+              </Button>
             </div>
           ) : null}
           <div className="h-3" />
@@ -206,16 +226,18 @@ function FavouriteRow({
   card,
   selected,
   onSelect,
-  kpis,
 }: {
   card: MomentumWeekCard;
   selected: boolean;
   onSelect: () => void;
-  /** undefined: the columns are not shown; null: shown, not at hand for this row. */
-  kpis: FavouriteKpis | null | undefined;
 }) {
   const row = favouriteRow(card);
   const thisWeek = card.blocked ?? row.sleeve ?? row.noSleeve ?? EMPTY;
+  const since = measured(card);
+  const why =
+    card.since_start && 'error' in card.since_start
+      ? card.since_start.error
+      : 'Only Paper and Invested favourites are measured since your start';
   return (
     <TRow onClick={onSelect} selected={selected} className="h-8">
       <Td dense className="max-w-72 pl-4">
@@ -238,38 +260,29 @@ function FavouriteRow({
       >
         {thisWeek}
       </Td>
-      <Td dense align="right" numeric>
-        {row.sells == null ? EMPTY : formatInt(row.sells)}
+      <Td
+        dense
+        align="right"
+        numeric
+        className={since ? tone(since.return) : 'text-faint'}
+        title={since ? `${since.weeks} weeks, to ${formatDay(since.as_of)}` : why}
+      >
+        {since ? formatPct(since.return, 1, { sign: true }) : EMPTY}
       </Td>
-      <Td dense align="right" numeric>
-        {row.buys == null ? EMPTY : formatInt(row.buys)}
+      <Td
+        dense
+        align="right"
+        numeric
+        className={since ? 'text-negative' : 'text-faint'}
+        title={since ? 'The deepest fall from a running peak since the start' : why}
+      >
+        {since ? formatPct(since.max_drawdown) : EMPTY}
       </Td>
       <Td dense>
         <SharedBar shared={card.shared_with_headline} held={card.held.length} />
       </Td>
-      {kpis !== undefined ? (
-        <>
-          <Td
-            dense
-            align="right"
-            numeric
-            title={kpis ? undefined : "A group's blended figures are on Saved runs"}
-          >
-            {kpis?.cagr == null ? EMPTY : formatPct(kpis.cagr)}
-          </Td>
-          <Td
-            dense
-            align="right"
-            numeric
-            className="text-negative"
-            title={kpis ? undefined : "A group's blended figures are on Saved runs"}
-          >
-            {kpis?.max_drawdown == null ? EMPTY : formatPct(kpis.max_drawdown)}
-          </Td>
-        </>
-      ) : null}
       <Td dense className="whitespace-nowrap pr-4 text-xs text-faint">
-        {selected ? 'shown below' : 'orders ▸'}
+        {selected ? 'selected' : 'select ▸'}
       </Td>
     </TRow>
   );

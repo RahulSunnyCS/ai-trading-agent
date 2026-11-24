@@ -15,14 +15,11 @@ Open this page to read the week, to run something by hand, or to classify a poss
 
 | Part | What it shows |
 |---|---|
-| Friday timeline | Each scheduled step: done (with the time it ran), done late (the laptop was asleep), still to come with a countdown, due now, or missed. **Run by hand** opens a drawer with the manual run, the data status (and **Refresh stock data**) and the schedule. **Week before** / **Week after** step through the weeks the journal holds. |
+| Friday timeline | Each scheduled step (the 14:40 ETF preview and 16:45 ETF final appear only while a favourite is an ETF favourite): done (with the time it ran), done late (the laptop was asleep), still to come with a countdown, due now, or missed. **Run by hand** opens a drawer with the manual run, the data status (and **Refresh stock data**) and the schedule. **Week before** / **Week after** step through the weeks the journal holds. |
 | Needs attention | Only shown when something needs you: a [possible split](glossary:corporate-action) to classify, a dataset not ready when it should be, or a journal entry still missing after the 21:00 check. The same items also reach you from any screen as [alerts](guide:start/alerts). |
 | Live-money rules | The last [rules check](guide:momentum/journal): weeks of paper tracking against the money gate, drawdown against your cut and exit lines, paper against the backtest, and the benchmark. **Check now** re-runs it here without sending anything. |
-| Favourites | Every favourite with its [status](glossary:favourite-status). The [headline](glossary:headline) is a card at the top: this week's sleeve and trades, how many names it holds, and which sleeve trades next. The others are a table under it, one row each: name, the sleeve that trades this week, how many sells and buys, and how many of its names the headline holds too (**K of N**, with a bar). CAGR and Max DD columns appear only for a favourite that is a single saved run; a group's blended figures are on [Saved runs](app:/momentum/saved). A dash means there is nothing to count (blocked, or no run yet), never zero. Click the card or a row to show that favourite's table below. |
-| The favourite's table | Sell, Buy, Not bought and Hold, each by rank: the 1–10 score strip from Scores, the rank and how it moved since last week, the room left before the exit rank (when the strategy has a single exit rank), and the name's share after the trades. A [group](glossary:favourite-group) shows its sleeves first: the ones that trade this week, and when the others next do. Click a scored stock for its drawer. |
-| Not bought | An ETF Rotation favourite's top-ranked name that was **not** bought because its ETF traded too far above its NAV at the last NAV published before that Friday (normally Thursday's; Friday's own NAV comes out after the close): over 2% for an Indian ETF, over 5% for Nasdaq 100 and Hang Seng. The row says the premium and the limit; the next-best name within the exit rank took its slot. A name already held is never sold for its premium, and a top-up of a held name is only flagged. On a week that buys nothing anyway the name keeps its Wait and shows the same note. The model portfolio still counts the buy, so next week the name can show as held: whether this gate belongs inside the backtest is still being researched. **Broad Momentum and Custom Index favourites** keep their signal saying Buy at any premium, but Your orders applies the same limits to a new buy (see below). |
-| Since the 14:40 preview | ETF favourites: what the final changed against the preview, so you know whether a trade made on the preview still stands. |
-| Names at the edge | The weakest names held and the strongest not held, by rank: next rebalance's likely trades. For a group, in the sleeve that trades next. |
+| Favourites | Every favourite with its [status](glossary:favourite-status). The [headline](glossary:headline) is a card at the top: this week's sleeve, how many names it holds, which sleeve trades next and, for a Paper or Invested one, its return and worst fall since your start. The Paper and Invested ones are a table under it, one row each, and the Watching ones sit behind **Show N watching favourites** (they show anyway while one of them is the favourite picked below): name, the sleeve that trades this week, **Return since** your start and its **Worst fall** (the deepest drop from a running peak), and how many of its names the headline holds too (**K of N**, with a bar). Those two figures are the favourite's lots put in the way yours were: lot 1 from the start Friday (`stage.paper_start` in the rules file, 23 Oct 2026), the next lot a Friday later, each as the sleeve that trades its Friday and each its sleeve's backtest started that Friday, after the backtest's costs. A new lot adds money, not return. They are model figures, not your fills, and are refreshed by the Friday 21:30 rules job (`mbt since-start refresh`), so they are as of the last Friday. A Watching favourite shows a dash: only Paper and Invested ones are measured. A dash also means there is nothing to count, never zero. The full backtest figures (CAGR and drawdown since 2017) are on [Saved runs](app:/momentum/saved). Click the card or a row to pick that favourite: Names at the edge below follows it. The page no longer lists a favourite's Sell / Buy / Hold table: it is the model portfolio's signal, which carries its own history and so differs from what your lots hold. What you place is in Your lots and Your orders. |
+| Names at the edge | Folded to one line; click it to open. The weakest names held and the strongest not held, by rank: next rebalance's likely trades. For a group, in the sleeve that trades next. |
 | Telegram message | Folded to one line: whether the headline's message was sent, when, and which run (*sent 16 Oct 20:01 · final*). Click it for the message word for word and **Re-send…**, which opens Run by hand, where a final run can be sent again after you confirm. |
 | Your lots | Only when lots are recorded for the headline (followed lot by lot on Kite): one row per lot with the shares booked to it, their value, its last and next rebalance, which lot is due this Friday and what the last Friday orders said for it; under it, what Kite holds that no lot has booked yet. See below. |
 | Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. From Thursday evening the block shows Friday's orders **tentatively** (nothing saved) until the 14:15 run makes them. **Preview for…** shows another favourite's orders against the same holdings. See below. |
@@ -50,7 +47,7 @@ time. Nothing here places an order: you place them in your broker yourself.
   bought as a new buy** in these orders: a new lot spreads its equal weights over the other picks, a
   rebalancing lot leaves the name out, and one the lot already holds is never sold for its premium.
   The block and the Telegram say *Not bought, ETF above NAV* with the premium and its date. This is
-  the same rule the ETF favourites already follow (see *Not bought* above).
+  the same rule the ETF Rotation favourites follow.
 - **Leftover cash (new lots).** A new lot first buys its picks in equal weights in whole shares. Cash
   that is left then goes to the picks that cost more than an equal slice, best rank first, **one
   share each** while the cash covers it; the first one it cannot cover ends this, so a lower-ranked
@@ -155,13 +152,11 @@ listed too and is never part of a lot; LIQUIDBEES and gold bonds never appear.
 
 ## Reading a group
 
-A group's sleeves trade on their own weeks, so most Fridays only some of them rebalance. Rows
-show the whole group: **After** is a name's share of the group, each sleeve weighted by its value
-since the last reset in April. A week when no sleeve rebalances says so.
+A group's sleeves trade on their own weeks, so most Fridays only some of them rebalance. A week
+when no sleeve rebalances says so.
 
 A group that follows [all Fridays](glossary:all-fridays) has one sleeve per Friday, so exactly one
-trades each week: its card says which (*Friday 2 of 4 trades*), and the other sleeves show when
-they next do. The orders are that sleeve's, shown as shares of the whole group.
+trades each week: its card in Favourites says which (*Friday 2 of 4 trades*), and Your lots shows which lot is due.
 
 ### Your first week
 

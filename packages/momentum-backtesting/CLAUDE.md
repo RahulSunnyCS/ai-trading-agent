@@ -517,9 +517,14 @@ contract, not a shared service).
   trades. **Numbers in the TOML are the owner's:** change one only in a commit that also updates
   `tests/test_live_rules.py` and logs the reason in BL-025. Drawdown and the money gate read the
   followed strategy's equity (`strategy.config_file` names its sleeves,
-  `search_spaces/bl142_followed.json`: Four Sectors Monthly, No Tilt on four Fridays; the lots are put
-  in from cash one Friday after another from `stage.paper_start`, each as the sleeve that trades that
-  Friday, and `live_rules.twr_index` makes the time-weighted index the drawdown is measured on, so a
+  `search_spaces/bl176_followed.json` since 2026-11-20: the headline Four-Strategy Mix, BSE Tags, the
+  record's four configs, each naming its own `space` and `fixed_settings` (extended tags, ₹10,000
+  ceiling) which `paper_curves` runs on; `bl142_followed.json`, Four Sectors Monthly, No Tilt, is the
+  earlier file and stays unedited; the lots are put in from cash one Friday after another from
+  `stage.paper_start` (2026-10-23, the mix's first lot), each as its sleeve (`live_rules.lot_sleeves`:
+  the first config in file order whose own calendar trades on the lot's Friday, so a 2-weekly sleeve
+  beside 4-weekly ones is the group's sleeve 4, not a clash), and `live_rules.twr_index` makes the
+  time-weighted index the drawdown is measured on, so a
   new lot never lifts the peak; without that key, the BL-010 frozen ensemble rebased at
   `paper_start`, `tracker.run_config`); the
   trailing rule needs a journal-scored live series and says "not measurable" until then (BL-024
@@ -528,6 +533,13 @@ contract, not a shared service).
   the Kite fills, not yet read by this check either). A breach is sent untagged (never switchable); the routine status is the
   `momentum.live_rules` type. Exit 0 on a breach, 1 only when the check cannot run or the data is
   stale. Scheduler job `momentum-live-rules`, Fri 21:30 IST.
+- `since_start.py` (`mbt since-start refresh`) — each Paper / Invested favourite's return and worst fall
+  since the owner's start (`live_rules.toml`'s `stage.paper_start`): its lots put in on consecutive
+  Fridays as the sleeve that trades each (`live_rules.lot_sleeves`), each lot `api.sleeve_summary` with
+  `start` set to its Friday, joined by `live_rules.twr_index`. Stored in `since_start.json` (state dir);
+  `api._with_since_start` puts it on every `/api/week` card (`since_start`, None for Watching). The Friday
+  21:30 `mbt live-rules check --send` runs the refresh after its own message (best-effort, a failure keeps
+  the last file). Model figures, never fills; the Favourites table and headline card show them.
 - `this_week.py` (BL-051) — Momentum › This week's data: `week_view` builds one card per
   favourite (a group's from its sleeves via `groups.combine`, sleeves never shown alone) from the
   **forward journal** of that week and the week before, so it survives restarts and covers the
@@ -536,9 +548,9 @@ contract, not a shared service).
   keeps its last report (`live_rules.save_last` → `live_rules_last.json`, written by `mbt
   live-rules check` and by `POST /api/live-rules/run`, a background job; `GET /api/live-rules`).
   `paper_start.json` (same folder, `mbt paper-start`) is the Friday the owner's portfolio starts from nothing: `week_view(start_week=)` turns every card's rows into buys that week (`_start_from_cash`) and, from it on, renumbers a group's sleeves (`_renumber_sleeves`: the sleeve trading on that Friday is "Friday 1 of K"; display only, saved names and ids unchanged), `_rebalance_response` / `_rebalance_group_preview` add `paper_start` / `first_week` to the Rebalance preview and number its group sleeves the same way (the preview already starts from nothing when no holdings are entered), `api._journal_entry_view(row, start)` does the same to the Journal page's entries (display only; the stored, hash-chained rows never change), and `_compute_orders` plans from cash that week. Both files live in `this_week.state_dir()`: `data/`, or `MOMENTUM_STATE_DIR`, which
-  `tests/conftest.py` points at a temp folder so no test writes the real ones. "Room to exit" is
-  only given for a strategy with a single exit rank (`_exit_rank`); Broad in category mode sells on
-  its category and pool ranks too, so it gets none.
+  `tests/conftest.py` points at a temp folder so no test writes the real ones. `_exit_rank` (a
+  single exit rank, which Broad in category mode lacks) is still sent as `exit_rank`; the dashboard
+  stopped drawing a room-to-exit column on 2026-11-20.
 - `orders.py` + `holdings_store.py` (BL-051 Phase 3) — Your orders. `orders.plan` is pure: holdings
   in shares, prices, target weights -> orders (exits and new names always; top-ups/trims under the
   owner's minimum, ₹10,000 by default, skipped; whole shares; blocked names held; charges at

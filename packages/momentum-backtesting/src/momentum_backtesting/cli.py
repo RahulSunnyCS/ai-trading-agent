@@ -3573,6 +3573,42 @@ def live_rules_check(
                 type=None if report.breached or report.simulated else live_rules.NOTIFY_TYPE,
             )
         )
+        if not simulate:
+            # The Favourites table's since-start figures ride on this Friday job; a failure here
+            # leaves the last stored figures and never changes the check's own result.
+            try:
+                from . import since_start
+
+                since_start.refresh(echo=typer.echo)
+            except Exception as error:
+                typer.echo(f"since-start refresh failed (kept the last figures): {error}")
+
+
+since_start_app = typer.Typer(
+    no_args_is_help=True,
+    help="Return and worst fall of each Paper / Invested favourite since your start. Never trades.",
+)
+app.add_typer(since_start_app, name="since-start")
+
+
+@since_start_app.command("refresh")
+def since_start_refresh() -> None:
+    """Run every Paper and Invested favourite's lots as yours were put in (from
+    `live_rules.toml`'s `stage.paper_start`) and store the figures This week's Favourites table
+    reads. A few minutes; the Friday 21:30 rules job runs it after its check."""
+    from . import since_start
+    from .config import load_repo_env
+
+    load_repo_env()
+    result = since_start.refresh(echo=typer.echo)
+    for item in result["items"].values():
+        figures = (
+            f"{item['return']:+.1%} return, {item['max_drawdown']:.1%} worst fall, "
+            f"{item['weeks']} weeks to {item['as_of']}"
+            if "return" in item
+            else item["error"]
+        )
+        typer.echo(f"{item['name']}: {figures}")
 
 
 @app.command("overlay-sweep")

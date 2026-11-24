@@ -10,13 +10,6 @@ import { useQueryState } from '../../../hooks/useQueryState';
 import { apiPost } from '../../../lib/api';
 import { followedCount } from '../../../lib/momentumFavourites';
 import {
-  type MomentumScores,
-  type StockScore,
-  buyZoneFrom,
-  markKey,
-  slugify,
-} from '../../../lib/momentumScores';
-import {
   type AttentionItem,
   needsAttention,
   selectedCard,
@@ -32,13 +25,11 @@ import type {
 } from '../../../types/momentum';
 import { StateMessage } from '../../ui/StateMessage';
 import { toast } from '../../ui/Toast';
-import { StockDrawer } from '../scores/StockDrawer';
-import { type FavouriteKpis, Favourites } from './Favourites';
+import { Favourites } from './Favourites';
 import { FridayTimeline } from './FridayTimeline';
 import { LotsPanel } from './LotsPanel';
 import { RulesStrip } from './RulesStrip';
-import { EdgeNames, NeedsAttention, SincePreview, TelegramMessage } from './SidePanels';
-import { SignalCard } from './SignalCard';
+import { EdgeNames, NeedsAttention, TelegramMessage } from './SidePanels';
 import { ClassifySplitDrawer, RunByHandDrawer } from './WeekDrawers';
 import { YourOrders } from './YourOrders';
 
@@ -58,7 +49,6 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   const [favId, setFavId] = useQueryState('fav');
   const [panel, setPanel] = useQueryState('panel');
   const [review, setReview] = useQueryState('review');
-  const [stockSymbol, setStockSymbol] = useQueryState('stock');
   // A slow clock for Needs attention only; the timeline keeps its own minute clock.
   const now = useNow(300_000);
 
@@ -80,9 +70,6 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   // Bumped when Your orders changed, so the Lots panel reads the ledger again.
   const [ordersVersion, setOrdersVersion] = useState(0);
   const onOrdersChanged = useCallback(() => setOrdersVersion((n) => n + 1), []);
-  // The Scores payload (~300 KB) only when a card holds scored stocks; see ScoresFetcher.
-  const [scoresData, setScoresData] = useState<MomentumScores | null>(null);
-
   // A finished manual run may have recorded new entries and a new message.
   const finishedAt = weekly.job?.finished_at ?? null;
   const refetchView = view.refetch;
@@ -130,32 +117,6 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   );
   const cards = view.data?.favourites ?? null;
   const card = cards ? selectedCard(cards, favId) : null;
-  const scoreMap = useMemo(() => {
-    if (!scoresData) return null;
-    const map = new Map<string, StockScore>();
-    for (const stock of scoresData.stocks) map.set(markKey(stock.symbol), stock);
-    return map;
-  }, [scoresData]);
-  const headlineFavourite = favourites.data?.find((run) => run.active);
-  // A single saved run's own CAGR and drawdown, already in the favourites response; a group's
-  // blend is on Saved runs and is not fetched here.
-  const kpis = useMemo(() => {
-    const map = new Map<string, FavouriteKpis>();
-    for (const run of favourites.data ?? []) {
-      if (run.group || run.kpis.cagr == null) continue;
-      map.set(run.id, { cagr: run.kpis.cagr ?? null, max_drawdown: run.kpis.max_drawdown ?? null });
-    }
-    return map;
-  }, [favourites.data]);
-  const zone = useMemo(() => buyZoneFrom(headlineFavourite), [headlineFavourite]);
-  const order = useMemo(
-    () =>
-      (card?.rows ?? [])
-        .map((row) => scoreMap?.get(markKey(row.asset))?.symbol)
-        .filter((symbol): symbol is string => Boolean(symbol)),
-    [card, scoreMap],
-  );
-
   // The weeks the journal has, newest first, plus this one: step back and forward through them.
   // The journal's weeks plus this one, which has none until its first run.
   const weeks = useMemo(() => {
@@ -190,6 +151,7 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
         previousWeek={previousWeek}
         nextWeek={nextWeek}
         running={weekly.running}
+        etfInUse={cards ? datasetsInUse.has('etf') : false}
       />
       <NeedsAttention items={attention} onAction={onAttention} />
       {view.data?.first_week ? (
@@ -212,33 +174,20 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
         selectedId={card?.id ?? null}
         onSelect={(id) => setFavId(cards?.find((c) => c.headline)?.id === id ? null : id)}
         followed={favourites.data ? followedCount(favourites.data) : null}
-        kpis={kpis}
       />
       {card ? (
-        <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <SignalCard
-            card={card}
-            scores={scoreMap}
-            lookbacks={scoresData?.lookbacks ?? [1, 2, 4, 8, 13, 26, 52]}
-            onStock={setStockSymbol}
-          />
-          <div className="grid content-start gap-4 lg:grid-cols-2 2xl:grid-cols-1">
-            <SincePreview card={card} />
-            <EdgeNames card={card} />
-            {card.headline ? (
-              <TelegramMessage
-                message={view.data?.message ?? null}
-                onResend={() => setPanel('run')}
-                firstWeek={view.data?.first_week ?? false}
-              />
-            ) : null}
-          </div>
+        <div className="grid content-start gap-4 lg:grid-cols-2">
+          <EdgeNames card={card} />
+          {card.headline ? (
+            <TelegramMessage
+              message={view.data?.message ?? null}
+              onResend={() => setPanel('run')}
+              firstWeek={view.data?.first_week ?? false}
+            />
+          ) : null}
         </div>
       ) : null}
 
-      {card && card.dataset !== 'etf' && !scoresData ? (
-        <ScoresFetcher onData={setScoresData} />
-      ) : null}
       <LotsPanel shownWeek={week} ordersVersion={ordersVersion} />
       <YourOrders favourites={cards} onChanged={onOrdersChanged} />
 
@@ -251,32 +200,6 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
           toast(`${review ?? 'The move'} classified`);
         }}
       />
-      {scoresData ? (
-        <StockDrawer
-          symbol={stockSymbol}
-          stocks={scoresData.stocks}
-          order={order}
-          lookbacks={scoresData.lookbacks}
-          zone={zone}
-          marks={undefined}
-          onOpen={setStockSymbol}
-          onClose={() => setStockSymbol(null)}
-          onSector={(stock) =>
-            navigate('momentum', 'scores', 'sectors', slugify(stock.parent_group))
-          }
-          onBacktest={() => navigate('momentum', 'backtest', 'broad')}
-        />
-      ) : null}
     </div>
   );
-}
-
-/** Loads the Scores payload once it is needed, and hands it up (the fetch hook cannot be
- * switched off, so it lives in a component that is only rendered then). */
-function ScoresFetcher({ onData }: { onData: (data: MomentumScores) => void }) {
-  const scores = usePolledResource<MomentumScores>('/api/momentum/scores', { cache: true });
-  useEffect(() => {
-    if (scores.data) onData(scores.data);
-  }, [scores.data, onData]);
-  return null;
 }
