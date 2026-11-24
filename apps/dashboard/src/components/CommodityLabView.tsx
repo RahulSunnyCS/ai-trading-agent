@@ -1,7 +1,7 @@
 /**
  * Commodity Lab: the workbench for MCX commodity options (gold, silver, crude oil, natural gas
  * minis). Reached through the Fastify proxy at /api/backtest/legwise/mcx/*. Read-only: nothing here
- * places an order, and the only experiment running is the gold Dir paper test (BL-219).
+ * places an order, and the only experiments running are the gold and silver Dir paper tests (BL-219, BL-242).
  *
  *  Today
  *   - Overview: the four minis' expiries and data freshness, and the forward test's headline

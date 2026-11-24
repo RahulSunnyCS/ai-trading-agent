@@ -201,18 +201,26 @@ def _weekdays_after(day: date, until: date) -> list[date]:
     return out
 
 
-def window(expiry: date, collected: list[date], upto: date, rule: Rule = GOLD) -> list[date]:
+def window(
+    expiry: date, collected: list[date], upto: date, rule: Rule = GOLD, settled: bool = True
+) -> list[date]:
     """The rule's WINDOW sessions: the last five ending on `expiry` (the expiry week) or the five
     before those (`week_offset` 1), as known on the night of session `upto`: the days the lake
     holds option bars for (and `upto` itself when it is a weekday, collected or not), then the
-    weekdays still to come. A holiday not yet known can only widen the real window, never drop a
-    day scored here."""
+    weekdays still to come. A holiday not yet known can only widen the real window of the expiry
+    week, never drop a day scored here. The week before is different: a holiday in the expiry
+    week moves its whole block one session earlier (BL-218 counts sessions, not weekdays), so with
+    `settled` (the default, what scoring uses) it is empty until `upto` reaches the expiry day,
+    when every session of the expiry week is known. `settled=False` is the provisional dates the
+    dashboard shows ahead of that."""
     known = {d for d in collected if d <= min(upto, expiry)}
     if upto <= expiry and upto.weekday() < 5:
         known.add(upto)
     days = sorted(known)
     last = max(days[-1] if days else upto, upto)
     future = _weekdays_after(last, expiry) if last < expiry else []
+    if rule.week_offset and settled and upto < expiry:
+        return []
     span = WINDOW * (rule.week_offset + 1)
     seq = (days + future)[-span:]
     return seq[:WINDOW] if rule.week_offset else seq
@@ -471,13 +479,16 @@ def telegram_line(entry: dict, totals: dict, rule: Rule = GOLD) -> str:
 
 
 def in_expected_window(today: date, expiry: date, rule: Rule = GOLD) -> bool:
-    """`today` is a session of the rule's window: its weekdays to expiry fall in the window's
-    band (0-4 for the expiry week, 5-9 for the week before)."""
+    """`today` may be a session of the rule's window: its weekdays to expiry fall in the window's
+    band (0-4 for the expiry week, 5-9 for the week before). The week before's band is two
+    weekdays wider (a holiday in the expiry week or the window moves its sessions out): a snapshot
+    of a neighbouring day is harmless, a missed window day is not."""
     k = len(_weekdays_after(today, expiry))
+    slack = 2 if rule.week_offset else 0
     return (
         expiry >= rule.start_expiry
         and today <= expiry
-        and WINDOW * rule.week_offset <= k < WINDOW * (rule.week_offset + 1)
+        and WINDOW * rule.week_offset <= k < WINDOW * (rule.week_offset + 1) + slack
     )
 
 

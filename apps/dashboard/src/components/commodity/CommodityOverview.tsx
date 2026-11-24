@@ -192,8 +192,8 @@ export function CommodityOverview() {
               ))}
             </div>
             <p className="text-[11px] text-faint">
-              Only gold’s expiry calendar is kept current (the forward test extends it); another
-              root shows where its calendar ends rather than a guess.
+              The forward tests keep the gold and silver expiry calendars current; another root
+              shows where its calendar ends rather than a guess.
             </p>
           </div>
         )}

@@ -93,7 +93,7 @@ export function CommodityData() {
         <div className="p-5 pb-0">
           <CardHeader
             title="Expiry calendar"
-            description="Each option expiry and the future it settles on (the future is the spot the engine uses). Only gold’s calendar runs past October 2026; the forward test keeps it current."
+            description="Each option expiry and the future it settles on (the future is the spot the engine uses). Only gold’s and silver’s calendars run past October 2026; the forward tests keep them current."
           />
         </div>
         <div className="px-5 pb-5">

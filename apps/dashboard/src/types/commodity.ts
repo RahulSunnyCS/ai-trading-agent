@@ -38,7 +38,7 @@ export interface ForwardTrade {
 export interface ForwardEntry {
   day: string;
   expiry: string;
-  /** Calendar days to the expiry (0 on expiry day). */
+  /** Sessions after this one up to the expiry day (0 on expiry day). */
   k: number;
   season: string;
   gross: number;
@@ -70,7 +70,9 @@ export type WindowState = 'journaled' | 'ready to score' | 'today' | 'to come' |
 
 export interface ForwardWindow {
   expiry: string;
-  sessions: { day: string; state: WindowState; k: number }[];
+  sessions: { day: string; state: WindowState; calendar_days_to_expiry: number }[];
+  /** True while a holiday in the expiry week could still move the week-before dates. */
+  provisional: boolean;
 }
 
 export interface SpreadContract {

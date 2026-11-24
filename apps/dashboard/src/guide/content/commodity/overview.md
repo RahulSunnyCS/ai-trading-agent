@@ -18,7 +18,7 @@
 
 - **The four cards** are Gold mini (GOLDM), Silver mini (SILVERM), Crude oil mini (CRUDEOILM) and Natural gas mini (NATGASMINI). Each shows the next option expiry and how many weekdays away it is, the day the collector last stored, how many days are held, and the future the option settles on (the future is the "spot" the engine uses, because commodities have no index).
 - **Collected** means the last stored day is today's or the previous weekday's. **Weekdays behind** means the nightly collection missed one or more sessions. Expired contracts cannot be fetched later, so a missed night is a permanent hole.
-- **Only gold's calendar is kept current.** The forward test extends it. For the other three the card says where its calendar ends (October 2026) instead of guessing a next expiry.
+- **Only gold's and silver's calendars are kept current.** The forward tests extend them (silver's from the first night after this was added). For crude oil and natural gas the card says where its calendar ends (October 2026) instead of guessing a next expiry.
 
 ## Contracts & data
 

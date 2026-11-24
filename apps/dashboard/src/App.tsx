@@ -57,7 +57,7 @@ const SUBTITLES: Record<Tab, string> = {
   optionslab:
     'Build, backtest and track option strategies: leg-wise on 1-minute Fyers data, or the YAML engine',
   commoditylab:
-    'MCX gold, silver, crude oil and natural gas options: the gold Dir paper test, the sweep verdict and the collected data',
+    'MCX gold, silver, crude oil and natural gas options: the gold and silver Dir paper tests, the sweep verdict and the collected data',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
   tradebook: "The real P&L from the brokers' contract notes: F&O, trades, money and Momentum",
   brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',

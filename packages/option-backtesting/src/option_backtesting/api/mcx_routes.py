@@ -5,9 +5,9 @@
           upcoming, calendar_ends, days_collected, first_day, last_day, days_last_30}],
          "errors": [...]}
         The four mini contracts the BL-218 sweep covered: when each next expires, which future it
-        settles on, and what the collector has put in the lake. Only GOLDM's contract calendar is
-        extended past the sweep (the forward test does it), so another root shows no next expiry
-        and says where its calendar ends, never a guess.
+        settles on, and what the collector has put in the lake. Only GOLDM's and SILVERM's contract
+        calendars are extended past the sweep (the forward tests do it), so another root shows no
+        next expiry and says where its calendar ends, never a guess.
 
     GET /legwise/mcx/forward
         {"as_of", "rules": [{"rule", "start_expiry", "pass_rule", "summary", "entries", "window",
@@ -128,7 +128,7 @@ def _window(root_dir: Path, today: date, done: set[str], rule: mf.Rule) -> dict 
     # expiry's window is the one to show
     for expiry in later:
         collected = mf.option_days(root_dir, rule)
-        days = mf.window(expiry, collected, today, rule)
+        days = mf.window(expiry, collected, today, rule, settled=False)
         if days and days[-1] >= today:
             break
     else:
@@ -145,8 +145,13 @@ def _window(root_dir: Path, today: date, done: set[str], rule: mf.Rule) -> dict 
             state = "today"
         else:
             state = "waiting for data"
-        sessions.append({"day": d.isoformat(), "state": state, "k": (expiry - d).days})
-    return {"expiry": expiry.isoformat(), "sessions": sessions}
+        sessions.append(
+            {"day": d.isoformat(), "state": state, "calendar_days_to_expiry": (expiry - d).days}
+        )
+    # the week before's dates can still move by a holiday in the expiry week: scoring waits for
+    # the expiry day, the page shows these as provisional until then
+    provisional = bool(rule.week_offset) and today < expiry
+    return {"expiry": expiry.isoformat(), "sessions": sessions, "provisional": provisional}
 
 
 def forward_rule(root_dir: Path, today: date, rule: mf.Rule) -> dict:

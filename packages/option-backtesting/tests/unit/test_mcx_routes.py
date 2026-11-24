@@ -78,6 +78,9 @@ def test_the_silver_block_is_its_own_journal_and_window(tmp_path):
     days = [s["day"] for s in silver["window"]["sessions"]]
     assert days[0] == "2026-12-15" and days[-1] == "2026-12-21"
     assert {s["state"] for s in silver["window"]["sessions"]} == {"to come"}
+    # a holiday in the expiry week could still move these dates, so the page is told they are provisional
+    assert silver["window"]["provisional"] is True
+    assert out["rules"][0]["window"] is None or out["rules"][0]["window"]["provisional"] is False
     # gold's journal is untouched by silver's
     assert out["rules"][0]["entries"] == []
 

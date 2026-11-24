@@ -12,7 +12,7 @@ Two paper tests run in the Commodity Lab, each a frozen setting scored every nig
 Both sell the call and put of the nearest option expiry, one lot each, with a stop on each leg, held to 15 minutes before the close (23:15 on a 23:30-close day, 23:40 on a 23:55-close day), with **1% slippage on every fill** and the MCX charges, as in the sweep.
 
 - **Gold:** in-the-money strike, entry **18:00**, 21% stop, re-enter once at cost. Window: the **expiry week**, the last five sessions up to and including expiry day, from the 27 Nov 2026 expiry.
-- **Silver:** at-the-money strike, entry **17:05**, 21% stop, **no re-entry**. Window: the **week before the expiry week**, the five sessions before the last five, from the 28 Dec 2026 expiry (its first window starts 15 Dec).
+- **Silver:** at-the-money strike, entry **17:05**, 21% stop, **no re-entry**. Window: the **week before the expiry week**, the five sessions before the last five, from the 28 Dec 2026 expiry. Sessions are counted without market holidays, so the window is only fixed once the expiry day has traded; its five sessions are then scored together (the first window is 14–18 Dec if MCX is shut on 25 Dec).
 
 The rule, the window and the start expiry were fixed before the first session, and nothing from the forward period feeds back into them.
 

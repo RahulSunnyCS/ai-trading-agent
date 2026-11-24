@@ -52,7 +52,7 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'A heatmap of entry time by stop for the four minis, like Options Lab’s Heatmap',
     'A Live board for gold and crude (spot future, ATM straddle) once an intraday MCX feed exists',
     'Serve the BL-218 sweep results (the files are not in the API) so the Sweep verdict is computed, not copied',
-    'Extend the expiry calendar of silver, crude and natural gas past October 2026 (only gold is kept current)',
+    'Extend the expiry calendar of crude and natural gas past October 2026 (gold and silver are kept current by their forward tests)',
     'Margin per lot and the real bid-ask spread: the sweep could not measure either',
   ],
   optionslab: [
