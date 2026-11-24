@@ -116,6 +116,7 @@ def claims(events: list[dict], planned: dict[str, dict[str, float]], at: str) ->
     out = [
         Claim(e["sleeve_id"], e["symbol"], float(e["delta"]), e["kind"], e["at"], e.get("note"))
         for e in sorted(events, key=lambda e: e["at"])
+        if e["kind"] != "transfer"  # a move between lots: no trade stands behind it
     ]
     for sleeve_id, plan in (planned or {}).items():
         for symbol, delta in plan.items():

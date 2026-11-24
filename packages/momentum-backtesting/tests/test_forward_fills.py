@@ -200,3 +200,13 @@ def test_a_target_never_bought_is_missed_and_an_unasked_buy_is_extra(tmp_path):
     assert rows["A"]["status"] == "missed"
     assert rows["B"]["status"] == "extra"
     assert rows["B"]["note"] == "B replaces A (premium)"
+
+
+def test_a_move_between_lots_makes_no_claim_on_a_real_fill():
+    events = [
+        {"sleeve_id": "a", "symbol": "SOUTHBANK", "delta": -105.0, "kind": "transfer", "at": W1},
+        {"sleeve_id": "b", "symbol": "SOUTHBANK", "delta": 105.0, "kind": "transfer", "at": W1},
+        {"sleeve_id": "b", "symbol": "SYRMA", "delta": 3.0, "kind": "attributed", "at": W1},
+    ]
+    got = forward_fills.claims(events, {}, W2)
+    assert [(c.sleeve_id, c.symbol) for c in got] == [("b", "SYRMA")]

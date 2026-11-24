@@ -1,0 +1,60 @@
+
+== T1 NIFTY-only: 2021-11-02 -> 2024-10-08, 722 sessions, 144 Fridays (Friday average -195, 50% won)
+                                              as now   skip Friday
+Total net (₹)                                137,680       165,701
+Return on ₹8.5 lakh                           16.2 %        19.5 %
+  per year                                     5.6 %         6.8 %
+Net per session (₹)                              191           230
+Max drawdown (₹)                              87,685        66,352
+  as % of ₹8.5 lakh                           10.3 %         7.8 %
+  trough on                               2024-09-20    2024-09-18
+Longest time under water (sessions)              141           144
+Return ÷ max drawdown                           1.57          2.50
+Sharpe (daily, ×√250)                           0.68          0.89
+Win rate (days traded)                          53 %          54 %
+Profit factor                                   1.12          1.18
+Average win day (₹)                            3,353         3,495
+Average loss day (₹)                          -3,442        -3,530
+Worst day (₹)                                -14,201       -14,201
+Best day (₹)                                  14,752        14,752
+Days traded                                      722           578
+
+== Core NIFTY-only: 2021-11-02 -> 2024-10-08, 722 sessions, 144 Fridays (Friday average -19, 51% won)
+                                              as now   skip Friday
+Total net (₹)                                147,221       149,972
+Return on ₹8.5 lakh                           17.3 %        17.6 %
+  per year                                     6.0 %         6.1 %
+Net per session (₹)                              204           208
+Max drawdown (₹)                              40,659        38,033
+  as % of ₹8.5 lakh                            4.8 %         4.5 %
+  trough on                               2024-09-30    2024-09-30
+Longest time under water (sessions)               91           101
+Return ÷ max drawdown                           3.62          3.94
+Sharpe (daily, ×√250)                           0.85          0.95
+Win rate (days traded)                          53 %          53 %
+Profit factor                                   1.15          1.19
+Average win day (₹)                            2,916         3,000
+Average loss day (₹)                          -2,827        -2,845
+Worst day (₹)                                 -9,951        -9,951
+Best day (₹)                                  25,945        25,945
+Days traded                                      722           578
+
+== Fixed base: 2021-11-02 -> 2024-10-08, 722 sessions, 144 Fridays (Friday average 238, 56% won)
+                                              as now   skip Friday
+Total net (₹)                                453,408       419,169
+Return on ₹8.5 lakh                           53.3 %        49.3 %
+  per year                                    18.5 %        17.1 %
+Net per session (₹)                              628           581
+Max drawdown (₹)                              55,419        41,011
+  as % of ₹8.5 lakh                            6.5 %         4.8 %
+  trough on                               2024-09-20    2024-08-12
+Longest time under water (sessions)              102            92
+Return ÷ max drawdown                           8.18         10.22
+Sharpe (daily, ×√250)                           2.13          2.14
+Win rate (days traded)                          59 %          59 %
+Profit factor                                   1.44          1.52
+Average win day (₹)                            3,494         3,586
+Average loss day (₹)                          -3,426        -3,421
+Worst day (₹)                                -10,246       -10,246
+Best day (₹)                                  34,237        34,237
+Days traded                                      722           578

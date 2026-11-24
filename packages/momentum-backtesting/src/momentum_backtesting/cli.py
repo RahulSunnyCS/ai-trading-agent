@@ -3611,6 +3611,28 @@ def since_start_refresh() -> None:
         typer.echo(f"{item['name']}: {figures}")
 
 
+@app.command("overlay-sweep")
+def overlay_sweep(
+    grid: Path = typer.Argument(..., help="Grid JSON: name, base settings, axes (BL-229)."),
+    workers: int = typer.Option(3, help="Worker processes (each loads its own data)."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Count the runs; run nothing."),
+) -> None:
+    """BL-227 / BL-229: run every combination of a grid of Options overlay settings, resumable;
+    results under <data>/overlay-sweeps/<name>/ (the dashboard's Sweeps table reads them)."""
+    from . import overlay_sweep as sweep
+
+    spec = json.loads(grid.read_text())
+    bodies = sweep.expand(spec)
+    done = sweep.done_ids(sweep.sweeps_dir() / spec["name"])
+    todo = [b for b in bodies if b["_id"] not in done]
+    typer.echo(f"{spec['name']}: {len(bodies)} runs, {len(bodies) - len(todo)} done, "
+               f"{len(todo)} to run on {workers} workers")  # fmt: skip
+    if dry_run:
+        return
+    status = sweep.run(grid, workers=workers)
+    typer.echo(json.dumps(status, indent=1))
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),

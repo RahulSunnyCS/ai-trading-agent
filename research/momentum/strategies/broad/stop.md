@@ -62,5 +62,5 @@ sharp dip, and it is bought back later.
 
 ## Related
 
-- [Sizing and exposure overlays](../../common/sizing.md), [cadence](../../common/cadence.md)
+- [Extension exit](extension-exit.md) (sell far above the 200-day EMA, BL-233), [sizing and exposure overlays](../../common/sizing.md), [cadence](../../common/cadence.md)
   (`sell_every_week`), [Broad strategy](README.md).

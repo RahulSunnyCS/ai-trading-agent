@@ -375,6 +375,12 @@ contract, not a shared service).
   `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
   sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
   `scripts/bl085_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
+- **Extension exit (BL-233, killed, off by default):** `Config.extension_exit` (close / 200-day EMA
+  − 1, e.g. 0.70) with `extension_action` `sell` or `trim` (half, once per crossing). Buffer rule only,
+  every week; a name above the level is not bought or topped up (merged into the upper-circuit
+  mask) and the proceeds wait as cash. The table is `categories/extension.py`, passed through
+  `run_broad_backtest` / `api._run_broad`; no API request sets it. Runner:
+  `scripts/bl233_extension_exit.py`; findings: `research/momentum/strategies/broad/extension-exit.md`.
 - **All Fridays (BL-087):** `BacktestRequest.split_fridays` (off by default; a no-op unless
   `rebalance="weekly"` and `rebalance_every > 1`) runs every `rebalance_offset` 0..K-1 with
   `capital / K` and returns one `Result` of the whole account (`tranches.blend_reset`: equal
@@ -603,7 +609,7 @@ contract, not a shared service).
   page's renumbered label. `reconcile` books each difference between Kite's holdings and the ledger
   first against what each lot was told to trade (`momentum_lot_state.planned`, stored by the last
   Friday run: a forced exit is booked to the lot told to sell it; the one net order a stock gets
-  is booked as planned), then the rest to the *pending* lot (the lot due on that Friday) when it
+  is booked as planned; when the lots' orders net to nothing, Kite never moves, so the move between lots is booked from the plan itself and dropped from it, `Reconciled.settled`; kind `transfer`, booked only on a later day than the plan's so a same-day replan is unchanged, and skipped by `forward_fills.claims` since no trade stands behind it), then the rest to the *pending* lot (the lot due on that Friday) when it
   may hold the name (its target or its current shares; noted "beyond the planned orders"); anything
   else is returned as unexplained, never guessed (`mbt lots assign`). The pending lot and the plan
   move only on a run on the Friday itself with a Kite snapshot read that day. Symbols Kite still

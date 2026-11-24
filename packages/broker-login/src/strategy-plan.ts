@@ -73,6 +73,12 @@ export interface Plan {
   notToday: string[];
   /** a wanted name the tool owns with different content (morning only: alerted, left alone) */
   changed: string[];
+  /**
+   * Evening only: unchanged picks uploaded for an earlier session, deleted and uploaded again
+   * (they are also in `delete` and `upload`). The owner may have edited one on AlgoTest during the
+   * day, so a pick is never carried over to the next session (owner, 2026-11-18).
+   */
+  refreshed: string[];
 }
 
 /**
@@ -107,6 +113,17 @@ export function owned(ledger: LedgerRow[]): Map<string, string> {
   for (const row of ledger) {
     if (!row.ok || !NAME_PREFIXES.some((p) => row.name.startsWith(p))) continue;
     if (row.action === 'upload') out.set(row.name, row.sha);
+    else out.delete(row.name);
+  }
+  return out;
+}
+
+/** The session `day` of each owned name's latest ok upload. */
+export function ownedDays(ledger: LedgerRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const row of ledger) {
+    if (!row.ok || !NAME_PREFIXES.some((p) => row.name.startsWith(p))) continue;
+    if (row.action === 'upload') out.set(row.name, row.day);
     else out.delete(row.name);
   }
   return out;
@@ -166,8 +183,11 @@ export function plan(
   ledger: LedgerRow[],
   existing: Set<string>,
   deployed: Set<string>,
+  /** the session the picks are for (the manifest's day) */
+  day: string,
 ): Plan {
   const mine = owned(ledger);
+  const uploadedFor = ownedDays(ledger);
   const out: Plan = {
     keep: [],
     upload: [],
@@ -176,6 +196,7 @@ export function plan(
     conflicts: [],
     notToday: [],
     changed: [],
+    refreshed: [],
   };
   const wantedByName = new Map(wanted.map((w) => [w.name, w]));
 
@@ -186,14 +207,17 @@ export function plan(
       out.upload.push(w);
     } else if (ownSha === undefined) {
       out.conflicts.push(w.name);
-    } else if (ownSha === w.sha) {
+    } else if (ownSha === w.sha && (mode !== 'evening' || uploadedFor.get(w.name) === day)) {
+      // the morning top-up, or an evening retry for the same session: already in place
       out.keep.push(w.name);
     } else if (mode === 'evening') {
-      // content changed (a strategy file was edited): replace it, unless it is deployed
+      // content changed, or uploaded for an earlier session (it may have been edited on AlgoTest
+      // since): replace it, unless it is deployed
       if (deployed.has(w.name)) out.deployedKept.push(w.name);
       else {
         out.delete.push(w.name);
         out.upload.push(w);
+        if (ownSha === w.sha) out.refreshed.push(w.name);
       }
     } else {
       out.changed.push(w.name);
@@ -213,6 +237,8 @@ export function summary(p: Plan, mode: Mode): string[] {
   const lines: string[] = [];
   if (p.keep.length) lines.push(`ready: ${p.keep.join(', ')}`);
   if (p.upload.length) lines.push(`upload: ${p.upload.map((w) => w.name).join(', ')}`);
+  if (p.refreshed.length)
+    lines.push(`fresh copy (unchanged, uploaded for an earlier day): ${p.refreshed.join(', ')}`);
   if (p.delete.length) lines.push(`delete: ${p.delete.join(', ')}`);
   if (p.deployedKept.length)
     lines.push(`NOT deleted, still deployed on /live: ${p.deployedKept.join(', ')}`);

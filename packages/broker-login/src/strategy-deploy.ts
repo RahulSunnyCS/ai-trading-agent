@@ -104,11 +104,7 @@ async function readLive(page: Page, opts: { brokers?: boolean } = {}): Promise<L
   await livePage.header(page).waitFor({ timeout: 30_000 });
   await livePage.anyRowCount(page).waitFor({ timeout: 30_000 });
   // the broker count renders after the rows; not shown in time = unread (planDeploy refuses)
-  if (opts.brokers)
-    await livePage
-      .brokerCount(page)
-      .waitFor({ timeout: 20_000 })
-      .catch(() => undefined);
+  if (opts.brokers) await livePage.brokerCountLoaded(page, 20_000).catch(() => undefined);
   return parseLive(await page.evaluate(() => document.body.innerText));
 }
 

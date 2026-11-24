@@ -634,11 +634,7 @@ class Monitor {
     await livePage.header(page).waitFor({ timeout: 30_000 });
     // the broker count renders after the header; missing in time = unread, said as such. Only on
     // a reload (the deploy check): the minute's loss reading does not read it
-    if (reload)
-      await livePage
-        .brokerCount(page)
-        .waitFor({ timeout: 20_000 })
-        .catch(() => undefined);
+    if (reload) await livePage.brokerCountLoaded(page, 20_000).catch(() => undefined);
     return page;
   }
 

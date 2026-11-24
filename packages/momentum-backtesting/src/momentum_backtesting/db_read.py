@@ -182,6 +182,11 @@ def _lake_files(root: Path) -> tuple:
     for path in sorted(lake.glob("year=*/*.parquet")):
         stat = path.stat()
         files.append((path.parent.name, stat.st_size, stat.st_mtime))
+    # the F&O list (`obt nse fno-build`) is a lake file too, written without a catalog row
+    members = root / "lake" / "eod" / "fno_universe" / "members.parquet"
+    if members.exists():
+        stat = members.stat()
+        files.append(("fno_universe", stat.st_size, stat.st_mtime_ns))
     return tuple(files)
 
 

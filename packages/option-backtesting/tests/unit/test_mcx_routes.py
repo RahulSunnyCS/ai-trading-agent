@@ -1,0 +1,92 @@
+"""The Commodity Lab's read-only routes: `/legwise/mcx/overview` and `/forward` over a temp data
+root with a calendar, a few lake days and a journal. Nothing is written."""
+
+import json
+from datetime import date
+
+from option_backtesting import mcx_forward as mf
+from option_backtesting.api import mcx_routes as mr
+from option_backtesting.legwise.market import mcx_calendar_path
+from option_backtesting.rotation import journal
+
+TODAY = date(2026, 11, 24)
+
+
+def _calendar(root, name, options):
+    path = mcx_calendar_path(root, name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"options": options, "futures": {}}))
+
+
+def _lake_day(root, name, day):
+    folder = root / "lake" / "bars_1m" / "asset=option" / f"underlying={name}" / f"date={day}"
+    folder.mkdir(parents=True)
+    (folder / "data.parquet").write_bytes(b"")
+
+
+def test_overview_names_the_next_expiry_or_where_the_calendar_ends(tmp_path):
+    _calendar(
+        tmp_path, "GOLDM", {"2026-11-27": "MCX:GOLDM26DECFUT", "2026-12-29": "MCX:GOLDM27JANFUT"}
+    )
+    _calendar(tmp_path, "SILVERM", {"2026-10-28": "MCX:SILVERM26NOVFUT"})
+    _lake_day(tmp_path, "GOLDM", "2026-11-23")
+    out = mr.overview(tmp_path, TODAY)
+    rows = {r["root"]: r for r in out["roots"]}
+    assert rows["GOLDM"]["nearest_expiry"] == "2026-11-27"
+    assert rows["GOLDM"]["weekdays_to_expiry"] == 3
+    assert rows["GOLDM"]["last_day"] == "2026-11-23"
+    assert rows["SILVERM"]["nearest_expiry"] is None
+    assert rows["SILVERM"]["calendar_ends"] == "2026-10-28"
+    assert rows["CRUDEOILM"]["days_collected"] == 0
+    assert out["errors"] == []
+
+
+def test_forward_reads_the_journal_and_marks_the_window(tmp_path):
+    _calendar(tmp_path, "GOLDM", {"2026-11-27": "MCX:GOLDM26DECFUT"})
+    _lake_day(tmp_path, "GOLDM", "2026-11-23")
+    entry = {
+        "day": "2026-11-23", "expiry": "2026-11-27", "k": 4, "season": "winter", "gross": 100.0,
+        "charges": 10.0, "net": 90.0, "net_0.5pct": 95.0, "net_0pct": 99.0, "stopped_by": None,
+        "future_at_18": 124487.0, "recorded_at": "2026-11-24T01:30:27+05:30", "trades": [],
+        "notes": [],
+    }  # fmt: skip
+    journal.append(mf.journal_path(tmp_path), entry)
+    out = mr.forward(tmp_path, TODAY)
+    assert [r["rule"]["key"] for r in out["rules"]] == ["goldm-dir", "silverm-dir-before"]
+    gold = out["rules"][0]
+    assert gold["chain"] == {"ok": True, "problems": []}
+    assert gold["summary"]["sessions"] == 1 and gold["summary"]["net"] == 90.0
+    assert gold["entries"][0]["day"] == "2026-11-23"
+    assert gold["entries"][0]["future_at_entry"] == 124487.0
+    assert gold["entry_contracts"] == ["ITM1_CE", "ITM1_PE"]
+    states = {s["day"]: s["state"] for s in gold["window"]["sessions"]}
+    assert states["2026-11-23"] == "journaled"
+    assert states["2026-11-24"] == "today"
+    assert states["2026-11-25"] == "to come"
+    assert gold["spreads"] == []
+
+
+def test_the_silver_block_is_its_own_journal_and_window(tmp_path):
+    _calendar(tmp_path, "SILVERM", {"2026-12-28": "MCX:SILVERM27FEBFUT"})
+    out = mr.forward(tmp_path, TODAY)
+    silver = out["rules"][1]
+    assert silver["rule"]["week"] == "week before expiry"
+    assert silver["entry_contracts"] == ["ATM_CE", "ATM_PE"]
+    assert silver["start_expiry"] == "2026-12-28"
+    assert silver["summary"]["sessions"] == 0 and silver["entries"] == []
+    # the window shown is the five sessions before the expiry week: all still to come
+    days = [s["day"] for s in silver["window"]["sessions"]]
+    assert days[0] == "2026-12-15" and days[-1] == "2026-12-21"
+    assert {s["state"] for s in silver["window"]["sessions"]} == {"to come"}
+    # a holiday in the expiry week could still move these dates, so the page is told they are provisional
+    assert silver["window"]["provisional"] is True
+    assert out["rules"][0]["window"] is None or out["rules"][0]["window"]["provisional"] is False
+    # gold's journal is untouched by silver's
+    assert out["rules"][0]["entries"] == []
+
+
+def test_forward_with_nothing_yet_is_empty_not_an_error(tmp_path):
+    out = mr.forward(tmp_path, TODAY)
+    for block in out["rules"]:
+        assert block["entries"] == [] and block["chain"]["ok"] is True
+    assert out["rules"][0]["window"] is None

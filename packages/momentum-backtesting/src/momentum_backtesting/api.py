@@ -1981,9 +1981,12 @@ def _run_broad(
     *,
     top_sector_weight: float | None = None,
     tax: TaxRules | None = None,
+    extension_exit: float | None = None,
+    extension_action: Literal["sell", "trim"] = "sell",
 ) -> broad.BroadBacktestResult:
-    """`top_sector_weight` (None = the request's `broad_top_sector_weight`) and `tax` are for
-    research scripts (BL-116, after-tax runs); the API's own Broad requests leave both unset."""
+    """`top_sector_weight` (None = the request's `broad_top_sector_weight`), `tax` and the BL-233
+    extension exit are for research scripts (BL-116, after-tax runs, BL-233); the API's own Broad
+    requests leave them unset."""
     if top_sector_weight is None:
         top_sector_weight = req.broad_top_sector_weight
     if top_sector_weight != 1.0 and req.broad_category_mode != "on":
@@ -2055,6 +2058,8 @@ def _run_broad(
         lc_locked=lc_locked,
         top_sector_weight=top_sector_weight,
         tax=tax,
+        extension_exit=extension_exit,
+        extension_action=extension_action,
     )
 
 
@@ -4008,6 +4013,11 @@ def _compute_lot_orders(
             for sid, info in sleeves.items()
         }
         pending_id, planned_before = lots.pending_state(con, who, group_id)
+        planned_row = con.execute(
+            "SELECT updated_at FROM momentum_lot_state WHERE owner = ? AND group_id = ?",
+            [who, group_id],
+        ).fetchone()
+        planned_at = str(planned_row[0]) if planned_row and planned_row[0] else ""
         # What Kite still holds that is not a strategy name today (outside, excluded, or a name
         # that dropped out of the data) is never booked as sold.
         reconciled = lots.reconcile(
@@ -4017,11 +4027,20 @@ def _compute_lot_orders(
             allowed,
             planned=planned_before,
             ignore=kite_symbols - set(held),
+            # A move between lots is booked from a later day than the plan's: a run on the same
+            # day replans from the ledger, and would see the lots already moved.
+            book_transfers=bool(planned_at) and planned_at[:10] < today.isoformat(),
         )
         at = (synced or {}).get("synced_at") or datetime.now(IST).isoformat(timespec="seconds")
         if reconciled.events:
             if not dry_run:  # a tentative plan reads Kite's changes but books nothing
                 lots.append(con, who, group_id, reconciled.events, at)
+                if reconciled.settled:  # booked from the plan: drop it so it is not booked twice
+                    left = {
+                        sid: {s: q for s, q in p.items() if s not in reconciled.settled}
+                        for sid, p in planned_before.items()
+                    }
+                    lots.set_pending(con, who, group_id, pending_id, planned_at, left)
             ledger = lots.apply(ledger, reconciled.events)
         has_history = lots.funded(con, who, group_id)
 
@@ -4202,10 +4221,12 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
         lines.append(head)
     # One order per stock (owner, 2026-11-23): the rows of the combined plan are already netted
     # across the lots, so a stock two lots trade is listed once, for the difference.
+    if any(r["quantity"] or r["action"] in ("SKIP", "HOLD") for r in payload["plan"]["rows"]):
+        lines.append("Orders, one per stock (all lots together)")
     for row in payload["plan"]["rows"]:
         if row["quantity"]:
             traded = True
-            extra = " · leftover cash" if row.get("note") == orders.LEFTOVER_NOTE else ""
+            extra = " · leftover cash" if orders.LEFTOVER_NOTE in row.get("note", "") else ""
             lines.append(
                 f"  • {row['action']} {row['symbol']} {row['quantity']} sh "
                 f"(₹{row['order_value']:,.0f}){extra}"
@@ -5020,6 +5041,85 @@ ORDERS_JOBS = _SingleFlightJob()
 # Friday's orders planned early (tentative): `tentative_orders`, from the page's button.
 TENTATIVE_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
+
+
+def _run_options_overlay(body: dict) -> dict:
+    from . import overlay_runs
+
+    try:
+        return overlay_runs.run_request(body)
+    except (ValueError, LookupError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error)) from error
+
+
+# BL-227: the Options overlay page's runs (a favourite re-run on F&O stocks takes minutes cold).
+OVERLAY_JOBS = _PreviewJobs(_run_options_overlay)
+
+
+def _run_overlay_starts(body: dict) -> dict:
+    from . import overlay_runs
+
+    try:
+        return overlay_runs.starts_request(body)
+    except (ValueError, LookupError, FileNotFoundError) as error:
+        raise HTTPException(422, str(error)) from error
+
+
+# The same settings started afresh on many days (the "Fresh starts" card; a run per start).
+OVERLAY_STARTS_JOBS = _PreviewJobs(_run_overlay_starts)
+
+
+class OverlayCustomStrategy(BaseModel):
+    """BL-227: a custom Broad strategy on F&O stocks (`overlay_runs.CUSTOM_BASE` plus these)."""
+
+    lookbacks: list[int] = Field([1, 4, 13, 26, 52], min_length=1, max_length=5)
+    top_n: int = Field(10, ge=1, le=30)
+    exit_rank: int = Field(20, ge=1, le=100)
+    rebalance: Literal["weekly", "fortnightly", "monthly"] = "weekly"
+    score: Literal["ranksum", "voladj"] = "ranksum"
+
+
+class OptionsOverlayRequest(BaseModel):
+    """BL-227: one Options overlay run (`options_overlay.Settings` plus the strategy)."""
+
+    favourite_id: str | None = None
+    custom: OverlayCustomStrategy | None = None  # instead of a favourite
+    direction: Literal["calls", "puts", "mirror", "switch", "both"] = "calls"
+    moneyness: Literal["ITM2", "ITM1", "ATM", "OTM1", "OTM2", "OTM3", "DELTA"] = "ATM"
+    sizing: Literal["one_lot", "premium", "capital_share", "exposure"] = "one_lot"
+    sizing_value: float | None = Field(None, gt=0)
+    capital: float = Field(1_000_000.0, gt=0, le=1e9)
+    n: int = Field(5, ge=1, le=30)
+    min_sessions_left: int = Field(10, ge=1, le=60)
+    min_oi_lots: int = Field(10, ge=0, le=1000)
+    slippage: float | None = Field(None, ge=0, lt=0.5)
+    tax: bool = True
+    market_filter: Literal["nifty_200dma", "nifty_26w", "breadth"] = "nifty_200dma"
+    put_share: float = Field(0.5, ge=0, le=1)
+    start: str = "2020-01-01"
+    end: str | None = None
+    # profit booking: each `profit_step` rupees made, `withdraw_share` of it taken out
+    profit_step: float | None = Field(None, gt=0)
+    withdraw_share: float = Field(0.75, ge=0, le=1)
+    refill: bool = True  # move taken-out money back when the account cannot pay for a pick
+    hold: bool = False  # keep a contract while its stock is still picked
+    delta_target: float = Field(0.6, ge=0.05, le=0.95)  # moneyness DELTA
+    expiry_skip: int = Field(0, ge=0, le=2)
+    stop: float | None = Field(None, gt=0, le=10)  # exit on a daily close this far down
+    target: float | None = Field(None, gt=0, le=10)  # ... or this far up
+    call_filter: Literal["none", "nifty_200dma", "nifty_26w", "breadth"] = "none"
+    max_positions: int | None = Field(None, ge=1, le=50)
+    max_weekly_premium: float | None = Field(None, gt=0, le=5)
+    split: str | None = None  # train / test split day
+
+
+class OverlayStartsRequest(OptionsOverlayRequest):
+    """The page's settings started afresh with `capital` every `every_months` months, each run
+    for `years` (`options_overlay.starts`)."""
+
+    every_months: Literal[1, 3, 6] = 3
+    years: int = Field(1, ge=1, le=3)
+    washout: float = Field(0.2, gt=0, lt=1)  # a start washed out below this share of capital
 
 
 class _BacktestJobs:
@@ -6542,6 +6642,56 @@ def create_app() -> FastAPI:
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:
         return rebalance_preview(req)
+
+    @app.get("/api/options-overlay/strategies")
+    def options_overlay_strategies() -> dict:
+        """BL-227: the Broad favourites the Options overlay can re-run on F&O stocks, and the F&O
+        lake's newest day (None when the lake has no F&O files)."""
+        from . import options_overlay, overlay_runs
+
+        try:
+            newest = options_overlay.LAKE.newest
+        except FileNotFoundError:
+            newest = None
+        return {"strategies": overlay_runs.strategies(), "data_through": newest}
+
+    @app.get("/api/options-overlay/sweeps")
+    def options_overlay_sweeps() -> dict:
+        """BL-229: the overlay sweeps on disk, with how far each has got."""
+        from . import overlay_sweep
+
+        return {"sweeps": overlay_sweep.list_sweeps()}
+
+    @app.get("/api/options-overlay/sweeps/{name}")
+    def options_overlay_sweep(name: str) -> dict:
+        from . import overlay_sweep
+
+        try:
+            return {"name": name, "rows": overlay_sweep.read_sweep(name)}
+        except LookupError as error:
+            raise HTTPException(404, str(error)) from error
+
+    @app.post("/api/options-overlay/jobs", status_code=202)
+    def start_options_overlay(req: OptionsOverlayRequest) -> dict:
+        return OVERLAY_JOBS.start(req.model_dump())
+
+    @app.get("/api/options-overlay/jobs/{job_id}")
+    def options_overlay_job(job_id: str) -> dict:
+        job = OVERLAY_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown overlay run (the service may have restarted).")
+        return job
+
+    @app.post("/api/options-overlay/starts/jobs", status_code=202)
+    def start_overlay_starts(req: OverlayStartsRequest) -> dict:
+        return OVERLAY_STARTS_JOBS.start(req.model_dump())
+
+    @app.get("/api/options-overlay/starts/jobs/{job_id}")
+    def overlay_starts_job(job_id: str) -> dict:
+        job = OVERLAY_STARTS_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown starts run (the service may have restarted).")
+        return job
 
     @app.post("/api/rebalance-preview/jobs", status_code=202)
     def start_preview_job(req: RebalanceRequest) -> dict:

@@ -89,6 +89,7 @@ describe('navigation preferences', () => {
       'overview',
       'optionslab',
       'live',
+      'commoditylab',
       'momentum',
       'tradebook',
       'jobs',
@@ -112,6 +113,7 @@ describe('navigation preferences', () => {
     expect(groupIds(DEFAULT_NAVIGATION_PREFERENCES)).toEqual([
       ['overview', ['overview']],
       ['optionslab', ['optionslab', 'live']],
+      ['commoditylab', ['commoditylab']],
       ['momentum', ['momentum']],
       ['tradebook', ['tradebook']],
       ['operations', ['jobs', 'brokerLogins', 'settings', 'guide']],
@@ -194,6 +196,7 @@ describe('navigation preferences', () => {
     expect(groups.map((group) => group.id)).toEqual([
       'overview',
       'optionslab',
+      'commoditylab',
       'momentum',
       'operations',
     ]);

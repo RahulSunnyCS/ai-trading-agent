@@ -35,6 +35,17 @@ The evening run's status and its **Run** button are at the top of Today.
 [Live](app:/live), below Options Lab in the sidebar, shows spot, VIX and two straddles minute by
 minute; a replay of a collected day until live capture exists. [Guide](guide:operations/live)
 
+## Commodity Lab
+
+Options on MCX gold, silver, crude oil and natural gas minis. Read-only research: no order is sent.
+
+| Workspace | Screen | What it is for |
+|---|---|---|
+| Today | [Overview](app:/commoditylab/overview) | Each mini's next expiry, how fresh its data is, and each forward test's headline. [Guide](guide:commodity/overview) |
+| Today | [Forward tests](app:/commoditylab/forward) | The paper tests of gold Dir (expiry week) and silver Dir (the week before), scored every night. [Guide](guide:commodity/forward-tests) |
+| Research | [Sweep verdict](app:/commoditylab/sweep) | Which commodity strategies worked in the two-year sweep. [Guide](guide:commodity/sweep-verdict) |
+| Explore data | [Contracts & data](app:/commoditylab/data) | The collected option bars and the expiry calendar. [Guide](guide:commodity/overview) |
+
 ## Momentum
 
 | Screen | What it is for |

@@ -557,10 +557,11 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-evening',
     description:
-      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones, then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
+      "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes every strategy the tool uploaded for an earlier session and uploads tomorrow's picks afresh (a pick that stays is replaced too, since the owner may have edited it on AlgoTest during the day; owner, 2026-11-18; a retry the same evening keeps what it already uploaded), then (BL-197) sets up each T1 pick's execution on /live with Trade monitoring on Candle Close, so the 08:11 `algotest-activate` only has to activate: this list is what trades tomorrow. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
     // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
     // results are incomplete (a late Fyers login), so the retries carry it to 20:40. It deletes the
-    // strategies it uploaded that tomorrow drops (--allow-delete, owner 2026-10-20): AlgoTest's own
+    // strategies it uploaded for an earlier session, kept or dropped (--allow-delete, owner 2026-10-20;
+    // kept ones too since 2026-11-18): AlgoTest's own
     // API call by each strategy's id, never one deployed on /live or one it did not upload, and it
     // stops at once if any other strategy vanishes with a delete.
     schedule: { at: '16:40', on: tradingDays, label: 'trading days 16:40' },
@@ -929,13 +930,44 @@ const BASE_JOBS: Job[] = [
       'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward spread (only meaningful at about 18:00 on a gold expiry-window weekday)',
   },
   {
+    // BL-242: the same read-only snapshot for the silver forward test (SILVERM Dir, the week before
+    // expiry, entered at 17:05). Reads the live bid/ask of the silver future and the ATM pair at
+    // 17:05 on a window weekday (the five sessions before an expiry week, from the 28 Dec 2026
+    // expiry); outside a window the command prints that and exits 0. Nothing is ordered.
+    id: 'mcx-forward-spread-silver',
+    description:
+      "Silver Dir forward test (BL-242): at 17:05 on a week-before-expiry window weekday, the live bid/ask of the silver future and the ATM call and put (`obt mcx-forward spread --rule silverm-dir-before`), kept to compare the real spread with the backtest's 1% slippage. Read-only; does nothing outside a window",
+    schedule: { at: '17:05', on: onWeekdays(1, 2, 3, 4, 5), label: 'weekdays 17:05' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        OPTIONS,
+        'obt',
+        'mcx-forward',
+        'spread',
+        '--rule',
+        'silverm-dir-before',
+      ],
+    ],
+    cwd: '.',
+    timeoutMinutes: 5,
+    retries: 1,
+    retryDelayMinutes: 2, // a retry past ~17:10 would read quotes after the entry minute
+    noRetryExitCodes: [2],
+    catchUpHours: 0.1,
+    fixHint:
+      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward spread --rule silverm-dir-before (only meaningful at about 17:05 on a silver week-before-expiry window weekday)',
+  },
+  {
     // BL-219: after the nightly collector. Scores the session just closed (and any window session
     // missed earlier whose bars are collected) into the hash-chained paper journal, one private
     // Telegram line each. The session is the evening just held (default_session): at 01:30 that
     // is yesterday's. Group `catalog`: it queues behind the 23:31 collector and the 21:00 T1 job.
     id: 'mcx-forward-score',
     description:
-      "Gold Dir forward test (BL-219): score the MCX session just closed (`obt mcx-forward score`): extend the gold contract calendar from the live master, fetch the settling future's day, simulate the frozen BL-218 rule on the collected option bars, append the session to the paper journal and send one private Telegram line. Nothing is ever ordered. Does nothing outside a gold expiry window",
+      "Gold and silver Dir forward tests (BL-219, BL-242): score the MCX session just closed (`obt mcx-forward score`, every rule): extend each root's contract calendar from the live master, fetch the settling future's day, simulate the frozen BL-218 rule on the collected option bars, append the session to that rule's paper journal and send one private Telegram line. Nothing is ever ordered. Does nothing outside a rule's expiry window",
     schedule: {
       at: '01:30',
       on: onWeekdays(2, 3, 4, 5, 6),
