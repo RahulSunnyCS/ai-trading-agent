@@ -179,6 +179,9 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
   expiry window (the last five sessions before an option expiry from 2026-11-27); the 01:30 job
   scores the evening just held (`default_session`: at 01:30 that is yesterday's) after the 23:31
   collector, journaling it and sending one private Telegram line. Neither places an order.
+  BL-242 adds the silver rule (SILVERM Dir, the week before expiry, from the 28 Dec 2026 expiry):
+  the same 01:30 job scores every rule, and `mcx-forward-spread-silver` (weekdays 17:05,
+  `obt mcx-forward spread --rule silverm-dir-before`) reads its own entry-minute quotes.
 - `momentum-journal-score` (BL-024, Fri 20:30, `mbt journal score`) sits between the 19:30
   stock-ingest run (which records the week's journal rows and prices it scores against) and the
   21:00 journal check, in the `catalog` group so it waits for a late 19:30 run. It re-runs every

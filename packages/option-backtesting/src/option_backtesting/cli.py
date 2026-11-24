@@ -1303,6 +1303,23 @@ def _forward_session(value: str | None):
     return date.fromisoformat(value) if value else default_session(datetime.now(IST))
 
 
+def _forward_rules(key: str | None, *, default_all: bool):
+    """The rules a command acts on: the named one, else every rule (score, status) or gold alone
+    (spread: each rule has its own snapshot minute, so a bare spread never reads another's)."""
+    from . import mcx_forward as mf
+
+    if key is None:
+        return list(mf.RULES.values()) if default_all else [mf.GOLD]
+    if key not in mf.RULES:
+        raise typer.BadParameter(f"unknown rule {key!r}; one of {', '.join(mf.RULES)}")
+    return [mf.RULES[key]]
+
+
+_RULE_OPTION = typer.Option(
+    None, "--rule", help="goldm-dir or silverm-dir-before (default: see each command)."
+)
+
+
 @mcx_forward_app.command("score")
 def mcx_forward_score(
     session: str | None = typer.Option(
@@ -1312,10 +1329,11 @@ def mcx_forward_score(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Simulate and print; write no future bars and no journal line."
     ),
+    rule_key: str | None = _RULE_OPTION,
 ) -> None:
-    """BL-219: extend the GOLDM contract calendar, then score (journal) every window session that
-    has its option bars and no line yet. Exit 0 done / nothing due, 2 no Fyers token, 1 failed.
-    Nothing here places an order."""
+    """BL-219 / BL-242: for each rule (default: all), extend its root's contract calendar, then
+    score (journal) every window session that has its option bars and no line yet. Exit 0 done /
+    nothing due, 2 no Fyers token, 1 failed. Nothing here places an order."""
     from . import mcx_forward as mf
     from .fyers.auth import FyersCredentialsError
     from .fyers.daily import data_dir
@@ -1324,88 +1342,105 @@ def mcx_forward_score(
 
     root = data_dir()
     last = _forward_session(session)
+    failed = 0
     try:
         client = _mcx_client()
-        try:
-            cal = mf.extend_calendar(root, last)
-            typer.echo(f"calendar: {len(cal['expiries'])} GOLDM expiries, added {cal['added']}")
-        except Exception as error:  # noqa: BLE001 - the calendar is only needed for new expiries
-            typer.echo(f"calendar not extended ({error}); scoring with the one on disk")
-        due = mf.sessions_to_score(root, last)
-        if dry_run:
-            for day, expiry in due:
-                typer.echo(f"would score {day} (expiry {expiry})")
-            return
-        failed = 0
-        for day, expiry in due:
+        for rule in _forward_rules(rule_key, default_all=True):
             try:
-                entry = mf.score_session(root, client, day, expiry)
-            except journal.AlreadyRecorded:
-                continue
-            except FyersCredentialsError:
-                raise
-            except Exception as error:  # noqa: BLE001 - one bad session must not stop the others
-                typer.echo(f"{day}: not scored: {type(error).__name__}: {error}")
-                failed += 1
-                continue
-            line = mf.telegram_line(entry, mf.summary(root))
-            typer.echo(line)
-            if not no_telegram:
-                send(Notification(source="mcx-forward", severity="info", title=line, plain=True))
-        missing = mf.expected_without_data(root, last)
-        if missing:
-            if not no_telegram:
-                send(
-                    Notification(
-                        source="mcx-forward",
-                        severity="warn",
-                        title=f"Gold Dir paper: no GOLDM option bars for {missing}",
-                        body="A holiday, or the nightly collector has not delivered. Said once; a "
-                        "later night scores it if it was a session.",
-                    )
+                cal = mf.extend_calendar(root, last, rule=rule)
+                typer.echo(
+                    f"{rule.key}: calendar {len(cal['expiries'])} {rule.root} expiries, "
+                    f"added {cal['added']}"
                 )
-                mf.mark_alerted(root, missing)
-            typer.echo(f"no GOLDM option bars for {missing} (a holiday, or not collected yet)")
-        if not due and not missing:
-            typer.echo("nothing due")
-        if failed:
-            raise typer.Exit(1)
+            except Exception as error:  # noqa: BLE001 - only needed for new expiries
+                typer.echo(f"{rule.key}: calendar not extended ({error}); using the one on disk")
+            due = mf.sessions_to_score(root, last, rule)
+            if dry_run:
+                for day, expiry in due:
+                    typer.echo(f"{rule.key}: would score {day} (expiry {expiry})")
+                continue
+            for day, expiry in due:
+                try:
+                    entry = mf.score_session(root, client, day, expiry, rule=rule)
+                except journal.AlreadyRecorded:
+                    continue
+                except FyersCredentialsError:
+                    raise
+                except Exception as error:  # noqa: BLE001 - one bad session must not stop others
+                    typer.echo(f"{rule.key} {day}: not scored: {type(error).__name__}: {error}")
+                    failed += 1
+                    continue
+                line = mf.telegram_line(entry, mf.summary(root, rule), rule)
+                typer.echo(line)
+                if not no_telegram:
+                    send(
+                        Notification(source="mcx-forward", severity="info", title=line, plain=True)
+                    )
+            missing = mf.expected_without_data(root, last, rule)
+            if missing:
+                if not no_telegram:
+                    send(
+                        Notification(
+                            source="mcx-forward",
+                            severity="warn",
+                            title=f"{rule.label}: no {rule.root} option bars for {missing}",
+                            body="A holiday, or the nightly collector has not delivered. Said "
+                            "once; a later night scores it if it was a session.",
+                        )
+                    )
+                    mf.mark_alerted(root, missing, rule)
+                typer.echo(
+                    f"{rule.key}: no {rule.root} option bars for {missing} "
+                    "(a holiday, or not collected yet)"
+                )
+            if not due and not missing:
+                typer.echo(f"{rule.key}: nothing due")
     except FyersCredentialsError as error:
         typer.echo(f"stopped: {error}")
         raise typer.Exit(2) from None
+    if failed:
+        raise typer.Exit(1)
 
 
 @mcx_forward_app.command("spread")
 def mcx_forward_spread(
     day: str | None = typer.Option(None, "--day", help="YYYY-MM-DD (default: today)."),
+    rule_key: str | None = _RULE_OPTION,
 ) -> None:
-    """BL-219: the 18:00 read-only quotes of the future and the entry contracts (bid, ask, spread
-    %), written under mcx-forward/goldm-dir/spread/. Does nothing outside an expiry window."""
+    """BL-219 / BL-242: the read-only quotes of the future and the entry contracts (bid, ask,
+    spread %), written under mcx-forward/<rule>/spread/. Run at the rule's entry minute (gold
+    18:00, silver 17:05); without --rule it reads gold's. Does nothing outside the rule's window."""
     from . import mcx_forward as mf
     from .fyers.auth import FyersCredentialsError
     from .fyers.daily import data_dir
     from .fyers.symbols import IST
 
     today = date.fromisoformat(day) if day else datetime.now(IST).date()
+    rule = _forward_rules(rule_key, default_all=False)[0]
     try:
-        out = mf.spread_snapshot(data_dir(), _mcx_client(), today)
+        out = mf.spread_snapshot(data_dir(), _mcx_client(), today, rule=rule)
     except FyersCredentialsError as error:
         typer.echo(f"stopped: {error}")
         raise typer.Exit(2) from None
-    typer.echo(json.dumps(out, indent=2) if out else f"{today}: not in a gold expiry window")
+    typer.echo(json.dumps(out, indent=2) if out else f"{today}: not in the {rule.key} window")
 
 
 @mcx_forward_app.command("status")
-def mcx_forward_status() -> None:
-    """BL-219: the running totals, by expiry, against the registered pass rule; verifies the
-    journal's hash chain."""
+def mcx_forward_status(rule_key: str | None = _RULE_OPTION) -> None:
+    """BL-219 / BL-242: each rule's running totals, by expiry, against its registered pass rule;
+    verifies each journal's hash chain."""
     from . import mcx_forward as mf
     from .fyers.daily import data_dir
     from .rotation import journal
 
     root = data_dir()
-    problems = journal.verify(mf.journal_path(root))
-    typer.echo(json.dumps(mf.summary(root), indent=2))
-    typer.echo("journal chain: " + ("intact" if not problems else "; ".join(problems)))
-    if problems:
+    broken = False
+    for rule in _forward_rules(rule_key, default_all=True):
+        problems = journal.verify(mf.journal_path(root, rule))
+        typer.echo(f"{rule.key}: " + json.dumps(mf.summary(root, rule), indent=2))
+        typer.echo(
+            f"{rule.key} journal chain: " + ("intact" if not problems else "; ".join(problems))
+        )
+        broken = broken or bool(problems)
+    if broken:
         raise typer.Exit(1)

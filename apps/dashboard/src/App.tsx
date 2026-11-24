@@ -6,6 +6,7 @@ import { cn } from './lib/cn';
 import { DEFAULT_TAB, aliasTarget, documentTitle, isAnalyticsPage } from './lib/routes';
 
 import { BrokerLoginsView } from './components/BrokerLoginsView';
+import { CommodityLabView } from './components/CommodityLabView';
 import { CoverageView } from './components/CoverageView';
 import { JobsView } from './components/JobsView';
 import { LiveView } from './components/LiveView';
@@ -55,6 +56,8 @@ const SUBTITLES: Record<Tab, string> = {
   jobs: 'Scheduled jobs: when they run next, how the last run went, and run one now',
   optionslab:
     'Build, backtest and track option strategies: leg-wise on 1-minute Fyers data, or the YAML engine',
+  commoditylab:
+    'MCX gold, silver, crude oil and natural gas options: the gold and silver Dir paper tests, the sweep verdict and the collected data',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
   tradebook: "The real P&L from the brokers' contract notes: F&O, trades, money and Momentum",
   brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
@@ -87,6 +90,8 @@ function renderView(
       return <JobsView />;
     case 'optionslab':
       return <OptionsLabView />;
+    case 'commoditylab':
+      return <CommodityLabView />;
     case 'momentum':
       return <MomentumBacktestingView />;
     case 'tradebook':

@@ -318,7 +318,10 @@ def test_one_bad_session_does_not_stop_the_others_and_exits_1(root, monkeypatch)
         monkeypatch,
         root,
         extend_calendar=lambda *a, **k: {"expiries": [], "added": []},
-        sessions_to_score=lambda *a, **k: sessions,
+        # the bare command runs every rule; only gold has sessions here
+        sessions_to_score=lambda root_dir, last, rule=mf.GOLD: (
+            sessions if rule.key == "goldm-dir" else []
+        ),
         score_session=score,
     )
     assert calls == [date(2026, 11, 23), DAY]  # the second was still scored
@@ -357,3 +360,83 @@ def test_the_no_data_alert_is_said_once(root, monkeypatch):
         CliRunner().invoke(cli.app, ["mcx-forward", "score"])
     assert [n.severity for n in sent] == ["warn"]  # the second night stays quiet
     assert (mf.forward_dir(root) / "alerted" / "2026-11-25").exists()
+
+
+# -- BL-242: SILVERM Dir, the week before expiry ---------------------------------------------
+
+SILVER_EXPIRY = date(2026, 12, 28)
+
+
+def test_the_silver_rule_equals_the_bl218_grid_cell():
+    grid = _grid()
+    cell = next(c for c in grid.cells("dir") if c.id == mf.SILVER.cell_id)
+    assert cell.id == "dir|entry=17:05|strike=ATM|sl=21|reentry=none|exit=close"
+    for season in ("summer", "winter"):
+        assert mf.strategy(season, mf.SILVER) == grid.build(cell, "SILVERM", season)
+    # one journal per rule, and gold's stays where BL-219 put it
+    assert mf.journal_path(Path("/r"), mf.GOLD) == Path("/r/mcx-forward/goldm-dir/journal.jsonl")
+    assert mf.journal_path(Path("/r"), mf.SILVER) == Path(
+        "/r/mcx-forward/silverm-dir-before/journal.jsonl"
+    )
+
+
+def test_the_silver_window_is_the_five_sessions_before_the_expiry_week():
+    held = _weekdays(date(2026, 12, 1), SILVER_EXPIRY)
+    # E-9..E-5: the five sessions before the last five (22-28 Dec)
+    expected = held[-10:-5]
+    assert expected[0] == date(2026, 12, 15) and expected[-1] == date(2026, 12, 21)
+    assert mf.window(SILVER_EXPIRY, held, SILVER_EXPIRY, mf.SILVER) == expected
+    # known in advance (the night of the 15th): not settled, so scoring has no window yet; the
+    # dashboard's provisional view shows the same five, the rest still to come
+    early = [d for d in held if d <= date(2026, 12, 15)]
+    assert mf.window(SILVER_EXPIRY, early, date(2026, 12, 15), mf.SILVER) == []
+    assert mf.window(SILVER_EXPIRY, early, date(2026, 12, 15), mf.SILVER, settled=False) == expected
+    # and gold's window on the same expiry is the last five
+    assert mf.window(SILVER_EXPIRY, held, SILVER_EXPIRY, mf.GOLD) == held[-5:]
+
+
+def test_the_silver_expected_window_is_five_to_nine_weekdays_out():
+    f = lambda d: mf.in_expected_window(d, SILVER_EXPIRY, mf.SILVER)  # noqa: E731
+    assert f(date(2026, 12, 15)) and f(date(2026, 12, 21))
+    # two weekdays wider than the window: a holiday in the expiry week moves it out
+    assert f(date(2026, 12, 14)) and f(date(2026, 12, 11))
+    assert not f(date(2026, 12, 10)) and not f(date(2026, 12, 22))  # too early, expiry week
+    assert not mf.in_expected_window(date(2026, 11, 20), date(2026, 11, 23), mf.SILVER)  # pre-start
+
+
+def test_the_silver_telegram_line_and_pass_rule_are_its_own(tmp_path):
+    entry = {
+        "day": "2026-12-14", "expiry": "2026-12-28", "k": 9, "net": 120.0, "gross": 200.0,
+        "charges": 80.0, "trades": [], "season": "winter",
+    }  # fmt: skip
+    totals = {"sessions": 1, "net": 120.0, "expiries_up": 1, "expiries": 1}
+    line = mf.telegram_line(entry, totals, mf.SILVER)
+    assert line.startswith("Silver Dir paper (week before), Mon 14 Dec (expiry −9)")
+    assert mf.summary(tmp_path, mf.SILVER)["sessions"] == 0
+
+
+def test_the_bare_score_command_runs_every_rule_and_a_bare_spread_only_gold():
+    from option_backtesting import cli
+
+    assert [r.key for r in cli._forward_rules(None, default_all=True)] == [
+        "goldm-dir",
+        "silverm-dir-before",
+    ]
+    assert [r.key for r in cli._forward_rules(None, default_all=False)] == ["goldm-dir"]
+    assert [r.key for r in cli._forward_rules("silverm-dir-before", default_all=False)] == [
+        "silverm-dir-before"
+    ]
+
+
+def test_a_holiday_in_the_expiry_week_moves_the_silver_window_and_scoring_waits_for_it():
+    # MCX shut on Fri 25 Dec: the expiry week is 22, 23, 24, 28 and the window E-9..E-5 is 14-18 Dec
+    held = [d for d in _weekdays(date(2026, 12, 1), SILVER_EXPIRY) if d != date(2026, 12, 25)]
+    real = [date(2026, 12, d) for d in (14, 15, 16, 17, 18)]
+    assert mf.window(SILVER_EXPIRY, held, SILVER_EXPIRY, mf.SILVER) == real
+    # the night of 21 Dec the holiday is not known: nothing is scored then (21 Dec is E-4, not E-5)
+    before = [d for d in held if d <= date(2026, 12, 21)]
+    assert mf.window(SILVER_EXPIRY, before, date(2026, 12, 21), mf.SILVER) == []
+    # and after the expiry the same five come out, however late the scoring runs
+    assert mf.window(SILVER_EXPIRY, held, date(2026, 12, 29), mf.SILVER) == real
+    # gold's expiry week keeps its old behaviour: the last five known sessions
+    assert mf.window(SILVER_EXPIRY, held, SILVER_EXPIRY, mf.GOLD) == held[-5:]
