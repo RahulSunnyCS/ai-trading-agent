@@ -10,9 +10,8 @@ import type {
   MomentumWeekMessage,
 } from '../../../types/momentum';
 import { Accordion } from '../../ui/Accordion';
-import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
-import { Card, CardHeader } from '../../ui/Card';
+import { Card } from '../../ui/Card';
 
 /** Only what needs a person; the card is not drawn when the list is empty. */
 export function NeedsAttention({
@@ -48,49 +47,6 @@ export function NeedsAttention({
           </li>
         ))}
       </ul>
-    </Card>
-  );
-}
-
-/** What the final run changed against the 14:40 preview (ETF favourites have a preview). */
-export function SincePreview({ card }: { card: MomentumWeekCard }) {
-  const diff = card.since_preview;
-  if (!diff) return null;
-  const changes = diff.added.length + diff.dropped.length;
-  return (
-    <Card>
-      <CardHeader
-        title="Since the 14:40 preview"
-        description={
-          changes
-            ? `${formatInt(changes)} change${changes === 1 ? '' : 's'} at the close`
-            : 'The final kept every trade the preview had.'
-        }
-      />
-      <ul className="space-y-1.5 text-sm">
-        {diff.added.map((item) => (
-          <li key={`a-${item.asset}`} className="flex items-center gap-2">
-            <Badge tone="info">{item.action}</Badge>
-            <span className="font-semibold text-foreground">{item.asset}</span>
-            <span className="text-xs text-muted">new at the final</span>
-          </li>
-        ))}
-        {diff.dropped.map((item) => (
-          <li key={`d-${item.asset}`} className="flex items-center gap-2">
-            <Badge tone="neutral">
-              <s>{item.action}</s>
-            </Badge>
-            <span className="font-semibold text-foreground">{item.asset}</span>
-            <span className="text-xs text-muted">was in the preview, not the final</span>
-          </li>
-        ))}
-      </ul>
-      {diff.dropped.length ? (
-        <p className="mt-2 text-xs text-muted">
-          If you traded on the preview, these differ from the model now; the next rebalance sorts
-          them out.
-        </p>
-      ) : null}
     </Card>
   );
 }
@@ -133,23 +89,26 @@ function EdgeList({ title, names }: { title: string; names: readonly MomentumWee
   );
 }
 
-/** Next week's likely trades: the weakest held names and the strongest not held, by rank. */
+/** Next week's likely trades: the weakest held names and the strongest not held, by rank. Folded
+ * to one line: the sleeve table above already says what trades this Friday. */
 export function EdgeNames({ card }: { card: MomentumWeekCard }) {
   const edge = card.edge;
   if (!edge) return null;
   return (
-    <Card>
-      <CardHeader
-        title="Names at the edge"
-        description={
-          edge.sleeve
-            ? `In ${edge.sleeve}, the next sleeve to trade${edge.on ? ` (${formatDay(edge.on)})` : ''}`
-            : 'Likely to move at the next rebalance'
-        }
-      />
-      <EdgeList title="Weakest held" names={edge.weakest_held} />
-      <EdgeList title="Strongest not held" names={edge.strongest_not_held} />
-    </Card>
+    <Accordion
+      defaultOpen={false}
+      title="Names at the edge"
+      description={
+        edge.sleeve
+          ? `In ${edge.sleeve}, the next sleeve to trade${edge.on ? ` (${formatDay(edge.on)})` : ''}`
+          : 'Likely to move at the next rebalance'
+      }
+    >
+      <div className="-mt-2">
+        <EdgeList title="Weakest held" names={edge.weakest_held} />
+        <EdgeList title="Strongest not held" names={edge.strongest_not_held} />
+      </div>
+    </Accordion>
   );
 }
 

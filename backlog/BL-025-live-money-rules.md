@@ -356,3 +356,15 @@ a new file. A rule here is never edited after a run. A changed rule is a new dat
   −30% lines and their alerts are unchanged; what follows each is now a decision the owner makes
   and logs here, not a prescribed trade. `live_rules.toml`'s `cut_half_action`, `exit_action` and
   `re_entry` reworded to say so; `tests/test_live_rules.py` pins the wording. No number changed.
+- 2026-11-20 — **the check now follows the headline the Kite lots follow.** `live_rules.toml` still named
+  Four Sectors Monthly, No Tilt (`bl142_followed.json`) while the headline favourite and the four Kite lots are
+  the BL-176 Four-Strategy Mix, BSE Tags, so the Momentum › This week strip measured a strategy the money was
+  not in. `strategy.config_file` is now `search_spaces/bl176_followed.json` (the four configs of
+  `bl176_frozen_extended.json`, copied unchanged, each running on its own space and fixed settings: extended
+  tags, ₹2 lakh a sleeve, ₹10,000 ceiling, the Stage 3 basis) and `stage.paper_start` is **2026-10-23**, the
+  mix's first lot (lots 2–4: 30 Oct, 6 Nov, 13 Nov), not 2026-10-16. Lots map to sleeves in the group's order
+  (`live_rules.lot_sleeves`), which the old offset lookup could not do for a 2-weekly sleeve beside 4-weekly
+  ones. **No rule number changed** (20% / 30% / 13 weeks / 5 points), but the paper weeks and the 13-week
+  money gate now count from 23 Oct, a week later than before: the owner may restore 16 Oct only by also
+  re-seating lot 1. **Not done:** the registered drawdown-rule test (`bl025_rules_result.json`, 2026-10-28) was
+  run on Four Sectors; its "re-run unchanged on BL-176's pick" note is still open for the mix.

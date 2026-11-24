@@ -142,7 +142,7 @@ def test_messages_are_kept_and_the_sent_one_wins(tmp_path):
 
 def test_the_rules_report_carries_its_numbers_and_is_kept_for_the_dashboard(tmp_path):
     rules = live_rules.load()
-    weeks = pd.date_range("2026-10-02", periods=6, freq="W-FRI")
+    weeks = pd.date_range("2026-10-09", periods=6, freq="W-FRI")
     followed = pd.Series([1.0, 1.05, 1.1, 1.0, 1.02, 1.04], index=weeks)
     bench = pd.Series([1.0, 1.01, 1.02, 1.0, 1.01, 1.02], index=weeks)
     report = live_rules.evaluate(rules, followed, bench)

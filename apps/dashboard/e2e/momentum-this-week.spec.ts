@@ -441,13 +441,9 @@ test('This week shows the day, what needs you, the rules and every favourite', a
   await expect(page.getByRole('dialog', { name: 'Your orders: settings' })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  // Another favourite's table, and what the final changed against the preview.
+  // Picking another favourite.
   await page.getByRole('button', { name: /ETF Weekly Core/ }).click();
   await expect(page).toHaveURL(/fav=w/);
-  await expect(page.getByText('Since the 14:40 preview')).toBeVisible();
-  await expect(
-    page.getByText('1 to go', { exact: false }).or(page.getByText('4 to go')),
-  ).toBeVisible();
 
   // Needs attention opens the split drawer; the old Weekly signal link lands here.
   await page.getByRole('button', { name: 'Classify…' }).click();
