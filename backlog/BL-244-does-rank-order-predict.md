@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money follows T1's ranking; this asks whether its order means anything |
-| **Status** | In progress |
+| **Status** | Done — top against bottom not shown (T1, both kinds); ranks 1–5 give no dependable order; no strategy owns the bottom of the ranking |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-26 |
@@ -136,3 +136,69 @@ None open. Answered by the owner, 2026-11-26:
   rank for day D reads results before D and D's 09:15 VIX and calendar labels only. Survivorship: the pool
   is fixed settings run on every day, but chosen with hindsight (in-sample). Only coverage and strategy
   counts were looked at, no P&L.
+- 2026-11-26 — **Run as registered** (`research/bl244/rank_order.py`; `results_new.json`, `results_old.json`;
+  per-day CSVs git-ignored under `research/bl244/out/`). The rebuilt ranking matched the pick job's own on
+  every 20th day (22 days in 2025-26, 37 in 2021-24). One fix between runs, not to a rule: Core's Dir pool
+  has 4 strategies, so its one-per-strategy table stops at 4. ₹ per lot-day, net of costs and 0.5 %
+  slippage, 95 % intervals.
+
+## Result
+
+**T1, 2025-01-10 → 2026-10-09 (423 days, the deciding run)**
+
+| | Top | Pool average | Bottom | Top − bottom | Halves | Verdict |
+|---|---|---|---|---|---|---|
+| Widesl (10) | ₹262 | ₹72 | ₹125 | +137 [−16, +288] | +100 / +166 | not passed |
+| Dir (5) | ₹290 | ₹114 | ₹192 | +98 [−81, +277] | −18 / +187 | not passed |
+
+- Without the 10 most favourable days: Widesl +8, Dir −32. Top ahead of bottom on 53 % / 50 % of days.
+- Top − pool average (not a pass rule): Widesl +191 [+71, +309], Dir +175 [+42, +310].
+- Top − its peers (same index and start band): Widesl +59 [−22, +134], Dir +93 [+6, +192]. 45 % / 37 % of
+  top Widesl picks start 09:17–10:02 (16 % of the pool): much of the Widesl lead is the time-of-day mix.
+- Bottom − its peers: Widesl +19 [−39, +73], Dir +89 [+5, +175]. A low rank is not a warning.
+
+**Ranks 1 to 5 (T1)** — mean / median per day, total, maximum drawdown:
+
+| Rank | Widesl 2025-26 | Dir 2025-26 | Widesl mean 2021-24 | Dir mean 2021-24 |
+|---|---|---|---|---|
+| 1 | 309 / 534 · 1,30,782 · −25,358 | 321 / 476 · 1,35,850 · −21,821 | 124 | 291 |
+| 2 | 528 / 718 · 2,23,304 · −15,965 | 285 / 494 · 1,20,515 · −37,158 | 108 | 159 |
+| 3 | 307 / 485 · 1,29,969 · −26,717 | 177 / 331 · 74,994 · −29,995 | 141 | 202 |
+| 4 | 192 / 417 · 81,388 · −30,707 | 413 / 686 · 1,74,791 · −13,891 | 112 | 180 |
+| 5 | 267 / 507 · 1,12,864 · −34,477 | 253 / 394 · 1,06,862 · −32,907 | 193 | 151 |
+
+- Order rule (ranks 1–2 minus 4–5): Widesl +189 [+11, +364] **passes as written**, but halves +4 / +332,
+  rank 1 earns less than rank 2, the one-per-strategy version includes zero (+148 [−21, +332]), and on
+  2021-24 it is −36 [−133, +66]. Read: no dependable order. Dir −30 [−193, +126]: no order.
+- The top 5 holds about 3 distinct strategies (3.0 Widesl, 3.1 Dir); the rest are the same ones at other
+  times.
+
+**Who fills the bottom (Phase 2)**
+
+- Bottom-ranked: no strategy and no index is over-represented, in T1, in either period. Dir only, 2025-26: early
+  starts (30 % / 31 % against 16 %), which also fill the top and the day's best, so they only swing more.
+- Day's worst realised, over-represented in both halves: `N_widesl_p150` (SL 60 %) 17 / 19 % against a 10 %
+  share (best 11 / 11 %), and 27 / 28 % against 17 % in 2021-24 (best 17 / 17 %); `S_widesl_p285` 17 / 19 %
+  (best 14 / 19 %, 2025-26 only); `N_dir_ITM1` (T1's setting) 26 / 28 % against 14 % but 24 / 24 % of the best
+  too. **Lead:** the NIFTY ₹150 Widesl lands among the day's worst more often than among its best in both
+  periods. This counts days, not money, so it does not say the strategy loses.
+
+**Older period (Phase 3, NIFTY only, 2021-11-02 → 2024-10-08, 722 days)**
+
+| T1-NIFTY | Top − bottom | Halves | Verdict | Order (1–2 minus 4–5) |
+|---|---|---|---|---|
+| Widesl | +100 [+4, +201] | +223 / −23 | not passed (repeats) | −36 [−133, +66]: no order (does **not** repeat) |
+| Dir | +87 [−33, +213] | +111 / +63 | not passed (repeats) | +59 [−67, +178]: no order (repeats) |
+
+Top − pool: Widesl +84 [+15, +158] (second half −12), Dir +62 [−30, +155].
+
+**Core-298 cross-check.** 2025-26: top − bottom Widesl +86 [−54, +229], Dir +137 [−18, +296]; neither
+passes or is ordered; Widesl top − peers −11 [−50, +26]. Core-NIFTY 2021-24: Widesl passes
+(+138 [+59, +220], ordered); Dir does not.
+
+**Reading.** The top of the ranking averaged more than the bottom in all eight cells (+86 to +138 a
+lot-day; the cells share days and strategies, so they are not eight proofs), but on T1, the book that is
+traded, it is within noise. The firmer part is top against the average strategy, much of it from preferring
+morning starts. The order inside the top 5 should not be used to prefer one pick or size it up (agrees with
+BL-129). In-sample, as Phase 0 says. Nothing changed live.
+

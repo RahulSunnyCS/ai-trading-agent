@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-11-16
+**Status:** Tested · **Last updated:** 2026-11-26
 
 ## What it is
 
@@ -61,6 +61,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-154 | Adaptive's weekday / DTE / VIX fits shrunk toward the variant's own window mean by n/(n+10); plus opening-gap and previous-day-range bands (÷ ATR, terciles) at weight 10 from weekday; P1 decides, 20 label shuffles | **Killed**: on P1 shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above it, drawdown 21% deeper; labels −₹20 [−91, +48]. Out of P1 shrinkage is wholly negative (P2 −₹172 [−321, −38], whole span −₹71 [−146, −1]); the more weight on the plain mean, the worse. Today's fits beat all 20 label shuffles on P2 and the whole span (17 of 20 on P1). Gross, 431 days 2025-01 → 2026-10 | [BL-154][bl154] |
 | BL-090 | A cap in `select`: no two core picks above trailing 63-day Pearson 0.5 / 0.6 / 0.7, lists A / B / C / REF, on BL-075's P1 / P2 / P3 (248 variants, P3 NIFTY only); pass = drawdown 10% shallower with net at most 5% lower in 2 of 3 periods | **Killed** for all 12 cells (best: 1 period). Drawdown is often shallower but net falls; in P2 every cap loses 28%–105% of net. Before charges, lists in-sample | [BL-090][bl090] |
 | BL-167 | ITM2 Dir added to the Adaptive universe (Core-298; Core-298 + T1), in-sample, 431 days | **No gain**: Core −₹57 a day (interval −235 to +118), T1 −₹74 (−258 to +108); Core drawdown 25% shallower, T1's 11% deeper; 75–78% of Core's ITM1 picks and 51–58% of its ATM picks are dropped (ITM2 enters in their place) | [BL-167][bl167] |
+| BL-244 | Does the order predict: top 10 Widesl / 5 Dir against bottom, pool and same-index same-time peers; ranks 1–5; who fills the bottom (T1 and Core, 2025-01 → 2026-10; NIFTY 2021-11 → 2024-10-08) | **Top − bottom not shown** on T1 (Widesl +₹137 [−16, +288], Dir +₹98 [−81, +277] per lot-day net after 0.5 % slippage; positive in all 8 cells, passes only Core Widesl 2021-24); top − pool +₹191 / +₹175 clears zero on T1 2025-26 (+₹84 / +₹62 in 2021-24), top Widesl − peers +₹59 [−22, +134]; ranks 1–5: no dependable order (T1 Widesl passes 2025-26 by ₹4 in one half, fails 2021-24). In-sample | [BL-244][bl244] |
 | BL-189 | `select`'s Widesl minimum: exactly two Widesl + one Dir every day (the best Dir forced in on three-Widesl days) vs at least two | **Keep as it is**: T1 2025-26 −₹55 [−97, −18] net per margin lot-day for the strict rule (68 of 434 days differ); NIFTY 2022-24 T1-N +₹4 [−19, +29], Core-N +₹66 [+36, +100] | [BL-189][bl189] |
 | BL-190 | A pick finished by 12:15 (stopped, no entry left) replaced by the strongest later Widesl or Dir by the morning composite | **Killed**: T1 2025-26 Widesl −₹9 [−56, +38], Dir −₹10 [−55, +35] (95 %), drawdown deeper; NIFTY 2022-24 +₹9 / +₹7; no better than a random replacement | [BL-190][bl190] |
 
@@ -90,6 +91,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
   lot-day, the key alone −₹34 [−372, +316], both −₹68 [−462, +377] with the drawdown 14 % deeper, key × start band
   +₹1 [−219, +227]; the start band carries what the three-family key loses. The 14 % is worked out from the item's two
   drawdown figures (24,403 / 21,340); the item's Result now states it too.
+- The composite separates the top from the average strategy better than it separates ranks (BL-244): on T1 2025-26 the top 10 Widesl / 5 Dir made ₹262 / ₹290 a lot-day against pool averages of ₹72 / ₹114, but the bottom made ₹125 / ₹192, so a low rank is not a warning; much of the Widesl lead is its preference for 09:17–10:02 starts; ranks 1–5 are not a preference order. No strategy owns the bottom of the ranking.
 - Charges: lists A / B / C / REF pay ₹80–81k each in P1 at ₹13 an order ([charges](charges.md)).
 - In-sample comparison only, not BL-100's test: over 2025-10-09 → 2026-10-09 the full pool earned more
   per lot-day than both restricted pools for every list (A ₹383.6 full vs ₹309.1 / ₹268.6), gross
@@ -99,8 +101,8 @@ per lot-day is above zero and its drawdown per lot is no worse.
 
 - The forward read-out after 60 trading days from 2026-10-12 (the only unseen test).
 - BL-100 on P3.
-- Whether the order itself predicts: top against bottom and ranks 1–5, Widesl and Dir apart, and who fills
-  the bottom (BL-244, planned).
+- Whether a plain "morning starts" preference does as well as the ranking (a lead from BL-244's peers
+  comparison), and whether the NIFTY ₹150 Widesl (SL 60 %), often among the day's worst, loses money in the book.
 - A 15 / 30 minute start gap between picks of the same kind (BL-245, planned; BL-069 B4 tried 90 minutes on
   the older universe: no effect).
 - An absolute 0–100 confidence beside the rank was tested and killed on one definition
@@ -144,6 +146,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl090]: ../../../backlog/BL-090-strategy-correlation-and-diverse-baskets.md
 [bl167]: ../../../backlog/BL-167-itm2-in-adaptive-and-t1.md
 [bl189]: ../../../backlog/BL-189-strict-two-widesl-one-dir.md
+[bl244]: ../../../backlog/BL-244-does-rank-order-predict.md
 [bl190]: ../../../backlog/BL-190-replace-early-stopped-pick.md
 [bl214]: ../../../backlog/BL-214-t1-five-year-out-of-sample.md
 [bl215]: ../../../backlog/BL-215-annual-retune-walk-forward.md
