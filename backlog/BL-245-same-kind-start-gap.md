@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a possible change to the live picks; earlier evidence leans against a gain |
-| **Status** | Done — killed: neither 15 nor 30 minutes passes; on T1 both lose money and deepen the worst drawdown |
+| **Status** | Done — killed: neither 15 nor 30 minutes passes; on T1 both earn less and deepen the worst drawdown |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-26 |
@@ -127,8 +127,12 @@ days, and 69 % / 32 % of placebos do as well. Risk route not met.
 (drawdown 6 % / 9 % shallower); Core-N −45 [−117, +29] and +6 [−53, +64] (drawdown 31 % / 5 % deeper).
 
 **Reading.** The return is lower in seven of the eight period-by-gap cells and flat in the eighth (cells
-share days and strategies). Drawdown goes either way, so the gap is not a dependable risk control. Blocking
-only same-index picks changes nothing in the verdict. Nothing changed live.
+share days and strategies). Drawdown goes either way, so the gap is not a dependable risk control. Nothing
+changed live.
+
+**Same index only (shown, not deciding).** T1: 15 minutes −128 [−304, +58] on 143 changed days, drawdown
+15 % deeper; 30 minutes −194 [−323, −69] on 238 days, 43 % deeper. Core: −123 [−252, −5] and
+−118 [−239, +4], drawdown 17 % / 15 % shallower. Neither passes.
 
 ## Risks
 
@@ -156,3 +160,6 @@ None open. Answered by the owner, 2026-11-26:
   per-day books git-ignored). The rebuilt ranking matched on every day and a gap of 0 reproduced today's
   book on every day. `pick.load_history` refuses 1 day of 2025-26 (September 2026's missing results) and 647
   days of BL-214's store (no lake); those are compared through the same two reads.
+- 2026-11-26 — **verdict: killed**, 15 and 30 minutes alike (neither the return nor the risk route; both
+  hurt return on T1). PR 470 review: status wording fixed, same-index figures added. The result files' pass
+  flags leave out the Core-298 sign check; no arm passed on T1, so nothing turns on it.
