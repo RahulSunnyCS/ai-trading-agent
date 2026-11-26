@@ -16,6 +16,7 @@ import json
 from bisect import bisect_left
 from collections import Counter
 from datetime import date, timedelta
+from functools import cache
 from pathlib import Path
 
 import numpy as np
@@ -96,21 +97,34 @@ def read_extra(name: str, root: Path) -> dict[date, tuple[float, int]]:
         }
 
 
-def history_from_disk(root: Path, names: list[str], day: date) -> pick.History:
-    """`pick.load_history`, or the same two reads where it cannot run: BL-214's store has no lake of
-    its own, so the pick's "results reach the last collected day" check has nothing to look at."""
+# the result files do not change during a run; without this every day's check re-reads all of them
+_READ_NET = store.read_net
+_CACHED_NET = cache(_READ_NET)
+
+
+def history_from_disk(
+    root: Path, names: list[str], day: date, fallback: bool = False
+) -> tuple[pick.History, bool]:
+    """(history, refused): `pick.load_history`, or the same two reads where it refuses for a known
+    reason. On the live store that is only "results end before the last collected day" (the days
+    after September 2026's missing results). BL-214's store (`fallback`) has no lake of its own."""
+    store.read_net = _CACHED_NET  # used by load_history only, which reads unslipped results
     try:
-        return pick.load_history(day, root, names)
-    except pick.PickError:
+        return pick.load_history(day, root, names), False
+    except pick.PickError as e:
+        if not fallback and not str(e).startswith("results end "):
+            raise
         m = store.load_matrix(names, root, through=day - timedelta(days=1))
         attrs = store.read_days(root)
         keep = [i for i, d in enumerate(m.days) if d in attrs]
         days = [m.days[i] for i in keep]
         cols = [[attrs[d][k] for d in days] for k in ("weekday", "vix_band", "dte_n", "dte_s")]
-        return pick.History(days, list(m.names), m.values[keep], *cols, "")
+        return pick.History(days, list(m.names), m.values[keep], *cols, ""), True
+    finally:
+        store.read_net = _READ_NET
 
 
-def run_pool(root: Path, names: list[str], period: dict, check_every: int = 20) -> dict:
+def run_pool(root: Path, names: list[str], period: dict, fallback: bool = False) -> dict:
     daylog._recon_cache.clear()
     rec = daylog.reconstruction(root, names)
     assert rec.error is None, rec.error
@@ -148,8 +162,8 @@ def run_pool(root: Path, names: list[str], period: dict, check_every: int = 20) 
     members: dict[str, dict[str, list[list[str]]]] = {
         k: {s: [] for s in ("top", "bottom", "best_realised", "worst_realised")} for k in kind_idx
     }
-    checked = 0
-    for pos, d in enumerate(days):
+    checked = gap_days = 0
+    for d in days:
         i = bisect_left(rec.days, d)
         a = rec.attrs[d]
         vix_open = daylog._number(a.get("vix_open"))
@@ -162,18 +176,19 @@ def run_pool(root: Path, names: list[str], period: dict, check_every: int = 20) 
         )
         comp = composite(Pv, weekday, bands, dmat, cols, LISTS["C"], fam)
 
-        if pos % check_every == 0:  # an independent path: what the pick job would read from disk
-            hist = history_from_disk(root, cols, d)
-            assert hist.days == rec.days[:i], d
-            live = next(
-                c
-                for key, _, c, _ in pick._rank(
-                    hist, d, vix_open, {"dte_n": a["dte_n"], "dte_s": a["dte_s"]}
-                )
-                if key == "C"
+        # every day, an independent path: what the pick job would read from disk
+        hist, refused = history_from_disk(root, cols, d, fallback)
+        gap_days += refused
+        assert hist.days == rec.days[:i], d
+        live = next(
+            c
+            for key, _, c, _ in pick._rank(
+                hist, d, vix_open, {"dte_n": a["dte_n"], "dte_s": a["dte_s"]}
             )
-            assert np.allclose(live, comp, rtol=0, atol=1e-9), d
-            checked += 1
+            if key == "C"
+        )
+        assert np.allclose(live, comp, rtol=0, atol=1e-9), d
+        checked += 1
 
         j = row_of[d]
         net = slip.values[j]
@@ -225,6 +240,7 @@ def run_pool(root: Path, names: list[str], period: dict, check_every: int = 20) 
         "split": split.isoformat(),
         "pool": {k: [cols[v] for v in idx] for k, idx in kind_idx.items()},
         "checked_days": checked,
+        "days_load_history_refused": gap_days,
     }
 
 
@@ -242,6 +258,7 @@ def summarise(run: dict) -> dict:
         "half_split": run["split"],
         "half_days": [len(halves[1]), len(halves[2])],
         "look_ahead_checked_days": run["checked_days"],
+        "days_load_history_refused": run["days_load_history_refused"],
     }
     for kind in SIZES:
 
@@ -403,7 +420,7 @@ def main() -> None:
     report: dict = {"period": args.period, "seed": SEED, "interval": LEVEL}
     (HERE / "out").mkdir(exist_ok=True)
     for label, names in pools.items():
-        run = run_pool(root, names, period)
+        run = run_pool(root, names, period, fallback=args.period == "old")
         s, conc = summarise(run), concentration(run)
         report[label] = {"variants": len(names), "summary": s, "concentration": conc}
         with (HERE / "out" / f"days_{args.period}_{label}.csv").open("w", newline="") as f:

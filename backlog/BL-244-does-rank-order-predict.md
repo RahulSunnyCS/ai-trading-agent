@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money follows T1's ranking; this asks whether its order means anything |
-| **Status** | Done — top against bottom not shown (T1, both kinds); ranks 1–5 give no dependable order; no strategy owns the bottom of the ranking |
+| **Status** | Done — top against bottom not shown (T1, both kinds); order rule passed by Widesl only, narrowly and not on 2021-24; no strategy owns the bottom of the ranking |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-26 |
@@ -138,9 +138,16 @@ None open. Answered by the owner, 2026-11-26:
   counts were looked at, no P&L.
 - 2026-11-26 — **Run as registered** (`research/bl244/rank_order.py`; `results_new.json`, `results_old.json`;
   per-day CSVs git-ignored under `research/bl244/out/`). The rebuilt ranking matched the pick job's own on
-  every 20th day (22 days in 2025-26, 37 in 2021-24). One fix between runs, not to a rule: Core's Dir pool
+  every 20th day (22 days in 2025-26, 37 in 2021-24; all days after the review, below). One fix between runs, not to a rule: Core's Dir pool
   has 4 strategies, so its one-per-strategy table stops at 4. ₹ per lot-day, net of costs and 0.5 %
   slippage, 95 % intervals.
+- 2026-11-26 — PR 469 review: the order verdict is now reported as registered (Widesl passes); the lead's
+  strategy ids corrected to the T1 settings measured; the look-ahead check now runs on every day, as
+  Phase 0 says, not every 20th (both periods rerun); the history fallback limited to BL-214's store. The
+  running-total charts were shown in chat and are not committed.
+- 2026-11-26 — every-day check run: the rebuild matched on all 423 and 722 days and every result is
+  unchanged. On 1 day of 2025-26 `pick.load_history` itself refuses (September 2026's missing results) and
+  on 647 days of BL-214's store (no lake of its own); those days are compared through the same two reads.
 
 ## Result
 
@@ -156,6 +163,8 @@ None open. Answered by the owner, 2026-11-26:
 - Top − its peers (same index and start band): Widesl +59 [−22, +134], Dir +93 [+6, +192]. 45 % / 37 % of
   top Widesl picks start 09:17–10:02 (16 % of the pool): much of the Widesl lead is the time-of-day mix.
 - Bottom − its peers: Widesl +19 [−39, +73], Dir +89 [+5, +175]. A low rank is not a warning.
+- Expiry days (179 of 423, descriptive): top − bottom Widesl +326 against −2 on other days, Dir +99 against
+  +97. The Widesl split did not repeat on 2021-24 (+42 against +115).
 
 **Ranks 1 to 5 (T1)** — mean / median per day, total, maximum drawdown:
 
@@ -167,9 +176,11 @@ None open. Answered by the owner, 2026-11-26:
 | 4 | 192 / 417 · 81,388 · −30,707 | 413 / 686 · 1,74,791 · −13,891 | 112 | 180 |
 | 5 | 267 / 507 · 1,12,864 · −34,477 | 253 / 394 · 1,06,862 · −32,907 | 193 | 151 |
 
-- Order rule (ranks 1–2 minus 4–5): Widesl +189 [+11, +364] **passes as written**, but halves +4 / +332,
-  rank 1 earns less than rank 2, the one-per-strategy version includes zero (+148 [−21, +332]), and on
-  2021-24 it is −36 [−133, +66]. Read: no dependable order. Dir −30 [−193, +126]: no order.
+- Order rule (ranks 1–2 minus 4–5), the registered verdict: **Widesl passes**, +189 [+11, +364], halves
+  +4 / +332. **Dir does not**, −30 [−193, +126].
+- Caveats on the Widesl pass (read after the result; they do not change the verdict): almost nothing in the
+  first half, rank 1 earns less than rank 2, the one-per-strategy version includes zero
+  (+148 [−21, +332]), and on 2021-24 it is −36 [−133, +66]. Not enough to prefer or size up a pick by rank.
 - The top 5 holds about 3 distinct strategies (3.0 Widesl, 3.1 Dir); the rest are the same ones at other
   times.
 
@@ -177,11 +188,12 @@ None open. Answered by the owner, 2026-11-26:
 
 - Bottom-ranked: no strategy and no index is over-represented, in T1, in either period. Dir only, 2025-26: early
   starts (30 % / 31 % against 16 %), which also fill the top and the day's best, so they only swing more.
-- Day's worst realised, over-represented in both halves: `N_widesl_p150` (SL 60 %) 17 / 19 % against a 10 %
-  share (best 11 / 11 %), and 27 / 28 % against 17 % in 2021-24 (best 17 / 17 %); `S_widesl_p285` 17 / 19 %
-  (best 14 / 19 %, 2025-26 only); `N_dir_ITM1` (T1's setting) 26 / 28 % against 14 % but 24 / 24 % of the best
-  too. **Lead:** the NIFTY ₹150 Widesl lands among the day's worst more often than among its best in both
-  periods. This counts days, not money, so it does not say the strategy loses.
+- Day's worst realised, over-represented in both halves: `N_p150-t1s11` (T1's NIFTY ₹150 premium Widesl,
+  SL 60 %) 17 / 19 % against a 10 % share (best 11 / 11 %), and 27 / 28 % against 17 % in 2021-24
+  (best 17 / 17 %); `S_p285-t1s22` 17 / 19 % (best 14 / 19 %, 2025-26 only); `N_ditm1-t1s36` (T1's NIFTY ITM1
+  Dir) 26 / 28 % against 14 % but 24 / 24 % of the best too. **Lead:** `N_p150-t1s11` lands among the day's
+  worst more often than among its best in both periods. This counts days, not money, so it does not say the
+  strategy loses.
 
 **Older period (Phase 3, NIFTY only, 2021-11-02 → 2024-10-08, 722 days)**
 
@@ -199,6 +211,6 @@ passes or is ordered; Widesl top − peers −11 [−50, +26]. Core-NIFTY 2021-2
 **Reading.** The top of the ranking averaged more than the bottom in all eight cells (+86 to +138 a
 lot-day; the cells share days and strategies, so they are not eight proofs), but on T1, the book that is
 traded, it is within noise. The firmer part is top against the average strategy, much of it from preferring
-morning starts. The order inside the top 5 should not be used to prefer one pick or size it up (agrees with
-BL-129). In-sample, as Phase 0 says. Nothing changed live.
+morning starts. The registered order rule passed for Widesl only; with the caveats above, the order inside the top
+5 should not be used to prefer one pick or size it up (agrees with BL-129). In-sample, as Phase 0 says. Nothing changed live.
 

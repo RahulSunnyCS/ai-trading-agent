@@ -13,7 +13,8 @@
     361,
     361
    ],
-   "look_ahead_checked_days": 37,
+   "look_ahead_checked_days": 722,
+   "days_load_history_refused": 647,
    "wide": {
     "sets": {
      "top": {
@@ -1491,7 +1492,8 @@
     361,
     361
    ],
-   "look_ahead_checked_days": 37,
+   "look_ahead_checked_days": 722,
+   "days_load_history_refused": 647,
    "wide": {
     "sets": {
      "top": {
