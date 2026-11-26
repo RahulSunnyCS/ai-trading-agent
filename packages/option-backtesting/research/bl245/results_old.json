@@ -1,0 +1,1003 @@
+{
+ "period": "old",
+ "seed": 20261126,
+ "interval": 0.95,
+ "t1": {
+  "days": 722,
+  "from": "2021-11-02",
+  "to": "2024-10-08",
+  "split": "2023-04-21",
+  "days_load_history_refused": 647,
+  "counts": {
+   "G15": {
+    "changed_days": 261,
+    "halves": [
+     134,
+     127
+    ],
+    "picks_replaced": 303,
+    "dir_changed_days": 30
+   },
+   "G30": {
+    "changed_days": 453,
+    "halves": [
+     239,
+     214
+    ],
+    "picks_replaced": 523,
+    "dir_changed_days": 65
+   },
+   "G15_same": {
+    "changed_days": 261,
+    "halves": [
+     134,
+     127
+    ],
+    "picks_replaced": 303,
+    "dir_changed_days": 30
+   },
+   "G30_same": {
+    "changed_days": 453,
+    "halves": [
+     239,
+     214
+    ],
+    "picks_replaced": 523,
+    "dir_changed_days": 65
+   }
+  },
+  "FREE": {
+   "stats": {
+    "all": {
+     "mean": 172.60795475530935,
+     "median": 203.50666666666666,
+     "total": 124622.94333333334,
+     "win_rate": 0.5637119113573407,
+     "max_drawdown": -22022.56666666665,
+     "longest_under_water": 77,
+     "worst_day": -4639.3566666666675,
+     "worst_5_days": -9016.293333333333
+    },
+    "h1": {
+     "mean": 265.01884579870733,
+     "median": 242.26,
+     "total": 95671.80333333334,
+     "win_rate": 0.5817174515235457,
+     "max_drawdown": -11111.090000000002,
+     "longest_under_water": 54,
+     "worst_day": -4196.973333333333,
+     "worst_5_days": -7612.79
+    },
+    "h2": {
+     "mean": 80.19706371191135,
+     "median": 172.00333333333333,
+     "total": 28951.14,
+     "win_rate": 0.5457063711911357,
+     "max_drawdown": -22022.566666666673,
+     "longest_under_water": 77,
+     "worst_day": -4639.3566666666675,
+     "worst_5_days": -9016.293333333333
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 583.2456648199446,
+     "median": 566.8900000000001,
+     "total": 421103.37,
+     "win_rate": 0.5470914127423823,
+     "max_drawdown": -70648.0500000001,
+     "longest_under_water": 77,
+     "worst_day": -16870.65,
+     "worst_5_days": -35742.95
+    },
+    "h1": {
+     "mean": 801.006814404432,
+     "median": 726.78,
+     "total": 289163.45999999996,
+     "win_rate": 0.5650969529085873,
+     "max_drawdown": -44194.350000000006,
+     "longest_under_water": 71,
+     "worst_day": -16870.65,
+     "worst_5_days": -35742.95
+    },
+    "h2": {
+     "mean": 365.48451523545697,
+     "median": 382.19999999999993,
+     "total": 131939.90999999997,
+     "win_rate": 0.5290858725761773,
+     "max_drawdown": -70648.04999999997,
+     "longest_under_water": 77,
+     "worst_day": -15797.76,
+     "worst_5_days": -28812.780000000002
+    }
+   }
+  },
+  "G15": {
+   "stats": {
+    "all": {
+     "mean": 142.28266389658359,
+     "median": 181.15833333333333,
+     "total": 102728.08333333334,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -20675.396666666653,
+     "longest_under_water": 84,
+     "worst_day": -4639.3566666666675,
+     "worst_5_days": -9372.463333333333
+    },
+    "h1": {
+     "mean": 231.2188088642659,
+     "median": 157.43999999999986,
+     "total": 83469.98999999999,
+     "win_rate": 0.5706371191135734,
+     "max_drawdown": -10821.343333333334,
+     "longest_under_water": 56,
+     "worst_day": -4196.973333333333,
+     "worst_5_days": -7323.043333333333
+    },
+    "h2": {
+     "mean": 53.34651892890121,
+     "median": 203.01666666666665,
+     "total": 19258.093333333338,
+     "win_rate": 0.554016620498615,
+     "max_drawdown": -20675.396666666667,
+     "longest_under_water": 84,
+     "worst_day": -4639.3566666666675,
+     "worst_5_days": -9372.463333333333
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 517.1073130193906,
+     "median": 517.2599999999999,
+     "total": 373351.48000000004,
+     "win_rate": 0.5554016620498615,
+     "max_drawdown": -66178.71000000002,
+     "longest_under_water": 77,
+     "worst_day": -16870.65,
+     "worst_5_days": -34931.1
+    },
+    "h1": {
+     "mean": 739.3371745152353,
+     "median": 538.01,
+     "total": 266900.72,
+     "win_rate": 0.5595567867036011,
+     "max_drawdown": -43325.11,
+     "longest_under_water": 71,
+     "worst_day": -16870.65,
+     "worst_5_days": -34931.1
+    },
+    "h2": {
+     "mean": 294.87745152354574,
+     "median": 464.1199999999999,
+     "total": 106450.76000000001,
+     "win_rate": 0.5512465373961218,
+     "max_drawdown": -66178.70999999995,
+     "longest_under_water": 77,
+     "worst_day": -15797.76,
+     "worst_5_days": -32380.229999999996
+    }
+   },
+   "gross_mean": 306.8171052631579,
+   "minus_free_changed_days": {
+    "days": 261,
+    "mean": -83.88835249042144,
+    "lo": -162.77912515964235,
+    "hi": -3.2400124521074467,
+    "halves": [
+     -91.05830845771146,
+     -76.32320209973747
+    ]
+   },
+   "minus_free_all_days_mean": -30.32529085872576,
+   "drawdown_change": {
+    "all": -0.06117225209898325,
+    "h1": -0.02607724954677426,
+    "h2": -0.06117225209898358
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.405,
+    "share_mean_at_least_as_high": 0.823,
+    "median_max_drawdown": -21200.16833333335,
+    "median_mean": 151.51834718374886
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": true
+  },
+  "G30": {
+   "stats": {
+    "all": {
+     "mean": 154.84067405355492,
+     "median": 149.95166666666665,
+     "total": 111794.96666666665,
+     "win_rate": 0.5512465373961218,
+     "max_drawdown": -20133.32666666672,
+     "longest_under_water": 61,
+     "worst_day": -5059.6033333333335,
+     "worst_5_days": -9723.646666666667
+    },
+    "h1": {
+     "mean": 231.06570637119114,
+     "median": 129.35666666666665,
+     "total": 83414.72,
+     "win_rate": 0.556786703601108,
+     "max_drawdown": -8781.443333333333,
+     "longest_under_water": 41,
+     "worst_day": -3814.26,
+     "worst_5_days": -6786.706666666667
+    },
+    "h2": {
+     "mean": 78.61564173591873,
+     "median": 156.22333333333333,
+     "total": 28380.24666666666,
+     "win_rate": 0.5457063711911357,
+     "max_drawdown": -20133.32666666666,
+     "longest_under_water": 61,
+     "worst_day": -5059.6033333333335,
+     "worst_5_days": -9723.646666666667
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 568.7243628808864,
+     "median": 544.785,
+     "total": 410618.99,
+     "win_rate": 0.554016620498615,
+     "max_drawdown": -62527.940000000235,
+     "longest_under_water": 75,
+     "worst_day": -15797.76,
+     "worst_5_days": -32238.439999999995
+    },
+    "h1": {
+     "mean": 761.3463157894737,
+     "median": 563.3100000000001,
+     "total": 274846.02,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -37205.41000000001,
+     "longest_under_water": 41,
+     "worst_day": -14504.69,
+     "worst_5_days": -29209.269999999997
+    },
+    "h2": {
+     "mean": 376.1024099722991,
+     "median": 516.72,
+     "total": 135772.96999999997,
+     "win_rate": 0.5457063711911357,
+     "max_drawdown": -62527.93999999999,
+     "longest_under_water": 75,
+     "worst_day": -15797.76,
+     "worst_5_days": -32238.439999999995
+    }
+   },
+   "gross_mean": 315.4246537396122,
+   "minus_free_changed_days": {
+    "days": 453,
+    "mean": -28.317829286239874,
+    "lo": -92.58107192788813,
+    "hi": 34.18578256070636,
+    "halves": [
+     -51.284867503486744,
+     -2.6677258566978264
+    ]
+   },
+   "minus_free_all_days_mean": -17.76728070175439,
+   "drawdown_change": {
+    "all": -0.08578654925174933,
+    "h1": -0.20966859837033713,
+    "h2": -0.08578654925175289
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.4,
+    "share_mean_at_least_as_high": 0.783,
+    "median_max_drawdown": -20750.58500000002,
+    "median_mean": 164.58776084949216
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": false
+  },
+  "G15_same": {
+   "stats": {
+    "all": {
+     "mean": 142.28266389658359,
+     "median": 181.15833333333333,
+     "total": 102728.08333333334,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -20675.396666666653,
+     "longest_under_water": 84,
+     "worst_day": -4639.3566666666675,
+     "worst_5_days": -9372.463333333333
+    },
+    "h1": {
+     "mean": 231.2188088642659,
+     "median": 157.43999999999986,
+     "total": 83469.98999999999,
+     "win_rate": 0.5706371191135734,
+     "max_drawdown": -10821.343333333334,
+     "longest_under_water": 56,
+     "worst_day": -4196.973333333333,
+     "worst_5_days": -7323.043333333333
+    },
+    "h2": {
+     "mean": 53.34651892890121,
+     "median": 203.01666666666665,
+     "total": 19258.093333333338,
+     "win_rate": 0.554016620498615,
+     "max_drawdown": -20675.396666666667,
+     "longest_under_water": 84,
+     "worst_day": -4639.3566666666675,
+     "worst_5_days": -9372.463333333333
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 517.1073130193906,
+     "median": 517.2599999999999,
+     "total": 373351.48000000004,
+     "win_rate": 0.5554016620498615,
+     "max_drawdown": -66178.71000000002,
+     "longest_under_water": 77,
+     "worst_day": -16870.65,
+     "worst_5_days": -34931.1
+    },
+    "h1": {
+     "mean": 739.3371745152353,
+     "median": 538.01,
+     "total": 266900.72,
+     "win_rate": 0.5595567867036011,
+     "max_drawdown": -43325.11,
+     "longest_under_water": 71,
+     "worst_day": -16870.65,
+     "worst_5_days": -34931.1
+    },
+    "h2": {
+     "mean": 294.87745152354574,
+     "median": 464.1199999999999,
+     "total": 106450.76000000001,
+     "win_rate": 0.5512465373961218,
+     "max_drawdown": -66178.70999999995,
+     "longest_under_water": 77,
+     "worst_day": -15797.76,
+     "worst_5_days": -32380.229999999996
+    }
+   },
+   "gross_mean": 306.8171052631579,
+   "minus_free_changed_days": {
+    "days": 261,
+    "mean": -83.88835249042144,
+    "lo": -162.77912515964235,
+    "hi": -3.2400124521074467,
+    "halves": [
+     -91.05830845771146,
+     -76.32320209973747
+    ]
+   },
+   "minus_free_all_days_mean": -30.32529085872576,
+   "drawdown_change": {
+    "all": -0.06117225209898325,
+    "h1": -0.02607724954677426,
+    "h2": -0.06117225209898358
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.405,
+    "share_mean_at_least_as_high": 0.823,
+    "median_max_drawdown": -21200.16833333335,
+    "median_mean": 151.51834718374886
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": true
+  },
+  "G30_same": {
+   "stats": {
+    "all": {
+     "mean": 154.84067405355492,
+     "median": 149.95166666666665,
+     "total": 111794.96666666665,
+     "win_rate": 0.5512465373961218,
+     "max_drawdown": -20133.32666666672,
+     "longest_under_water": 61,
+     "worst_day": -5059.6033333333335,
+     "worst_5_days": -9723.646666666667
+    },
+    "h1": {
+     "mean": 231.06570637119114,
+     "median": 129.35666666666665,
+     "total": 83414.72,
+     "win_rate": 0.556786703601108,
+     "max_drawdown": -8781.443333333333,
+     "longest_under_water": 41,
+     "worst_day": -3814.26,
+     "worst_5_days": -6786.706666666667
+    },
+    "h2": {
+     "mean": 78.61564173591873,
+     "median": 156.22333333333333,
+     "total": 28380.24666666666,
+     "win_rate": 0.5457063711911357,
+     "max_drawdown": -20133.32666666666,
+     "longest_under_water": 61,
+     "worst_day": -5059.6033333333335,
+     "worst_5_days": -9723.646666666667
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 568.7243628808864,
+     "median": 544.785,
+     "total": 410618.99,
+     "win_rate": 0.554016620498615,
+     "max_drawdown": -62527.940000000235,
+     "longest_under_water": 75,
+     "worst_day": -15797.76,
+     "worst_5_days": -32238.439999999995
+    },
+    "h1": {
+     "mean": 761.3463157894737,
+     "median": 563.3100000000001,
+     "total": 274846.02,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -37205.41000000001,
+     "longest_under_water": 41,
+     "worst_day": -14504.69,
+     "worst_5_days": -29209.269999999997
+    },
+    "h2": {
+     "mean": 376.1024099722991,
+     "median": 516.72,
+     "total": 135772.96999999997,
+     "win_rate": 0.5457063711911357,
+     "max_drawdown": -62527.93999999999,
+     "longest_under_water": 75,
+     "worst_day": -15797.76,
+     "worst_5_days": -32238.439999999995
+    }
+   },
+   "gross_mean": 315.4246537396122,
+   "minus_free_changed_days": {
+    "days": 453,
+    "mean": -28.317829286239874,
+    "lo": -92.58107192788813,
+    "hi": 34.18578256070636,
+    "halves": [
+     -51.284867503486744,
+     -2.6677258566978264
+    ]
+   },
+   "minus_free_all_days_mean": -17.76728070175439,
+   "drawdown_change": {
+    "all": -0.08578654925174933,
+    "h1": -0.20966859837033713,
+    "h2": -0.08578654925175289
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.4,
+    "share_mean_at_least_as_high": 0.783,
+    "median_max_drawdown": -20750.58500000002,
+    "median_mean": 164.58776084949216
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": false
+  }
+ },
+ "core": {
+  "days": 722,
+  "from": "2021-11-02",
+  "to": "2024-10-08",
+  "split": "2023-04-21",
+  "days_load_history_refused": 647,
+  "counts": {
+   "G15": {
+    "changed_days": 275,
+    "halves": [
+     131,
+     144
+    ],
+    "picks_replaced": 299,
+    "dir_changed_days": 23
+   },
+   "G30": {
+    "changed_days": 480,
+    "halves": [
+     242,
+     238
+    ],
+    "picks_replaced": 540,
+    "dir_changed_days": 57
+   },
+   "G15_same": {
+    "changed_days": 275,
+    "halves": [
+     131,
+     144
+    ],
+    "picks_replaced": 299,
+    "dir_changed_days": 23
+   },
+   "G30_same": {
+    "changed_days": 480,
+    "halves": [
+     242,
+     238
+    ],
+    "picks_replaced": 540,
+    "dir_changed_days": 57
+   }
+  },
+  "FREE": {
+   "stats": {
+    "all": {
+     "mean": 171.78296398891968,
+     "median": 197.14000000000004,
+     "total": 124027.3,
+     "win_rate": 0.5720221606648199,
+     "max_drawdown": -8919.526666666672,
+     "longest_under_water": 58,
+     "worst_day": -3222.523333333333,
+     "worst_5_days": -8919.526666666667
+    },
+    "h1": {
+     "mean": 199.46854108956603,
+     "median": 154.98666666666665,
+     "total": 72008.14333333334,
+     "win_rate": 0.5734072022160664,
+     "max_drawdown": -8286.723333333335,
+     "longest_under_water": 44,
+     "worst_day": -3203.3333333333335,
+     "worst_5_days": -5923.143333333333
+    },
+    "h2": {
+     "mean": 144.0973868882733,
+     "median": 246.82666666666668,
+     "total": 52019.15666666666,
+     "win_rate": 0.5706371191135734,
+     "max_drawdown": -8919.526666666665,
+     "longest_under_water": 58,
+     "worst_day": -3222.523333333333,
+     "worst_5_days": -8919.526666666667
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 530.9058864265928,
+     "median": 760.0550000000001,
+     "total": 383314.05,
+     "win_rate": 0.5581717451523546,
+     "max_drawdown": -41527.43999999997,
+     "longest_under_water": 67,
+     "worst_day": -13281.01,
+     "worst_5_days": -36970.759999999995
+    },
+    "h1": {
+     "mean": 574.1829639889196,
+     "median": 698.44,
+     "total": 207280.05,
+     "win_rate": 0.5595567867036011,
+     "max_drawdown": -37916.029999999984,
+     "longest_under_water": 37,
+     "worst_day": -12089.32,
+     "worst_5_days": -25365.58
+    },
+    "h2": {
+     "mean": 487.6288088642659,
+     "median": 807.18,
+     "total": 176034.0,
+     "win_rate": 0.556786703601108,
+     "max_drawdown": -41527.44,
+     "longest_under_water": 67,
+     "worst_day": -13281.01,
+     "worst_5_days": -36970.759999999995
+    }
+   }
+  },
+  "G15": {
+   "stats": {
+    "all": {
+     "mean": 154.54076638965836,
+     "median": 181.42000000000002,
+     "total": 111578.43333333333,
+     "win_rate": 0.5664819944598338,
+     "max_drawdown": -11676.579999999958,
+     "longest_under_water": 89,
+     "worst_day": -4588.3533333333335,
+     "worst_5_days": -10493.999999999998
+    },
+    "h1": {
+     "mean": 205.93979686057247,
+     "median": 129.35666666666665,
+     "total": 74344.26666666666,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -7034.613333333333,
+     "longest_under_water": 37,
+     "worst_day": -3334.693333333333,
+     "worst_5_days": -6933.639999999999
+    },
+    "h2": {
+     "mean": 103.1417359187442,
+     "median": 234.73000000000002,
+     "total": 37234.16666666666,
+     "win_rate": 0.5706371191135734,
+     "max_drawdown": -11676.57999999999,
+     "longest_under_water": 89,
+     "worst_day": -4588.3533333333335,
+     "worst_5_days": -10493.999999999998
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 478.30031855955673,
+     "median": 629.02,
+     "total": 345332.82999999996,
+     "win_rate": 0.5581717451523546,
+     "max_drawdown": -45691.56999999995,
+     "longest_under_water": 89,
+     "worst_day": -14374.3,
+     "worst_5_days": -45082.810000000005
+    },
+    "h1": {
+     "mean": 599.5919944598337,
+     "median": 563.6699999999998,
+     "total": 216452.70999999996,
+     "win_rate": 0.554016620498615,
+     "max_drawdown": -36843.95000000001,
+     "longest_under_water": 53,
+     "worst_day": -11234.869999999999,
+     "worst_5_days": -27693.409999999996
+    },
+    "h2": {
+     "mean": 357.0086426592798,
+     "median": 762.9000000000001,
+     "total": 128880.12000000001,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -45691.57000000001,
+     "longest_under_water": 89,
+     "worst_day": -14374.3,
+     "worst_5_days": -45082.810000000005
+    }
+   },
+   "gross_mean": 311.1615420129271,
+   "minus_free_changed_days": {
+    "days": 275,
+    "mean": -45.26860606060607,
+    "lo": -117.16833787878788,
+    "hi": 28.588161515151448,
+    "halves": [
+     17.833002544529233,
+     -102.67354166666668
+    ]
+   },
+   "minus_free_all_days_mean": -17.24219759926132,
+   "drawdown_change": {
+    "all": 0.3091030988938821,
+    "h1": -0.15109832314099247,
+    "h2": 0.30910309889388676
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.841,
+    "share_mean_at_least_as_high": 0.421,
+    "median_max_drawdown": -10224.226666666662,
+    "median_mean": 152.93885272391503
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": false
+  },
+  "G30": {
+   "stats": {
+    "all": {
+     "mean": 175.69434903047087,
+     "median": 190.0116666666667,
+     "total": 126851.31999999998,
+     "win_rate": 0.5692520775623269,
+     "max_drawdown": -9334.216666666674,
+     "longest_under_water": 73,
+     "worst_day": -5523.41,
+     "worst_5_days": -8574.593333333334
+    },
+    "h1": {
+     "mean": 206.17030470914128,
+     "median": 158.29999999999998,
+     "total": 74427.48,
+     "win_rate": 0.5595567867036011,
+     "max_drawdown": -7468.16333333333,
+     "longest_under_water": 37,
+     "worst_day": -3208.7833333333333,
+     "worst_5_days": -7468.163333333335
+    },
+    "h2": {
+     "mean": 145.21839335180056,
+     "median": 231.23,
+     "total": 52423.84,
+     "win_rate": 0.5789473684210527,
+     "max_drawdown": -9334.216666666667,
+     "longest_under_water": 73,
+     "worst_day": -5523.41,
+     "worst_5_days": -8574.593333333334
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 583.6221191135735,
+     "median": 687.02,
+     "total": 421375.17000000004,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -39324.58999999997,
+     "longest_under_water": 68,
+     "worst_day": -16570.23,
+     "worst_5_days": -39324.59
+    },
+    "h1": {
+     "mean": 622.81891966759,
+     "median": 667.15,
+     "total": 224837.62999999998,
+     "win_rate": 0.5595567867036011,
+     "max_drawdown": -35958.17999999999,
+     "longest_under_water": 54,
+     "worst_day": -11366.17,
+     "worst_5_days": -29296.98
+    },
+    "h2": {
+     "mean": 544.4253185595568,
+     "median": 803.22,
+     "total": 196537.54,
+     "win_rate": 0.5650969529085873,
+     "max_drawdown": -39324.590000000026,
+     "longest_under_water": 68,
+     "worst_day": -16570.23,
+     "worst_5_days": -39324.59
+    }
+   },
+   "gross_mean": 333.0067636195752,
+   "minus_free_changed_days": {
+    "days": 480,
+    "mean": 5.8833749999999965,
+    "lo": -53.069885763888905,
+    "hi": 64.43026302083332,
+    "halves": [
+     9.997258953168043,
+     1.7003501400560208
+    ]
+   },
+   "minus_free_all_days_mean": 3.9113850415512417,
+   "drawdown_change": {
+    "all": 0.04649237739820289,
+    "h1": -0.09877969458776892,
+    "h2": 0.04649237739820311
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.06,
+    "share_mean_at_least_as_high": 0.027,
+    "median_max_drawdown": -11091.263333333329,
+    "median_mean": 153.61482917820865
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": false
+  },
+  "G15_same": {
+   "stats": {
+    "all": {
+     "mean": 154.54076638965836,
+     "median": 181.42000000000002,
+     "total": 111578.43333333333,
+     "win_rate": 0.5664819944598338,
+     "max_drawdown": -11676.579999999958,
+     "longest_under_water": 89,
+     "worst_day": -4588.3533333333335,
+     "worst_5_days": -10493.999999999998
+    },
+    "h1": {
+     "mean": 205.93979686057247,
+     "median": 129.35666666666665,
+     "total": 74344.26666666666,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -7034.613333333333,
+     "longest_under_water": 37,
+     "worst_day": -3334.693333333333,
+     "worst_5_days": -6933.639999999999
+    },
+    "h2": {
+     "mean": 103.1417359187442,
+     "median": 234.73000000000002,
+     "total": 37234.16666666666,
+     "win_rate": 0.5706371191135734,
+     "max_drawdown": -11676.57999999999,
+     "longest_under_water": 89,
+     "worst_day": -4588.3533333333335,
+     "worst_5_days": -10493.999999999998
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 478.30031855955673,
+     "median": 629.02,
+     "total": 345332.82999999996,
+     "win_rate": 0.5581717451523546,
+     "max_drawdown": -45691.56999999995,
+     "longest_under_water": 89,
+     "worst_day": -14374.3,
+     "worst_5_days": -45082.810000000005
+    },
+    "h1": {
+     "mean": 599.5919944598337,
+     "median": 563.6699999999998,
+     "total": 216452.70999999996,
+     "win_rate": 0.554016620498615,
+     "max_drawdown": -36843.95000000001,
+     "longest_under_water": 53,
+     "worst_day": -11234.869999999999,
+     "worst_5_days": -27693.409999999996
+    },
+    "h2": {
+     "mean": 357.0086426592798,
+     "median": 762.9000000000001,
+     "total": 128880.12000000001,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -45691.57000000001,
+     "longest_under_water": 89,
+     "worst_day": -14374.3,
+     "worst_5_days": -45082.810000000005
+    }
+   },
+   "gross_mean": 311.1615420129271,
+   "minus_free_changed_days": {
+    "days": 275,
+    "mean": -45.26860606060607,
+    "lo": -117.16833787878788,
+    "hi": 28.588161515151448,
+    "halves": [
+     17.833002544529233,
+     -102.67354166666668
+    ]
+   },
+   "minus_free_all_days_mean": -17.24219759926132,
+   "drawdown_change": {
+    "all": 0.3091030988938821,
+    "h1": -0.15109832314099247,
+    "h2": 0.30910309889388676
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.841,
+    "share_mean_at_least_as_high": 0.421,
+    "median_max_drawdown": -10224.226666666662,
+    "median_mean": 152.93885272391503
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": false
+  },
+  "G30_same": {
+   "stats": {
+    "all": {
+     "mean": 175.69434903047087,
+     "median": 190.0116666666667,
+     "total": 126851.31999999998,
+     "win_rate": 0.5692520775623269,
+     "max_drawdown": -9334.216666666674,
+     "longest_under_water": 73,
+     "worst_day": -5523.41,
+     "worst_5_days": -8574.593333333334
+    },
+    "h1": {
+     "mean": 206.17030470914128,
+     "median": 158.29999999999998,
+     "total": 74427.48,
+     "win_rate": 0.5595567867036011,
+     "max_drawdown": -7468.16333333333,
+     "longest_under_water": 37,
+     "worst_day": -3208.7833333333333,
+     "worst_5_days": -7468.163333333335
+    },
+    "h2": {
+     "mean": 145.21839335180056,
+     "median": 231.23,
+     "total": 52423.84,
+     "win_rate": 0.5789473684210527,
+     "max_drawdown": -9334.216666666667,
+     "longest_under_water": 73,
+     "worst_day": -5523.41,
+     "worst_5_days": -8574.593333333334
+    }
+   },
+   "traded": {
+    "all": {
+     "mean": 583.6221191135735,
+     "median": 687.02,
+     "total": 421375.17000000004,
+     "win_rate": 0.5623268698060941,
+     "max_drawdown": -39324.58999999997,
+     "longest_under_water": 68,
+     "worst_day": -16570.23,
+     "worst_5_days": -39324.59
+    },
+    "h1": {
+     "mean": 622.81891966759,
+     "median": 667.15,
+     "total": 224837.62999999998,
+     "win_rate": 0.5595567867036011,
+     "max_drawdown": -35958.17999999999,
+     "longest_under_water": 54,
+     "worst_day": -11366.17,
+     "worst_5_days": -29296.98
+    },
+    "h2": {
+     "mean": 544.4253185595568,
+     "median": 803.22,
+     "total": 196537.54,
+     "win_rate": 0.5650969529085873,
+     "max_drawdown": -39324.590000000026,
+     "longest_under_water": 68,
+     "worst_day": -16570.23,
+     "worst_5_days": -39324.59
+    }
+   },
+   "gross_mean": 333.0067636195752,
+   "minus_free_changed_days": {
+    "days": 480,
+    "mean": 5.8833749999999965,
+    "lo": -53.069885763888905,
+    "hi": 64.43026302083332,
+    "halves": [
+     9.997258953168043,
+     1.7003501400560208
+    ]
+   },
+   "minus_free_all_days_mean": 3.9113850415512417,
+   "drawdown_change": {
+    "all": 0.04649237739820289,
+    "h1": -0.09877969458776892,
+    "h2": 0.04649237739820311
+   },
+   "placebo": {
+    "share_drawdown_at_least_as_shallow": 0.06,
+    "share_mean_at_least_as_high": 0.027,
+    "median_max_drawdown": -11091.263333333329,
+    "median_mean": 153.61482917820865
+   },
+   "return_pass": false,
+   "risk_pass": false,
+   "risk_parts": {
+    "all": false,
+    "h1": false,
+    "h2": false
+   },
+   "hurts": false
+  }
+ }
+}

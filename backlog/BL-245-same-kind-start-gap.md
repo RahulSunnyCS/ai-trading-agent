@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — a possible change to the live picks; earlier evidence leans against a gain |
-| **Status** | In progress — Phase 0 committed |
+| **Status** | Done — killed: neither 15 nor 30 minutes passes; on T1 both lose money and deepen the worst drawdown |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-26 |
 | **Depends on** | BL-058 (ranking), BL-113 (T1); best run after BL-244 Phase 1 |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.80 |
 
 ## Context
 
@@ -95,6 +95,41 @@ Any change to the live picks, lists or journal. A gap between a Widesl and a Dir
   descriptively.
 - **Done when:** the Log has the verdicts and `research/options/common/rotation-ranking.md` is updated.
 
+## Result
+
+Verdict: **killed** for both gaps. ₹ per lot-day (the book's mean pick), net of costs and 0.5 % slippage,
+one lot a pick.
+
+**T1, 2025-01-10 → 2026-10-09 (423 days, the deciding run)**
+
+| | Today (FREE) | 15 minutes | 30 minutes |
+|---|---|---|---|
+| Days the book changes | — | 149 | 250 |
+| Mean / median a day | 509 / 523 | 448 / 534 | 406 / 556 |
+| Total per lot | 2,15,415 | 1,89,410 | 1,71,833 |
+| Maximum drawdown | −8,628 | −9,887 (15 % deeper) | −10,763 (25 % deeper) |
+| Drawdown, first / second half | −8,628 / −8,108 | −8,798 / −9,887 | −8,844 / −10,763 |
+| Longest under water, days | 36 | 26 | 34 |
+| Worst day / worst 5 days | −4,568 / −6,609 | −4,568 / −7,916 | −4,568 / −8,014 |
+| Minus FREE on changed days (95 %) | — | −175 [−333, −8] | −174 [−304, −46] |
+| Dir at 2 lots on non-expiry days: book mean / drawdown, ₹ | 1,676 / −36,648 | 1,460 / −40,332 | 1,346 / −40,388 |
+
+- Neither route passes; by the registered rule both gaps **hurt** (interval below zero; G15 only just).
+- Placebo (the same picks swapped at random for next-ranked Widesl): 80 % / 70 % of placebo books had a
+  drawdown at least as shallow, and 74 % / 57 % a mean at least as high. The gap does no better than a
+  random swap of the same picks: what costs money is giving up a better-ranked pick.
+
+**Core-298 (sign check).** Mean falls too (−129 [−249, −11] and −102 [−219, +20] on changed days). Maximum
+drawdown is 17 % / 15 % shallower, but the mean is 18 % / 22 % lower, time under water rises from 47 to 83–84
+days, and 69 % / 32 % of placebos do as well. Risk route not met.
+
+**2021-11 → 2024-10-08, NIFTY only (supporting).** Mean falls: T1-N −84 [−163, −3] and −28 [−93, +34]
+(drawdown 6 % / 9 % shallower); Core-N −45 [−117, +29] and +6 [−53, +64] (drawdown 31 % / 5 % deeper).
+
+**Reading.** The return is lower in seven of the eight period-by-gap cells and flat in the eighth (cells
+share days and strategies). Drawdown goes either way, so the gap is not a dependable risk control. Blocking
+only same-index picks changes nothing in the verdict. Nothing changed live.
+
 ## Risks
 
 - Passing on drawdown alone can be one lucky stretch; hence both halves.
@@ -115,3 +150,9 @@ None open. Answered by the owner, 2026-11-26:
   run the evaluation was red-teamed and Phase 0 changed: window and half split aligned with BL-244
   (2026-10-09, split 2025-10-09 instead of 2025-11-30); drawdown measures listed; a placebo for the
   drawdown added; the 2021-24 store added as support. No P&L of any arm has been computed.
+- 2026-11-26 — changed days counted before any P&L: T1 149 (G15) / 250 (G30), Core 179 / 277, all above the 20
+  needed. A blocked Widesl can let a Dir into a book that had none (21 / 42 changed days on T1).
+- 2026-11-26 — **run as registered** (`research/bl245/start_gap.py`; `results_new.json`, `results_old.json`;
+  per-day books git-ignored). The rebuilt ranking matched on every day and a gap of 0 reproduced today's
+  book on every day. `pick.load_history` refuses 1 day of 2025-26 (September 2026's missing results) and 647
+  days of BL-214's store (no lake); those are compared through the same two reads.
