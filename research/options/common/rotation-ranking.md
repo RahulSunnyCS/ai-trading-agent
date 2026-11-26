@@ -99,6 +99,10 @@ per lot-day is above zero and its drawdown per lot is no worse.
 
 - The forward read-out after 60 trading days from 2026-10-12 (the only unseen test).
 - BL-100 on P3.
+- Whether the order itself predicts: top against bottom and ranks 1–5, Widesl and Dir apart, and who fills
+  the bottom (BL-244, planned).
+- A 15 / 30 minute start gap between picks of the same kind (BL-245, planned; BL-069 B4 tried 90 minutes on
+  the older universe: no effect).
 - An absolute 0–100 confidence beside the rank was tested and killed on one definition
   ([rotation confidence](rotation-confidence.md), BL-210); a rescaled version is untested.
 

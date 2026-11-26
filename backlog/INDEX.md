@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-11-20
+Last updated: 2026-11-26
 
 ## Open
 
@@ -51,6 +51,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-211](BL-211-day-type-list-rules.md) | Day-type list rules in Settings › Automation: an account row trades a different list (None / Classic / Tuned) when a condition on the session holds (one index's weekdays to expiry, or the weekday), first match wins, resolved per session by every job, with a today / tomorrow preview on the page | P1 | In progress | feature | options / scheduler / dashboard |
 | [BL-231](BL-231-intraday-collection-no-evening-job.md) | Collect the day's option data during the session (5-minute tiers, shared Angel One / Fyers request budget) so no evening collection job is needed; Phase 1 fixes the Angel One rate-limit abort; Phase 6 adds a live picks × time matrix to the Live board | P1 | Planned | improvement | options / infra |
 | [BL-236](BL-236-lot-rebalance-equal-split.md) | Momentum lots: a due lot rebalances by the backtest's equal split of the sleeve's exits and free cash, not toward the sleeve's drifted end weights (20 Nov's lot 1 plan is the case); Phase 1 measures the gap on past rebalances | P1 | In progress: built, 20 Nov orders on it; Phase 4 open | improvement | momentum |
+| [BL-244](BL-244-does-rank-order-predict.md) | Does the ranking's order predict results? Top 10 Widesl / 5 Dir against the bottom ones and the pool, ranks 1–5 one by one (median, total, drawdown), and which strategies fill the bottom | P1 | Planned | research | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
@@ -86,6 +87,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-220](BL-220-friday-size-down.md) | Friday size-down: trade fewer Adaptive picks on Fridays (drop the lowest pick, skip, or no starts from 13:00), tested on NIFTY 2022–24 and 20 forward Fridays, not the days that suggested it | P2 | In progress; Phase 1 passed narrowly (NIFTY 2022–24: Friday ₹81 vs ₹192, p 0.012); A2 on 2021–24 NIFTY T1: R1 and R2 pass, R3 fails; Phase 2 waits for 20 Fridays (~2 Apr 2027) | research | options |
 | [BL-227](BL-227-options-overlay-backtest.md) | Options overlay backtest: run a Momentum strategy's picks as bought stock options from the dashboard, calls and puts (downward momentum, market switch); book vs shares, minimum capital, winners, trades | P2 | In progress (page built; daily data refresh open) | feature | momentum / options / dashboard |
 | [BL-230](BL-230-options-overlay-rescore.md) | Re-score the options-overlay record after the PR #450–#454 review fixes: BL-226 with the ban rule, BL-228's registered extras, BL-229 round 1 on the fixed engine, BL-227's parity figure | P2 | Planned | research | momentum / options |
+| [BL-245](BL-245-same-kind-start-gap.md) | A minimum start-time gap (15 / 30 minutes) between Adaptive picks of the same kind; a Widesl and a Dir may still share a minute | P2 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
