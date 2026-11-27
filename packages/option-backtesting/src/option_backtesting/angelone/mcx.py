@@ -29,19 +29,32 @@ from .symbols import _expiry
 #: 895 bars a day at most; SmartAPI's cap of ~8,000 rows a request leaves room for 8 days
 CHUNK_DAYS = 7
 EXCHANGE = "MCX"
+#: BL-219: the market-quote call (best bid / ask in FULL mode); SmartAPI allows about one a second
+QUOTE_PATH = "/rest/secure/angelbroking/market/v1/quote/"
+FUTURE_TYPE = "FUTCOM"
 
 
 class AngelMcxClient(AngelClient):
+    #: what a snapshot taken through this client says about where its quotes came from
+    source = "angelone"
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         #: Fyers symbol -> (Angel token, lot size)
         self.mcx: dict[str, tuple[str, int]] = {}
+        self._master_rows: list[dict] | None = None
+
+    def _master(self) -> list[dict]:
+        """Angel One's scrip master, downloaded once per client."""
+        from .symbols import download_master
+
+        if self._master_rows is None:
+            self._master_rows = (self._master_loader or download_master)()
+        return self._master_rows
 
     def bind_mcx(self, contracts: list[Contract]) -> int:
         """Match the Fyers contracts to Angel One's MCX option rows; returns how many matched."""
-        from .symbols import download_master
-
-        master = (self._master_loader or download_master)()
+        master = self._master()
         index: dict[tuple, tuple[str, int]] = {}
         for row in master:
             symbol = row.get("symbol", "")
@@ -64,6 +77,58 @@ class AngelMcxClient(AngelClient):
             else:
                 self.mcx[c.symbol] = hit
         return len(self.mcx)
+
+    def bind_future(self, contract: Contract) -> bool:
+        """Match one Fyers future (`option_type == "FUT"`) to Angel One's MCX future row by root and
+        expiry; False when Angel One lists none. Kept apart from `bind_mcx` so the nightly
+        collector's matching is unchanged."""
+        for row in self._master():
+            if row.get("exch_seg") != EXCHANGE or row.get("instrumenttype") != FUTURE_TYPE:
+                continue
+            if row.get("name") != contract.underlying or _expiry(row) != contract.expiry:
+                continue
+            try:
+                lot = max(int(float(row.get("lotsize") or 1)), 1)
+            except ValueError:
+                lot = 1
+            self.mcx[contract.symbol] = (row["token"], lot)
+            return True
+        return False
+
+    def quotes(self, symbols: list[str]) -> dict[str, dict]:
+        """BL-219: last price and best bid / ask of bound contracts, keyed by Fyers symbol in the
+        shape the Fyers quotes give (`lp`, `bid`, `ask`; a side with no resting order is absent).
+        A contract that was not bound, or that Angel One did not answer, is left out."""
+        by_token = {self.mcx[s][0]: s for s in symbols if s in self.mcx}
+        if not by_token:
+            return {}
+        body = {"mode": "FULL", "exchangeTokens": {EXCHANGE: list(by_token)}}
+        payload = self._call(QUOTE_PATH, body)
+        if self.on_response is not None:
+            self.on_response("quotes", body, payload)
+        self._check(payload, "quotes")
+
+        def best(levels: object) -> float | None:
+            for level in levels if isinstance(levels, list) else []:
+                price = float(level.get("price") or 0)
+                if price > 0:
+                    return price
+            return None
+
+        out: dict[str, dict] = {}
+        for row in (payload.get("data") or {}).get("fetched") or []:
+            symbol = by_token.get(str(row.get("symbolToken")))
+            if symbol is None:
+                continue
+            depth = row.get("depth") or {}
+            quote: dict = {"lp": float(row["ltp"]) if row.get("ltp") is not None else None}
+            bid, ask = best(depth.get("buy")), best(depth.get("sell"))
+            if bid is not None:
+                quote["bid"] = bid
+            if ask is not None:
+                quote["ask"] = ask
+            out[symbol] = quote
+        return out
 
     def minute_candles_range(self, symbol: str, start: date, end: date) -> list[Candle]:
         """1-minute candles for [start, end] in the Fyers `Candle` shape, OI in lots; [] when

@@ -9,7 +9,7 @@ from trading_data.db import connect
 
 from option_backtesting.angelone.auth import AngelCredentialsError, Session
 from option_backtesting.angelone.client import CANDLE_PATH, OI_PATH
-from option_backtesting.angelone.mcx import CHUNK_DAYS, AngelMcxClient
+from option_backtesting.angelone.mcx import CHUNK_DAYS, QUOTE_PATH, AngelMcxClient
 from option_backtesting.fyers import mcx_daily
 from option_backtesting.fyers.symbols import Contract
 
@@ -294,3 +294,86 @@ def test_a_fallback_that_matches_most_contracts_to_nothing_fails_instead_of_look
     out = _run(root, client, source="angelone", inclusive=False, lookback=3)
     assert out["status"] == "failed" and "no match at Angel One" in out["reason"]
     assert out["unmatched_contracts"] == 2 and out["matched_contracts"] == 0
+
+
+# BL-219: the spread snapshot's fallback quotes
+
+FUT_EXPIRY = date(2026, 12, 4)
+FUT = Contract("MCX:GOLDM26DECFUT", "GOLDM", FUT_EXPIRY, None, "FUT", 100)
+FUT_ROW = {
+    "token": "477904", "symbol": "GOLDM04DEC26FUT", "name": "GOLDM", "expiry": "04DEC2026",
+    "strike": "-1.000000", "lotsize": "100", "instrumenttype": "FUTCOM", "exch_seg": "MCX",
+}  # fmt: skip
+
+
+class QuoteApi(FakeApi):
+    def __init__(self, rows):
+        super().__init__()
+        self.rows = rows
+
+    def __call__(self, path, body, headers):
+        if path == QUOTE_PATH:
+            self.requests.append((path, body))
+            return 200, {"status": True, "data": {"fetched": self.rows}}
+        return super().__call__(path, body, headers)
+
+
+def _quote_client(api):
+    client = AngelMcxClient(
+        Session("jwt", "key"),
+        min_interval_s=0.0,
+        post=api,
+        master_loader=lambda: [*MASTER, FUT_ROW],
+    )
+    client.bind_mcx([CE, PE])
+    return client
+
+
+def test_a_future_is_matched_on_root_and_expiry_and_apart_from_the_options():
+    client = _quote_client(FakeApi())
+    assert client.bind_future(FUT) is True
+    assert client.mcx[FUT.symbol] == ("477904", 100)
+    other = Contract("MCX:GOLDM27JANFUT", "GOLDM", date(2027, 1, 5), None, "FUT", 100)
+    assert client.bind_future(other) is False and other.symbol not in client.mcx
+
+
+def test_quotes_give_the_best_bid_and_ask_in_the_shape_the_snapshot_reads():
+    api = QuoteApi(
+        [
+            {  # a two-sided book, the best level first
+                "symbolToken": "582912",
+                "ltp": 101.5,
+                "depth": {
+                    "buy": [{"price": 100.0, "quantity": 5}, {"price": 99.0, "quantity": 9}],
+                    "sell": [{"price": 103.0, "quantity": 7}],
+                },
+            },
+            {  # no resting sell order: Angel One sends a zero level
+                "symbolToken": "583062",
+                "ltp": 50.0,
+                "depth": {"buy": [{"price": 49.0, "quantity": 1}], "sell": [{"price": 0}]},
+            },
+            {"symbolToken": "999", "ltp": 1.0, "depth": {}},  # not asked for
+        ]
+    )
+    client = _quote_client(api)
+    out = client.quotes([CE.symbol, PE.symbol, GAP.symbol])
+    assert out == {
+        CE.symbol: {"lp": 101.5, "bid": 100.0, "ask": 103.0},
+        PE.symbol: {"lp": 50.0, "bid": 49.0},
+    }
+    ((path, body),) = api.requests
+    assert path == QUOTE_PATH and body["mode"] == "FULL"
+    assert sorted(body["exchangeTokens"]["MCX"]) == ["582912", "583062"]  # GAP was never bound
+    assert client.quotes([GAP.symbol]) == {} and len(api.requests) == 1  # nothing asked, no call
+
+
+def test_an_expired_session_on_the_quote_call_is_a_credentials_error():
+    class Rejecting(QuoteApi):
+        def __call__(self, path, body, headers):
+            if path == QUOTE_PATH:
+                return 200, {"status": False, "errorcode": "AG8001", "message": "Invalid Token"}
+            return super().__call__(path, body, headers)
+
+    with pytest.raises(AngelCredentialsError):
+        _quote_client(Rejecting([])).quotes([CE.symbol])

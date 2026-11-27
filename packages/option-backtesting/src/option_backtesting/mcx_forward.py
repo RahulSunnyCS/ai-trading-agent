@@ -499,10 +499,20 @@ def nearest_expiry(root_dir: Path, today: date, rule: Rule = GOLD) -> date | Non
 
 
 def _quotes(client: FyersClient, symbols: list[str]) -> dict[str, dict]:
+    if hasattr(client, "quotes"):  # the Angel One client (BL-219): same answer, other source
+        return client.quotes(symbols)
     body = client._get({"symbols": ",".join(symbols)}, endpoint=f"{DATA_API}/quotes")
     if body.get("s") != "ok":
         raise RuntimeError(f"quotes: {body.get('message') or body}")
     return {row["n"]: row["v"] for row in body.get("d", []) if row.get("s") == "ok"}
+
+
+def spread_due(root_dir: Path, today: date, rule: Rule = GOLD) -> date | None:
+    """The expiry whose window `today` is in (the day a spread is read), else None."""
+    expiry = nearest_expiry(root_dir, today, rule)
+    if expiry is None or not in_expected_window(today, expiry, rule):
+        return None
+    return expiry
 
 
 def spread_snapshot(
@@ -514,18 +524,25 @@ def spread_snapshot(
 ) -> dict | None:
     """At 18:00 on a window weekday: bid/ask of the future and the ITM1 pair (and the ATM
     pair), read-only. None when today is outside the window. Writes
-    mcx-forward/goldm-dir/spread/<day>.json."""
-    expiry = nearest_expiry(root_dir, today, rule)
-    if expiry is None or not in_expected_window(today, expiry, rule):
+    mcx-forward/<rule>/spread/<day>.json. `client` is Fyers' or, when Fyers cannot be used,
+    Angel One's (it has `bind_mcx` / `bind_future` / `quotes`); the file says which."""
+    expiry = spread_due(root_dir, today, rule)
+    if expiry is None:
         return None
     cal = mcx_calendar(root_dir, rule.root)
     future = cal["options"][expiry.isoformat()]
     text = master_text if master_text is not None else download_master(MASTER_SEGMENT)
+    contracts = parse_master(text, {rule.root})
     options = {
         (c.strike, c.option_type): c.symbol
-        for c in parse_master(text, {rule.root})
+        for c in contracts
         if c.option_type in ("CE", "PE") and c.expiry == expiry
     }
+    if hasattr(client, "bind_mcx"):  # Angel One: its own tokens for the Fyers symbols
+        client.bind_mcx([c for c in contracts if c.symbol in options.values()])
+        fut = next((c for c in contracts if c.symbol == future), None)
+        if fut is None or not client.bind_future(fut):
+            raise RuntimeError(f"Angel One lists no MCX future for {future}")
     ltp = _quotes(client, [future])[future]["lp"]
 
     def strike(method: str, right: Right) -> float:  # the engine's resolver: half-up, per right
@@ -544,6 +561,7 @@ def spread_snapshot(
         "day": today.isoformat(),
         "expiry": expiry.isoformat(),
         "read_at": datetime.now(IST).isoformat(timespec="seconds"),
+        "source": getattr(client, "source", "fyers"),
         "future": {"symbol": future, "lp": ltp},
         "atm": atm,
         "contracts": {},

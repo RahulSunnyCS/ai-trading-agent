@@ -911,8 +911,8 @@ const BASE_JOBS: Job[] = [
   },
   {
     // BL-219: the forward paper test of GOLDM Dir in the expiry week (BL-218's one pass). Read-only:
-    // nothing here places an order. At 18:00 on a window weekday it reads Fyers' live quotes for
-    // the future and the two entry contracts (bid, ask) and keeps them beside the journal; outside
+    // nothing here places an order. At 18:00 on a window weekday it reads live quotes (Fyers, else Angel One
+    // when Fyers has no usable token) for the future and the two entry contracts (bid, ask) and keeps them beside the journal; outside
     // a gold expiry window (the last five sessions before an option expiry from 2026-11-27) the
     // command prints that and exits 0.
     id: 'mcx-forward-spread',
@@ -927,7 +927,7 @@ const BASE_JOBS: Job[] = [
     noRetryExitCodes: [2],
     catchUpHours: 0.1,
     fixHint:
-      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward spread (only meaningful at about 18:00 on a gold expiry-window weekday)',
+      'Neither Fyers nor Angel One could be read (the log says why): log in to Fyers or fix the Angel One login, then run: uv run --directory packages/option-backtesting obt mcx-forward spread (only meaningful at about 18:00 on a gold expiry-window weekday)',
   },
   {
     // BL-242: the same read-only snapshot for the silver forward test (SILVERM Dir, the week before
@@ -958,7 +958,7 @@ const BASE_JOBS: Job[] = [
     noRetryExitCodes: [2],
     catchUpHours: 0.1,
     fixHint:
-      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt mcx-forward spread --rule silverm-dir-before (only meaningful at about 17:05 on a silver week-before-expiry window weekday)',
+      'Neither Fyers nor Angel One could be read (the log says why): log in to Fyers or fix the Angel One login, then run: uv run --directory packages/option-backtesting obt mcx-forward spread --rule silverm-dir-before (only meaningful at about 17:05 on a silver week-before-expiry window weekday)',
   },
   {
     // BL-219: after the nightly collector. Scores the session just closed (and any window session
