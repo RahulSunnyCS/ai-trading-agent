@@ -180,7 +180,8 @@ def run_half(root_dir: Path, half: str, workers: int, passed: str | None) -> Non
         if not passed:
             raise SystemExit("the test half needs --passed <committed file>")
         subprocess.run(
-            ["git", "ls-files", "--error-unmatch", str(Path(passed).resolve())],
+            # in HEAD, not merely staged
+            ["git", "cat-file", "-e", f"HEAD:./{Path(passed).resolve().relative_to(HERE)}"],
             cwd=HERE,
             check=True,
             capture_output=True,

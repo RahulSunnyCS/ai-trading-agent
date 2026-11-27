@@ -233,9 +233,9 @@ None open: the owner's answers are in the Log.
   mcx-commodities.md`, and a BL-218 row on every variable page the grid tested.
 - 2026-11-27 — **The gold pass is not reliable (BL-247 follow-up).** The engine carries a contract's
   last price through untraded minutes, and gold's 100-point strikes often did not trade. Of the test
-  year's ₹96,369, ₹61,262 came from 21 trades priced off a contract with no trade in the 15 minutes
+  year's ₹96,369, ₹62,996 came from 20 trades priced off a contract with no trade in the 15 minutes
   before; ₹90,299 came before 28 Apr 2026, when strikes were 100 apart, and ₹6,070 (₹173 a session)
-  after. In the fit year the median entry price was 47 minutes old. The verdict above stands as what
+  after. In the fit year the median entry price was 42 minutes old. The verdict above stands as what
   the registered rule returned; it should not be read as evidence of an edge. The statement that ATM
   legs were live appears to be wrong. Silver's and gold's other cohorts have the same exposure (BL-247
   gate). Detail: BL-247's Log.

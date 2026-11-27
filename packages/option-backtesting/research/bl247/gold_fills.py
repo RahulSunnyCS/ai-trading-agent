@@ -67,14 +67,16 @@ def main() -> None:
                 entry_at = SESSION_START + t.entry_min
                 exit_at = SESSION_START + t.exit_min
                 stop = t.exit_reason == "SL"
+                # a re-entry at cost, like a stop, fills inside its own minute
+                reentry = t.entry_min != result.trades[0].entry_min
                 rows.append(
                     {
                         "net": t.pnl - mcx_charges.trade_charges(t),
-                        "entry_age": age(minutes, entry_at),
+                        "entry_age": age(minutes, entry_at + 1 if reentry else entry_at),
                         # a stop reads its own bar; any other exit the bars before it
                         "exit_age": age(minutes, exit_at + 1 if stop else exit_at),
                         "reason": t.exit_reason,
-                        "reentry": t.entry_min != result.trades[0].entry_min,
+                        "reentry": reentry,
                         "day_lots": len(minutes),
                     }
                 )

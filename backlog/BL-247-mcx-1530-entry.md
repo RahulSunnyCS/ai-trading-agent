@@ -162,12 +162,16 @@ None open.
   | | Trades | Stale | Net from stale trades | Net from live trades |
   |---|---|---|---|---|
   | Fit year | 93 | 59 | ₹40,041 | ₹20,938 |
-  | Test year | 123 | 21 | ₹61,262 | ₹35,107 |
+  | Test year | 123 | 20 | ₹62,996 | ₹33,373 |
 
-  Fit year: median entry price 47 minutes old. Test year by strike spacing: before the 2026-04-28
+  Fit year: median entry price 42 minutes old. Test year by strike spacing: before the 2026-04-28
   expiry (strikes 100 apart) 25 sessions, 53% of trades stale, ₹90,299 (₹3,612 a session); from it
-  (strikes 500 apart) 35 sessions, 1% stale, **₹6,070 (₹173 a session)**. Strike spacing and the
+  (strikes 500 apart) 35 sessions, no stale trade, **₹6,070 (₹173 a session)**. Strike spacing and the
   Jan–Mar 2026 gold run overlap, so the two causes cannot be separated here.
   73% of the expiring contract's bar rows in the fit year's expiry weeks have zero volume; BL-218's
   check ("ATM legs last traded a median 1 minute earlier") probably counted such rows as trades
   (its script was not found or re-run).
+- 2026-11-27 — Review of the PR: re-entry fills' own bar had been left out of the price-age check
+  (the figures above are the corrected ones); the test half now needs the passed list in HEAD. The
+  18:00 gold re-run is outside Phase 0's list of runs: the owner asked for it in chat ("Yes, check
+  gold"); no `override:` line was written.
