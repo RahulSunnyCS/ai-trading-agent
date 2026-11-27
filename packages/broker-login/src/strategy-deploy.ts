@@ -36,6 +36,7 @@ import {
 } from './deploy-plan.js';
 import { deployList, placements, staleExport } from './deploy-quantity.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { openLive } from './live-ready.js';
 import { hhmm, setupSheet } from './live-sheet.js';
 import { algotestLoginLocked } from './login-lock.js';
 import { redact, registerSecret } from './secrets.js';
@@ -100,7 +101,7 @@ function entryOf(doc: unknown): number {
 }
 
 async function readLive(page: Page, opts: { brokers?: boolean } = {}): Promise<LiveState> {
-  await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
+  await openLive(page, `${BASE_URL}/live`);
   await livePage.header(page).waitFor({ timeout: 30_000 });
   await livePage.anyRowCount(page).waitFor({ timeout: 30_000 });
   // the broker count renders after the rows; not shown in time = unread (planDeploy refuses)

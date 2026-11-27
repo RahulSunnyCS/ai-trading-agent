@@ -257,6 +257,9 @@ week, until disabled.
   A sheet set up before (its save button reads "Update Execution Settings": the morning activation reopens
   last evening's) is only checked for Candle Close and no day ticked, then closed with Cancel, never saved
   again (`src/live-sheet.ts`, tested against a stand-in page in `live-sheet.test.ts`).
+  The deployer's /live reads and the uploader's deployed check (what the evening run may delete) go
+  through `openLive` (`src/live-ready.ts`; the trade monitor's do not): it waits for the page's deployments call,
+  because the rows render first with "0 Deployed" and a click made then does nothing (2026-11-25, 2026-11-27).
 - Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read
   `latest-<book>.json`, written by `obt rotation algotest-export`. The page contract is in
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save

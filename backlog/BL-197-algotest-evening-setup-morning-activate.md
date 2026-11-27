@@ -76,6 +76,11 @@ combination ③; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26�
   up was off in settings v10 (18:47 the day before). Phase 2 built the same day (above): the after-login
   activation, the two 09:16 jobs retired, the 09:25 check on the evening list. First live morning: the next
   trading day, owner watching; the owner activates by hand if no Telegram message has come by 08:30.
+- 2026-11-27 — cause of the 25 and 27 Nov activation failures: /live draws the strategy rows (each "0 Deployed")
+  before its deployments arrive, and the deployer read and clicked then. On 25 Nov it reported "0 Deployed" for
+  a deploy that had gone through. Every /live read in the deployer now waits for the deployments call
+  (`live-ready.ts`). Run live by the owner the same day: one test strategy uploaded, set up and activated on one
+  broker. Not yet seen on a scheduled 08:11 run.
 - 2026-11-27 — owner: set AlgoTest's broker stop each morning by the book-stop rule (T1 ₹9,000, Core ₹8,000).
   Built: `broker-stop.ts`, first in `algotest-activate`; AlgoTest rows take an MTM SL in Settings (off until
   switched on). Before 09:15 only; stop loss only, target and trail sent back; read back; Telegram. Calls in
