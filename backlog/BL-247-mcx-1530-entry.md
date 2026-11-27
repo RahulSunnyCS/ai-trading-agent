@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked for it; a follow-up to BL-218, not on the month's Momentum path |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-11-27 |
 | **Depends on** | BL-218 (the sweep, its engine grid and MCX charges), BL-148 (the data) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.11.43 |
 
 ## Context
 
@@ -115,3 +115,9 @@ None open.
 - 2026-11-27 — created and pre-registered from the owner's request ("start with our research in
   3:30 PM also"); the owner confirmed the scope ("Yes, register it"): Dir and Widesl, the four
   minis, compared against 17:05. Nothing run.
+- 2026-11-27 — started ("Yes, start it"); no open questions. Phase 1: `research/bl247/` (grid, run,
+  score), shared session code in `research/common/mcx_sessions.py`, grid SHA `5364a4f9a71161f3`.
+  Hand check, CRUDEOILM 2025-10-14, Dir ATM SL21 at 15:30: future 5185 → 5200 strike; CE sold at the
+  15:29 close 89.65 less 1%; PE at 102.50 less 1%, stopped on the 16:11 bar (high 126.9); CE bought
+  back at the 23:15 price. One detail fixed before any run: the gate counts each leg's first sale once
+  a session and contract, per family and entry time.
