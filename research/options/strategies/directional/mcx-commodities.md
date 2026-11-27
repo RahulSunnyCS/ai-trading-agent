@@ -23,6 +23,11 @@ None: nothing trades MCX.
 
 ## What we know
 
+- **Correction (2026-11-27, [BL-247][bl247]): the gold "pass" below rests largely on stale prices.**
+  The engine carries a last price through untraded minutes. From the 28 Apr 2026 expiry, when gold
+  strikes went to 500 apart and fills were live, the cell made ₹173 a session, against ₹3,612 before
+  it. Gold and silver 15:30 and 17:05 cohorts failed a prices-live gate. Do not read BL-218's gold or
+  silver figures as achievable.
 - **Gold mini, expiry week, passed all five registered rules** on the untouched year: ₹96,369 a lot
   (₹1,606 a session, PF 2.80, LB +₹653), ₹120,279 at 0.5% slippage, ₹135,980 at 0%; fit year
   ₹60,979; up in 10 of 12 fit and 9 of 12 test expiries; 6 of its 7 neighbouring cells positive
@@ -47,3 +52,4 @@ None: nothing trades MCX.
 - [Widesl on MCX](../widesl/mcx-commodities.md), [Buy on MCX](../buy-breakout/mcx-commodities.md).
 
 [bl218]: ../../../../backlog/BL-218-mcx-commodity-options-sweep.md
+[bl247]: ../../../../backlog/BL-247-mcx-1530-entry.md

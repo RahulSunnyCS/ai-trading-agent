@@ -153,4 +153,21 @@ None open.
   could be entered at 15:30 (they include 2024-11-15, 2025-03-14, 04-10 and 04-14, which look like
   evening-only holiday sessions); they count as 0, as registered. Passing cohort committed as
   `research/bl247/passed_2026-11-27.json`. The test half has **not** been run.
+- 2026-11-27 — **Follow-up the owner asked for: the fills behind BL-218's gold pass** (descriptive;
+  `research/bl247/gold_fills.py`; both halves already read; no BL-219 forward result read). The
+  passing cell reproduces to the rupee (fit ₹60,979, test ₹96,369). The engine carries a contract's
+  last price through minutes with no trade. A price is "stale" here when the contract had not traded
+  in the 15 minutes before it (entry or exit).
 
+  | | Trades | Stale | Net from stale trades | Net from live trades |
+  |---|---|---|---|---|
+  | Fit year | 93 | 59 | ₹40,041 | ₹20,938 |
+  | Test year | 123 | 21 | ₹61,262 | ₹35,107 |
+
+  Fit year: median entry price 47 minutes old. Test year by strike spacing: before the 2026-04-28
+  expiry (strikes 100 apart) 25 sessions, 53% of trades stale, ₹90,299 (₹3,612 a session); from it
+  (strikes 500 apart) 35 sessions, 1% stale, **₹6,070 (₹173 a session)**. Strike spacing and the
+  Jan–Mar 2026 gold run overlap, so the two causes cannot be separated here.
+  73% of the expiring contract's bar rows in the fit year's expiry weeks have zero volume; BL-218's
+  check ("ATM legs last traded a median 1 minute earlier") probably counted such rows as trades
+  (its script was not found or re-run).
