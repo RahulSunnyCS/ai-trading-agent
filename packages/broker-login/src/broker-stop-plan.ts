@@ -43,6 +43,9 @@ export function parseBrokerStop(json: unknown, algotestId: string): BrokerStop {
     throw new Error(`AlgoTest /brokers: ${found.length} entries for ${algotestId}, expected 1`);
   const id = String(entry._id ?? '');
   if (!/^[\w-]+$/.test(id)) throw new Error(`AlgoTest /brokers: unusable id for ${algotestId}`);
+  // an answer without the field is one this cannot read: saving over it would clear the trail
+  if (!('v2_settings' in entry))
+    throw new Error(`AlgoTest /brokers: no v2_settings for ${algotestId}`);
   const state = (
     entry.v2_settings as { non_signal_settings?: { state?: Record<string, unknown> } } | undefined
   )?.non_signal_settings?.state;

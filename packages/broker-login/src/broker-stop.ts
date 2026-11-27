@@ -159,8 +159,14 @@ async function main(): Promise<number> {
             lines.push(`${name}: stop ${rupee(now.stopLoss)}, kept ${JSON.stringify(now.kept)}`);
             continue;
           }
+          // an export that cannot be read costs the extra, never the stop itself
           const { extra, note } =
-            row.dirBoost && row.list !== 'none' ? await extraFor(row.list) : { extra: 0, note: '' };
+            row.dirBoost && row.list !== 'none'
+              ? await extraFor(row.list).catch(() => ({
+                  extra: 0,
+                  note: 'export unreadable: Dir ×2 not added',
+                }))
+              : { extra: 0, note: '' };
           const target = mtmSl + extra;
           const want = `${rupee(target)}${extra ? ` (${rupee(mtmSl)} + ${rupee(extra)} for Dir ×2)` : ''}`;
           const tail = note ? ` (${note})` : '';

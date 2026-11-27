@@ -40,6 +40,8 @@ describe('parseBrokerStop', () => {
 
   it('refuses an answer it does not understand', () => {
     assert.throws(() => parseBrokerStop({}, 'Broker.Finvasia'), /no brokers list/);
+    const bare = { brokers: [{ _id: 'abc123', broker: 'Broker.Finvasia' }] };
+    assert.throws(() => parseBrokerStop(bare, 'Broker.Finvasia'), /no v2_settings/);
     assert.throws(() => parseBrokerStop(answer(null), 'Broker.AngelOne'), /0 entries/);
     assert.throws(() => read({ StopLoss: { Value: 1 } }), /not a number/);
   });
