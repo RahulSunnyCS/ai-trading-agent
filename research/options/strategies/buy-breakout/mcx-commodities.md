@@ -24,6 +24,9 @@ None: nothing trades MCX.
 
 ## What we know
 
+- **Caution (2026-11-27, [BL-247][bl247]):** gold and silver mini options often did not trade at the
+  strikes used, and the engine carries the last price forward. Their figures below may not be
+  achievable.
 - The buys lose **before** charges on most roots and sessions: evening breakout and evening timed
   buys on crude are gross-negative on all 612 cells; gold and silver evening timed buys average
   −₹418 / −₹475 a session gross.
@@ -35,3 +38,4 @@ None: nothing trades MCX.
 - [Directional on MCX](../directional/mcx-commodities.md), [Widesl on MCX](../widesl/mcx-commodities.md).
 
 [bl218]: ../../../../backlog/BL-218-mcx-commodity-options-sweep.md
+[bl247]: ../../../../backlog/BL-247-mcx-1530-entry.md

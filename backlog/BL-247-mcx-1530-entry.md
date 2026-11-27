@@ -1,0 +1,177 @@
+# BL-247 — MCX commodity Dir and Widesl: does a 15:30 entry beat 17:05?
+
+| | |
+|---|---|
+| **Priority** | P2 — the owner asked for it; a follow-up to BL-218, not on the month's Momentum path |
+| **Status** | In progress |
+| **Type** | research |
+| **Area** | options |
+| **Created** | 2026-11-27 |
+| **Depends on** | BL-218 (the sweep, its engine grid and MCX charges), BL-148 (the data) |
+| **TODO.md row** | 3.11.43 |
+
+## Context
+
+BL-218 swept MCX mini options with Dir and Widesl entering at 17:05, 18:00, 19:00 and 20:00. The
+owner (2026-11-27): commodity trading is available from 15:30, when NSE closes, so the research
+should cover a 15:30 entry as well. BL-218's grid is fixed by its SHA, so this is a new item.
+
+## Goal
+
+For each root × family × week, a registered answer to "is entering at 15:30 better than entering
+at 17:05, everything else the same?", with a findings entry either way.
+
+## Out of scope
+
+Live trading and any paper journal; the Buy families; standard contracts; any change to BL-218's
+verdicts or to the BL-219 / BL-242 forward tests.
+
+## Plan
+
+### Phase 0 — Pre-register (committed before any run)
+
+**What has been seen before this registration.** BL-218's results for the 17:05–20:00 entries, both
+halves. No return of any 15:30 entry has been computed. On 2026-11-27 trading activity alone (no
+strategy, no P&L) was compared at 15:30, 16:00, 17:05 and 18:00 on the fit year's expiry weeks:
+crude and natural gas were about as liquid at 15:30 as at 17:05; gold and silver depend heavily on
+which strike is picked.
+
+- **Hypothesis:** a 15:30 entry is no better than a 17:05 entry for Dir or Widesl on any of the
+  four minis. The default if nothing passes is BL-218's grid as it stands (no 15:30 entry).
+- **Universe:** as BL-218, unchanged: CRUDEOILM, NATGASMINI, GOLDM, SILVERM; expiry week (sessions
+  E-4..E0) and week before (E-9..E-5); fit = expiries 2024-11-01 → 2025-10-31, test = expiries
+  2025-11-01 → 2026-10-31; the expiring contract, strikes off the settling future from the contract
+  calendar, 1 lot at today's lot size; sessions `data_quality` excludes count as due and not run.
+- **Execution:** as BL-218: the legwise engine on the MCX grid, 1% slippage on every fill, MCX
+  charges from `research/common/mcx_charges.py`, "close" = 23:15 (23:40 on a 23:55-close day).
+- **Cells:** each 15:30 cell is paired with the cell identical but for a 17:05 entry; both are run
+  by the same code on the same data.
+
+  | Family | Axes (all but entry) | Pairs |
+  |---|---|---|
+  | Dir (sell CE + PE) | strike ITM1/ATM × leg SL 15/21/30% × re-entry none/cost×1 × exit 22:00/close | 24 |
+  | Widesl (sell CE + PE) | strike OTM1/OTM2 × leg SL 80/115/150% × trail none/15-10% × exit 22:00/close | 24 |
+
+  4 roots × 2 families × 2 weeks = **16 cohorts**.
+- **Measure:** one number a cohort-session, so no cell is picked: D = the mean over the cohort's 24
+  pairs of (net at 15:30 − net at 17:05), in rupees a lot. A cell that does not enter counts as 0.
+- **Prices-live gate (computed first, before any P&L is read):** at each entry time, the share of
+  sold legs whose own contract had not traded in the 15 minutes before the entry minute. A cohort
+  where that share is over 20% at either time is **not judged: prices not live**, and no verdict is
+  claimed for it.
+- **Pass (fit half):** mean D > 0, **and** the 5th percentile of mean D over 2,000 resamples of whole
+  expiries (seed 20261127) > 0, **and** the cohort's mean net at 15:30 > 0.
+- **Consistency (test half, passing cohorts only):** mean D > 0 and mean 15:30 net > 0. BL-218 has
+  already read this year at later entry times, so it is a second look, **not** an unseen test.
+- **Verdict:** a cohort passing both is "15:30 worth a forward paper test", never a live setting;
+  every other judged cohort is "no better than 17:05". With 16 cohorts at a one-sided 5% about one
+  pass is expected by chance, so a single pass is weak evidence and the verdict says so.
+- **Reported, not decided on:** the per-cell table; entry rates and coverage at both times; net at
+  0% and 0.5% slippage; the largest share of net from one expiry.
+- **Look-ahead check:** strikes and entries read only bars that end by the decision minute (the
+  engine's price-at-T rule, as BL-218); the settling future comes from the contract calendar; the
+  exit uses the published close; the gate reads only bars before the entry minute.
+- **Survivorship:** as BL-218: every contract in the frozen BL-148 manifest; a strike with no price
+  at entry is a no-trade, never dropped.
+- **Hold-out:** nothing after expiry 2026-10-31 is read, so the sessions BL-219 and BL-242 are
+  testing forward stay unseen. Confirmation, if any, is forward only.
+- **Will not run:** other entry times (16:00, 16:30), the Buy families, other strikes or stops,
+  picking a best 15:30 cell, a decision at 0% or 0.5% slippage, the next-month expiry — each needs
+  `override: <reason>` in the Log.
+
+### Phase 1 — Code
+
+- **Tasks:** `packages/option-backtesting/research/bl247/` (grid, runner, gate, scorer); a test that
+  pins the pair counts and the grid SHA.
+- **Done when:** the tests pass, the SHA is in the Log, and one session is hand-checked at 15:30
+  (fills against the raw chain and the future).
+
+### Phase 2 — Gate and fit half
+
+- **Tasks:** the prices-live gate for all 16 cohorts, written to a file; then the fit half.
+- **Done when:** each cohort is marked not judged, failed or passed.
+
+### Phase 3 — Test half and verdict
+
+- **Tasks:** passing cohorts only; update `research/options/strategies/{directional,widesl}/`
+  `mcx-commodities.md` and the entry-time pages in the same commit.
+- **Done when:** every cohort has a line in the Log.
+
+## Risks
+
+- About 60 sessions a cohort a year: the test can say "not shown" far more often than "yes".
+- The bid-ask spread at 15:30 on mini options is not measured; 1% slippage may understate it, more
+  so before the US session opens.
+- Gold's strike step is finer than where its volume sits. On 2025-08-22 the 98,900 call traded about
+  15 lots in the day against about 51,000 for the 99,000 call. The gate above keeps this item from
+  judging such a cohort; whether it affects BL-218's gold result or BL-219 has **not** been checked.
+
+## Open questions
+
+None open.
+
+## Log
+
+- 2026-11-27 — created and pre-registered from the owner's request ("start with our research in
+  3:30 PM also"); the owner confirmed the scope ("Yes, register it"): Dir and Widesl, the four
+  minis, compared against 17:05. Nothing run.
+- 2026-11-27 — started ("Yes, start it"); no open questions. Phase 1: `research/bl247/` (grid, run,
+  score), shared session code in `research/common/mcx_sessions.py`, grid SHA `5364a4f9a71161f3`.
+  Hand check, CRUDEOILM 2025-10-14, Dir ATM SL21 at 15:30: future 5185 → 5200 strike; CE sold at the
+  15:29 close 89.65 less 1%; PE at 102.50 less 1%, stopped on the 16:11 bar (high 126.9); CE bought
+  back at the 23:15 price. One detail fixed before any run: the gate counts each leg's first sale once
+  a session and contract, per family and entry time.
+- 2026-11-27 — **Prices-live gate** (fit sessions; `run.py gate`, no P&L in its output). A first
+  attempt stopped on a timestamp-type error before computing anything; fixed in `run.py` (grid SHA
+  unchanged). Share of sold legs with no trade in the 15 minutes before entry (15:30 / 17:05):
+
+  | Root | dir expiry | widesl expiry | dir before | widesl before |
+  |---|---|---|---|---|
+  | CRUDEOILM | 0% / 0% | 0% / 0% | 0% / 1% | 0% / 0% |
+  | NATGASMINI | 0% / 0% | 0% / 0% | 3% / 0% | 0% / 0% |
+  | GOLDM | 56% / 52% | 50% / 49% | 50% / 46% | 53% / 52% |
+  | SILVERM | 28% / 31% | 28% / 31% | 34% / 43% | 42% / 32% |
+
+  **All eight gold and silver cohorts are not judged.** This disagrees with BL-218's check that ATM
+  legs were live (it looked at 18:00); BL-218's gold pass and the BL-219 forward test have **not**
+  been re-checked.
+- 2026-11-27 — **Fit half** (crude and gas; rupees a lot a session, mean of 24 pairs, after charges
+  and 1% slippage):
+
+  | Cohort | 15:30 net | 17:05 net | Difference | 5th pct | Pairs better | Result |
+  |---|---|---|---|---|---|---|
+  | CRUDEOILM dir expiry | −21 | −37 | +15 | −38 | 18/24 | fail |
+  | CRUDEOILM widesl expiry | −5 | −35 | +30 | −10 | 24/24 | fail |
+  | CRUDEOILM dir before | −63 | −111 | +48 | +22 | 22/24 | fail (15:30 loses) |
+  | CRUDEOILM widesl before | −97 | −69 | −28 | −82 | 6/24 | fail |
+  | NATGASMINI dir expiry | 20 | 42 | −22 | −154 | 11/24 | fail |
+  | NATGASMINI widesl expiry | 11 | −31 | +42 | −33 | 23/24 | fail |
+  | NATGASMINI dir before | −182 | −163 | −19 | −86 | 8/24 | fail |
+  | **NATGASMINI widesl before** | **3** | −39 | +42 | +10 | 24/24 | **pass** |
+
+  One pass of eight judged, at about breakeven (₹3 a session). On 4 crude and 6 gas sessions nothing
+  could be entered at 15:30 (they include 2024-11-15, 2025-03-14, 04-10 and 04-14, which look like
+  evening-only holiday sessions); they count as 0, as registered. Passing cohort committed as
+  `research/bl247/passed_2026-11-27.json`. The test half has **not** been run.
+- 2026-11-27 — **Follow-up the owner asked for: the fills behind BL-218's gold pass** (descriptive;
+  `research/bl247/gold_fills.py`; both halves already read; no BL-219 forward result read). The
+  passing cell reproduces to the rupee (fit ₹60,979, test ₹96,369). The engine carries a contract's
+  last price through minutes with no trade. A price is "stale" here when the contract had not traded
+  in the 15 minutes before it (entry or exit).
+
+  | | Trades | Stale | Net from stale trades | Net from live trades |
+  |---|---|---|---|---|
+  | Fit year | 93 | 59 | ₹40,041 | ₹20,938 |
+  | Test year | 123 | 20 | ₹62,996 | ₹33,373 |
+
+  Fit year: median entry price 42 minutes old. Test year by strike spacing: before the 2026-04-28
+  expiry (strikes 100 apart) 25 sessions, 53% of trades stale, ₹90,299 (₹3,612 a session); from it
+  (strikes 500 apart) 35 sessions, no stale trade, **₹6,070 (₹173 a session)**. Strike spacing and the
+  Jan–Mar 2026 gold run overlap, so the two causes cannot be separated here.
+  73% of the expiring contract's bar rows in the fit year's expiry weeks have zero volume; BL-218's
+  check ("ATM legs last traded a median 1 minute earlier") probably counted such rows as trades
+  (its script was not found or re-run).
+- 2026-11-27 — Review of the PR: re-entry fills' own bar had been left out of the price-age check
+  (the figures above are the corrected ones); the test half now needs the passed list in HEAD. The
+  18:00 gold re-run is outside Phase 0's list of runs: the owner asked for it in chat ("Yes, check
+  gold"); no `override:` line was written.

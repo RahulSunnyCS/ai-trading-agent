@@ -20,6 +20,9 @@ None: nothing trades MCX.
 
 ## What we know
 
+- **Caution (2026-11-27, [BL-247][bl247]):** gold and silver mini options often did not trade at the
+  strikes used, and the engine carries the last price forward. Their figures below may not be
+  achievable.
 - Gold mini: expiry week (17:05 OTM1, SL 115%, trail 15/10, to close) ₹92,266 on the fit year,
   then ₹32,861 on the test year with LB −₹138, 56% of it from one expiry, and its cohort's PBO 0.55;
   week before (17:05 OTM1, SL 115%, out 22:00) ₹70,339 then **−₹61,402**.
@@ -35,3 +38,4 @@ None: nothing trades MCX.
 - [Directional on MCX](../directional/mcx-commodities.md), [Buy on MCX](../buy-breakout/mcx-commodities.md).
 
 [bl218]: ../../../../backlog/BL-218-mcx-commodity-options-sweep.md
+[bl247]: ../../../../backlog/BL-247-mcx-1530-entry.md

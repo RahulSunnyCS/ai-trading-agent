@@ -106,4 +106,8 @@ None open: the owner's answers are in the Log.
   the engine's strike resolver (half-up); the "no option bars" alert is said once per day. A
   dry run reproduced three BL-218 backtest sessions (24 Dec 2025, 25 Feb 2026, 27 Oct 2026) to
   the paisa. Not yet live: waits for PRs #445-#448 and a scheduler restart.
-
+- 2026-11-27 — Note, no rule change: the BL-218 backtest figure this test started from rests largely
+  on stale prices (BL-247 follow-up). From the 28 Apr 2026 expiry, with strikes 500 apart, the same
+  cell made ₹173 a session with 99% of trades on live prices. The three 18:00 spread snapshots to
+  27 Nov show quotes on the rule's strikes with a half-spread near 0.2%, so forward fills look
+  achievable. This test's own journal was not read for that note.

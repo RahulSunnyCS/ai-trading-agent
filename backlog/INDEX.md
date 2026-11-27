@@ -96,6 +96,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-171](BL-171-finvasia-capital-auto.md) | Finvasia's capital read automatically for the Trade book (typed by hand meanwhile) | P3 | Idea | improvement | contract-notes / broker-login / scheduler |
 | [BL-178](BL-178-options-lab-polish-leftovers.md) | Options Lab polish left from BL-102: Correlation / Regimes run bar and drawer, Builder arrow keys, "View as YAML", lot size, round-trip test, unused code removed | P3 | Planned | improvement | dashboard |
 | [BL-242](BL-242-silver-dir-forward-paper-test.md) | Forward paper test of SILVERM Dir in the week before expiry: a setting the sweep did not clear, tested forward at the owner's request | P3 | In progress; built, waits for the merge and a scheduler restart (first window 2026-12-15) | research | options / dashboard |
+| [BL-247](BL-247-mcx-1530-entry.md) | MCX commodity Dir and Widesl: does a 15:30 entry beat the same setting at 17:05? Pre-registered on the four minis (BL-218's data and costs), nothing run | P2 | In progress | research | options |
 
 ## Done / Dropped
 
