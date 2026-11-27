@@ -70,7 +70,8 @@ def _last_trades(root_dir: Path, root: str, day: date) -> dict:
     path = lake.bars_1m_path(root_dir, "option", root, day)
     table = pq.read_table(path, columns=["ts", "expiry", "strike", "option_type", "volume"])
     table = table.filter(pc.greater(table.column("volume"), 0))
-    ts = table.column("ts").cast("timestamp[s, tz=UTC]").cast("int64").to_numpy()
+    ts = table.column("ts").cast("int64").to_numpy()
+    ts = ts // 10 ** (len(str(int(ts.max()))) - 10)  # the file's ticks per second
     minutes = ((ts + 19_800) % 86_400) // 60
     out: dict = {}
     for key, minute in zip(

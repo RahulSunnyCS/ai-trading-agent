@@ -121,3 +121,36 @@ None open.
   15:29 close 89.65 less 1%; PE at 102.50 less 1%, stopped on the 16:11 bar (high 126.9); CE bought
   back at the 23:15 price. One detail fixed before any run: the gate counts each leg's first sale once
   a session and contract, per family and entry time.
+- 2026-11-27 — **Prices-live gate** (fit sessions; `run.py gate`, no P&L in its output). A first
+  attempt stopped on a timestamp-type error before computing anything; fixed in `run.py` (grid SHA
+  unchanged). Share of sold legs with no trade in the 15 minutes before entry (15:30 / 17:05):
+
+  | Root | dir expiry | widesl expiry | dir before | widesl before |
+  |---|---|---|---|---|
+  | CRUDEOILM | 0% / 0% | 0% / 0% | 0% / 1% | 0% / 0% |
+  | NATGASMINI | 0% / 0% | 0% / 0% | 3% / 0% | 0% / 0% |
+  | GOLDM | 56% / 52% | 50% / 49% | 50% / 46% | 53% / 52% |
+  | SILVERM | 28% / 31% | 28% / 31% | 34% / 43% | 42% / 32% |
+
+  **All eight gold and silver cohorts are not judged.** This disagrees with BL-218's check that ATM
+  legs were live (it looked at 18:00); BL-218's gold pass and the BL-219 forward test have **not**
+  been re-checked.
+- 2026-11-27 — **Fit half** (crude and gas; rupees a lot a session, mean of 24 pairs, after charges
+  and 1% slippage):
+
+  | Cohort | 15:30 net | 17:05 net | Difference | 5th pct | Pairs better | Result |
+  |---|---|---|---|---|---|---|
+  | CRUDEOILM dir expiry | −21 | −37 | +15 | −38 | 18/24 | fail |
+  | CRUDEOILM widesl expiry | −5 | −35 | +30 | −10 | 24/24 | fail |
+  | CRUDEOILM dir before | −63 | −111 | +48 | +22 | 22/24 | fail (15:30 loses) |
+  | CRUDEOILM widesl before | −97 | −69 | −28 | −82 | 6/24 | fail |
+  | NATGASMINI dir expiry | 20 | 42 | −22 | −154 | 11/24 | fail |
+  | NATGASMINI widesl expiry | 11 | −31 | +42 | −33 | 23/24 | fail |
+  | NATGASMINI dir before | −182 | −163 | −19 | −86 | 8/24 | fail |
+  | **NATGASMINI widesl before** | **3** | −39 | +42 | +10 | 24/24 | **pass** |
+
+  One pass of eight judged, at about breakeven (₹3 a session). On 4 crude and 6 gas sessions nothing
+  could be entered at 15:30 (they include 2024-11-15, 2025-03-14, 04-10 and 04-14, which look like
+  evening-only holiday sessions); they count as 0, as registered. Passing cohort committed as
+  `research/bl247/passed_2026-11-27.json`. The test half has **not** been run.
+
