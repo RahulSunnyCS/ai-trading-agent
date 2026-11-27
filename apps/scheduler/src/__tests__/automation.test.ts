@@ -411,7 +411,7 @@ describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
   });
 });
 
-describe('MTM SL per Quantiply row (BL-172)', () => {
+describe('MTM SL per row (BL-172)', () => {
   it('settings saved before the field read as the list stop on Quantiply, none on AlgoTest', () => {
     const old = structuredClone(DEFAULT_SETTINGS) as unknown as {
       rows: Record<string, Record<string, unknown>>;
@@ -424,13 +424,12 @@ describe('MTM SL per Quantiply row (BL-172)', () => {
     expect(read.rows['algotest.finvasia'].mtmSl).toBeNull();
   });
 
-  it('refuses a missing, fractional or out-of-range figure, and any figure on AlgoTest', () => {
+  it('refuses a missing, fractional or out-of-range figure', () => {
     for (const [key, bad] of [
       ['quantiply.angelone', undefined],
       ['quantiply.angelone', 8000.5],
       ['quantiply.angelone', 100],
       ['quantiply.angelone', '8000'],
-      ['algotest.finvasia', 8000],
     ] as const) {
       const s = structuredClone(DEFAULT_SETTINGS);
       (s.rows[key] as unknown as Record<string, unknown>).mtmSl = bad;

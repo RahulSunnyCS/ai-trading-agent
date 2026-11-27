@@ -185,11 +185,10 @@ describe('MTM SL per Quantiply row (BL-172)', () => {
     assert.equal(a.rows['algotest.finvasia'].mtmSl, null);
   });
 
-  it('a bad figure, or one on AlgoTest, is an error, never a guess', () => {
+  it('a bad figure is an error, never a guess', () => {
     for (const [key, bad] of [
       ['quantiply.angelone', 80.5],
       ['quantiply.angelone', '8000'],
-      ['algotest.finvasia', 8000],
     ] as const) {
       const s = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as {
         rows: Record<string, Record<string, unknown>>;

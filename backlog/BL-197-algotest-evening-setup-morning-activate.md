@@ -76,3 +76,7 @@ combination ③; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26�
   up was off in settings v10 (18:47 the day before). Phase 2 built the same day (above): the after-login
   activation, the two 09:16 jobs retired, the 09:25 check on the evening list. First live morning: the next
   trading day, owner watching; the owner activates by hand if no Telegram message has come by 08:30.
+- 2026-11-27 — owner: set AlgoTest's broker stop each morning by the book-stop rule (T1 ₹9,000, Core ₹8,000).
+  Built: `broker-stop.ts`, first in `algotest-activate`; AlgoTest rows take an MTM SL in Settings (off until
+  switched on). Before 09:15 only; stop loss only, target and trail sent back; read back; Telegram. Calls in
+  `docs/algotest-execution.md` §7, read from the page's JavaScript: no save by the tool has been tried yet.

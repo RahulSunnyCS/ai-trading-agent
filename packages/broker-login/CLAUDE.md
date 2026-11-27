@@ -263,6 +263,14 @@ week, until disabled.
   Strategy".
 
 
+## AlgoTest daily book stop (2026-11-27)
+
+`src/broker-stop.ts` (+ pure `src/broker-stop-plan.ts`) sets each AlgoTest row's `mtmSl` (Settings ›
+Automation, null = off) as that broker's stop on AlgoTest, over API calls
+(`docs/algotest-execution.md` §7, "Broker stop"): before 09:15 only, stop loss only (target and trail
+sent back), read back, one Telegram. Dir ×2 adds the doubled pick's own stop. `--apply` needs
+`ALGOTEST_DEPLOY=on`. First step of `algotest-activate`; it never ends that chain.
+
 ## Trade monitor (BL-143): margin, deploy and loss checks, read-only
 
 `src/trade-monitor.ts` (+ pure `src/monitor-plan.ts`) is the scheduler's `trade-monitor` job (trading days
