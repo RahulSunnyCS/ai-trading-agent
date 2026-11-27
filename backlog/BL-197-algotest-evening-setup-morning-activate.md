@@ -81,3 +81,7 @@ combination ③; BL-196). The 09:16 deployer (BL-138) had never deployed: on 26�
   a deploy that had gone through. Every /live read in the deployer now waits for the deployments call
   (`live-ready.ts`). Run live by the owner the same day: one test strategy uploaded, set up and activated on one
   broker. Not yet seen on a scheduled 08:11 run.
+- 2026-11-27 — owner: set AlgoTest's broker stop each morning by the book-stop rule (T1 ₹9,000, Core ₹8,000).
+  Built: `broker-stop.ts`, first in `algotest-activate`; AlgoTest rows take an MTM SL in Settings (off until
+  switched on). Before 09:15 only; stop loss only, target and trail sent back; read back; Telegram. Calls in
+  `docs/algotest-execution.md` §7, read from the page's JavaScript: no save by the tool has been tried yet.

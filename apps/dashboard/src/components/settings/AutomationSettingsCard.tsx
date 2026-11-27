@@ -23,7 +23,6 @@ import {
   MULTIPLIER_MIN,
   ROWS,
   applyNowOpen,
-  defaultMtmSl,
   describeChanges,
   githubOutcome,
   heldByMaster,
@@ -226,48 +225,54 @@ export function AutomationSettingsCard() {
                         }
                       />
                     </div>
-                    {platform === 'Quantiply' ? (
-                      <div className="space-y-2">
-                        <SettingSwitch
-                          label="Keep the clientwise MTM SL"
-                          description="Checked every trading day at 08:00, after the login, and set to this figure when it differs (the account's whole MTM, your own algos included). Off leaves it as you set it."
-                          checked={row.mtmSl !== null}
-                          disabled={saving}
-                          onChange={(on) =>
-                            setDraft(
-                              withRow(draft, key, {
-                                mtmSl: on ? (defaultMtmSl(key, row.list) ?? 8000) : null,
-                              }),
-                            )
-                          }
-                        />
-                        {row.mtmSl !== null ? (
-                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <label
-                              htmlFor={`mtmsl-${key}`}
-                              className="text-sm font-medium text-foreground"
-                            >
-                              MTM SL (₹)
-                              <span className="ml-2 text-xs font-normal text-muted">
-                                Whole rupees, {MTM_SL_MIN} to {MTM_SL_MAX}.
-                              </span>
-                            </label>
-                            <NumberField
-                              id={`mtmsl-${key}`}
-                              className="w-28"
-                              min={MTM_SL_MIN}
-                              max={MTM_SL_MAX}
-                              step={500}
-                              value={row.mtmSl}
-                              disabled={saving}
-                              onChange={(mtmSl) =>
-                                setDraft(withRow(draft, key, { mtmSl: Math.round(mtmSl) }))
-                              }
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    <div className="space-y-2">
+                      <SettingSwitch
+                        label={
+                          platform === 'Quantiply'
+                            ? 'Keep the clientwise MTM SL'
+                            : 'Set the account stop loss'
+                        }
+                        description={
+                          platform === 'Quantiply'
+                            ? "Checked every trading day at 08:00, after the login, and set to this figure when it differs (the account's whole MTM, your own algos included). Off leaves it as you set it."
+                            : "Before the open each trading day, AlgoTest's stop for this broker is set to this figure when it differs (the broker's whole MTM, your own strategies included). Only the stop loss changes. Off leaves it as you set it."
+                        }
+                        checked={row.mtmSl !== null}
+                        disabled={saving}
+                        onChange={(on) =>
+                          setDraft(
+                            withRow(draft, key, {
+                              mtmSl: on ? (row.list === 't1' ? 9000 : 8000) : null,
+                            }),
+                          )
+                        }
+                      />
+                      {row.mtmSl !== null ? (
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <label
+                            htmlFor={`mtmsl-${key}`}
+                            className="text-sm font-medium text-foreground"
+                          >
+                            MTM SL (₹)
+                            <span className="ml-2 text-xs font-normal text-muted">
+                              Whole rupees, {MTM_SL_MIN} to {MTM_SL_MAX}.
+                            </span>
+                          </label>
+                          <NumberField
+                            id={`mtmsl-${key}`}
+                            className="w-28"
+                            min={MTM_SL_MIN}
+                            max={MTM_SL_MAX}
+                            step={500}
+                            value={row.mtmSl}
+                            disabled={saving}
+                            onChange={(mtmSl) =>
+                              setDraft(withRow(draft, key, { mtmSl: Math.round(mtmSl) }))
+                            }
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                     <SettingSwitch
                       label="Include the Buy add-on"
                       description="Off leaves the add-on picks out of this list's exports, so they are not uploaded, deployed or checked."
@@ -277,7 +282,7 @@ export function AutomationSettingsCard() {
                     />
                     <SettingSwitch
                       label="Dir ×2 on non-expiry days"
-                      description="On a day neither index expires, the picked Dir is uploaded at 2 lots and its MTM SL doubles (4 lots in all); on expiry days, and when no Dir is picked, every pick stays at 1 lot. On Quantiply the morning job raises the MTM SL above by the Dir's own stop on those days."
+                      description="On a day neither index expires, the picked Dir is uploaded at 2 lots and its MTM SL doubles (4 lots in all); on expiry days, and when no Dir is picked, every pick stays at 1 lot. The morning job raises the stop above by the Dir's own stop on those days."
                       checked={row.dirBoost}
                       disabled={saving}
                       onChange={(dirBoost) => setDraft(withRow(draft, key, { dirBoost }))}

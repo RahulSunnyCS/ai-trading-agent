@@ -601,7 +601,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-activate',
     description:
-      "Activate last evening's list on AlgoTest's /live right after the morning login (BL-197 Phase 2): every list an AlgoTest row in Settings › Automation uploads (Tuned, Classic or both, each from its own export; a list switched in after 16:40 is exported, uploaded and set up first), each strategy the 16:40 run (or that catch-up) uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose row uploads that list, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading a list",
+      "Activate last evening's list on AlgoTest's /live right after the morning login (BL-197 Phase 2): every list an AlgoTest row in Settings › Automation uploads (Tuned, Classic or both, each from its own export; a list switched in after 16:40 is exported, uploaded and set up first), each strategy the 16:40 run (or that catch-up) uploaded and set up (Trade monitoring on Candle Close), one instance per AlgoTest broker whose row uploads that list, through the broker sheet: REAL MONEY on the owner's accounts. The evening list is what trades on AlgoTest; the 09:16 pick changes nothing there (owner, 2026-11-02). A strategy already deployed is left alone, one whose entry minute has come is reported and never activated late, and the Buy add-on is left out when no AlgoTest row has it on now. Needs ALGOTEST_DEPLOY=on, Automated deployment on and an AlgoTest row uploading a list. First it sets each AlgoTest row's MTM SL from Settings › Automation as that broker's stop on AlgoTest (stop loss only, target and trail kept; nothing written after 09:15)",
     // 08:11 in the quantiply group: it starts when the 08:02 `broker-login` (which waits for
     // AlgoTest's 08:16 broker window, so about 08:20) and the 08:10 Quantiply switch-on have
     // ended. Never retried: a second attempt could activate what the first already did; the run
@@ -617,7 +617,9 @@ const BASE_JOBS: Job[] = [
       [
         'bash',
         '-c',
-        'uv run --directory ../option-backtesting obt rotation algotest-export --from-settings --preview --only-missing && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode topup --apply && node_modules/.bin/tsx src/strategy-deploy.ts --from-settings --setup --apply; exit 0',
+        // 2026-11-27: first each AlgoTest row's book stop, before anything is activated; it
+        // reports its own failure (--soft-fail) and the rest runs whatever it does.
+        'node_modules/.bin/tsx src/broker-stop.ts --apply --soft-fail; uv run --directory ../option-backtesting obt rotation algotest-export --from-settings --preview --only-missing && node_modules/.bin/tsx src/strategy-upload.ts --from-settings --mode topup --apply && node_modules/.bin/tsx src/strategy-deploy.ts --from-settings --setup --apply; exit 0',
       ],
       [
         'node_modules/.bin/tsx',

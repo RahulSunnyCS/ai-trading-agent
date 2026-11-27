@@ -27,7 +27,10 @@ export interface Row {
   addon: boolean;
   /** BL-183: the picked Dir at 2 lots (its MTM SL doubled) on a non-expiry day (default no) */
   dirBoost: boolean;
-  /** Quantiply only (BL-172): the clientwise MTM SL in rupees the 08:00 job keeps; null = leave it */
+  /**
+   * The account's book stop in rupees, null = leave it: Quantiply's clientwise MTM SL (BL-172,
+   * kept by the 08:10 job) or AlgoTest's broker stop (broker-stop.ts, set before the open)
+   */
   mtmSl: number | null;
 }
 
@@ -168,10 +171,7 @@ export function readAutomation(path: string = settingsPath()): Automation {
       }
       // BL-172: missing = the list's stop; anything else must be null or whole rupees 500-100,000.
       const mtmSl = row.mtmSl === undefined ? defaultMtmSl(p, row.list as Row['list']) : row.mtmSl;
-      if (
-        mtmSl !== null &&
-        !(Number.isInteger(mtmSl) && mtmSl >= 500 && mtmSl <= 100_000 && p === 'quantiply')
-      ) {
+      if (mtmSl !== null && !(Number.isInteger(mtmSl) && mtmSl >= 500 && mtmSl <= 100_000)) {
         throw new Error(`${path}: row ${p}.${b} has mtmSl ${JSON.stringify(row.mtmSl)}`);
       }
       rows[`${p}.${b}`] = { ...(row as Row), multiplier, addon, dirBoost, mtmSl };

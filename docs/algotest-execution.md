@@ -299,6 +299,17 @@ the bulk call. It waits while a card shows `pending_square_off` and never calls 
 
 <a id="pending"></a>
 
+**Broker stop (read from the /live page's public JavaScript and the owner's signed-in page, 2026-11-27).**
+Each broker's card opens its "Broker Settings": Stop Loss, Target Profit, a trailing option.
+
+| Call | What |
+|---|---|
+| `GET /brokers` | each entry's `v2_settings.non_signal_settings.state`: `config` (`StopLoss`, `Target`, `OverallTrailSL`, `LockAndTrail`), `is_active`, `display_sl_value` |
+| `PUT /update-broker-settings/v2/<broker _id>?is_signal=false` | body: the four `config` fields; a null clears one |
+
+`src/broker-stop.ts` (first step of `algotest-activate`) uses both. Not yet seen: a save made by the
+tool, the stored sign of `StopLoss`, and whether yesterday's setting reads inactive next morning.
+
 ## Pending actions → moved
 
 **Everything blocked on the repo owner now lives in [`/TODO.md`](../TODO.md)**,

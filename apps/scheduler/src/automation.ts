@@ -65,14 +65,14 @@ export const MARGIN_DAYS_MAX = 30;
 /** What the margin block reads when the settings predate it (owner, 2026-11-04). */
 export const DEFAULT_MARGIN: Margin = { bufferPct: 10, days: 6 };
 
-/** The Quantiply clientwise MTM SL a row may ask for (BL-172): whole rupees in this range. */
+/** The book stop a row may ask for (Quantiply's clientwise MTM SL, AlgoTest's broker stop). */
 export const MTM_SL_MIN = 500;
 export const MTM_SL_MAX = 100_000;
 
 /**
  * The MTM SL a row reads as when its settings predate the field (BL-172): the list's portfolio
  * stop on the Rotation page (Adaptive Tuned ₹9,000, Adaptive Classic ₹8,000) on a Quantiply row,
- * the owner's choice of 2026-10-28; none on AlgoTest, where the tool never sets one.
+ * the owner's choice of 2026-10-28; none on AlgoTest until the owner switches it on.
  */
 export function defaultMtmSl(key: string, list: List | undefined): number | null {
   if (!key.startsWith('quantiply.')) return null;
@@ -319,10 +319,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         );
       if (typeof row.addon !== 'boolean') errors.push(`${key}.addon must be true or false`);
       if (typeof row.dirBoost !== 'boolean') errors.push(`${key}.dirBoost must be true or false`);
-      if (key.startsWith('algotest.')) {
-        if (row.mtmSl !== null)
-          errors.push(`${key}.mtmSl must be null (AlgoTest has none the tool sets)`);
-      } else if (
+      if (
         row.mtmSl !== null &&
         !(
           typeof row.mtmSl === 'number' &&
