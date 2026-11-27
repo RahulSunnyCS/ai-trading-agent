@@ -10,6 +10,7 @@ import { normalizePhone, readTelegramConfig } from './config.js';
 import { automationForSession, sessionFor } from './day-type.js';
 import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { openLive } from './live-ready.js';
 import { algotestLoginLocked } from './login-lock.js';
 import { sessionOver } from './quantiply-plan.js';
 import { redact, registerSecret } from './secrets.js';
@@ -88,7 +89,8 @@ async function listStrategies(page: Page): Promise<Listing> {
 async function deployedNames(page: Page, candidates: string[]): Promise<Set<string>> {
   const out = new Set<string>();
   if (!candidates.length) return out;
-  await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
+  // before this, every row reads "0 Deployed" and a deployed strategy could be deleted
+  await openLive(page, `${BASE_URL}/live`);
   await livePage
     .anyRowCount(page)
     .waitFor({ timeout: 30_000 })
